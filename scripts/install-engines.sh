@@ -4,7 +4,11 @@ set -e
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 mkdir -p "$BIN_DIR"
 
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
 echo "=== Doom Engines & Launcher Installer ==="
+echo "Platform: $OS ($ARCH)"
 echo "Target directory: $BIN_DIR"
 echo ""
 
@@ -55,16 +59,38 @@ download_binary() {
         return 1
     fi
 
-    mv "$tmp_file" "$dest"
-    chmod +x "$dest"
+    if [[ "$url" == *.zip ]]; then
+        local extract_dir
+        extract_dir=$(mktemp -d "${TMPDIR:-/tmp}/doom_zip.XXXXXX")
+        unzip -q -o "$tmp_file" -d "$extract_dir"
+        local bin_match
+        bin_match=$(find "$extract_dir" -type f -perm -111 -name "$name*" | head -n 1)
+        if [ -n "$bin_match" ]; then
+            cp "$bin_match" "$dest"
+        else
+            cp -r "$extract_dir"/* "$BIN_DIR/"
+        fi
+        rm -rf "$extract_dir" "$tmp_file"
+    else
+        mv "$tmp_file" "$dest"
+    fi
+
+    chmod +x "$dest" 2>/dev/null || true
     echo "Successfully installed $name to $dest"
     echo ""
 }
 
 install_uzdoom() {
     local repo="UZDoom/UZDoom"
-    local pattern="Linux-UZDoom-.*\.AppImage"
-    local fallback="https://github.com/UZDoom/UZDoom/releases/download/4.14.3/Linux-UZDoom-4.14.3.AppImage"
+    local pattern
+    local fallback
+    if [ "$OS" = "Darwin" ]; then
+        pattern="macOS-UZDoom-.*\.zip"
+        fallback="https://github.com/UZDoom/UZDoom/releases/download/4.14.3/macOS-UZDoom-4.14.3.zip"
+    else
+        pattern="Linux-UZDoom-.*\.AppImage"
+        fallback="https://github.com/UZDoom/UZDoom/releases/download/4.14.3/Linux-UZDoom-4.14.3.AppImage"
+    fi
     local url
     url=$(get_latest_github_url "$repo" "$pattern" "$fallback")
     download_binary "uzdoom" "$url"
@@ -72,8 +98,20 @@ install_uzdoom() {
 
 install_dsda() {
     local repo="kraflab/dsda-doom"
-    local pattern="dsda-doom-.*-linux-x86_64\.appimage"
-    local fallback="https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-linux-x86_64.appimage"
+    local pattern
+    local fallback
+    if [ "$OS" = "Darwin" ]; then
+        if [ "$ARCH" = "arm64" ]; then
+            pattern="dsda-doom-.*-mac-arm64\.zip"
+            fallback="https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-mac-arm64.zip"
+        else
+            pattern="dsda-doom-.*-mac-x86_64\.zip"
+            fallback="https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-mac-x86_64.zip"
+        fi
+    else
+        pattern="dsda-doom-.*-linux-x86_64\.appimage"
+        fallback="https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-linux-x86_64.appimage"
+    fi
     local url
     url=$(get_latest_github_url "$repo" "$pattern" "$fallback")
     download_binary "dsda-doom" "$url"
@@ -81,8 +119,15 @@ install_dsda() {
 
 install_doomrunner() {
     local repo="Youda008/DoomRunner"
-    local pattern="DoomRunner-.*-Linux-x86_64\.AppImage"
-    local fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Linux-x86_64.AppImage"
+    local pattern
+    local fallback
+    if [ "$OS" = "Darwin" ]; then
+        pattern="DoomRunner-.*-mac.*"
+        fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Linux-x86_64.AppImage"
+    else
+        pattern="DoomRunner-.*-Linux-x86_64\.AppImage"
+        fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Linux-x86_64.AppImage"
+    fi
     local url
     url=$(get_latest_github_url "$repo" "$pattern" "$fallback")
     download_binary "doomrunner" "$url"

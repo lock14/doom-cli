@@ -12,12 +12,14 @@ A curated set of configuration files and presets for playing Doom using modern s
 
 ---
 
-## Setup Instructions
+### Linux & macOS
 
-### Linux
+The `Makefile` automatically detects whether you are running **Linux** or **macOS (Darwin)** and maps configuration directories accordingly:
+- **Linux Destinations**: `~/.config/uzdoom/`, `~/.local/share/dsda-doom/`, `~/.local/share/DoomRunner/`
+- **macOS Destinations**: `~/Library/Application Support/uzdoom/`, `~/Library/Application Support/dsda-doom/`, `~/Library/Application Support/DoomRunner/`
 
 #### Option 1: Full Bootstrap (Engines + Configs)
-To automatically download the latest official AppImages (`uzdoom`, `dsda-doom`, `doomrunner`) into `~/.local/bin/` and deploy all configurations:
+To automatically download the latest official binaries/AppImages (`uzdoom`, `dsda-doom`, `doomrunner`) into `~/.local/bin/` and deploy all configurations:
 
 ```bash
 make bootstrap
@@ -37,17 +39,17 @@ make install
 ```
 
 Or install individual components:
-- `make install-uzdoom` — Deploys `~/.config/uzdoom/autoexec.cfg`
-- `make install-dsda` — Deploys `~/.local/share/dsda-doom/dsda-doom.cfg`
-- `make install-doomrunner` — Deploys `~/.local/share/DoomRunner/options.json`
-- `make install-engines` — Downloads only the AppImages into `~/.local/bin/`
+- `make install-uzdoom` — Deploys `autoexec.cfg`
+- `make install-dsda` — Deploys `dsda-doom.cfg`
+- `make install-doomrunner` — Deploys `options.json`
+- `make install-engines` — Downloads only the binaries into `~/.local/bin/`
 
 #### Managing In-Game Changes
 - `make diff` — Compare current repository configs against live configs on your system.
 - `make sync` — Pull changes made in-game back into the repository so you can commit them.
 
 #### Standalone Shell Script
-Alternatively, deploy without `make`:
+Alternatively, deploy without `make` using the POSIX setup script:
 ```bash
 ./setup.sh
 ```
@@ -92,6 +94,7 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 Place your game files (`.wad`, `.deh`, `.pk3`) in the standard directory expected by DoomRunner:
 
 - **Linux Default**: `~/.local/share/games/uzdoom/`
+- **macOS Default**: `~/Library/Application Support/games/uzdoom/`
 - **Windows Default**: `E:\Doom WADS\` (or your customized `-BaseDrive` path)
 
 ### Recommended Core Files
