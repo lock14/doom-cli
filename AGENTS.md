@@ -11,12 +11,16 @@ Any agent modifying this repository must follow these core principles.
 - **Never Commit Personal User Paths**: Never commit absolute personal paths like `/home/<username>/` into configuration files or scripts.
 - **Use `__HOME__` for Linux Presets**: In `DoomRunner/linux/options.json`, all user home paths must use the `__HOME__` placeholder. Deployment tooling (`Makefile`, `setup.sh`) will dynamically substitute `__HOME__` with `$HOME` at installation time.
 - **Respect Standard Directory Structures**:
-  - **UZDoom Config**: `~/.config/uzdoom/autoexec.cfg`
-  - **DSDA-Doom Config**: `~/.local/share/dsda-doom/dsda-doom.cfg`
-  - **DoomRunner Linux**: `~/.local/share/DoomRunner/options.json`
-  - **DoomRunner Windows**: `%LOCALAPPDATA%\DoomRunner\options.json` & `%APPDATA%\DoomRunner\options.json`
-  - **Linux Binaries**: `~/.local/bin/` (`uzdoom`, `dsda-doom`, `doomrunner`)
+  - **UZDoom Config (Linux)**: `~/.config/uzdoom/autoexec.cfg`
+  - **UZDoom Config (macOS)**: `~/Library/Application Support/uzdoom/autoexec.cfg`
+  - **DSDA-Doom Config (Linux)**: `~/.local/share/dsda-doom/dsda-doom.cfg`
+  - **DSDA-Doom Config (macOS)**: `~/Library/Application Support/dsda-doom/dsda-doom.cfg`
+  - **DoomRunner (Linux)**: `~/.local/share/DoomRunner/options.json`
+  - **DoomRunner (macOS)**: `~/Library/Application Support/DoomRunner/options.json`
+  - **DoomRunner (Windows)**: `%LOCALAPPDATA%\DoomRunner\options.json` & `%APPDATA%\DoomRunner\options.json`
+  - **Linux / macOS Binaries**: `~/.local/bin/` (`uzdoom`, `dsda-doom`, `doomrunner`)
   - **Linux WADs Directory**: `~/.local/share/games/uzdoom/`
+  - **macOS WADs Directory**: `~/Library/Application Support/games/uzdoom/`
   - **Windows WADs Directory**: `E:\Doom WADS\` (default, configurable via `-BaseDrive` in `setup.ps1`)
 
 ---

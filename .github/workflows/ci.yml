@@ -45,6 +45,28 @@ jobs:
           curl -sI https://api.github.com/repos/kraflab/dsda-doom/releases/latest | grep -i "status: 200" || true
           curl -sI https://api.github.com/repos/Youda008/DoomRunner/releases/latest | grep -i "status: 200" || true
 
+  validate-macos:
+    name: macOS - Invariants & Installation Test
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run make check test suite
+        run: |
+          make check
+
+      - name: Test standalone setup.sh script on macOS
+        run: |
+          TEST_HOME=$(mktemp -d)
+          HOME="$TEST_HOME" ./setup.sh
+          test -f "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
+          test -f "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
+          test -f "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          ! grep -q '__HOME__' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          rm -rf "$TEST_HOME"
+
   validate-windows:
     name: Windows - PowerShell & Preset Validation
     runs-on: windows-latest
