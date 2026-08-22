@@ -1,4 +1,4 @@
-name: Linux CI
+name: CI
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  validate:
-    name: Lint, Invariants & Installation Test
+  validate-linux:
+    name: Linux - Lint, Invariants & Installation Test
     runs-on: ubuntu-latest
 
     steps:
@@ -44,3 +44,50 @@ jobs:
           curl -sI https://api.github.com/repos/UZDoom/UZDoom/releases/latest | grep -i "status: 200" || true
           curl -sI https://api.github.com/repos/kraflab/dsda-doom/releases/latest | grep -i "status: 200" || true
           curl -sI https://api.github.com/repos/Youda008/DoomRunner/releases/latest | grep -i "status: 200" || true
+
+  validate-windows:
+    name: Windows - PowerShell & Preset Validation
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate JSON Files
+        shell: pwsh
+        run: |
+          Get-Content -Raw "DoomRunner/windows/options.json" | ConvertFrom-Json | Out-Null
+          Get-Content -Raw "DoomRunner/linux/options.json" | ConvertFrom-Json | Out-Null
+          Write-Host "JSON files are valid."
+
+      - name: Test setup.ps1 default installation
+        shell: pwsh
+        run: |
+          # Execute setup.ps1
+          .\setup.ps1
+          
+          # Verify files exist in both AppData directories
+          $LocalOptions = "$env:LOCALAPPDATA\DoomRunner\options.json"
+          $RoamingOptions = "$env:APPDATA\DoomRunner\options.json"
+          
+          if (-not (Test-Path $LocalOptions)) { throw "Missing $LocalOptions" }
+          if (-not (Test-Path $RoamingOptions)) { throw "Missing $RoamingOptions" }
+          
+          # Test automatic backup on second run
+          .\setup.ps1
+          $LocalBackups = Get-ChildItem "$env:LOCALAPPDATA\DoomRunner" -Filter "options.json.bak.*"
+          $RoamingBackups = Get-ChildItem "$env:APPDATA\DoomRunner" -Filter "options.json.bak.*"
+          
+          if ($LocalBackups.Count -eq 0) { throw "No backup file created in LocalAppData" }
+          if ($RoamingBackups.Count -eq 0) { throw "No backup file created in AppData" }
+          
+          Write-Host "Default installation and backup tests passed."
+
+      - name: Test setup.ps1 with custom BaseDrive remapping
+        shell: pwsh
+        run: |
+          .\setup.ps1 -BaseDrive "D:"
+          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
+          if ($Content -match "E:/Doom WADS") { throw "Drive remapping failed; found E:/Doom WADS" }
+          if (-not ($Content -match "D:/Doom WADS")) { throw "Drive remapping failed; missing D:/Doom WADS" }
+          Write-Host "BaseDrive remapping test passed."
