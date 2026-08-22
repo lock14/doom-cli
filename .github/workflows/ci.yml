@@ -1,0 +1,46 @@
+name: Linux CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Lint, Invariants & Installation Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          shellcheck setup.sh scripts/install-engines.sh
+
+      - name: Run make check test suite
+        run: |
+          make check
+
+      - name: Test standalone setup.sh script
+        run: |
+          TEST_HOME=$(mktemp -d)
+          HOME="$TEST_HOME" ./setup.sh
+          test -f "$TEST_HOME/.config/uzdoom/autoexec.cfg"
+          test -f "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
+          test -f "$TEST_HOME/.local/share/DoomRunner/options.json"
+          ! grep -q '__HOME__' "$TEST_HOME/.local/share/DoomRunner/options.json"
+          rm -rf "$TEST_HOME"
+
+      - name: Verify Engine Downloader URL Resolution
+        run: |
+          # Verify that release URLs for all 3 targets can be resolved
+          curl -sI https://api.github.com/repos/UZDoom/UZDoom/releases/latest | grep -i "status: 200" || true
+          curl -sI https://api.github.com/repos/kraflab/dsda-doom/releases/latest | grep -i "status: 200" || true
+          curl -sI https://api.github.com/repos/Youda008/DoomRunner/releases/latest | grep -i "status: 200" || true

@@ -83,11 +83,12 @@ Any agent modifying this repository must follow these core principles.
 ## 7. Verification Checklist for Agents
 
 Before completing any changes:
-1. Verify `git diff` contains no hardcoded usernames or personal paths.
-2. Run `make -n install` or `make help` to verify `Makefile` syntax.
-3. If shell scripts were modified, run `bash -n <script.sh>` to verify syntax.
-4. **Update Documentation**:
+1. Run `make check` to execute the full local validation suite (syntax, JSON validity, path invariants, and dry install).
+2. Verify `git diff` contains no hardcoded usernames or personal paths.
+3. Run `make -n install` or `make help` to verify `Makefile` syntax.
+4. If shell scripts were modified, run `bash -n <script.sh>` to verify syntax.
+5. **Update Documentation**:
    - Update `README.md` if user-facing behavior changed (presets, commands, defaults, directories).
    - Update `AGENTS.md` if repository principles, build architecture, or agent rules changed.
    - **Encode Corrections**: If the user or a reviewer provided a correction, ensure the principle is codified in `AGENTS.md`.
-5. Verify `README.md` tables (presets catalog, Makefile reference) accurately reflect the new state.
+6. Verify `README.md` tables (presets catalog, Makefile reference) accurately reflect the new state.
