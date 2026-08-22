@@ -40,6 +40,9 @@ $SourceOptions = Join-Path $ScriptDir "DoomRunner\windows\options.json"
 $OptionsContent = Get-Content -Path $SourceOptions -Raw
 if ($BaseDrive -ne "E:") {
     $NormalizedDrive = $BaseDrive.TrimEnd('\').TrimEnd('/')
+    if (-not $NormalizedDrive.EndsWith(':')) {
+        $NormalizedDrive = "$NormalizedDrive`:"
+    }
     $OptionsContent = $OptionsContent.Replace("E:", $NormalizedDrive)
 }
 
