@@ -95,7 +95,9 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 > **Game Files (WADs) Are Not Included**
 > 
 > This repository contains configuration files, launcher presets, and bootstrap scripts. You must provide your own legally acquired game files:
-> - **Commercial IWADs** (`DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`, `HERETIC.WAD`, `HEXEN.WAD`) can be acquired from digital storefronts such as **[Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/)** or **[GOG](https://www.gog.com/en/game/doom_doom_ii)**.
+> - **Commercial IWADs** (`DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`, `HERETIC.WAD`, `HEXEN.WAD`) can be acquired from digital storefronts:
+>   - **Doom + Doom II**: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) / [GOG](https://www.gog.com/en/game/doom_doom_ii)
+>   - **Heretic + Hexen**: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) / [GOG](https://www.gog.com/en/game/heretic_hexen)
 > - **Community Megawads & Expansions** (*Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*, *Sunder*, etc.) are free community creations downloadable from **[Doomworld / idgames](https://www.doomworld.com/idgames/)** or their respective release threads.
 
 Place your game files (`.wad`, `.deh`, `.pk3`) in the standard directory expected by DoomRunner:
