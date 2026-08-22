@@ -71,6 +71,21 @@ download_binary() {
             cp -r "$extract_dir"/* "$BIN_DIR/"
         fi
         rm -rf "$extract_dir" "$tmp_file"
+    elif [[ "$url" == *.dmg ]] && [ "$OS" = "Darwin" ]; then
+        local mount_point
+        mount_point=$(mktemp -d "${TMPDIR:-/tmp}/doom_dmg.XXXXXX")
+        hdiutil attach "$tmp_file" -mountpoint "$mount_point" -nobrowse -quiet
+        local app_match
+        app_match=$(find "$mount_point" -maxdepth 2 -name "*.app" | head -n 1)
+        if [ -n "$app_match" ]; then
+            local app_bin
+            app_bin=$(find "$app_match/Contents/MacOS" -type f -perm -111 | head -n 1)
+            if [ -n "$app_bin" ]; then
+                cp "$app_bin" "$dest"
+            fi
+        fi
+        hdiutil detach "$mount_point" -quiet || true
+        rm -rf "$mount_point" "$tmp_file"
     else
         mv "$tmp_file" "$dest"
     fi
@@ -122,8 +137,13 @@ install_doomrunner() {
     local pattern
     local fallback
     if [ "$OS" = "Darwin" ]; then
-        pattern="DoomRunner-.*-mac.*"
-        fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Linux-x86_64.AppImage"
+        if [ "$ARCH" = "arm64" ]; then
+            pattern="DoomRunner-.*-MacOS-arm64\.dmg"
+            fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-MacOS-arm64.dmg"
+        else
+            pattern="DoomRunner-.*-MacOS-x86_64\.dmg"
+            fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-MacOS-x86_64.dmg"
+        fi
     else
         pattern="DoomRunner-.*-Linux-x86_64\.AppImage"
         fallback="https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Linux-x86_64.AppImage"

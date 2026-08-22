@@ -141,7 +141,7 @@ DoomRunner comes pre-populated with presets configured for the best matching eng
 ## Engine Profiles & Customizations
 
 ### UZDoom ("Software-Plus" Profile)
-Configured in [`uzdoom/autoexec.cfg`](file:///home/brianb/doom-configs/uzdoom/autoexec.cfg) to reproduce the crisp Nightdive Remaster aesthetic:
+Configured in [`uzdoom/autoexec.cfg`](uzdoom/autoexec.cfg) to reproduce the crisp Nightdive Remaster aesthetic:
 - **Software Sector Lighting**: `gl_lightmode 0` with light stepping (`gl_bandedsw 1`).
 - **Tonemapping**: 256-color palette tonemapping (`gl_tonemap 3`).
 - **Nearest-Neighbor Filtering**: Crisp, unblurred pixels (`gl_texture_filter 0`) with 16x anisotropic filtering (`gl_texture_filter_aniso 16`).
@@ -149,7 +149,7 @@ Configured in [`uzdoom/autoexec.cfg`](file:///home/brianb/doom-configs/uzdoom/au
 - **Quality of Life**: High-definition 48kHz audio sampling, FluidSynth MIDI backend, and `F5`/`F9` fast save & load.
 
 ### DSDA-Doom (Speedrunning & Demo Accuracy)
-Configured in [`dsda-doom/dsda-doom.cfg`](file:///home/brianb/doom-configs/dsda-doom/dsda-doom.cfg):
+Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 - **Compatibility**: Default `complevel 21` (MBF21 standard).
 - **Video & Display**: OpenGL mode with integer scaling, 60 FPS limiter, and uncapped framerate.
 - **Extended HUD (exHUD)**: In-game level splits, secret counters, and completion times.
