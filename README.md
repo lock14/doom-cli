@@ -83,6 +83,7 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 | `make install-doomrunner` | Installs only `DoomRunner/linux/options.json` |
 | `make diff` | Shows diff between repo configs and live system configs |
 | `make sync` | Syncs live system configs back into the git repository |
+| `make check` | Runs validation suite (syntax, JSON validation, invariants, test install) |
 
 ---
 

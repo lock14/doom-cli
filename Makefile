@@ -5,7 +5,7 @@ BIN_DIR ?= $(PREFIX)/.local/bin
 
 .PHONY: all bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
         install-engines install-engine-uzdoom install-engine-dsda install-engine-doomrunner \
-        sync diff help
+        sync diff help check test
 
 all: install
 
@@ -19,6 +19,7 @@ help:
 	@echo "  make install-engines   - Download latest AppImages (UZDoom, DSDA-Doom, DoomRunner)"
 	@echo "  make sync              - Copy active system configs back into repo"
 	@echo "  make diff              - Compare repo configs against installed system configs"
+	@echo "  make check             - Run validation suite (syntax, invariants, dry install)"
 
 # Complete bootstrap: download engines and install configs
 bootstrap: install-engines install
@@ -90,3 +91,30 @@ diff:
 	@-diff -u dsda-doom/dsda-doom.cfg $(SHARE_DIR)/dsda-doom/dsda-doom.cfg || true
 	@echo "=== DoomRunner Diff ==="
 	@-sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json | diff -u - $(SHARE_DIR)/DoomRunner/options.json || true
+
+# Test & Validation targets
+check: test
+
+test:
+	@echo "=== Validating Shell Scripts ==="
+	@bash -n setup.sh
+	@bash -n scripts/install-engines.sh
+	@echo "=== Validating JSON Files ==="
+	@jq . DoomRunner/linux/options.json > /dev/null
+	@jq . DoomRunner/windows/options.json > /dev/null
+	@echo "=== Checking Path Invariants ==="
+	@if grep -E '/home/[a-zA-Z0-9_-]+' DoomRunner/linux/options.json; then \
+		echo "Error: Hardcoded personal path found in DoomRunner/linux/options.json"; \
+		exit 1; \
+	fi
+	@echo "=== Testing Isolated Installation ==="
+	@TEST_DIR=$$(mktemp -d); \
+	trap 'rm -rf "$$TEST_DIR"' EXIT; \
+	$(MAKE) PREFIX="$$TEST_DIR" install > /dev/null && \
+	test -f "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
+	test -f "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
+	test -f "$$TEST_DIR/.local/share/DoomRunner/options.json" && \
+	! grep -q '__HOME__' "$$TEST_DIR/.local/share/DoomRunner/options.json" && \
+	$(MAKE) PREFIX="$$TEST_DIR" install > /dev/null && \
+	ls "$$TEST_DIR/.config/uzdoom/" | grep -q 'autoexec.cfg.bak.' && \
+	echo "All validation checks passed successfully!"
