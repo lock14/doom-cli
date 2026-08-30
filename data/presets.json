@@ -1,0 +1,507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Declarative presets and engine configurations for Doom source ports and launchers"
+  },
+  "engines": {
+    "dsda-doom": {
+      "name": "dsda-doom",
+      "family": "PrBoom",
+      "linux_path": "__HOME__/.local/bin/dsda-doom",
+      "linux_config_dir": "__HOME__/.local/share/dsda-doom",
+      "linux_data_dir": "__HOME__/.local/share/dsda-doom/dsda_doom_data",
+      "windows_id": "D83A1056",
+      "windows_name": "dsda-doom-0.29.4-win-x64",
+      "windows_path": "E:/dsda-doom-0.29.4-win-x64/dsda-doom.exe",
+      "windows_config_dir": "../dsda-doom-0.29.4-win-x64",
+      "windows_data_dir": "../dsda-doom-0.29.4-win-x64"
+    },
+    "uzdoom": {
+      "name": "uzdoom",
+      "family": "ZDoom",
+      "linux_path": "__HOME__/.local/bin/uzdoom",
+      "linux_config_dir": "__HOME__/.config/uzdoom",
+      "linux_data_dir": "__HOME__/.local/share/games/uzdoom",
+      "windows_id": "453D2AAB",
+      "windows_name": "UZDoom",
+      "windows_path": "E:/UZDoom/uzdoom.exe",
+      "windows_config_dir": "../UZDoom",
+      "windows_data_dir": "../UZDoom"
+    }
+  },
+  "presets": [
+    {
+      "name": "Alien Vendetta",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "AV.WAD",
+        "AV.DEH"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Boom",
+      "description": "Classic Boom megawad + DEH patch",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/av.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/av"
+      ]
+    },
+    {
+      "name": "Ancient Aliens",
+      "engine": "uzdoom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "aaliens_v1_2.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "MBF",
+      "description": "MBF / Complevel 11 with custom color palette",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/aaliens.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens"
+      ]
+    },
+    {
+      "name": "Back to Saturn X: Episode 1",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "btsx_e1a.wad",
+        "btsx_e1b.wad",
+        "btsx_e1.deh"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla / Boom",
+      "description": "Vanilla/Boom compatible with custom soundtrack & palettes",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e1.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1"
+      ]
+    },
+    {
+      "name": "Back to Saturn X: Episode 2",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "btsx_e2.deh",
+        "btsx_e2a.wad",
+        "btsx_e2b.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla / Boom",
+      "description": "Vanilla/Boom compatible with custom soundtrack & palettes",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e2.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2"
+      ]
+    },
+    {
+      "name": "Deathless",
+      "engine": "dsda-doom",
+      "iwad": "DOOM.WAD",
+      "mappacks": [
+        "deathless.wad",
+        "idkfa 2024.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Modern Ultimate Doom episode replacement",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom/megawads/deathless.zip",
+        "https://www.doomworld.com/idgames/levels/doom/megawads/deathless"
+      ]
+    },
+    {
+      "name": "Doom",
+      "engine": "dsda-doom",
+      "iwad": "DOOM.WAD",
+      "mappacks": [
+        "idkfa 2024.wad"
+      ],
+      "category": "Official IWAD",
+      "compatibility": "Vanilla",
+      "description": "Classic IWAD with modern MIDI audio",
+      "download_urls": []
+    },
+    {
+      "name": "Doom II",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "idkfa 2024.wad"
+      ],
+      "category": "Official IWAD",
+      "compatibility": "Vanilla",
+      "description": "Classic IWAD with modern MIDI audio",
+      "download_urls": []
+    },
+    {
+      "name": "Doom Zero",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "DOOMZERO.DEH",
+        "DoomZero.wad",
+        "idkfa 2024.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla / DEH",
+      "description": "Anniversary megawad + DEH modifications",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/doomzero.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/doomzero"
+      ]
+    },
+    {
+      "name": "Doom: The Way ID Did",
+      "engine": "dsda-doom",
+      "iwad": "DOOM.WAD",
+      "mappacks": [
+        "DTWID.wad",
+        "DTWID.deh",
+        "idkfa 2024.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Classic vanilla-style homage megawad",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom/megawads/dtwid.zip",
+        "https://www.doomworld.com/idgames/levels/doom/megawads/dtwid"
+      ]
+    },
+    {
+      "name": "Doom II: The Way ID Did",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "D2TWID.deh",
+        "D2TWID.wad",
+        "idkfa 2024.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Classic vanilla-style homage megawad",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/d2twid.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/d2twid"
+      ]
+    },
+    {
+      "name": "Eviternity",
+      "engine": "uzdoom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "Eviternity.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "MBF / OTEX",
+      "description": "OTEX texture pack & custom monsters",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternity.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity"
+      ]
+    },
+    {
+      "name": "Eviternity II",
+      "engine": "uzdoom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "eviternityii.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "MBF21 / OTEX",
+      "description": "OTEX texture pack, advanced MBF21 & custom monsters",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip",
+        "https://eviternity.dfdoom.com/wads/eviternityii.zip"
+      ]
+    },
+    {
+      "name": "Going Down Turbo",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "gdturbo.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Boom",
+      "description": "Fast-paced, compact map pack",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/gd-turbo.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/gd-turbo"
+      ]
+    },
+    {
+      "name": "Heretic",
+      "engine": "uzdoom",
+      "iwad": "HERETIC.WAD",
+      "mappacks": [],
+      "category": "Official IWAD",
+      "compatibility": "Raven Software",
+      "description": "Raven Software classic fantasy shooter",
+      "download_urls": []
+    },
+    {
+      "name": "Hexen",
+      "engine": "uzdoom",
+      "iwad": "HEXEN.WAD",
+      "mappacks": [],
+      "category": "Official IWAD",
+      "compatibility": "Raven Software",
+      "description": "Raven Software hub-based fantasy shooter",
+      "download_urls": []
+    },
+    {
+      "name": "Legacy of Rust",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "id24res.wad",
+        "id1-res.wad",
+        "id1-weap.wad",
+        "id1.wad",
+        "extras.wad",
+        "idkfa 2024.wad"
+      ],
+      "category": "Official Expansion",
+      "compatibility": "ID24",
+      "description": "Official ID24 standard episode + weapons & monsters",
+      "download_urls": []
+    },
+    {
+      "name": "Master Levels",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "MASTERLEVELS.WAD",
+        "idkfa 2024.wad"
+      ],
+      "category": "Official Expansion",
+      "compatibility": "Vanilla",
+      "description": "Full 20-level classic collection",
+      "download_urls": []
+    },
+    {
+      "name": "Nostalgia",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "Nostalgia.wad",
+        "idkfa 2024.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Vanilla-compatible megawad",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/nostalgia.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/nostalgia"
+      ]
+    },
+    {
+      "name": "No End In Sight",
+      "engine": "dsda-doom",
+      "iwad": "DOOM.WAD",
+      "mappacks": [
+        "NEIS.wad",
+        "NEIS.deh"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla / Ultimate Doom",
+      "description": "Classic 4-episode expansion for Ultimate Doom",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom/megawads/neis.zip",
+        "https://www.doomworld.com/idgames/levels/doom/megawads/neis"
+      ]
+    },
+    {
+      "name": "No Rest for the Living",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "NERVE.WAD",
+        "idkfa 2024.wad"
+      ],
+      "category": "Official Expansion",
+      "compatibility": "Vanilla",
+      "description": "Official 9-level expansion for Doom II",
+      "download_urls": []
+    },
+    {
+      "name": "Sigil",
+      "engine": "dsda-doom",
+      "iwad": "DOOM.WAD",
+      "mappacks": [
+        "SIGIL_V1_23.wad"
+      ],
+      "category": "Community Episode",
+      "compatibility": "Vanilla",
+      "description": "John Romero's unofficial 5th episode for Ultimate Doom",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom/megawads/sigil_v1_23.zip",
+        "https://romerogames.digitalpress.com/s/SIGIL_v1_23.zip"
+      ]
+    },
+    {
+      "name": "Sigil II",
+      "engine": "dsda-doom",
+      "iwad": "DOOM.WAD",
+      "mappacks": [
+        "SIGIL_II_V1_0.WAD"
+      ],
+      "load_maps_after_mods": true,
+      "category": "Community Episode",
+      "compatibility": "Vanilla",
+      "description": "John Romero's unofficial 6th episode for Ultimate Doom",
+      "download_urls": [
+        "https://romerogames.digitalpress.com/s/SIGIL_II_V1_0.zip"
+      ]
+    },
+    {
+      "name": "Scythe",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "SCYTHE.WAD"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Iconic fast-paced speedrunning megawad",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/scythe"
+      ]
+    },
+    {
+      "name": "Scythe 2",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "scythe2.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Boom / DEH",
+      "description": "Erik Alm's legendary sequel with custom monsters",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe2.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/scythe2"
+      ]
+    },
+    {
+      "name": "Speed of Doom",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "SODFINAL.WAD"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Boom",
+      "description": "33-level intense challenge megawad",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/sodfinal.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/sodfinal"
+      ]
+    },
+    {
+      "name": "Sunder",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "SUNDER_V2512.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "MBF21 / Boom",
+      "description": "Monumental architectural slaughter megawad",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunder.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunder"
+      ]
+    },
+    {
+      "name": "Sunlust",
+      "engine": "dsda-doom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "sunlust.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Boom",
+      "description": "32-level visual and gameplay masterpiece",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunlust.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunlust"
+      ]
+    },
+    {
+      "name": "The Plutonia Experiment",
+      "engine": "dsda-doom",
+      "iwad": "PLUTONIA.WAD",
+      "mappacks": [
+        "idkfa 2024.wad"
+      ],
+      "category": "Official IWAD",
+      "compatibility": "Vanilla",
+      "description": "Classic Final Doom IWAD with modern soundtrack",
+      "download_urls": []
+    },
+    {
+      "name": "Plutonia 2",
+      "engine": "dsda-doom",
+      "iwad": "PLUTONIA.WAD",
+      "mappacks": [
+        "PL2.WAD",
+        "PL2.DEH"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Community sequel to The Plutonia Experiment",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/pl2.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/pl2"
+      ]
+    },
+    {
+      "name": "TNT: Evilution",
+      "engine": "dsda-doom",
+      "iwad": "TNT.WAD",
+      "mappacks": [
+        "idkfa 2024.wad"
+      ],
+      "category": "Official IWAD",
+      "compatibility": "Vanilla",
+      "description": "Classic Final Doom IWAD with modern soundtrack",
+      "download_urls": []
+    },
+    {
+      "name": "TNT: Revilution",
+      "engine": "dsda-doom",
+      "iwad": "TNT.WAD",
+      "mappacks": [
+        "TNTR.wad",
+        "TNTR.deh"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "Vanilla",
+      "description": "Community sequel to TNT: Evilution",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/megawads/tntr.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/megawads/tntr"
+      ]
+    },
+    {
+      "name": "Valiant",
+      "engine": "uzdoom",
+      "iwad": "DOOM2.WAD",
+      "mappacks": [
+        "Valiant.wad"
+      ],
+      "category": "Community Megawad",
+      "compatibility": "MBF",
+      "description": "MBF-compatible with custom weapons & dehacked",
+      "download_urls": [
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/valiant.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant"
+      ]
+    }
+  ]
+}

@@ -15,13 +15,17 @@ else
     DSDA_DIR="$HOME/.local/share/dsda-doom"
     RUNNER_DIR="$HOME/.local/share/DoomRunner"
 fi
+BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 
-echo "Setting up Doom configurations for $OS..."
+DETECTED_RES=$("$SCRIPT_DIR/scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080")
+
+echo "Setting up Doom configurations for $OS (Detected Resolution: $DETECTED_RES)..."
 
 echo "Creating directories..."
 mkdir -p "$UZDOOM_DIR"
 mkdir -p "$DSDA_DIR"
 mkdir -p "$RUNNER_DIR"
+mkdir -p "$BIN_DIR"
 
 copy_with_backup() {
     local src="$1"
@@ -35,11 +39,15 @@ copy_with_backup() {
     fi
 
     echo "Installing $(basename "$dest")..."
-    sed "s|__HOME__|$HOME|g" "$src" > "$dest"
+    sed -e "s|__HOME__|$HOME|g" -e "s|__RESOLUTION__|$DETECTED_RES|g" "$src" > "$dest"
 }
 
 copy_with_backup "$SCRIPT_DIR/uzdoom/autoexec.cfg" "$UZDOOM_DIR/autoexec.cfg"
 copy_with_backup "$SCRIPT_DIR/DoomRunner/linux/options.json" "$RUNNER_DIR/options.json"
 copy_with_backup "$SCRIPT_DIR/dsda-doom/dsda-doom.cfg" "$DSDA_DIR/dsda-doom.cfg"
+
+echo "Installing doom-launch CLI -> $BIN_DIR/doom-launch..."
+cp "$SCRIPT_DIR/scripts/doom-launch.sh" "$BIN_DIR/doom-launch"
+chmod +x "$BIN_DIR/doom-launch"
 
 echo "Setup complete!"

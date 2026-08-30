@@ -7,38 +7,49 @@ ifeq ($(UNAME_S),Darwin)
     UZDOOM_DIR  ?= $(APP_SUPPORT)/uzdoom
     DSDA_DIR    ?= $(APP_SUPPORT)/dsda-doom
     RUNNER_DIR  ?= $(APP_SUPPORT)/DoomRunner
+    WADS_DIR    ?= $(APP_SUPPORT)/games/uzdoom
+    SF_DIR      ?= $(APP_SUPPORT)/soundfonts
 else
     # Linux standard XDG paths
     UZDOOM_DIR  ?= $(PREFIX)/.config/uzdoom
     DSDA_DIR    ?= $(PREFIX)/.local/share/dsda-doom
     RUNNER_DIR  ?= $(PREFIX)/.local/share/DoomRunner
+    WADS_DIR    ?= $(PREFIX)/.local/share/games/uzdoom
+    SF_DIR      ?= $(PREFIX)/.local/share/soundfonts
 endif
 
 BIN_DIR ?= $(PREFIX)/.local/bin
 
 .PHONY: all bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
-        install-engines install-engine-uzdoom install-engine-dsda install-engine-doomrunner \
-        sync diff help check test
+        install-launcher install-soundfonts install-engines install-engine-uzdoom \
+        install-engine-dsda install-engine-doomrunner build-presets fetch-wads \
+        extract-iwads play sync diff help check test
 
 all: install
 
 help:
 	@echo "Doom Configs - Available Makefile targets ($(UNAME_S)):"
-	@echo "  make bootstrap         - Complete setup: download all engines + install configs"
-	@echo "  make install           - Install all configurations with automatic backups"
+	@echo "  make bootstrap         - Complete setup: download all engines + install configs + launcher"
+	@echo "  make install           - Install all configurations & doom-launch with automatic backups"
+	@echo "  make play              - Launch interactive terminal preset launcher (fzf / menu)"
+	@echo "  make fetch-wads        - Download and extract all free community megawads into WADs directory"
+	@echo "  make extract-iwads     - Auto-discover & copy official IWADs from Steam / GOG installs"
+	@echo "  make install-soundfonts- Download & install curated Roland SC-55 / GM SoundFont"
+	@echo "  make build-presets     - Compile data/presets.json into DoomRunner options.json"
 	@echo "  make install-uzdoom    - Install only UZDoom autoexec.cfg"
-	@echo "  make install-dsda      - Install only DSDA-Doom dsda-doom.cfg"
+	@echo "  make install-dsda      - Install only DSDA-Doom dsda-doom.cfg (auto-detects display resolution)"
 	@echo "  make install-doomrunner- Install only DoomRunner options.json"
+	@echo "  make install-launcher  - Install interactive doom-launch CLI to $(BIN_DIR)"
 	@echo "  make install-engines   - Download latest binaries (UZDoom, DSDA-Doom, DoomRunner)"
 	@echo "  make sync              - Copy active system configs back into repo"
 	@echo "  make diff              - Compare repo configs against installed system configs"
-	@echo "  make check             - Run validation suite (syntax, invariants, dry install)"
+	@echo "  make check             - Run full validation suite (presets, scripts, invariants, dry install)"
 
-# Complete bootstrap: download engines and install configs
+# Complete bootstrap: download engines and install configs + launcher
 bootstrap: install-engines install
 
-install: install-uzdoom install-dsda install-doomrunner
-	@echo "All configurations successfully installed!"
+install: install-uzdoom install-dsda install-doomrunner install-launcher
+	@echo "All configurations and launcher successfully installed!"
 
 # Config installation targets
 install-uzdoom:
@@ -56,8 +67,9 @@ install-dsda:
 		echo "Backing up existing dsda-doom.cfg..."; \
 		cp "$(DSDA_DIR)/dsda-doom.cfg" "$(DSDA_DIR)/dsda-doom.cfg.bak.$$(date +%Y%m%d%H%M%S)"; \
 	fi
-	@echo "Installing dsda-doom/dsda-doom.cfg -> $(DSDA_DIR)/dsda-doom.cfg"
-	@cp dsda-doom/dsda-doom.cfg "$(DSDA_DIR)/dsda-doom.cfg"
+	@RES=$$("./scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080"); \
+	echo "Installing dsda-doom/dsda-doom.cfg -> $(DSDA_DIR)/dsda-doom.cfg (Resolution: $$RES)"; \
+	sed "s|__RESOLUTION__|$$RES|g" dsda-doom/dsda-doom.cfg > "$(DSDA_DIR)/dsda-doom.cfg"
 
 install-doomrunner:
 	@mkdir -p "$(RUNNER_DIR)"
@@ -67,6 +79,28 @@ install-doomrunner:
 	fi
 	@echo "Installing DoomRunner/linux/options.json -> $(RUNNER_DIR)/options.json"
 	@sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json > "$(RUNNER_DIR)/options.json"
+
+install-launcher:
+	@mkdir -p "$(BIN_DIR)"
+	@echo "Installing scripts/doom-launch.sh -> $(BIN_DIR)/doom-launch"
+	@cp scripts/doom-launch.sh "$(BIN_DIR)/doom-launch"
+	@chmod +x "$(BIN_DIR)/doom-launch"
+
+# Interactive CLI & Automation targets
+play:
+	@BIN_DIR="$(BIN_DIR)" WADS_DIR="$(WADS_DIR)" ./scripts/doom-launch.sh
+
+fetch-wads:
+	@WADS_DIR="$(WADS_DIR)" ./scripts/fetch-wads.sh all
+
+extract-iwads:
+	@WADS_DIR="$(WADS_DIR)" ./scripts/extract-iwads.sh
+
+install-soundfonts:
+	@SF_DIR="$(SF_DIR)" ./scripts/install-soundfonts.sh
+
+build-presets:
+	@python3 scripts/build-presets.py --build
 
 # Engine & Launcher download targets
 install-engines:
@@ -89,7 +123,7 @@ sync:
 	fi
 	@if [ -f "$(DSDA_DIR)/dsda-doom.cfg" ]; then \
 		echo "Syncing $(DSDA_DIR)/dsda-doom.cfg -> dsda-doom/dsda-doom.cfg"; \
-		cp "$(DSDA_DIR)/dsda-doom.cfg" dsda-doom/dsda-doom.cfg; \
+		sed -E 's/screen_resolution[[:space:]]+"[0-9]+x[0-9]+"/screen_resolution               "__RESOLUTION__"/g' "$(DSDA_DIR)/dsda-doom.cfg" > dsda-doom/dsda-doom.cfg; \
 	fi
 	@if [ -f "$(RUNNER_DIR)/options.json" ]; then \
 		echo "Syncing $(RUNNER_DIR)/options.json -> DoomRunner/linux/options.json"; \
@@ -101,7 +135,8 @@ diff:
 	@echo "=== UZDoom Diff ==="
 	@-diff -u uzdoom/autoexec.cfg "$(UZDOOM_DIR)/autoexec.cfg" || true
 	@echo "=== DSDA-Doom Diff ==="
-	@-diff -u dsda-doom/dsda-doom.cfg "$(DSDA_DIR)/dsda-doom.cfg" || true
+	@-RES=$$("./scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080"); \
+	sed "s|__RESOLUTION__|$$RES|g" dsda-doom/dsda-doom.cfg | diff -u - "$(DSDA_DIR)/dsda-doom.cfg" || true
 	@echo "=== DoomRunner Diff ==="
 	@-sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json | diff -u - "$(RUNNER_DIR)/options.json" || true
 
@@ -112,12 +147,20 @@ test:
 	@echo "=== Validating Shell Scripts ==="
 	@bash -n setup.sh
 	@bash -n scripts/install-engines.sh
+	@bash -n scripts/detect-resolution.sh
+	@bash -n scripts/fetch-wads.sh
+	@bash -n scripts/extract-iwads.sh
+	@bash -n scripts/install-soundfonts.sh
+	@bash -n scripts/doom-launch.sh
+	@echo "=== Validating Declarative Presets & Parity ==="
+	@python3 scripts/build-presets.py --check
 	@echo "=== Validating JSON Files ==="
+	@jq . data/presets.json > /dev/null
 	@jq . DoomRunner/linux/options.json > /dev/null
 	@jq . DoomRunner/windows/options.json > /dev/null
 	@echo "=== Checking Path Invariants ==="
-	@if grep -E '/home/[a-zA-Z0-9_-]+' DoomRunner/linux/options.json; then \
-		echo "Error: Hardcoded personal path found in DoomRunner/linux/options.json"; \
+	@if grep -E '/home/[a-zA-Z0-9_-]+' DoomRunner/linux/options.json data/presets.json; then \
+		echo "Error: Hardcoded personal path found in options.json or presets.json"; \
 		exit 1; \
 	fi
 	@echo "=== Testing Isolated Installation for $(UNAME_S) ==="
@@ -128,11 +171,15 @@ test:
 		test -f "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
 		test -f "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		test -f "$$TEST_DIR/Library/Application Support/DoomRunner/options.json" && \
+		test -f "$$TEST_DIR/.local/bin/doom-launch" && \
+		! grep -q '__RESOLUTION__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json"; \
 	else \
 		test -f "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
 		test -f "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
 		test -f "$$TEST_DIR/.local/share/DoomRunner/options.json" && \
+		test -f "$$TEST_DIR/.local/bin/doom-launch" && \
+		! grep -q '__RESOLUTION__' "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/.local/share/DoomRunner/options.json"; \
 	fi && \
 	$(MAKE) PREFIX="$$TEST_DIR" install > /dev/null && \

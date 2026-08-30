@@ -22,7 +22,7 @@ jobs:
 
       - name: Run ShellCheck
         run: |
-          shellcheck setup.sh scripts/install-engines.sh
+          shellcheck setup.sh scripts/*.sh
 
       - name: Run make check test suite
         run: |
@@ -35,8 +35,17 @@ jobs:
           test -f "$TEST_HOME/.config/uzdoom/autoexec.cfg"
           test -f "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
           test -f "$TEST_HOME/.local/share/DoomRunner/options.json"
+          test -f "$TEST_HOME/.local/bin/doom-launch"
           ! grep -q '__HOME__' "$TEST_HOME/.local/share/DoomRunner/options.json"
           rm -rf "$TEST_HOME"
+
+      - name: Test CLI and automation tool interfaces
+        run: |
+          ./scripts/doom-launch.sh --list
+          ./scripts/doom-launch.sh --preview "Alien Vendetta"
+          ./scripts/fetch-wads.sh --list
+          ./scripts/extract-iwads.sh --help
+          ./scripts/install-soundfonts.sh --help
 
       - name: Verify Engine Downloader URL Resolution
         run: |
@@ -64,6 +73,7 @@ jobs:
           test -f "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
           test -f "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
           test -f "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          test -f "$TEST_HOME/.local/bin/doom-launch"
           ! grep -q '__HOME__' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
           rm -rf "$TEST_HOME"
 
@@ -78,6 +88,7 @@ jobs:
       - name: Validate JSON Files
         shell: pwsh
         run: |
+          Get-Content -Raw "data/presets.json" | ConvertFrom-Json | Out-Null
           Get-Content -Raw "DoomRunner/windows/options.json" | ConvertFrom-Json | Out-Null
           Get-Content -Raw "DoomRunner/linux/options.json" | ConvertFrom-Json | Out-Null
           Write-Host "JSON files are valid."
