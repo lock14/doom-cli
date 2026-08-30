@@ -91,14 +91,12 @@ launch_preset() {
     shift
     local extra_args=("$@")
 
-    local name
-    local engine
-    local iwad
-    local mappacks_str
-    name=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print(d['name'])" "$preset_json")
-    engine=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print(d['engine'])" "$preset_json")
-    iwad=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print(d['iwad'])" "$preset_json")
-    mappacks_str=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print('###'.join(d.get('mappacks', [])))" "$preset_json")
+    local name engine iwad mappacks_str
+    IFS=$'\t' read -r name engine iwad mappacks_str < <(python3 -c "
+import json, sys
+d = json.loads(sys.argv[1])
+print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', []))}\")
+" "$preset_json")
 
     # Find engine executable
     local engine_bin=""

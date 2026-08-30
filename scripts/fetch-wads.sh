@@ -63,10 +63,13 @@ for p in data['presets']:
 
 download_preset() {
     local name="$1"
+    local urls_str="${2:-}"
+    local files_str="${3:-}"
     
-    # Query preset details from presets.json
-    local info
-    info=$(python3 -c "
+    if [ -z "$urls_str" ] || [ -z "$files_str" ]; then
+        # Query preset details from presets.json
+        local info
+        info=$(python3 -c "
 import json, sys
 with open('$PRESETS_FILE') as f:
     data = json.load(f)
@@ -79,20 +82,17 @@ files = '|'.join(p.get('mappacks', []))
 print(f\"{p['name']}###{urls}###{files}\")
 " "$name" || true)
 
-    if [ -z "$info" ]; then
-        echo "Error: Preset '$name' not found or has no download sources."
-        return 1
+        if [ -z "$info" ]; then
+            echo "Error: Preset '$name' not found or has no download sources."
+            return 1
+        fi
+
+        urls_str=$(echo "$info" | awk -F'###' '{print $2}')
+        files_str=$(echo "$info" | awk -F'###' '{print $3}')
     fi
 
-    local preset_name
-    local urls_str
-    local files_str
-    preset_name=$(echo "$info" | awk -F'###' '{print $1}')
-    urls_str=$(echo "$info" | awk -F'###' '{print $2}')
-    files_str=$(echo "$info" | awk -F'###' '{print $3}')
-
     if [ -z "$urls_str" ]; then
-        echo "Note: '$preset_name' is an official commercial release; download must be provided by user."
+        echo "Note: '$name' is an official commercial release; download must be provided by user."
         return 0
     fi
 
@@ -107,11 +107,11 @@ print(f\"{p['name']}###{urls}###{files}\")
     done
 
     if [ "$missing" -eq 0 ] && [ "$FORCE" -eq 0 ]; then
-        echo "✓ [$preset_name] All required files already exist in $WADS_DIR. (Use --force to re-download)"
+        echo "✓ [$name] All required files already exist in $WADS_DIR. (Use --force to re-download)"
         return 0
     fi
 
-    echo ">>> Downloading: $preset_name"
+    echo ">>> Downloading: $name"
     mkdir -p "$WADS_DIR"
 
     local tmp_dir
@@ -147,7 +147,6 @@ print(f\"{p['name']}###{urls}###{files}\")
                         cp "$found" "$WADS_DIR/$exp"
                         echo "    Installed: $exp -> $WADS_DIR/$exp"
                     else
-                        # In case files are nested or have slight extension variation
                         echo "    Warning: Could not find exact match for $exp in archive."
                     fi
                 done
@@ -160,7 +159,7 @@ print(f\"{p['name']}###{urls}###{files}\")
     rm -rf "$tmp_dir"
 
     if [ "$success" -eq 0 ]; then
-        echo "    Error: Failed to download $preset_name from available mirrors."
+        echo "    Error: Failed to download $name from available mirrors."
         return 1
     fi
     echo ""
@@ -202,16 +201,19 @@ echo "Target directory: $WADS_DIR"
 echo ""
 
 if [ "$TARGET" = "all" ]; then
-    python3 -c "
+    while IFS=$'\t' read -r name urls files; do
+        [ -z "$name" ] && continue
+        download_preset "$name" "$urls" "$files" || true
+    done < <(python3 -c "
 import json
 with open('$PRESETS_FILE') as f:
     data = json.load(f)
 for p in data['presets']:
     if p.get('download_urls'):
-        print(p['name'])
-" | while read -r name; do
-        download_preset "$name" || true
-    done
+        urls = '|'.join(p.get('download_urls', []))
+        files = '|'.join(p.get('mappacks', []))
+        print(f\"{p['name']}\t{urls}\t{files}\")
+")
     echo "All community megawads processed!"
 else
     download_preset "$TARGET"

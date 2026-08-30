@@ -11,6 +11,11 @@ $TargetDirs = @(
     "$env:APPDATA\DoomRunner"
 )
 
+$DataDirs = @(
+    "$env:LOCALAPPDATA\doom-configs",
+    "$env:APPDATA\doom-configs"
+)
+
 function Install-ConfigWithBackup {
     param (
         [string]$Content,
@@ -49,6 +54,14 @@ if ($BaseDrive -ne "E:") {
 foreach ($Dir in $TargetDirs) {
     $TargetFile = Join-Path $Dir "options.json"
     Install-ConfigWithBackup -Content $OptionsContent -Destination $TargetFile
+}
+
+# Deploy declarative presets.json data
+$SourcePresets = Join-Path $ScriptDir "data\presets.json"
+$PresetsContent = Get-Content -Path $SourcePresets -Raw
+foreach ($Dir in $DataDirs) {
+    $TargetFile = Join-Path $Dir "presets.json"
+    Install-ConfigWithBackup -Content $PresetsContent -Destination $TargetFile
 }
 
 Write-Host "Setup complete!"

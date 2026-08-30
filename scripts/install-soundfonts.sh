@@ -61,6 +61,7 @@ fi
 
 echo "Downloading GeneralUser-GS SoundFont (Roland SC-55 Balanced GM)..."
 TMP_DL=$(mktemp "${TMPDIR:-/tmp}/soundfont.XXXXXX")
+trap 'rm -f "$TMP_DL"' EXIT INT TERM
 
 if command -v curl >/dev/null 2>&1; then
     curl -L --progress-bar -o "$TMP_DL" "$SF_URL"
@@ -68,11 +69,11 @@ elif command -v wget >/dev/null 2>&1; then
     wget -q --show-progress -O "$TMP_DL" "$SF_URL"
 else
     echo "Error: Neither curl nor wget found."
-    rm -f "$TMP_DL"
     exit 1
 fi
 
 mv "$TMP_DL" "$SF_FILE"
+trap - EXIT INT TERM
 chmod 644 "$SF_FILE"
 
 echo ""

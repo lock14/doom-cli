@@ -129,6 +129,19 @@ TARGET_PATTERNS=(
 
 FOUND_COUNT=0
 
+# Fast single-pass filesystem index across all search roots
+declare -A CANDIDATE_FILES
+for root in "${EXISTING_ROOTS[@]}"; do
+    while IFS= read -r fpath; do
+        [ -z "$fpath" ] && continue
+        fname=$(basename "$fpath")
+        fname_lower=$(echo "$fname" | tr '[:upper:]' '[:lower:]')
+        if [ -z "${CANDIDATE_FILES["$fname_lower"]:-}" ]; then
+            CANDIDATE_FILES["$fname_lower"]="$fpath"
+        fi
+    done < <(find "$root" -maxdepth 6 -type f \( -iname "*.wad" -o -iname "*.pk3" -o -iname "*.deh" \) 2>/dev/null || true)
+done
+
 for item in "${TARGET_PATTERNS[@]}"; do
     pattern="${item%%:*}"
     dest_name="${item##*:}"
@@ -138,17 +151,14 @@ for item in "${TARGET_PATTERNS[@]}"; do
         continue
     fi
 
-    for root in "${EXISTING_ROOTS[@]}"; do
-        # Search case-insensitively, limited depth for speed
-        match=$(find "$root" -maxdepth 6 -type f -iname "$pattern" 2>/dev/null | head -n 1 || true)
-        if [ -n "$match" ] && [ -f "$match" ]; then
-            cp "$match" "$dest_file"
-            echo "✓ Found & Installed: $dest_name"
-            echo "    Source: $match"
-            FOUND_COUNT=$((FOUND_COUNT + 1))
-            break
-        fi
-    done
+    pattern_lower=$(echo "$pattern" | tr '[:upper:]' '[:lower:]')
+    match="${CANDIDATE_FILES["$pattern_lower"]:-}"
+    if [ -n "$match" ] && [ -f "$match" ]; then
+        cp "$match" "$dest_file"
+        echo "✓ Found & Installed: $dest_name"
+        echo "    Source: $match"
+        FOUND_COUNT=$((FOUND_COUNT + 1))
+    fi
 done
 
 echo ""

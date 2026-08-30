@@ -108,9 +108,13 @@ jobs:
           # Verify files exist in both AppData directories
           $LocalOptions = "$env:LOCALAPPDATA\DoomRunner\options.json"
           $RoamingOptions = "$env:APPDATA\DoomRunner\options.json"
+          $LocalPresets = "$env:LOCALAPPDATA\doom-configs\presets.json"
+          $RoamingPresets = "$env:APPDATA\doom-configs\presets.json"
           
           if (-not (Test-Path $LocalOptions)) { throw "Missing $LocalOptions" }
           if (-not (Test-Path $RoamingOptions)) { throw "Missing $RoamingOptions" }
+          if (-not (Test-Path $LocalPresets)) { throw "Missing $LocalPresets" }
+          if (-not (Test-Path $RoamingPresets)) { throw "Missing $RoamingPresets" }
           
           # Test automatic backup on second run
           .\setup.ps1
