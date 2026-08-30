@@ -108,8 +108,8 @@
       "compatibility": "Vanilla",
       "description": "Modern Ultimate Doom episode replacement",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom/megawads/deathless.zip",
-        "https://www.doomworld.com/idgames/levels/doom/megawads/deathless"
+        "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/deathless.zip",
+        "https://www.doomworld.com/idgames/levels/doom/Ports/megawads/deathless"
       ]
     },
     {
@@ -148,10 +148,7 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla / DEH",
       "description": "Anniversary megawad + DEH modifications",
-      "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/doomzero.zip",
-        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/doomzero"
-      ]
+      "download_urls": []
     },
     {
       "name": "Doom: The Way ID Did",
@@ -213,8 +210,7 @@
       "compatibility": "MBF21 / OTEX",
       "description": "OTEX texture pack, advanced MBF21 & custom monsters",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip",
-        "https://eviternity.dfdoom.com/wads/eviternityii.zip"
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip"
       ]
     },
     {
@@ -228,8 +224,7 @@
       "compatibility": "Boom",
       "description": "Fast-paced, compact map pack",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/Ports/gd-turbo.zip",
-        "https://www.doomworld.com/idgames/levels/doom2/Ports/gd-turbo"
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gd.zip"
       ]
     },
     {
@@ -294,8 +289,8 @@
       "compatibility": "Vanilla",
       "description": "Vanilla-compatible megawad",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/megawads/nostalgia.zip",
-        "https://www.doomworld.com/idgames/levels/doom2/megawads/nostalgia"
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/nostalgia.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/m-o/nostalgia"
       ]
     },
     {
@@ -310,8 +305,8 @@
       "compatibility": "Vanilla / Ultimate Doom",
       "description": "Classic 4-episode expansion for Ultimate Doom",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom/megawads/neis.zip",
-        "https://www.doomworld.com/idgames/levels/doom/megawads/neis"
+        "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/neis.zip",
+        "https://www.doomworld.com/idgames/levels/doom/Ports/megawads/neis"
       ]
     },
     {
@@ -337,10 +332,7 @@
       "category": "Community Episode",
       "compatibility": "Vanilla",
       "description": "John Romero's unofficial 5th episode for Ultimate Doom",
-      "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom/megawads/sigil_v1_23.zip",
-        "https://romerogames.digitalpress.com/s/SIGIL_v1_23.zip"
-      ]
+      "download_urls": []
     },
     {
       "name": "Sigil II",
@@ -353,9 +345,7 @@
       "category": "Community Episode",
       "compatibility": "Vanilla",
       "description": "John Romero's unofficial 6th episode for Ultimate Doom",
-      "download_urls": [
-        "https://romerogames.digitalpress.com/s/SIGIL_II_V1_0.zip"
-      ]
+      "download_urls": []
     },
     {
       "name": "Scythe",
@@ -383,8 +373,8 @@
       "compatibility": "Boom / DEH",
       "description": "Erik Alm's legendary sequel with custom monsters",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe2.zip",
-        "https://www.doomworld.com/idgames/levels/doom2/megawads/scythe2"
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/scythe2.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/scythe2"
       ]
     },
     {
@@ -398,8 +388,8 @@
       "compatibility": "Boom",
       "description": "33-level intense challenge megawad",
       "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/megawads/sodfinal.zip",
-        "https://www.doomworld.com/idgames/levels/doom2/megawads/sodfinal"
+        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sodfinal.zip",
+        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sodfinal"
       ]
     },
     {
@@ -412,10 +402,7 @@
       "category": "Community Megawad",
       "compatibility": "MBF21 / Boom",
       "description": "Monumental architectural slaughter megawad",
-      "download_urls": [
-        "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunder.zip",
-        "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunder"
-      ]
+      "download_urls": []
     },
     {
       "name": "Sunlust",

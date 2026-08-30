@@ -56,8 +56,7 @@
     "global_options": {
         "additional_args": "",
         "cmd_prefix": "",
-        "env_vars": {
-        },
+        "env_vars": {},
         "use_preset_name_as_config_dir": false,
         "use_preset_name_as_demo_dir": false,
         "use_preset_name_as_save_dir": false,
@@ -117,11 +116,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Alien Vendetta",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -144,11 +141,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Ancient Aliens",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -170,11 +165,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Back to Saturn X: Episode 1",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -198,11 +191,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Back to Saturn X: Episode 2",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -226,11 +217,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Deathless",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM.WAD",
             "selected_config": "",
@@ -253,11 +242,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Doom",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM.WAD",
             "selected_config": "",
@@ -279,11 +266,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Doom II",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -305,11 +290,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Doom Zero",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -333,11 +316,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Doom: The Way ID Did",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM.WAD",
             "selected_config": "",
@@ -361,11 +342,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Doom II: The Way ID Did",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -389,11 +368,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Eviternity",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -415,11 +392,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Eviternity II",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -441,11 +416,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Going Down Turbo",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -467,17 +440,14 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Heretic",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/HERETIC.WAD",
             "selected_config": "",
             "selected_engine": "__HOME__/.local/bin/uzdoom",
-            "selected_mappacks": [
-            ]
+            "selected_mappacks": []
         },
         {
             "additional_args": "",
@@ -492,17 +462,14 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Hexen",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/HEXEN.WAD",
             "selected_config": "",
             "selected_engine": "__HOME__/.local/bin/uzdoom",
-            "selected_mappacks": [
-            ]
+            "selected_mappacks": []
         },
         {
             "additional_args": "",
@@ -517,11 +484,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Legacy of Rust",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -548,11 +513,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Master Levels",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -575,11 +538,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Nostalgia",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -602,11 +563,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "No End In Sight",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM.WAD",
             "selected_config": "",
@@ -629,11 +588,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "No Rest for the Living",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -656,11 +613,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Sigil",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM.WAD",
             "selected_config": "",
@@ -682,11 +637,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": true,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Sigil II",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM.WAD",
             "selected_config": "",
@@ -708,11 +661,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Scythe",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -734,11 +685,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Scythe 2",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -760,11 +709,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Speed of Doom",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -786,11 +733,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Sunder",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -812,11 +757,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Sunlust",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
@@ -838,11 +781,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "The Plutonia Experiment",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/PLUTONIA.WAD",
             "selected_config": "",
@@ -864,11 +805,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Plutonia 2",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/PLUTONIA.WAD",
             "selected_config": "",
@@ -891,11 +830,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "TNT: Evilution",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/TNT.WAD",
             "selected_config": "",
@@ -917,11 +854,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "TNT: Revilution",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/TNT.WAD",
             "selected_config": "",
@@ -944,11 +879,9 @@
                 "compatflags1": 0,
                 "compatflags2": 0
             },
-            "env_vars": {
-            },
+            "env_vars": {},
             "load_maps_after_mods": false,
-            "mods": [
-            ],
+            "mods": [],
             "name": "Valiant",
             "selected_IWAD": "__HOME__/.local/share/games/uzdoom/DOOM2.WAD",
             "selected_config": "",
