@@ -213,23 +213,19 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 
 ## Makefile Quick Reference
 
-| Target | Description |
-| :--- | :--- |
-| `make bootstrap` | **Full setup:** Downloads engines + installs all configs & `doom-launch` CLI |
-| `make install` | Deploys all configuration files and `doom-launch` with automatic backups |
-| `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |
-| `make fetch-wads` | Automatically downloads and extracts free community megawads into WADs folder |
-| `make extract-iwads` | Auto-locates & copies official IWADs from local Steam / GOG installations |
-| `make install-soundfonts` | Downloads and deploys curated GeneralUser GS SoundFont for FluidSynth |
-| `make build-presets` | Compiles declarative `data/presets.json` into DoomRunner `options.json` |
-| `make install-engines` | Downloads latest binaries (UZDoom, DSDA-Doom, DoomRunner) to `~/.local/bin/` |
-| `make install-uzdoom` | Installs only `uzdoom/autoexec.cfg` |
-| `make install-dsda` | Installs only `dsda-doom/dsda-doom.cfg` (auto-detects display resolution) |
-| `make install-doomrunner` | Installs only `DoomRunner/linux/options.json` |
-| `make install-launcher` | Installs `doom-launch` CLI to `~/.local/bin/` |
-| `make diff` | Shows diff between repo configs and live system configs |
-| `make sync` | Syncs live system configs back into the git repository |
-| `make check` | Runs full validation suite (presets, scripts, invariants, dry install) |
+| Category | Target | Description |
+| :--- | :--- | :--- |
+| **🚀 Quick Start** | `make turnkey` | ⚡ **1-Step Setup:** Downloads engines, configs, SoundFont, IWADs & megawads |
+| | `make install` | Deploys all configuration files & `doom-launch` CLI with backups |
+| | `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |
+| **📦 Content & Assets** | `make fetch-wads` | Auto-downloads and unpacks 20+ free community megawads |
+| | `make extract-iwads` | Auto-discovers and copies official IWADs from Steam / GOG |
+| | `make install-soundfonts` | Deploys curated GeneralUser GS SoundFont for FluidSynth |
+| | `make install-engines` | Downloads latest binaries (UZDoom, DSDA-Doom, DoomRunner) to `~/.local/bin/` |
+| **🔧 Maintenance** | `make diff` | Shows diff between repository configs and live system configs |
+| | `make sync` | Syncs in-game configuration tweaks back into the git repository |
+| | `make check` | Runs full validation suite (presets, scripts, invariants, tests) |
+| | `make build-presets` | Compiles `data/presets.json` into launcher `options.json` files |
 
 ---
 
