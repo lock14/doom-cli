@@ -22,7 +22,7 @@ endif
 
 BIN_DIR ?= $(PREFIX)/.local/bin
 
-.PHONY: all bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
+.PHONY: all turnkey bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
         install-data install-launcher install-soundfonts install-engines install-engine-uzdoom \
         install-engine-dsda install-engine-doomrunner build-presets fetch-wads \
         extract-iwads play sync diff help check test
@@ -31,6 +31,7 @@ all: install
 
 help:
 	@echo "Doom Configs - Available Makefile targets ($(UNAME_S)):"
+	@echo "  make turnkey           - ⚡ 1-Step Complete Setup: engines, configs, soundfonts, IWADs & WADs"
 	@echo "  make bootstrap         - Complete setup: download all engines + install configs + launcher"
 	@echo "  make install           - Install all configurations & doom-launch with automatic backups"
 	@echo "  make play              - Launch interactive terminal preset launcher (fzf / menu)"
@@ -47,6 +48,15 @@ help:
 	@echo "  make sync              - Copy active system configs back into repo"
 	@echo "  make diff              - Compare repo configs against installed system configs"
 	@echo "  make check             - Run full validation suite (presets, scripts, invariants, dry install)"
+
+# ⚡ Turnkey Setup: All-in-one installation for players who just want everything ready
+turnkey: bootstrap install-soundfonts extract-iwads fetch-wads
+	@echo ""
+	@echo "============================================================"
+	@echo "  ✓ Turnkey Doom setup complete!"
+	@echo "  Engines, configs, soundfonts, and megawads are ready."
+	@echo "  Run 'make play' or 'doom-launch' to start playing!"
+	@echo "============================================================"
 
 # Complete bootstrap: download engines and install configs + launcher
 bootstrap: install-engines install

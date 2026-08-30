@@ -13,18 +13,23 @@ A curated set of configuration files and presets for playing Doom using modern s
 
 ---
 
+## Installation & Setup
+
 ### Linux & macOS
 
 The `Makefile` automatically detects whether you are running **Linux** or **macOS (Darwin)** and maps configuration directories accordingly:
-- **Linux Destinations**: `~/.config/uzdoom/`, `~/.local/share/dsda-doom/`, `~/.local/share/DoomRunner/`, `~/.local/bin/`
-- **macOS Destinations**: `~/Library/Application Support/uzdoom/`, `~/Library/Application Support/dsda-doom/`, `~/Library/Application Support/DoomRunner/`, `~/.local/bin/`
+- **Linux Destinations**: `~/.config/uzdoom/`, `~/.local/share/dsda-doom/`, `~/.local/share/DoomRunner/`, `~/.local/share/doom-configs/`, `~/.local/bin/`
+- **macOS Destinations**: `~/Library/Application Support/uzdoom/`, `~/Library/Application Support/dsda-doom/`, `~/Library/Application Support/DoomRunner/`, `~/Library/Application Support/doom-configs/`, `~/.local/bin/`
 
-#### Option 1: Full Bootstrap (Engines + Configs + Launcher)
-To automatically download the latest official binaries (`uzdoom`, `dsda-doom`, `doomrunner`) into `~/.local/bin/` and deploy all configurations and the `doom-launch` CLI:
+#### Option 1: ⚡ Turnkey Setup (One-Command Everything)
+For players who just want everything ready to play immediately with zero manual steps:
+Downloads all engines (`uzdoom`, `dsda-doom`, `doomrunner`), installs all configurations & `doom-launch`, deploys the Roland SC-55 MIDI SoundFont, auto-extracts official Steam/GOG IWADs, and downloads all 20+ free community megawads:
 
 ```bash
-make bootstrap
+make turnkey
 ```
+
+*(Or without `make`: `./setup.sh --turnkey`)*
 
 > [!TIP]
 > Ensure `~/.local/bin` is in your `$PATH` (e.g. in your `~/.bashrc` or `~/.zshrc`):
@@ -32,7 +37,14 @@ make bootstrap
 > export PATH="$HOME/.local/bin:$PATH"
 > ```
 
-#### Option 2: Configs Only
+#### Option 2: Bootstrap (Engines + Configs + Launcher)
+To download the engine binaries into `~/.local/bin/` and deploy all configurations and `doom-launch`:
+
+```bash
+make bootstrap
+```
+
+#### Option 3: Configs Only
 To deploy only configuration files (with automatic `.bak` backups of existing configs):
 
 ```bash
@@ -41,10 +53,10 @@ make install
 
 Or install individual components:
 - `make install-uzdoom` — Deploys `autoexec.cfg`
-- `make install-dsda` — Deploys `dsda-doom.cfg`
+- `make install-dsda` — Deploys `dsda-doom.cfg` (auto-detects display resolution)
 - `make install-doomrunner` — Deploys `options.json`
 - `make install-launcher` — Installs `doom-launch` to `~/.local/bin/`
-- `make install-engines` — Downloads only the binaries into `~/.local/bin/`
+- `make install-engines` — Downloads only the engine binaries into `~/.local/bin/`
 
 #### Managing In-Game Changes
 - `make diff` — Compare current repository configs against live configs on your system.
@@ -75,9 +87,11 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 
 ---
 
-## Interactive Terminal Launcher (`doom-launch`)
+## Playing & Launching Games
 
-In addition to DoomRunner, you can launch presets directly from your terminal using `doom-launch` (or `make play`):
+### Interactive Terminal Launcher (`doom-launch`)
+
+Launch any preset directly from your terminal using `doom-launch` (or `make play`):
 
 ```bash
 # Interactive fuzzy-finder menu (requires fzf) or numbered menu
@@ -87,7 +101,7 @@ doom-launch
 make play
 ```
 
-### Direct CLI Launching & Custom Arguments
+#### Direct CLI Launching & Custom Arguments
 You can also launch presets directly by name and pass additional engine arguments on the fly:
 
 ```bash
@@ -106,7 +120,22 @@ doom-launch --list
 
 ---
 
-## Automated WAD & Audio Tooling
+## Game Files & Automated Tools
+
+> [!IMPORTANT]
+> **Commercial Game Files Are Not Tracked in Git**
+> 
+> This repository contains configuration files, launcher presets, and automated fetch scripts. You must provide your own legally acquired game files:
+> - **Commercial IWADs** (`DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`, `HERETIC.WAD`, `HEXEN.WAD`) can be acquired from digital storefronts:
+>   - **Doom + Doom II**: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) / [GOG](https://www.gog.com/en/game/doom_doom_ii)
+>   - **Heretic + Hexen**: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) / [GOG](https://www.gog.com/en/game/heretic_hexen)
+>   *(Tip: Use `make extract-iwads` to auto-import them from Steam/GOG).*
+> - **Community Megawads & Expansions** (*Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*, *Sunder*, etc.) can be fetched automatically via `make fetch-wads` or manually downloaded from **[Doomworld / idgames](https://www.doomworld.com/idgames/)**.
+
+Place your game files (`.wad`, `.deh`, `.pk3`) in the standard directory:
+- **Linux Default**: `~/.local/share/games/uzdoom/`
+- **macOS Default**: `~/Library/Application Support/games/uzdoom/`
+- **Windows Default**: `E:\Doom WADS\` (or your customized `-BaseDrive` path)
 
 ### 1. Steam & GOG IWAD Auto-Extractor
 If you own *Doom + Doom II (2024)* or *Heretic / Hexen* on Steam or GOG, you can automatically discover and copy official IWADs and the modern `idkfa 2024.wad` soundtrack into your WADs folder:
@@ -132,48 +161,6 @@ Download and deploy the balanced `GeneralUser-GS.sf2` SoundFont for high-definit
 ```bash
 make install-soundfonts
 ```
-
----
-
-## Makefile Quick Reference
-
-| Target | Description |
-| :--- | :--- |
-| `make bootstrap` | **Full setup:** Downloads engines + installs all configs & `doom-launch` CLI |
-| `make install` | Deploys all configuration files and `doom-launch` with automatic backups |
-| `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |
-| `make fetch-wads` | Automatically downloads and extracts free community megawads into WADs folder |
-| `make extract-iwads` | Auto-locates & copies official IWADs from local Steam / GOG installations |
-| `make install-soundfonts` | Downloads and deploys curated GeneralUser GS SoundFont for FluidSynth |
-| `make build-presets` | Compiles declarative `data/presets.json` into DoomRunner `options.json` |
-| `make install-engines` | Downloads latest binaries (UZDoom, DSDA-Doom, DoomRunner) to `~/.local/bin/` |
-| `make install-uzdoom` | Installs only `uzdoom/autoexec.cfg` |
-| `make install-dsda` | Installs only `dsda-doom/dsda-doom.cfg` |
-| `make install-doomrunner` | Installs only `DoomRunner/linux/options.json` |
-| `make install-launcher` | Installs `doom-launch` CLI to `~/.local/bin/` |
-| `make diff` | Shows diff between repo configs and live system configs |
-| `make sync` | Syncs live system configs back into the git repository |
-| `make check` | Runs full validation suite (presets, scripts, invariants, dry install) |
-
----
-
-## WAD & File Locations
-
-> [!IMPORTANT]
-> **Commercial Game Files Are Not Tracked in Git**
-> 
-> This repository contains configuration files, launcher presets, and automated fetch scripts. You must provide your own legally acquired game files:
-> - **Commercial IWADs** (`DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`, `HERETIC.WAD`, `HEXEN.WAD`) can be acquired from digital storefronts:
->   - **Doom + Doom II**: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) / [GOG](https://www.gog.com/en/game/doom_doom_ii)
->   - **Heretic + Hexen**: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) / [GOG](https://www.gog.com/en/game/heretic_hexen)
->   *(Tip: Use `make extract-iwads` to auto-import them from Steam/GOG).*
-> - **Community Megawads & Expansions** (*Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*, *Sunder*, etc.) can be fetched automatically via `make fetch-wads` or manually downloaded from **[Doomworld / idgames](https://www.doomworld.com/idgames/)**.
-
-Place your game files (`.wad`, `.deh`, `.pk3`) in the standard directory:
-
-- **Linux Default**: `~/.local/share/games/uzdoom/`
-- **macOS Default**: `~/Library/Application Support/games/uzdoom/`
-- **Windows Default**: `E:\Doom WADS\` (or your customized `-BaseDrive` path)
 
 ---
 
@@ -221,6 +208,28 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 - **Video & Display**: OpenGL mode with integer scaling, 60 FPS limiter, and uncapped framerate.
 - **Extended HUD (exHUD)**: In-game level splits, secret counters, and completion times.
 - **Built-in Capture**: Ready-to-use `ffmpeg` video recording commands.
+
+---
+
+## Makefile Quick Reference
+
+| Target | Description |
+| :--- | :--- |
+| `make bootstrap` | **Full setup:** Downloads engines + installs all configs & `doom-launch` CLI |
+| `make install` | Deploys all configuration files and `doom-launch` with automatic backups |
+| `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |
+| `make fetch-wads` | Automatically downloads and extracts free community megawads into WADs folder |
+| `make extract-iwads` | Auto-locates & copies official IWADs from local Steam / GOG installations |
+| `make install-soundfonts` | Downloads and deploys curated GeneralUser GS SoundFont for FluidSynth |
+| `make build-presets` | Compiles declarative `data/presets.json` into DoomRunner `options.json` |
+| `make install-engines` | Downloads latest binaries (UZDoom, DSDA-Doom, DoomRunner) to `~/.local/bin/` |
+| `make install-uzdoom` | Installs only `uzdoom/autoexec.cfg` |
+| `make install-dsda` | Installs only `dsda-doom/dsda-doom.cfg` (auto-detects display resolution) |
+| `make install-doomrunner` | Installs only `DoomRunner/linux/options.json` |
+| `make install-launcher` | Installs `doom-launch` CLI to `~/.local/bin/` |
+| `make diff` | Shows diff between repo configs and live system configs |
+| `make sync` | Syncs live system configs back into the git repository |
+| `make check` | Runs full validation suite (presets, scripts, invariants, dry install) |
 
 ---
 

@@ -20,11 +20,23 @@ get_latest_github_url() {
     local url=""
 
     if command -v curl >/dev/null 2>&1; then
-        url=$(curl -sL "https://api.github.com/repos/${repo}/releases/latest" | \
-              grep "browser_download_url" | \
-              grep -E "${pattern}" | \
-              head -n 1 | \
-              cut -d '"' -f 4 || true)
+        local release_json
+        release_json=$(curl -sL "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null || true)
+        if [ -n "$release_json" ]; then
+            url=$(python3 -c "
+import json, re, sys
+try:
+    data = json.loads(sys.argv[1])
+    pattern = re.compile(sys.argv[2], re.IGNORECASE)
+    for asset in data.get('assets', []):
+        name = asset.get('name', '')
+        if pattern.search(name) and not name.endswith('.zsync') and not name.endswith('.asc') and not name.endswith('.sig'):
+            print(asset.get('browser_download_url', ''))
+            break
+except Exception:
+    pass
+" "$release_json" "$pattern" 2>/dev/null || true)
+        fi
     fi
 
     if [ -z "$url" ]; then
@@ -100,11 +112,11 @@ install_uzdoom() {
     local pattern
     local fallback
     if [ "$OS" = "Darwin" ]; then
-        pattern="macOS-UZDoom-.*\.zip"
-        fallback="https://github.com/UZDoom/UZDoom/releases/download/4.14.3/macOS-UZDoom-4.14.3.zip"
+        pattern=".*(macos|mac|darwin).*uzdoom.*(\.dmg|\.zip)"
+        fallback="https://github.com/UZDoom/UZDoom/releases/download/5.0.0/MacOS-UZDoom-Release-ARM64.dmg"
     else
-        pattern="Linux-UZDoom-.*\.AppImage"
-        fallback="https://github.com/UZDoom/UZDoom/releases/download/4.14.3/Linux-UZDoom-4.14.3.AppImage"
+        pattern="linux.*uzdoom.*\.appimage"
+        fallback="https://github.com/UZDoom/UZDoom/releases/download/5.0.0/Linux-UZDoom-Release-x86_64.AppImage"
     fi
     local url
     url=$(get_latest_github_url "$repo" "$pattern" "$fallback")
