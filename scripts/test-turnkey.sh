@@ -111,6 +111,9 @@ fi
 if grep -q '__SOUNDFONT__' "$UZDOOM_DIR/autoexec.cfg"; then
     echo "FAIL: Un-substituted __SOUNDFONT__ found in $UZDOOM_DIR/autoexec.cfg"; exit 1
 fi
+if grep -q '__REFRESH_RATE__' "$UZDOOM_DIR/autoexec.cfg"; then
+    echo "FAIL: Un-substituted __REFRESH_RATE__ found in $UZDOOM_DIR/autoexec.cfg"; exit 1
+fi
 
 # Second install (must trigger backups)
 sleep 1 # Ensure timestamp differs

@@ -16,12 +16,12 @@ Any agent modifying this repository must follow these core principles.
 
 ## 2. Portability & Path Invariants
 
-- **Never Commit Personal User Paths & Resolutions**: Never commit absolute personal paths like `/home/<username>/` or hardcoded local display resolutions into configuration files, presets, or scripts.
-- **Use `__HOME__`, `__RESOLUTION__`, and `__SOUNDFONT__` Placeholders**:
+- **Never Commit Personal User Paths, Resolutions, or Refresh Rates**: Never commit absolute personal paths like `/home/<username>/`, hardcoded local display resolutions, or fixed monitor refresh rates into configuration files, presets, or scripts.
+- **Use `__HOME__`, `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` Placeholders**:
   - In `DoomRunner/linux/options.json` and `data/presets.json`, all user home paths must use the `__HOME__` placeholder.
   - In `dsda-doom/dsda-doom.cfg`, `screen_resolution` must use `__RESOLUTION__` and `snd_soundfont` must use `__SOUNDFONT__`.
-  - In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__`.
-  - Deployment tooling (`Makefile`, `setup.sh`) dynamically substitutes `__HOME__`, `__RESOLUTION__` (via `scripts/detect-resolution.sh`), and `__SOUNDFONT__` at installation time.
+  - In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use `__REFRESH_RATE__`.
+  - Deployment tooling (`Makefile`, `setup.sh`) dynamically substitutes `__HOME__`, `__RESOLUTION__` (via `scripts/detect-resolution.sh`), `__REFRESH_RATE__` (via `scripts/detect-refresh-rate.sh`), and `__SOUNDFONT__` at installation time.
 - **Respect Standard Directory Structures**:
   - **UZDoom Config (Linux)**: `~/.config/uzdoom/autoexec.cfg`
   - **UZDoom Config (macOS)**: `~/Library/Application Support/uzdoom/autoexec.cfg`

@@ -57,7 +57,7 @@ make install
 ```
 
 Or install individual components:
-- `make install-uzdoom` — Deploys `autoexec.cfg`
+- `make install-uzdoom` — Deploys `autoexec.cfg` (auto-detects display refresh rate)
 - `make install-dsda` — Deploys `dsda-doom.cfg` (auto-detects display resolution)
 - `make install-doomrunner` — Deploys `options.json`
 - `make install-launcher` — Installs `doom-launch` to `~/.local/bin/`
