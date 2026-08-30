@@ -56,6 +56,17 @@ copy_with_backup() {
         "$src" > "$dest"
 }
 
+if [ "$TURNKEY" -eq 1 ]; then
+    echo ""
+    echo "=== Running Turnkey Step 1/4: Downloading Port Engines ==="
+    "$SCRIPT_DIR/scripts/install-engines.sh" all
+    echo ""
+    echo "=== Running Turnkey Step 2/4: Deploying Roland SC-55 SoundFont ==="
+    "$SCRIPT_DIR/scripts/install-soundfonts.sh"
+    echo ""
+    echo "=== Running Turnkey Step 3/4: Deploying Configurations & Presets ==="
+fi
+
 copy_with_backup "$SCRIPT_DIR/uzdoom/autoexec.cfg" "$UZDOOM_DIR/autoexec.cfg"
 copy_with_backup "$SCRIPT_DIR/DoomRunner/linux/options.json" "$RUNNER_DIR/options.json"
 copy_with_backup "$SCRIPT_DIR/dsda-doom/dsda-doom.cfg" "$DSDA_DIR/dsda-doom.cfg"
@@ -69,9 +80,7 @@ chmod +x "$BIN_DIR/doom-launch"
 
 if [ "$TURNKEY" -eq 1 ]; then
     echo ""
-    echo "=== Running Turnkey Additions ==="
-    "$SCRIPT_DIR/scripts/install-engines.sh" all
-    "$SCRIPT_DIR/scripts/install-soundfonts.sh"
+    echo "=== Running Turnkey Step 4/4: Extracting IWADs & Fetching Megawads ==="
     "$SCRIPT_DIR/scripts/extract-iwads.sh"
     "$SCRIPT_DIR/scripts/fetch-wads.sh" all
     echo ""
@@ -82,4 +91,7 @@ if [ "$TURNKEY" -eq 1 ]; then
     echo "============================================================"
 else
     echo "Setup complete! Run 'make turnkey' or './setup.sh --turnkey' for all-in-one setup."
+    if [ ! -f "$SF_DIR/GeneralUser-GS.sf2" ]; then
+        echo "  ℹ Tip: Run 'make install-soundfonts' or './setup.sh --turnkey' to download the configured Roland SC-55 SoundFont."
+    fi
 fi

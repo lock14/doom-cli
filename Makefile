@@ -50,7 +50,7 @@ help:
 	@echo "    make build-presets      Recompile data/presets.json into launcher options.json"
 
 # ⚡ Turnkey Setup: All-in-one installation for players who just want everything ready
-turnkey: bootstrap install-soundfonts extract-iwads fetch-wads
+turnkey: install-engines install-soundfonts install extract-iwads fetch-wads
 	@echo ""
 	@echo "============================================================"
 	@echo "  ✓ Turnkey Doom setup complete!"
@@ -63,6 +63,9 @@ bootstrap: install-engines install
 
 install: install-uzdoom install-dsda install-doomrunner install-data install-launcher
 	@echo "All configurations, data files, and launcher successfully installed!"
+	@if [ ! -f "$(SF_DIR)/GeneralUser-GS.sf2" ]; then \
+		echo "  ℹ Tip: Run 'make install-soundfonts' (or 'make turnkey') to download the configured Roland SC-55 SoundFont."; \
+	fi
 
 # Config installation targets
 install-uzdoom:
