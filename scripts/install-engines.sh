@@ -60,6 +60,7 @@ download_binary() {
 
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/doom_dl.XXXXXX")
+    trap 'rm -f "$tmp_file"' EXIT INT TERM
 
     if command -v curl >/dev/null 2>&1; then
         curl -L --progress-bar -o "$tmp_file" "$url"
@@ -74,6 +75,7 @@ download_binary() {
     if [[ "$url" == *.zip ]]; then
         local extract_dir
         extract_dir=$(mktemp -d "${TMPDIR:-/tmp}/doom_zip.XXXXXX")
+        trap 'rm -rf "$extract_dir" "$tmp_file"' EXIT INT TERM
         unzip -q -o "$tmp_file" -d "$extract_dir"
         local bin_match
         bin_match=$(find "$extract_dir" -type f -perm -111 -name "$name*" | head -n 1)
@@ -83,9 +85,11 @@ download_binary() {
             cp -r "$extract_dir"/* "$BIN_DIR/"
         fi
         rm -rf "$extract_dir" "$tmp_file"
+        trap - EXIT INT TERM
     elif [[ "$url" == *.dmg ]] && [ "$OS" = "Darwin" ]; then
         local mount_point
         mount_point=$(mktemp -d "${TMPDIR:-/tmp}/doom_dmg.XXXXXX")
+        trap 'hdiutil detach "$mount_point" -quiet 2>/dev/null || true; rm -rf "$mount_point" "$tmp_file"' EXIT INT TERM
         hdiutil attach "$tmp_file" -mountpoint "$mount_point" -nobrowse -quiet
         local app_match
         app_match=$(find "$mount_point" -maxdepth 2 -name "*.app" | head -n 1)
@@ -98,8 +102,10 @@ download_binary() {
         fi
         hdiutil detach "$mount_point" -quiet || true
         rm -rf "$mount_point" "$tmp_file"
+        trap - EXIT INT TERM
     else
         mv "$tmp_file" "$dest"
+        trap - EXIT INT TERM
     fi
 
     chmod +x "$dest" 2>/dev/null || true
