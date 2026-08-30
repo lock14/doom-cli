@@ -208,4 +208,6 @@ test:
 	else \
 		ls "$$TEST_DIR/.config/uzdoom/" | grep -q 'autoexec.cfg.bak.'; \
 	fi && \
+	echo "=== Running End-to-End Turnkey & System Test Suite ===" && \
+	./scripts/test-turnkey.sh && \
 	echo "All validation checks passed successfully for $(UNAME_S)!"

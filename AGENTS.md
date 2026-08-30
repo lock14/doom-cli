@@ -102,6 +102,7 @@ Before completing any changes:
    - JSON format validation.
    - Path invariant inspection.
    - Isolated dry installation and backup verification.
+   - End-to-end turnkey sandbox verification (`scripts/test-turnkey.sh` testing mock Steam libraries, SoundFonts, WAD download, and CLI execution).
 2. Verify `git diff` contains no hardcoded usernames or personal paths.
 3. Run `make -n install` or `make help` to verify `Makefile` syntax.
 4. If shell scripts were modified, run `shellcheck <script.sh>` and `bash -n <script.sh>`.
