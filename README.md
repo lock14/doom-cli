@@ -21,12 +21,15 @@ The `Makefile` automatically detects whether you are running **Linux** or **macO
 - **Linux Destinations**: `~/.config/uzdoom/`, `~/.local/share/dsda-doom/`, `~/.local/share/DoomRunner/`, `~/.local/share/doom-configs/`, `~/.local/bin/`
 - **macOS Destinations**: `~/Library/Application Support/uzdoom/`, `~/Library/Application Support/dsda-doom/`, `~/Library/Application Support/DoomRunner/`, `~/Library/Application Support/doom-configs/`, `~/.local/bin/`
 
-#### Option 1: Full Bootstrap (Engines + Configs + Launcher)
-To automatically download the latest official binaries (`uzdoom`, `dsda-doom`, `doomrunner`) into `~/.local/bin/` and deploy all configurations and the `doom-launch` CLI:
+#### Option 1: ⚡ Turnkey Setup (One-Command Everything)
+For players who just want everything ready to play immediately with zero manual steps:
+Downloads all engines (`uzdoom`, `dsda-doom`, `doomrunner`), installs all configurations & `doom-launch`, deploys the Roland SC-55 MIDI SoundFont, auto-extracts official Steam/GOG IWADs, and downloads all 20+ free community megawads:
 
 ```bash
-make bootstrap
+make turnkey
 ```
+
+*(Or without `make`: `./setup.sh --turnkey`)*
 
 > [!TIP]
 > Ensure `~/.local/bin` is in your `$PATH` (e.g. in your `~/.bashrc` or `~/.zshrc`):
@@ -34,7 +37,14 @@ make bootstrap
 > export PATH="$HOME/.local/bin:$PATH"
 > ```
 
-#### Option 2: Configs Only
+#### Option 2: Bootstrap (Engines + Configs + Launcher)
+To download the engine binaries into `~/.local/bin/` and deploy all configurations and `doom-launch`:
+
+```bash
+make bootstrap
+```
+
+#### Option 3: Configs Only
 To deploy only configuration files (with automatic `.bak` backups of existing configs):
 
 ```bash

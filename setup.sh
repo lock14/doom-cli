@@ -19,6 +19,11 @@ else
 fi
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 
+TURNKEY=0
+if [ "${1:-}" = "--turnkey" ]; then
+    TURNKEY=1
+fi
+
 DETECTED_RES=$("$SCRIPT_DIR/scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080")
 
 echo "Setting up Doom configurations for $OS (Detected Resolution: $DETECTED_RES)..."
@@ -56,4 +61,19 @@ echo "Installing doom-launch CLI -> $BIN_DIR/doom-launch..."
 cp "$SCRIPT_DIR/scripts/doom-launch.sh" "$BIN_DIR/doom-launch"
 chmod +x "$BIN_DIR/doom-launch"
 
-echo "Setup complete!"
+if [ "$TURNKEY" -eq 1 ]; then
+    echo ""
+    echo "=== Running Turnkey Additions ==="
+    "$SCRIPT_DIR/scripts/install-engines.sh" all
+    "$SCRIPT_DIR/scripts/install-soundfonts.sh"
+    "$SCRIPT_DIR/scripts/extract-iwads.sh"
+    "$SCRIPT_DIR/scripts/fetch-wads.sh" all
+    echo ""
+    echo "============================================================"
+    echo "  ✓ Turnkey Doom setup complete!"
+    echo "  Engines, configs, soundfonts, and megawads are ready."
+    echo "  Run 'doom-launch' to start playing!"
+    echo "============================================================"
+else
+    echo "Setup complete! Run 'make turnkey' or './setup.sh --turnkey' for all-in-one setup."
+fi
