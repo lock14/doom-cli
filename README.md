@@ -1,15 +1,20 @@
 # Doom Configs
 
-A curated set of configuration files and presets for playing Doom using modern source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) with the **[DoomRunner](https://github.com/Youda008/DoomRunner)** graphical launcher and interactive terminal launcher (`doom-launch`) across Linux, macOS, and Windows.
+[![CI](https://github.com/lock14/doom-configs/actions/workflows/ci.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/ci.yml)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
+![Engines](https://img.shields.io/badge/engines-DSDA--Doom%20%7C%20UZDoom-red)
+![Presets](https://img.shields.io/badge/presets-32%20megawads-orange)
+
+A curated collection of configuration files, launcher presets, build targets, and CLI automation tools for playing Doom using modern source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) with both the **[DoomRunner](https://github.com/Youda008/DoomRunner)** graphical launcher and the lightweight **`doom-launch`** terminal launcher across Linux, macOS, and Windows.
 
 ---
 
-## Supported Ports & Launchers
+## Supported Source Ports & Launchers
 
-- **[DSDA-Doom](https://github.com/kraflab/dsda-doom)**: Precision speedrunning and demo-accurate source port preconfigured for MBF21, extended HUD, and uncapped framerates.
-- **[UZDoom](https://github.com/UZDoom/uzdoom)**: Modern ZDoom-based engine configured with a Nightdive "Software-Plus" visual aesthetic and broad mod compatibility.
-- **[DoomRunner](https://github.com/Youda008/DoomRunner)**: Graphical launcher preloaded with 32 community megawad presets mapped to their ideal engines.
-- **`doom-launch`**: Lightweight, lightning-fast terminal UI / CLI launcher with interactive fuzzy search (`fzf`), detailed metadata previews, and direct CLI launching.
+- **[DSDA-Doom](https://github.com/kraflab/dsda-doom)**: Precision speedrunning and demo-accurate source port preconfigured for MBF21, extended HUD, dynamic resolution scaling, and uncapped framerates.
+- **[UZDoom](https://github.com/UZDoom/uzdoom)**: Modern ZDoom-based engine configured with a Nightdive "Software-Plus" visual profile, auto-detecting aspect ratio, and broad mod compatibility.
+- **`doom-launch`**: Lightweight, lightning-fast terminal UI / CLI launcher with interactive fuzzy search (`fzf`), real-time metadata previews, and direct CLI launching.
+- **[DoomRunner](https://github.com/Youda008/DoomRunner)**: Modern graphical launcher preloaded with 32 community megawad presets mapped to their ideal engines.
 
 ---
 
@@ -87,40 +92,7 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 
 ---
 
-## Playing & Launching Games
-
-### Interactive Terminal Launcher (`doom-launch`)
-
-Launch any preset directly from your terminal using `doom-launch` (or `make play`):
-
-```bash
-# Interactive fuzzy-finder menu (requires fzf) or numbered menu
-doom-launch
-
-# Or launch via Makefile
-make play
-```
-
-#### Direct CLI Launching & Custom Arguments
-You can also launch presets directly by name and pass additional engine arguments on the fly:
-
-```bash
-# Launch a specific preset
-doom-launch "Eviternity II"
-
-# Launch with custom skill and warp flags
-doom-launch "Sunlust" -skill 4 -warp 01
-
-# Inspect launch arguments without starting the game
-doom-launch --dry-run "Alien Vendetta"
-
-# List all available presets and their engines
-doom-launch --list
-```
-
----
-
-## Game Files & Automated Tools
+## Game Files & Content Setup
 
 > [!IMPORTANT]
 > **Commercial Game Files Are Not Tracked in Git**
@@ -164,9 +136,53 @@ make install-soundfonts
 
 ---
 
+## Launching & Playing Games
+
+### 1. Interactive Terminal Launcher (`doom-launch`)
+
+Launch presets from anywhere in your terminal using `doom-launch` (or `make play`):
+
+```bash
+# Interactive fuzzy-finder menu (requires fzf) or numbered menu
+doom-launch
+
+# Or launch via Makefile
+make play
+```
+
+#### Direct CLI Launching & Custom Engine Flags
+You can launch presets directly by name and pass additional engine arguments on the fly:
+
+```bash
+# Launch a specific preset
+doom-launch "Eviternity II"
+
+# Launch with custom skill and warp flags
+doom-launch "Sunlust" -skill 4 -warp 01
+
+# Inspect synthesized launch command without starting the game
+doom-launch --dry-run "Alien Vendetta"
+
+# List all available presets and their mapped engines
+doom-launch --list
+```
+
+### 2. Graphical Launcher (DoomRunner)
+
+Launch DoomRunner from your application menu or terminal:
+
+```bash
+# Start the graphical launcher
+doomrunner
+```
+
+DoomRunner will open with all 32 presets pre-configured with their matching engines, IWADs, load orders, and DeHackEd patches. Simply select a preset and click **Launch**.
+
+---
+
 ## Preconfigured Presets
 
-DoomRunner and `doom-launch` come pre-populated with presets configured for the best matching engine:
+All presets are declaratively managed in [`data/presets.json`](data/presets.json) and mapped to their optimal engine:
 
 | Megawad / Expansion | Engine | Compatibility / Details |
 | :--- | :--- | :--- |
