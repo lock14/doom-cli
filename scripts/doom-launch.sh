@@ -300,7 +300,7 @@ if [ -n "$SELECTED_TARGET" ]; then
 fi
 
 # Interactive Selection
-if command -v fzf >/dev/null 2>&1; then
+if [ -t 0 ] && command -v fzf >/dev/null 2>&1; then
     PRESET_NAMES=$(python3 -c "
 import json
 with open('$PRESETS_FILE') as f:
