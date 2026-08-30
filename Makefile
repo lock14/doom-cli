@@ -174,6 +174,7 @@ test:
 	@bash -n scripts/install-soundfonts.sh
 	@bash -n scripts/doom-launch.sh
 	@bash -n scripts/test-turnkey.sh
+	@bash -n scripts/test-doom-launch.sh
 	@echo "=== Validating Declarative Presets & Parity ==="
 	@python3 scripts/build-presets.py --check
 	@echo "=== Validating JSON Files ==="
@@ -216,6 +217,8 @@ test:
 	else \
 		ls "$$TEST_DIR/.config/uzdoom/" | grep -q 'autoexec.cfg.bak.'; \
 	fi && \
+	echo "=== Running doom-launch CLI Test Suite ===" && \
+	./scripts/test-doom-launch.sh && \
 	echo "=== Running End-to-End Turnkey & System Test Suite ===" && \
 	./scripts/test-turnkey.sh && \
 	echo "All validation checks passed successfully for $(UNAME_S)!"
