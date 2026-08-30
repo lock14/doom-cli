@@ -10,10 +10,12 @@ if [ "$OS" = "Darwin" ]; then
     UZDOOM_DIR="$APP_SUPPORT/uzdoom"
     DSDA_DIR="$APP_SUPPORT/dsda-doom"
     RUNNER_DIR="$APP_SUPPORT/DoomRunner"
+    DATA_DIR="$APP_SUPPORT/doom-configs"
 else
     UZDOOM_DIR="$HOME/.config/uzdoom"
     DSDA_DIR="$HOME/.local/share/dsda-doom"
     RUNNER_DIR="$HOME/.local/share/DoomRunner"
+    DATA_DIR="$HOME/.local/share/doom-configs"
 fi
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 
@@ -25,6 +27,7 @@ echo "Creating directories..."
 mkdir -p "$UZDOOM_DIR"
 mkdir -p "$DSDA_DIR"
 mkdir -p "$RUNNER_DIR"
+mkdir -p "$DATA_DIR"
 mkdir -p "$BIN_DIR"
 
 copy_with_backup() {
@@ -45,6 +48,9 @@ copy_with_backup() {
 copy_with_backup "$SCRIPT_DIR/uzdoom/autoexec.cfg" "$UZDOOM_DIR/autoexec.cfg"
 copy_with_backup "$SCRIPT_DIR/DoomRunner/linux/options.json" "$RUNNER_DIR/options.json"
 copy_with_backup "$SCRIPT_DIR/dsda-doom/dsda-doom.cfg" "$DSDA_DIR/dsda-doom.cfg"
+
+echo "Installing presets data -> $DATA_DIR/presets.json..."
+cp "$SCRIPT_DIR/data/presets.json" "$DATA_DIR/presets.json"
 
 echo "Installing doom-launch CLI -> $BIN_DIR/doom-launch..."
 cp "$SCRIPT_DIR/scripts/doom-launch.sh" "$BIN_DIR/doom-launch"

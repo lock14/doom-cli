@@ -5,8 +5,24 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PRESETS_FILE="$ROOT_DIR/data/presets.json"
+
+# Locate presets.json across source repo and standard installed locations
+PRESETS_FILE=""
+if [ -n "${DOOM_PRESETS_FILE:-}" ] && [ -f "$DOOM_PRESETS_FILE" ]; then
+    PRESETS_FILE="$DOOM_PRESETS_FILE"
+elif [ -f "$SCRIPT_DIR/../data/presets.json" ]; then
+    PRESETS_FILE="$SCRIPT_DIR/../data/presets.json"
+elif [ -f "$HOME/.local/share/doom-configs/presets.json" ]; then
+    PRESETS_FILE="$HOME/.local/share/doom-configs/presets.json"
+elif [ -f "$HOME/Library/Application Support/doom-configs/presets.json" ]; then
+    PRESETS_FILE="$HOME/Library/Application Support/doom-configs/presets.json"
+fi
+
+if [ -z "$PRESETS_FILE" ] || [ ! -f "$PRESETS_FILE" ]; then
+    echo "Error: presets.json data file not found." >&2
+    echo "Run 'make install' or './setup.sh' to install configuration and preset data files." >&2
+    exit 1
+fi
 
 OS="$(uname -s)"
 if [ "$OS" = "Darwin" ]; then

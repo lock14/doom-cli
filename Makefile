@@ -9,6 +9,7 @@ ifeq ($(UNAME_S),Darwin)
     RUNNER_DIR  ?= $(APP_SUPPORT)/DoomRunner
     WADS_DIR    ?= $(APP_SUPPORT)/games/uzdoom
     SF_DIR      ?= $(APP_SUPPORT)/soundfonts
+    DATA_DIR    ?= $(APP_SUPPORT)/doom-configs
 else
     # Linux standard XDG paths
     UZDOOM_DIR  ?= $(PREFIX)/.config/uzdoom
@@ -16,12 +17,13 @@ else
     RUNNER_DIR  ?= $(PREFIX)/.local/share/DoomRunner
     WADS_DIR    ?= $(PREFIX)/.local/share/games/uzdoom
     SF_DIR      ?= $(PREFIX)/.local/share/soundfonts
+    DATA_DIR    ?= $(PREFIX)/.local/share/doom-configs
 endif
 
 BIN_DIR ?= $(PREFIX)/.local/bin
 
 .PHONY: all bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
-        install-launcher install-soundfonts install-engines install-engine-uzdoom \
+        install-data install-launcher install-soundfonts install-engines install-engine-uzdoom \
         install-engine-dsda install-engine-doomrunner build-presets fetch-wads \
         extract-iwads play sync diff help check test
 
@@ -39,6 +41,7 @@ help:
 	@echo "  make install-uzdoom    - Install only UZDoom autoexec.cfg"
 	@echo "  make install-dsda      - Install only DSDA-Doom dsda-doom.cfg (auto-detects display resolution)"
 	@echo "  make install-doomrunner- Install only DoomRunner options.json"
+	@echo "  make install-data      - Install declarative data/presets.json to $(DATA_DIR)"
 	@echo "  make install-launcher  - Install interactive doom-launch CLI to $(BIN_DIR)"
 	@echo "  make install-engines   - Download latest binaries (UZDoom, DSDA-Doom, DoomRunner)"
 	@echo "  make sync              - Copy active system configs back into repo"
@@ -48,8 +51,8 @@ help:
 # Complete bootstrap: download engines and install configs + launcher
 bootstrap: install-engines install
 
-install: install-uzdoom install-dsda install-doomrunner install-launcher
-	@echo "All configurations and launcher successfully installed!"
+install: install-uzdoom install-dsda install-doomrunner install-data install-launcher
+	@echo "All configurations, data files, and launcher successfully installed!"
 
 # Config installation targets
 install-uzdoom:
@@ -79,6 +82,11 @@ install-doomrunner:
 	fi
 	@echo "Installing DoomRunner/linux/options.json -> $(RUNNER_DIR)/options.json"
 	@sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json > "$(RUNNER_DIR)/options.json"
+
+install-data:
+	@mkdir -p "$(DATA_DIR)"
+	@echo "Installing data/presets.json -> $(DATA_DIR)/presets.json"
+	@cp data/presets.json "$(DATA_DIR)/presets.json"
 
 install-launcher:
 	@mkdir -p "$(BIN_DIR)"
@@ -171,6 +179,7 @@ test:
 		test -f "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
 		test -f "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		test -f "$$TEST_DIR/Library/Application Support/DoomRunner/options.json" && \
+		test -f "$$TEST_DIR/Library/Application Support/doom-configs/presets.json" && \
 		test -f "$$TEST_DIR/.local/bin/doom-launch" && \
 		! grep -q '__RESOLUTION__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json"; \
@@ -178,6 +187,7 @@ test:
 		test -f "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
 		test -f "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
 		test -f "$$TEST_DIR/.local/share/DoomRunner/options.json" && \
+		test -f "$$TEST_DIR/.local/share/doom-configs/presets.json" && \
 		test -f "$$TEST_DIR/.local/bin/doom-launch" && \
 		! grep -q '__RESOLUTION__' "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/.local/share/DoomRunner/options.json"; \

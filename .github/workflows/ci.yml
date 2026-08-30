@@ -35,8 +35,11 @@ jobs:
           test -f "$TEST_HOME/.config/uzdoom/autoexec.cfg"
           test -f "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
           test -f "$TEST_HOME/.local/share/DoomRunner/options.json"
+          test -f "$TEST_HOME/.local/share/doom-configs/presets.json"
           test -f "$TEST_HOME/.local/bin/doom-launch"
           ! grep -q '__HOME__' "$TEST_HOME/.local/share/DoomRunner/options.json"
+          ! grep -q '__RESOLUTION__' "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
+          HOME="$TEST_HOME" "$TEST_HOME/.local/bin/doom-launch" --list
           rm -rf "$TEST_HOME"
 
       - name: Test CLI and automation tool interfaces
@@ -73,8 +76,11 @@ jobs:
           test -f "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
           test -f "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
           test -f "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          test -f "$TEST_HOME/Library/Application Support/doom-configs/presets.json"
           test -f "$TEST_HOME/.local/bin/doom-launch"
           ! grep -q '__HOME__' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          ! grep -q '__RESOLUTION__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
+          HOME="$TEST_HOME" "$TEST_HOME/.local/bin/doom-launch" --list
           rm -rf "$TEST_HOME"
 
   validate-windows:
