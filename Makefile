@@ -50,7 +50,7 @@ help:
 	@echo "    make build-presets      Recompile data/presets.json into launcher options.json"
 
 # ⚡ Turnkey Setup: All-in-one installation for players who just want everything ready
-turnkey: bootstrap install-soundfonts extract-iwads fetch-wads
+turnkey: install-engines install-soundfonts install extract-iwads fetch-wads
 	@echo ""
 	@echo "============================================================"
 	@echo "  ✓ Turnkey Doom setup complete!"
@@ -63,6 +63,9 @@ bootstrap: install-engines install
 
 install: install-uzdoom install-dsda install-doomrunner install-data install-launcher
 	@echo "All configurations, data files, and launcher successfully installed!"
+	@if [ ! -f "$(SF_DIR)/GeneralUser-GS.sf2" ]; then \
+		echo "  ℹ Tip: Run 'make install-soundfonts' (or 'make turnkey') to download the configured Roland SC-55 SoundFont."; \
+	fi
 
 # Config installation targets
 install-uzdoom:
@@ -72,7 +75,7 @@ install-uzdoom:
 		cp "$(UZDOOM_DIR)/autoexec.cfg" "$(UZDOOM_DIR)/autoexec.cfg.bak.$$(date +%Y%m%d%H%M%S)"; \
 	fi
 	@echo "Installing uzdoom/autoexec.cfg -> $(UZDOOM_DIR)/autoexec.cfg"
-	@cp uzdoom/autoexec.cfg "$(UZDOOM_DIR)/autoexec.cfg"
+	@sed "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" uzdoom/autoexec.cfg > "$(UZDOOM_DIR)/autoexec.cfg"
 
 install-dsda:
 	@mkdir -p "$(DSDA_DIR)"
@@ -82,7 +85,7 @@ install-dsda:
 	fi
 	@RES=$$("./scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080"); \
 	echo "Installing dsda-doom/dsda-doom.cfg -> $(DSDA_DIR)/dsda-doom.cfg (Resolution: $$RES)"; \
-	sed "s|__RESOLUTION__|$$RES|g" dsda-doom/dsda-doom.cfg > "$(DSDA_DIR)/dsda-doom.cfg"
+	sed -e "s|__RESOLUTION__|$$RES|g" -e "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" dsda-doom/dsda-doom.cfg > "$(DSDA_DIR)/dsda-doom.cfg"
 
 install-doomrunner:
 	@mkdir -p "$(RUNNER_DIR)"
@@ -137,11 +140,11 @@ install-engine-doomrunner:
 sync:
 	@if [ -f "$(UZDOOM_DIR)/autoexec.cfg" ]; then \
 		echo "Syncing $(UZDOOM_DIR)/autoexec.cfg -> uzdoom/autoexec.cfg"; \
-		cp "$(UZDOOM_DIR)/autoexec.cfg" uzdoom/autoexec.cfg; \
+		sed -E 's/fluid_patchset[[:space:]]+".*"/fluid_patchset "__SOUNDFONT__"/g' "$(UZDOOM_DIR)/autoexec.cfg" > uzdoom/autoexec.cfg; \
 	fi
 	@if [ -f "$(DSDA_DIR)/dsda-doom.cfg" ]; then \
 		echo "Syncing $(DSDA_DIR)/dsda-doom.cfg -> dsda-doom/dsda-doom.cfg"; \
-		sed -E 's/screen_resolution[[:space:]]+"[0-9]+x[0-9]+"/screen_resolution               "__RESOLUTION__"/g' "$(DSDA_DIR)/dsda-doom.cfg" > dsda-doom/dsda-doom.cfg; \
+		sed -E -e 's/screen_resolution[[:space:]]+"[0-9]+x[0-9]+"/screen_resolution               "__RESOLUTION__"/g' -e 's/snd_soundfont[[:space:]]+".*"/snd_soundfont                   "__SOUNDFONT__"/g' "$(DSDA_DIR)/dsda-doom.cfg" > dsda-doom/dsda-doom.cfg; \
 	fi
 	@if [ -f "$(RUNNER_DIR)/options.json" ]; then \
 		echo "Syncing $(RUNNER_DIR)/options.json -> DoomRunner/linux/options.json"; \
@@ -151,10 +154,10 @@ sync:
 # Show differences between repo configs and installed system configs
 diff:
 	@echo "=== UZDoom Diff ==="
-	@-diff -u uzdoom/autoexec.cfg "$(UZDOOM_DIR)/autoexec.cfg" || true
+	@-sed "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" uzdoom/autoexec.cfg | diff -u - "$(UZDOOM_DIR)/autoexec.cfg" || true
 	@echo "=== DSDA-Doom Diff ==="
 	@-RES=$$("./scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080"); \
-	sed "s|__RESOLUTION__|$$RES|g" dsda-doom/dsda-doom.cfg | diff -u - "$(DSDA_DIR)/dsda-doom.cfg" || true
+	sed -e "s|__RESOLUTION__|$$RES|g" -e "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" dsda-doom/dsda-doom.cfg | diff -u - "$(DSDA_DIR)/dsda-doom.cfg" || true
 	@echo "=== DoomRunner Diff ==="
 	@-sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json | diff -u - "$(RUNNER_DIR)/options.json" || true
 
@@ -170,6 +173,7 @@ test:
 	@bash -n scripts/extract-iwads.sh
 	@bash -n scripts/install-soundfonts.sh
 	@bash -n scripts/doom-launch.sh
+	@bash -n scripts/test-turnkey.sh
 	@echo "=== Validating Declarative Presets & Parity ==="
 	@python3 scripts/build-presets.py --check
 	@echo "=== Validating JSON Files ==="
@@ -192,6 +196,8 @@ test:
 		test -f "$$TEST_DIR/Library/Application Support/doom-configs/presets.json" && \
 		test -f "$$TEST_DIR/.local/bin/doom-launch" && \
 		! grep -q '__RESOLUTION__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
+		! grep -q '__SOUNDFONT__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
+		! grep -q '__SOUNDFONT__' "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json"; \
 	else \
 		test -f "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
@@ -200,6 +206,8 @@ test:
 		test -f "$$TEST_DIR/.local/share/doom-configs/presets.json" && \
 		test -f "$$TEST_DIR/.local/bin/doom-launch" && \
 		! grep -q '__RESOLUTION__' "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
+		! grep -q '__SOUNDFONT__' "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
+		! grep -q '__SOUNDFONT__' "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/.local/share/DoomRunner/options.json"; \
 	fi && \
 	$(MAKE) PREFIX="$$TEST_DIR" install > /dev/null && \

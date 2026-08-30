@@ -105,6 +105,12 @@ fi
 if grep -q '__RESOLUTION__' "$DSDA_DIR/dsda-doom.cfg"; then
     echo "FAIL: Un-substituted __RESOLUTION__ found in $DSDA_DIR/dsda-doom.cfg"; exit 1
 fi
+if grep -q '__SOUNDFONT__' "$DSDA_DIR/dsda-doom.cfg"; then
+    echo "FAIL: Un-substituted __SOUNDFONT__ found in $DSDA_DIR/dsda-doom.cfg"; exit 1
+fi
+if grep -q '__SOUNDFONT__' "$UZDOOM_DIR/autoexec.cfg"; then
+    echo "FAIL: Un-substituted __SOUNDFONT__ found in $UZDOOM_DIR/autoexec.cfg"; exit 1
+fi
 
 # Second install (must trigger backups)
 sleep 1 # Ensure timestamp differs
