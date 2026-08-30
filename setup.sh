@@ -11,11 +11,13 @@ if [ "$OS" = "Darwin" ]; then
     DSDA_DIR="$APP_SUPPORT/dsda-doom"
     RUNNER_DIR="$APP_SUPPORT/DoomRunner"
     DATA_DIR="$APP_SUPPORT/doom-configs"
+    SF_DIR="$APP_SUPPORT/soundfonts"
 else
     UZDOOM_DIR="$HOME/.config/uzdoom"
     DSDA_DIR="$HOME/.local/share/dsda-doom"
     RUNNER_DIR="$HOME/.local/share/DoomRunner"
     DATA_DIR="$HOME/.local/share/doom-configs"
+    SF_DIR="$HOME/.local/share/soundfonts"
 fi
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 
@@ -34,6 +36,7 @@ mkdir -p "$DSDA_DIR"
 mkdir -p "$RUNNER_DIR"
 mkdir -p "$DATA_DIR"
 mkdir -p "$BIN_DIR"
+mkdir -p "$SF_DIR"
 
 copy_with_backup() {
     local src="$1"
@@ -47,7 +50,10 @@ copy_with_backup() {
     fi
 
     echo "Installing $(basename "$dest")..."
-    sed -e "s|__HOME__|$HOME|g" -e "s|__RESOLUTION__|$DETECTED_RES|g" "$src" > "$dest"
+    sed -e "s|__HOME__|$HOME|g" \
+        -e "s|__RESOLUTION__|$DETECTED_RES|g" \
+        -e "s|__SOUNDFONT__|$SF_DIR/GeneralUser-GS.sf2|g" \
+        "$src" > "$dest"
 }
 
 copy_with_backup "$SCRIPT_DIR/uzdoom/autoexec.cfg" "$UZDOOM_DIR/autoexec.cfg"
