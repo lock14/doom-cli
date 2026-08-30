@@ -74,8 +74,9 @@ install-uzdoom:
 		echo "Backing up existing autoexec.cfg..."; \
 		cp "$(UZDOOM_DIR)/autoexec.cfg" "$(UZDOOM_DIR)/autoexec.cfg.bak.$$(date +%Y%m%d%H%M%S)"; \
 	fi
-	@echo "Installing uzdoom/autoexec.cfg -> $(UZDOOM_DIR)/autoexec.cfg"
-	@sed "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" uzdoom/autoexec.cfg > "$(UZDOOM_DIR)/autoexec.cfg"
+	@RATE=$$("./scripts/detect-refresh-rate.sh" 2>/dev/null || echo "60"); \
+	echo "Installing uzdoom/autoexec.cfg -> $(UZDOOM_DIR)/autoexec.cfg (Refresh Rate: $${RATE}Hz)"; \
+	sed -e "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" -e "s|__REFRESH_RATE__|$$RATE|g" uzdoom/autoexec.cfg > "$(UZDOOM_DIR)/autoexec.cfg"
 
 install-dsda:
 	@mkdir -p "$(DSDA_DIR)"
@@ -140,7 +141,7 @@ install-engine-doomrunner:
 sync:
 	@if [ -f "$(UZDOOM_DIR)/autoexec.cfg" ]; then \
 		echo "Syncing $(UZDOOM_DIR)/autoexec.cfg -> uzdoom/autoexec.cfg"; \
-		sed -E 's/fluid_patchset[[:space:]]+".*"/fluid_patchset "__SOUNDFONT__"/g' "$(UZDOOM_DIR)/autoexec.cfg" > uzdoom/autoexec.cfg; \
+		sed -E -e 's/fluid_patchset[[:space:]]+".*"/fluid_patchset "__SOUNDFONT__"/g' -e 's/vid_maxfps[[:space:]]+[0-9]+/vid_maxfps __REFRESH_RATE__/g' "$(UZDOOM_DIR)/autoexec.cfg" > uzdoom/autoexec.cfg; \
 	fi
 	@if [ -f "$(DSDA_DIR)/dsda-doom.cfg" ]; then \
 		echo "Syncing $(DSDA_DIR)/dsda-doom.cfg -> dsda-doom/dsda-doom.cfg"; \
@@ -154,7 +155,8 @@ sync:
 # Show differences between repo configs and installed system configs
 diff:
 	@echo "=== UZDoom Diff ==="
-	@-sed "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" uzdoom/autoexec.cfg | diff -u - "$(UZDOOM_DIR)/autoexec.cfg" || true
+	@-RATE=$$("./scripts/detect-refresh-rate.sh" 2>/dev/null || echo "60"); \
+	sed -e "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" -e "s|__REFRESH_RATE__|$$RATE|g" uzdoom/autoexec.cfg | diff -u - "$(UZDOOM_DIR)/autoexec.cfg" || true
 	@echo "=== DSDA-Doom Diff ==="
 	@-RES=$$("./scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080"); \
 	sed -e "s|__RESOLUTION__|$$RES|g" -e "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" dsda-doom/dsda-doom.cfg | diff -u - "$(DSDA_DIR)/dsda-doom.cfg" || true
@@ -169,6 +171,7 @@ test:
 	@bash -n setup.sh
 	@bash -n scripts/install-engines.sh
 	@bash -n scripts/detect-resolution.sh
+	@bash -n scripts/detect-refresh-rate.sh
 	@bash -n scripts/fetch-wads.sh
 	@bash -n scripts/extract-iwads.sh
 	@bash -n scripts/install-soundfonts.sh
@@ -199,6 +202,7 @@ test:
 		! grep -q '__RESOLUTION__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__SOUNDFONT__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__SOUNDFONT__' "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
+		! grep -q '__REFRESH_RATE__' "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json"; \
 	else \
 		test -f "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
@@ -209,6 +213,7 @@ test:
 		! grep -q '__RESOLUTION__' "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__SOUNDFONT__' "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__SOUNDFONT__' "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
+		! grep -q '__REFRESH_RATE__' "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
 		! grep -q '__HOME__' "$$TEST_DIR/.local/share/DoomRunner/options.json"; \
 	fi && \
 	$(MAKE) PREFIX="$$TEST_DIR" install > /dev/null && \

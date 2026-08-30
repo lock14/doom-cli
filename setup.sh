@@ -27,8 +27,9 @@ if [ "${1:-}" = "--turnkey" ]; then
 fi
 
 DETECTED_RES=$("$SCRIPT_DIR/scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080")
+DETECTED_RATE=$("$SCRIPT_DIR/scripts/detect-refresh-rate.sh" 2>/dev/null || echo "60")
 
-echo "Setting up Doom configurations for $OS (Detected Resolution: $DETECTED_RES)..."
+echo "Setting up Doom configurations for $OS (Detected: ${DETECTED_RES} @ ${DETECTED_RATE}Hz)..."
 
 echo "Creating directories..."
 mkdir -p "$UZDOOM_DIR"
@@ -52,6 +53,7 @@ copy_with_backup() {
     echo "Installing $(basename "$dest")..."
     sed -e "s|__HOME__|$HOME|g" \
         -e "s|__RESOLUTION__|$DETECTED_RES|g" \
+        -e "s|__REFRESH_RATE__|$DETECTED_RATE|g" \
         -e "s|__SOUNDFONT__|$SF_DIR/GeneralUser-GS.sf2|g" \
         "$src" > "$dest"
 }
