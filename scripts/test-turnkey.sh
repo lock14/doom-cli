@@ -197,10 +197,15 @@ FRESH_SANDBOX=$(mktemp -d "${TMPDIR:-/tmp}/doom_turnkey_fresh.XXXXXX")
 trap 'rm -rf "$SANDBOX" "$FRESH_SANDBOX"' EXIT INT TERM
 
 # Run make turnkey or setup.sh --turnkey in sandbox
-HOME="$FRESH_SANDBOX" PREFIX="$FRESH_SANDBOX" BIN_DIR="$FRESH_SANDBOX/.local/bin" WADS_DIR="$FRESH_SANDBOX/.local/share/games/uzdoom" SF_DIR="$FRESH_SANDBOX/.local/share/soundfonts" "$ROOT_DIR/setup.sh"
+HOME="$FRESH_SANDBOX" PREFIX="$FRESH_SANDBOX" BIN_DIR="$FRESH_SANDBOX/.local/bin" "$ROOT_DIR/setup.sh"
 
 test -f "$FRESH_SANDBOX/.local/bin/doom-launch" || { echo "FAIL: Turnkey did not install doom-launch"; exit 1; }
-test -f "$FRESH_SANDBOX/.local/share/doom-configs/presets.json" || { echo "FAIL: Turnkey did not install presets.json"; exit 1; }
+
+if [ "$OS" = "Darwin" ]; then
+    test -f "$FRESH_SANDBOX/Library/Application Support/doom-configs/presets.json" || { echo "FAIL: Turnkey did not install presets.json"; exit 1; }
+else
+    test -f "$FRESH_SANDBOX/.local/share/doom-configs/presets.json" || { echo "FAIL: Turnkey did not install presets.json"; exit 1; }
+fi
 
 echo "✓ Test 6 Passed: Turnkey all-in-one setup completed successfully."
 
