@@ -178,10 +178,17 @@ echo "$OUT_PREV" | grep -q "Preset:        Deathless" || { echo "FAIL: Invalid p
 echo "$OUT_PREV" | grep -q "DOOM.WAD \[✓ Found\]" || { echo "FAIL: IWAD not shown as Found in preview"; exit 1; }
 echo "$OUT_PREV" | grep -q "deathless.wad.*\[✓ Found\]" || { echo "FAIL: Mappack not shown as Found in preview"; exit 1; }
 
-# Test dry-run execution
+# Test dry-run execution with default engine
 OUT_DRY=$(cd /tmp && HOME="$SANDBOX" BIN_DIR="$BIN_DIR" WADS_DIR="$WADS_DIR" "$DOOM_LAUNCH_BIN" --dry-run "Deathless" -skill 4 -warp E1M1)
 echo "$OUT_DRY" | grep -q "dsda-doom.*-iwad.*DOOM.WAD.*-file.*deathless.wad.*-skill 4 -warp E1M1" || {
     echo "FAIL: Synthesized launch command is incorrect: $OUT_DRY"
+    exit 1
+}
+
+# Test engine override with -e flag
+OUT_OVERRIDE=$(cd /tmp && HOME="$SANDBOX" BIN_DIR="$BIN_DIR" WADS_DIR="$WADS_DIR" "$DOOM_LAUNCH_BIN" --dry-run "Deathless" -e uzdoom)
+echo "$OUT_OVERRIDE" | grep -q "uzdoom.*-iwad.*DOOM.WAD.*-file.*deathless.wad" || {
+    echo "FAIL: Engine override (-e uzdoom) failed: $OUT_OVERRIDE"
     exit 1
 }
 

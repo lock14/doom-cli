@@ -157,6 +157,9 @@ You can launch presets directly by name and pass additional engine arguments on 
 # Launch a specific preset
 doom-launch "Eviternity II"
 
+# Override default engine (e.g. run MBF mapset in DSDA-Doom)
+doom-launch "Ancient Aliens" -e dsda-doom
+
 # Launch with custom skill and warp flags
 doom-launch "Sunlust" -skill 4 -warp 01
 

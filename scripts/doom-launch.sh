@@ -45,15 +45,17 @@ usage() {
     echo "Interactive terminal launcher for Doom presets."
     echo ""
     echo "Options:"
-    echo "  --list           List all available presets"
-    echo "  --wads-dir <dir> Set custom WADs directory (default: $WADS_DIR)"
-    echo "  --dry-run        Print the engine command without executing"
-    echo "  --help, -h       Show this help message"
+    echo "  --list                 List all available presets"
+    echo "  --engine, -e <engine>  Override engine (dsda-doom or uzdoom)"
+    echo "  --wads-dir <dir>       Set custom WADs directory (default: $WADS_DIR)"
+    echo "  --dry-run              Print the engine command without executing"
+    echo "  --help, -h             Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $(basename "$0")                          # Interactive launcher (fzf or numbered menu)"
-    echo "  $(basename "$0") \"Eviternity II\"          # Launch specific preset"
-    echo "  $(basename "$0") \"Sunlust\" -skill 4 -warp 01  # Pass custom engine arguments"
+    echo "  $(basename "$0")                                  # Interactive launcher (fzf or numbered menu)"
+    echo "  $(basename "$0") \"Eviternity II\"                  # Launch specific preset"
+    echo "  $(basename "$0") \"Ancient Aliens\" -e dsda-doom    # Override engine"
+    echo "  $(basename "$0") \"Sunlust\" -skill 4 -warp 01      # Pass custom engine arguments"
     exit 0
 }
 
@@ -97,6 +99,21 @@ import json, sys
 d = json.loads(sys.argv[1])
 print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', []))}\")
 " "$preset_json")
+
+    # Apply engine override if requested via --engine / -e
+    if [ -n "$ENGINE_OVERRIDE" ]; then
+        case "$(echo "$ENGINE_OVERRIDE" | tr '[:upper:]' '[:lower:]')" in
+            dsda|dsda-doom|dsdadoom)
+                engine="dsda-doom"
+                ;;
+            uzdoom|gzdoom|zdoom)
+                engine="uzdoom"
+                ;;
+            *)
+                engine="$ENGINE_OVERRIDE"
+                ;;
+        esac
+    fi
 
     # Find engine executable
     local engine_bin=""
@@ -226,6 +243,7 @@ for m in p.get('mappacks', []):
 }
 
 DRY_RUN=0
+ENGINE_OVERRIDE=""
 SELECTED_TARGET=""
 EXTRA_ARGS=()
 
@@ -243,6 +261,10 @@ while [ $# -gt 0 ]; do
         --dry-run)
             DRY_RUN=1
             shift
+            ;;
+        --engine|-e)
+            ENGINE_OVERRIDE="$2"
+            shift 2
             ;;
         --wads-dir)
             WADS_DIR="$2"
