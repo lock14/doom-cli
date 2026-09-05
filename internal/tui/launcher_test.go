@@ -15,9 +15,30 @@ import (
 func mockCatalog() *preset.Catalog {
 	return &preset.Catalog{
 		Presets: []preset.Preset{
-			{Name: "Alien Vendetta", Engine: "dsda-doom", IWAD: "doom2.wad", Mappacks: []string{"av.wad"}},
-			{Name: "Eviternity II", Engine: "uzdoom", IWAD: "doom2.wad", Mappacks: []string{"eviternityii.wad"}},
-			{Name: "Sunder", Engine: "dsda-doom", IWAD: "doom2.wad", Mappacks: []string{"sunder.wad"}},
+			{
+				Name:        "Alien Vendetta",
+				Engine:      "dsda-doom",
+				IWAD:        "doom2.wad",
+				Mappacks:    []string{"av.wad"},
+				Author:      "Anders Johnsen, Brad Spencer, et al.",
+				ReleaseDate: "2002",
+			},
+			{
+				Name:        "Eviternity II",
+				Engine:      "uzdoom",
+				IWAD:        "doom2.wad",
+				Mappacks:    []string{"eviternityii.wad"},
+				Author:      "Joshua \"Dragonfly\" O'Sullivan et al.",
+				ReleaseDate: "2023",
+			},
+			{
+				Name:        "Sunder",
+				Engine:      "dsda-doom",
+				IWAD:        "doom2.wad",
+				Mappacks:    []string{"sunder.wad"},
+				Author:      "Insane_Gazebo",
+				ReleaseDate: "2009",
+			},
 		},
 	}
 }
@@ -192,10 +213,13 @@ func TestModel_ReadmeViewer(t *testing.T) {
 	cat := mockCatalog()
 	m := initialModel(cat, tmpDir)
 
-	// In initial view, readme tag and Author should appear in preview
+	// In initial view, readme tag and Author/Released should appear in preview
 	viewInitial := m.View()
-	if !strings.Contains(viewInitial, "Author:        Anders Johnsen") {
+	if !strings.Contains(viewInitial, "Author:        Anders Johnsen, Brad Spencer, et al.") {
 		t.Errorf("expected view to contain Author, got:\n%s", viewInitial)
+	}
+	if !strings.Contains(viewInitial, "Released:      2002") {
+		t.Errorf("expected view to contain Released, got:\n%s", viewInitial)
 	}
 	if !strings.Contains(viewInitial, "av.txt") {
 		t.Errorf("expected view to list av.txt, got:\n%s", viewInitial)

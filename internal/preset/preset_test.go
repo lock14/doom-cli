@@ -147,20 +147,11 @@ func TestPresetParityAndInvariants(t *testing.T) {
 	}
 }
 
-func TestResolveReadme_And_ParseReadme(t *testing.T) {
+func TestResolveReadme(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	txtContent := `===========================================================================
-Title                   : Ancient Aliens
-Filename                : aaliens.zip
-Release date            : May 8, 2016
-Author                  : Paul "skillsaw" DeBruyne
-Description             : A 32-level megawad.
-New levels              : 32
-===========================================================================`
-
 	txtPath := filepath.Join(tmpDir, "aaliens_v1_2.txt")
-	if err := os.WriteFile(txtPath, []byte(txtContent), 0644); err != nil {
+	if err := os.WriteFile(txtPath, []byte("Test Readme"), 0644); err != nil {
 		t.Fatalf("failed writing test txt: %v", err)
 	}
 
@@ -175,15 +166,20 @@ New levels              : 32
 	if !ok || filepath.Base(resolved) != "aaliens_v1_2.txt" {
 		t.Fatalf("expected to resolve aaliens_v1_2.txt, got %s, ok=%v", resolved, ok)
 	}
+}
 
-	info := ParseReadme(resolved)
-	if info.Author != `Paul "skillsaw" DeBruyne` {
-		t.Errorf("expected skillsaw, got %q", info.Author)
+func TestPresetMetadata(t *testing.T) {
+	cat, err := LoadCatalog("")
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
 	}
-	if info.ReleaseDate != "May 8, 2016" {
-		t.Errorf("expected May 8, 2016, got %q", info.ReleaseDate)
-	}
-	if info.MapCount != "32" {
-		t.Errorf("expected 32, got %q", info.MapCount)
+
+	for _, p := range cat.Presets {
+		if strings.TrimSpace(p.Author) == "" {
+			t.Errorf("Preset %q missing author", p.Name)
+		}
+		if strings.TrimSpace(p.ReleaseDate) == "" {
+			t.Errorf("Preset %q missing release_date", p.Name)
+		}
 	}
 }

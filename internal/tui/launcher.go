@@ -312,22 +312,18 @@ func (m model) View() string {
 		cur := m.filtered[m.cursor]
 		readmePath, foundReadme := preset.ResolveReadme(m.wadsDir, cur)
 		hasReadme = foundReadme
-		var readmeInfo preset.ReadmeInfo
-		if hasReadme {
-			readmeInfo = preset.ParseReadme(readmePath)
-		}
 
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", labelStyle.Render("Preset:        "), valueBoldStyle.Render(cur.Name)),
 		)
-		if readmeInfo.Author != "" {
+		if cur.Author != "" {
 			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Author:        "), readmeInfo.Author),
+				fmt.Sprintf("%s%s", labelStyle.Render("Author:        "), cur.Author),
 			)
 		}
-		if readmeInfo.ReleaseDate != "" {
+		if cur.ReleaseDate != "" {
 			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Released:      "), readmeInfo.ReleaseDate),
+				fmt.Sprintf("%s%s", labelStyle.Render("Released:      "), cur.ReleaseDate),
 			)
 		}
 		engStr := "UZDoom (Software-Plus / Advanced)"
@@ -375,7 +371,7 @@ func (m model) View() string {
 			}
 			if hasReadme {
 				previewLines = append(previewLines,
-					fmt.Sprintf("  - %-22s %s", readmeInfo.Filename, tagUZDoomStyle.Render("[✓ Readme]")),
+					fmt.Sprintf("  - %-22s %s", filepath.Base(readmePath), tagUZDoomStyle.Render("[✓ Readme]")),
 				)
 			}
 		}
