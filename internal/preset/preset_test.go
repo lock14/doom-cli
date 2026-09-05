@@ -183,3 +183,58 @@ func TestPresetMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeText_And_ReadReadme(t *testing.T) {
+	// 1. CRLF normalization
+	crlf := []byte("Line 1\r\nLine 2\r\n")
+	if got := DecodeText(crlf); got != "Line 1\nLine 2\n" {
+		t.Errorf("expected normalized LF, got %q", got)
+	}
+
+	// 2. CP437 DOS block/shade art (like Alien Vendetta AV.TXT)
+	// In CP437: 0xDB = █, 0xB0 = ░, 0xB1 = ▒, 0xB2 = ▓
+	// If mistakenly decoded as UTF-8, 0xDB 0xB0 becomes the Arabic digit '۰'
+	cp437Bytes := []byte{0xdb, 0xb0, 0xdb, 0xb1, 0xdb, 0xb2, 0xb0, 0xb1, 0xb2}
+	decodedCP437 := DecodeText(cp437Bytes)
+	if strings.Contains(decodedCP437, "۰") {
+		t.Errorf("CP437 text mistakenly decoded as Arabic numeral: %q", decodedCP437)
+	}
+	expectedCP437 := "█░█▒█▓░▒▓"
+	if decodedCP437 != expectedCP437 {
+		t.Errorf("expected CP437 %q, got %q", expectedCP437, decodedCP437)
+	}
+
+	// 3. Windows-1252 smart quotes and dashes
+	win1252Bytes := []byte("Dragonfly\x92s map \x96 exciting")
+	decodedWin := DecodeText(win1252Bytes)
+	expectedWin := "Dragonfly’s map – exciting"
+	if decodedWin != expectedWin {
+		t.Errorf("expected Windows-1252 %q, got %q", expectedWin, decodedWin)
+	}
+
+	// 4. ReadReadme from disk
+	tmpDir := t.TempDir()
+	txtPath := filepath.Join(tmpDir, "test.txt")
+	if err := os.WriteFile(txtPath, cp437Bytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+	content, err := ReadReadme(txtPath)
+	if err != nil {
+		t.Fatalf("ReadReadme failed: %v", err)
+	}
+	if content != expectedCP437 {
+		t.Errorf("expected ReadReadme %q, got %q", expectedCP437, content)
+	}
+
+	// 5. Multiline CP437 ASCII art with CRLF
+	multilineCP437 := []byte(
+		"Header\r\n" +
+			"\xb0\xb1\xb2 \xdb\xdb\xdb \xb2\xb1\xb0\r\n" +
+			"Footer\r\n",
+	)
+	decodedMulti := DecodeText(multilineCP437)
+	expectedMulti := "Header\n░▒▓ ███ ▓▒░\nFooter\n"
+	if decodedMulti != expectedMulti {
+		t.Errorf("expected multiline CP437 %q, got %q", expectedMulti, decodedMulti)
+	}
+}

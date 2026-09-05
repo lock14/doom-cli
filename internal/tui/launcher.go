@@ -111,8 +111,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
-			m.viewport.Width = msg.Width - 4
-			m.viewport.Height = msg.Height - 6
+			boxWidth := m.width - 2
+			if boxWidth < 40 {
+				boxWidth = 40
+			}
+			m.viewport.Width = boxWidth - 4
+			vpHeight := m.height - 7
+			if vpHeight < 5 {
+				vpHeight = 5
+			}
+			m.viewport.Height = vpHeight
 			return m, nil
 
 		case tea.KeyMsg:
@@ -159,20 +167,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 				cur := m.filtered[m.cursor]
 				if txtPath, ok := preset.ResolveReadme(m.wadsDir, cur); ok {
-					content, err := os.ReadFile(txtPath)
+					content, err := preset.ReadReadme(txtPath)
 					if err == nil {
 						m.viewingReadme = true
 						m.readmeTitle = fmt.Sprintf("README: %s (%s)", cur.Name, filepath.Base(txtPath))
-						vpWidth := m.width - 4
-						if vpWidth < 40 {
-							vpWidth = 40
+						boxWidth := m.width - 2
+						if boxWidth < 40 {
+							boxWidth = 40
 						}
-						vpHeight := m.height - 6
+						vpWidth := boxWidth - 4
+						if vpWidth < 36 {
+							vpWidth = 36
+						}
+						vpHeight := m.height - 7
 						if vpHeight < 5 {
 							vpHeight = 5
 						}
 						m.viewport = viewport.New(vpWidth, vpHeight)
-						m.viewport.SetContent(string(content))
+						m.viewport.SetContent(content)
 						return m, nil
 					}
 				}
@@ -239,8 +251,12 @@ func (m model) View() string {
 	}
 
 	if m.viewingReadme {
+		boxWidth := m.width - 2
+		if boxWidth < 40 {
+			boxWidth = 40
+		}
 		header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
-		box := previewBoxStyle.Width(m.width - 4).Height(m.viewport.Height).Render(m.viewport.View())
+		box := previewBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
 		footer := "\n\n" + helpStyle.Render("↑/↓/PgUp/PgDn: Scroll • Enter: Launch • Tab/Esc/q: Back")
 		return header + box + footer + "\n"
 	}

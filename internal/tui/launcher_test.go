@@ -205,8 +205,10 @@ func TestModel_View_QuittingAndSelected(t *testing.T) {
 func TestModel_ReadmeViewer(t *testing.T) {
 	tmpDir := t.TempDir()
 	txtPath := filepath.Join(tmpDir, "av.txt")
-	txtContent := "Title: Alien Vendetta\nAuthor: Anders Johnsen\nDescription: Megawad"
-	if err := os.WriteFile(txtPath, []byte(txtContent), 0644); err != nil {
+	txtContent := []byte(
+		"Title: Alien Vendetta\n\xdb\xb0\xdb\xb1\xdb\xb2\nAuthor: Anders Johnsen\nDescription: Megawad",
+	)
+	if err := os.WriteFile(txtPath, txtContent, 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -238,6 +240,12 @@ func TestModel_ReadmeViewer(t *testing.T) {
 	}
 	if !strings.Contains(viewReadme, "Title: Alien Vendetta") {
 		t.Errorf("expected view to contain readme content, got:\n%s", viewReadme)
+	}
+	if strings.Contains(viewReadme, "۰") {
+		t.Errorf("expected view not to contain Arabic numeral from CP437, got:\n%s", viewReadme)
+	}
+	if !strings.Contains(viewReadme, "█░█▒█▓") {
+		t.Errorf("expected view to contain decoded CP437 block art █░█▒█▓, got:\n%s", viewReadme)
 	}
 
 	// Pressing esc closes the readme
