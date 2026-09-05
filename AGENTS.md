@@ -87,6 +87,14 @@ Any agent modifying this repository must follow these core principles.
     5. `README.md` (documentation, commands, and presets table)
 - **CLI Subcommand Naming & Tone**: Prefer clean, idiomatic imperative verbs (`setup`, `play`, `launch`, `install`, `diff`, `sync`, `fetch`) over corporate jargon or adjectives (use `setup` rather than `turnkey`).
 
+- **Go Code Style & Quality Standards**:
+  - **Formatting**: Always format code using `gofmt -s -w .` (simplifying slice and composite literal syntax).
+  - **Receiver Naming**: Use short (1-2 letters), mnemonic receiver names consistently across methods on a type. Never use `this` or `self`.
+  - **Avoid Identifier Shadowing**: Never shadow Go built-in identifiers (`min`, `max`, `len`, `cap`, `new`, `clear`, `copy`, `close`, `delete`). Use descriptive identifiers such as `maxVal`, `count`, or `limit`.
+  - **Documentation Comments**: All exported packages, types, interfaces, constants, and functions must have Go doc comments starting with the symbol name and adhering to standard Go and `revive` conventions.
+  - **Static Analysis & Linting**: Enforce clean linting via `revive -config revive.toml -formatter friendly ./...` and `go vet ./...`.
+  - **Hardened Testing**: All tests must execute cleanly under `-race` (race detector) and `-shuffle=on` (test order randomization).
+
 ---
 
 ## 6. Documentation Boundaries & Mandatory Updates
@@ -113,10 +121,11 @@ Any agent modifying this repository must follow these core principles.
 ## 8. Verification Checklist for Agents
 
 Before completing any changes:
-1. Run `make check` to execute the full local validation suite:
-   - Go unit tests across all internal packages (`go test -v ./...`).
-   - Declarative preset invariants and parity checks (`TestPresetParityAndInvariants` verifying no duplicate base IWADs, options.json parity, and README table parity).
-   - Path invariant inspection (`grep -rE '/home/[a-zA-Z0-9_-]+'` verifying zero hardcoded personal user paths).
+1. Run the local verification sequence:
+   - `make format-check` (verify `gofmt -s -l .` reports zero unformatted files).
+   - `make tidy-check` (verify `go mod tidy && git diff --exit-code go.mod go.sum`).
+   - `make lint` (verify `go vet ./...` and `revive -config revive.toml` pass with zero warnings).
+   - `make check` (runs full suite: formatting check, tidy check, linters, `go test -v -race -shuffle=on ./...`, preset parity invariants, and path invariant inspection verifying zero hardcoded personal user paths).
 2. Verify `git diff` contains no hardcoded usernames or personal paths.
 3. Run `make help` to verify `Makefile` syntax.
 4. **Update Documentation**:

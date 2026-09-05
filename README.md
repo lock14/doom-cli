@@ -234,8 +234,11 @@ For contributors and developers building or testing the `doom` CLI from source:
 | :--- | :--- |
 | `make build` | Compiles the `bin/doom` static binary |
 | `make install` | Compiles and installs `doom` to `~/.local/bin/doom` |
-| `make test` | Runs the full Go unit test suite across all internal packages |
-| `make check` | Runs the full validation suite (unit tests, preset parity, path invariant audit) |
+| `make test` | Runs the full Go test suite with `-race` and `-shuffle=on` |
+| `make lint` | Runs `go vet` and `revive` static analysis |
+| `make format` | Formats all Go source files using `gofmt -s` |
+| `make tidy` | Tidies and verifies `go.mod` / `go.sum` |
+| `make check` | Runs full validation (format check, tidy check, lint, tests, path audit) |
 | `make clean` | Removes build artifacts |
 | `make help` | Displays available developer targets |
 

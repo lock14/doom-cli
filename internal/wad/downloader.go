@@ -1,3 +1,4 @@
+// Package wad handles multi-mirror downloading, zip extraction, and SoundFont deployment.
 package wad
 
 import (
@@ -306,7 +307,7 @@ func extractZipFile(zf *zip.File, destPath string) error {
 }
 
 // DownloadAll downloads all downloadable community megawads in the catalog.
-func (d *Downloader) DownloadAll(catalog *preset.PresetCatalog) error {
+func (d *Downloader) DownloadAll(catalog *preset.Catalog) error {
 	fmt.Fprintf(d.Out, "=== Doom Community Megawad Downloader ===\n")
 	fmt.Fprintf(d.Out, "Target directory: %s\n\n", d.WadsDir)
 

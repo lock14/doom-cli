@@ -1,3 +1,4 @@
+// Package engine manages source port downloading, execution, and argument synthesis.
 package engine
 
 import (

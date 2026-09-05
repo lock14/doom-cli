@@ -1,3 +1,4 @@
+// Package steam handles auto-discovery and extraction of official game files from Steam and GOG libraries.
 package steam
 
 import (

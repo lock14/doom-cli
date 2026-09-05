@@ -1,3 +1,4 @@
+// Package main provides the entry point for the unified doom CLI.
 package main
 
 import (
@@ -25,7 +26,7 @@ var (
 	flagPresetsFile    string
 )
 
-func getCatalog() (*preset.PresetCatalog, error) {
+func getCatalog() (*preset.Catalog, error) {
 	return preset.LoadCatalog(flagPresetsFile)
 }
 
@@ -463,4 +464,3 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 
 	return engineArgs
 }
-

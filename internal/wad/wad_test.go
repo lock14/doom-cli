@@ -173,4 +173,3 @@ func TestInstallSoundFont(t *testing.T) {
 		t.Errorf("expected path %s, got %s", installed, installed2)
 	}
 }
-

@@ -146,4 +146,3 @@ func TestPresetParityAndInvariants(t *testing.T) {
 		}
 	}
 }
-

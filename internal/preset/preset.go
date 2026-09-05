@@ -1,3 +1,4 @@
+// Package preset manages the declarative preset catalog, lookup, and DoomRunner options compilation.
 package preset
 
 import (
@@ -11,8 +12,8 @@ import (
 //go:embed data/presets.json
 var embeddedPresetsJSON []byte
 
-// PresetCatalog represents the root structure of presets.json.
-type PresetCatalog struct {
+// Catalog represents the root structure of presets.json.
+type Catalog struct {
 	Schema   string                `json:"$schema,omitempty"`
 	Metadata map[string]string     `json:"metadata,omitempty"`
 	Engines  map[string]EngineMeta `json:"engines"`
@@ -35,20 +36,20 @@ type EngineMeta struct {
 
 // Preset defines a single Doom mapset configuration.
 type Preset struct {
-	Name               string   `json:"name"`
-	Engine             string   `json:"engine"`
-	IWAD               string   `json:"iwad"`
-	Mappacks           []string `json:"mappacks"`
-	Category           string   `json:"category"`
-	Compatibility      string   `json:"compatibility"`
-	Description        string   `json:"description"`
-	DownloadURLs       []string `json:"download_urls,omitempty"`
-	AdditionalArgs     string   `json:"additional_args,omitempty"`
-	LoadMapsAfterMods  bool     `json:"load_maps_after_mods,omitempty"`
+	Name              string   `json:"name"`
+	Engine            string   `json:"engine"`
+	IWAD              string   `json:"iwad"`
+	Mappacks          []string `json:"mappacks"`
+	Category          string   `json:"category"`
+	Compatibility     string   `json:"compatibility"`
+	Description       string   `json:"description"`
+	DownloadURLs      []string `json:"download_urls,omitempty"`
+	AdditionalArgs    string   `json:"additional_args,omitempty"`
+	LoadMapsAfterMods bool     `json:"load_maps_after_mods,omitempty"`
 }
 
 // LoadCatalog loads the preset catalog from an external file if provided/existing, or falls back to embedded data.
-func LoadCatalog(customPath string) (*PresetCatalog, error) {
+func LoadCatalog(customPath string) (*Catalog, error) {
 	var raw []byte
 	var err error
 
@@ -62,7 +63,7 @@ func LoadCatalog(customPath string) (*PresetCatalog, error) {
 		raw = embeddedPresetsJSON
 	}
 
-	var catalog PresetCatalog
+	var catalog Catalog
 	if err := json.Unmarshal(raw, &catalog); err != nil {
 		return nil, err
 	}
@@ -70,7 +71,7 @@ func LoadCatalog(customPath string) (*PresetCatalog, error) {
 }
 
 // Find searches for a preset by exact name, case-insensitive match, or prefix.
-func (c *PresetCatalog) Find(target string) *Preset {
+func (c *Catalog) Find(target string) *Preset {
 	clean := strings.TrimSpace(strings.ToLower(target))
 	if clean == "" {
 		return nil

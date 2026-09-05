@@ -1,3 +1,4 @@
+// Package display provides native display resolution and refresh rate detection.
 package display
 
 import (

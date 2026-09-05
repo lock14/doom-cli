@@ -1,3 +1,4 @@
+// Package config provides platform-idiomatic path resolution for doom-configs.
 package config
 
 import (

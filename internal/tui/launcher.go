@@ -1,3 +1,4 @@
+// Package tui provides an interactive terminal user interface for launching Doom presets.
 package tui
 
 import (
@@ -11,8 +12,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mattn/go-isatty"
 	"github.com/sahilm/fuzzy"
+	"golang.org/x/term"
 
 	"github.com/lock14/doom-configs/internal/preset"
 )
@@ -52,7 +53,7 @@ var (
 )
 
 type model struct {
-	catalog  *preset.PresetCatalog
+	catalog  *preset.Catalog
 	wadsDir  string
 	input    textinput.Model
 	filtered []preset.Preset
@@ -63,7 +64,7 @@ type model struct {
 	quitting bool
 }
 
-func initialModel(catalog *preset.PresetCatalog, wadsDir string) model {
+func initialModel(catalog *preset.Catalog, wadsDir string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Type to search presets..."
 	ti.Focus()
@@ -259,9 +260,9 @@ func (m model) View() string {
 }
 
 // RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
-func RunInteractiveLauncher(catalog *preset.PresetCatalog, wadsDir string) (*preset.Preset, error) {
+func RunInteractiveLauncher(catalog *preset.Catalog, wadsDir string) (*preset.Preset, error) {
 	// If not running in a terminal, fallback to numbered menu
-	if !isatty.IsTerminal(os.Stdin.Fd()) || !isatty.IsTerminal(os.Stdout.Fd()) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
@@ -277,7 +278,7 @@ func RunInteractiveLauncher(catalog *preset.PresetCatalog, wadsDir string) (*pre
 }
 
 // RunNumberedMenu provides a standard interactive menu without full-screen TUI.
-func RunNumberedMenu(catalog *preset.PresetCatalog, in io.Reader, out io.Writer) (*preset.Preset, error) {
+func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*preset.Preset, error) {
 	fmt.Fprintln(out, "======================================================")
 	fmt.Fprintln(out, "               DOOM PRESET LAUNCHER                   ")
 	fmt.Fprintln(out, "======================================================")

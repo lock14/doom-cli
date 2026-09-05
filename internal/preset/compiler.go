@@ -1,3 +1,4 @@
+// Package preset manages the declarative preset catalog and DoomRunner compilation.
 package preset
 
 import (
@@ -11,21 +12,21 @@ import (
 
 // DoomRunnerPreset represents a preset entry in DoomRunner's options.json.
 type DoomRunnerPreset struct {
-	AdditionalArgs        string            `json:"additional_args"`
-	AlternativePaths      map[string]string `json:"alternative_paths"`
-	CompatibilityOptions  map[string]int    `json:"compatibility_options"`
-	EnvVars               map[string]string `json:"env_vars"`
-	LoadMapsAfterMods     bool              `json:"load_maps_after_mods"`
-	Mods                  []string          `json:"mods"`
-	Name                  string            `json:"name"`
-	SelectedIWAD          string            `json:"selected_IWAD"`
-	SelectedConfig        string            `json:"selected_config"`
-	SelectedEngine        string            `json:"selected_engine"`
-	SelectedMappacks      []string          `json:"selected_mappacks"`
+	AdditionalArgs       string            `json:"additional_args"`
+	AlternativePaths     map[string]string `json:"alternative_paths"`
+	CompatibilityOptions map[string]int    `json:"compatibility_options"`
+	EnvVars              map[string]string `json:"env_vars"`
+	LoadMapsAfterMods    bool              `json:"load_maps_after_mods"`
+	Mods                 []string          `json:"mods"`
+	Name                 string            `json:"name"`
+	SelectedIWAD         string            `json:"selected_IWAD"`
+	SelectedConfig       string            `json:"selected_config"`
+	SelectedEngine       string            `json:"selected_engine"`
+	SelectedMappacks     []string          `json:"selected_mappacks"`
 }
 
 // BuildLinuxPresets converts the catalog presets to DoomRunner Linux preset entries.
-func BuildLinuxPresets(cat *PresetCatalog) []DoomRunnerPreset {
+func BuildLinuxPresets(cat *Catalog) []DoomRunnerPreset {
 	var result []DoomRunnerPreset
 	for _, p := range cat.Presets {
 		enginePath := fmt.Sprintf("__HOME__/.local/bin/%s", p.Engine)
@@ -62,7 +63,7 @@ func BuildLinuxPresets(cat *PresetCatalog) []DoomRunnerPreset {
 }
 
 // BuildWindowsPresets converts the catalog presets to DoomRunner Windows preset entries.
-func BuildWindowsPresets(cat *PresetCatalog) []DoomRunnerPreset {
+func BuildWindowsPresets(cat *Catalog) []DoomRunnerPreset {
 	var result []DoomRunnerPreset
 	for _, p := range cat.Presets {
 		engineMeta, ok := cat.Engines[p.Engine]
@@ -103,7 +104,7 @@ func BuildWindowsPresets(cat *PresetCatalog) []DoomRunnerPreset {
 }
 
 // GenerateReadmeTable constructs the markdown table for README.md.
-func GenerateReadmeTable(cat *PresetCatalog) string {
+func GenerateReadmeTable(cat *Catalog) string {
 	lines := []string{
 		"| Megawad / Expansion | Engine | Compatibility / Details |",
 		"| :--- | :--- | :--- |",

@@ -1,3 +1,4 @@
+// Package templates handles engine configuration templates, backup deployment, and synchronization.
 package templates
 
 import (
@@ -268,4 +269,3 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 
 	return nil
 }
-

@@ -10,8 +10,8 @@ import (
 	"github.com/lock14/doom-configs/internal/preset"
 )
 
-func mockCatalog() *preset.PresetCatalog {
-	return &preset.PresetCatalog{
+func mockCatalog() *preset.Catalog {
+	return &preset.Catalog{
 		Presets: []preset.Preset{
 			{Name: "Alien Vendetta", Engine: "dsda-doom", IWAD: "doom2.wad", Mappacks: []string{"av.wad"}},
 			{Name: "Eviternity II", Engine: "uzdoom", IWAD: "doom2.wad", Mappacks: []string{"eviternityii.wad"}},

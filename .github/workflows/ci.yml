@@ -6,13 +6,19 @@ on:
   pull_request:
     branches: [ main ]
 
-jobs:
-  validate-linux:
-    name: Linux - Test & Build
-    runs-on: ubuntu-latest
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
+permissions:
+  contents: read
+
+jobs:
+  format-and-tidy:
+    name: Format & Module Hygiene
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Go
@@ -20,75 +26,127 @@ jobs:
         with:
           go-version: 'stable'
 
-      - name: Run Go test suite
+      - name: Verify dependencies
         run: |
-          go test -v ./...
+          go mod verify
+          go mod download
 
-      - name: Run make check
+      - name: Check formatting
         run: |
-          make check
+          if [ -n "$(gofmt -s -l .)" ]; then
+            echo "The following files are not formatted properly:"
+            gofmt -s -l .
+            echo "Please run 'gofmt -s -w .' locally and commit the changes."
+            exit 1
+          fi
+
+      - name: Check go mod tidy
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+  lint:
+    name: Lint & Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Install and run revive
+        run: |
+          go install github.com/mgechev/revive@latest
+          revive -config revive.toml -formatter friendly ./...
+
+  govulncheck:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version: 'stable'
+
+  test:
+    name: Test & Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run tests (Linux / macOS with race detector)
+        if: runner.os != 'Windows'
+        run: go test -v -race -shuffle=on ./...
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: go test -v -shuffle=on ./...
+
+      - name: Build binary
+        shell: bash
+        run: |
+          mkdir -p bin
+          go build -o bin/doom ./cmd/doom
 
       - name: Verify CLI commands
+        shell: bash
         run: |
           ./bin/doom --help
           ./bin/doom presets list
           ./bin/doom wads list
           ./bin/doom setup --help
 
-  validate-macos:
-    name: macOS - Test & Build
-    runs-on: macos-latest
-
+  # CI Gatekeeper Aggregator Job
+  # Acts as the single required status check for branch protection rules.
+  ci-gatekeeper:
+    name: CI Gatekeeper
+    runs-on: ubuntu-latest
+    needs:
+      - format-and-tidy
+      - lint
+      - govulncheck
+      - test
+    if: always()
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 'stable'
-
-      - name: Run Go test suite
+      - name: Evaluate Upstream Job Statuses
         run: |
-          go test -v ./...
+          echo "Evaluating CI pipeline job results:"
+          echo "Format & Tidy: ${{ needs.format-and-tidy.result }}"
+          echo "Lint:          ${{ needs.lint.result }}"
+          echo "Govulncheck:   ${{ needs.govulncheck.result }}"
+          echo "Test Matrix:   ${{ needs.test.result }}"
 
-      - name: Run make check
-        run: |
-          make check
+          if [ "${{ needs.format-and-tidy.result }}" != "success" ] || \
+             [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.govulncheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ]; then
+            echo "❌ CI Gatekeeper failed: One or more upstream checks did not succeed."
+            exit 1
+          fi
 
-      - name: Verify CLI commands
-        run: |
-          ./bin/doom --help
-          ./bin/doom presets list
-          ./bin/doom wads list
-
-  validate-windows:
-    name: Windows - Test & Build
-    runs-on: windows-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 'stable'
-
-      - name: Run Go test suite
-        shell: pwsh
-        run: |
-          go test -v ./...
-
-      - name: Build native Windows executable
-        shell: pwsh
-        run: |
-          go build -o bin\doom.exe .\cmd\doom
-
-      - name: Verify Windows CLI commands
-        shell: pwsh
-        run: |
-          .\bin\doom.exe --help
-          .\bin\doom.exe presets list
-          .\bin\doom.exe wads list
-          .\bin\doom.exe setup --help
+          echo "✅ All required CI checks passed successfully!"

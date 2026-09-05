@@ -9,10 +9,11 @@ import (
 	"time"
 )
 
-const (
-	DefaultSoundFontURL  = "https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/GeneralUser-GS.sf2"
-	DefaultSoundFontFile = "GeneralUser-GS.sf2"
-)
+// DefaultSoundFontURL is the primary mirror URL for the GeneralUser GS SoundFont.
+const DefaultSoundFontURL = "https://raw.githubusercontent.com/mrbumpy409/GeneralUser-GS/main/GeneralUser-GS.sf2"
+
+// DefaultSoundFontFile is the default filename of the GeneralUser GS SoundFont.
+const DefaultSoundFontFile = "GeneralUser-GS.sf2"
 
 // InstallSoundFont downloads and installs the Roland SC-55 compatible SoundFont from DefaultSoundFontURL.
 func InstallSoundFont(destDir string, force bool, out io.Writer) (string, error) {
