@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/lock14/doom-cli/internal/preset"
 )
@@ -159,6 +160,13 @@ func TestModel_View_Layouts(t *testing.T) {
 			expectSide:  false,
 			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
 		},
+		{
+			name:        "extra wide terminal side-by-side (190 columns)",
+			width:       190,
+			height:      40,
+			expectSide:  true,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -172,6 +180,41 @@ func TestModel_View_Layouts(t *testing.T) {
 				if !strings.Contains(view, term) {
 					t.Errorf("expected view to contain %q, view was:\n%s", term, view)
 				}
+			}
+
+			// Verify that every line in view fits within the terminal width and has proper borders
+			lines := strings.Split(strings.TrimSuffix(view, "\n"), "\n")
+			if len(lines) > tt.height {
+				t.Errorf("view height %d exceeds terminal height %d", len(lines), tt.height)
+			}
+			var borderLineCount int
+			for lineIdx, line := range lines {
+				w := lipgloss.Width(line)
+				if w > tt.width {
+					t.Errorf("line %d width %d exceeds terminal width %d: %q", lineIdx, w, tt.width, line)
+				}
+				trimmed := strings.TrimRight(line, " ")
+				if strings.Contains(line, "╭") {
+					borderLineCount++
+					if !strings.HasSuffix(trimmed, "╮") {
+						t.Errorf("top border line %d expected to end with '╮', got %q", lineIdx, trimmed)
+					}
+				}
+				if strings.Contains(line, "╰") {
+					borderLineCount++
+					if !strings.HasSuffix(trimmed, "╯") {
+						t.Errorf("bottom border line %d expected to end with '╯', got %q", lineIdx, trimmed)
+					}
+				}
+				if strings.Contains(line, "│") {
+					borderLineCount++
+					if !strings.HasSuffix(trimmed, "│") {
+						t.Errorf("content line %d expected to end with '│', got %q", lineIdx, trimmed)
+					}
+				}
+			}
+			if borderLineCount == 0 {
+				t.Errorf("expected border lines in view, found none")
 			}
 
 			// Move cursor down to UZDoom preset
@@ -246,6 +289,18 @@ func TestModel_ReadmeViewer(t *testing.T) {
 	}
 	if !strings.Contains(viewReadme, "█░█▒█▓") {
 		t.Errorf("expected view to contain decoded CP437 block art █░█▒█▓, got:\n%s", viewReadme)
+	}
+
+	// Verify that readme view lines fit within terminal dimensions
+	readmeLines := strings.Split(strings.TrimSuffix(viewReadme, "\n"), "\n")
+	if len(readmeLines) > m.height {
+		t.Errorf("readme view height %d exceeds terminal height %d", len(readmeLines), m.height)
+	}
+	for lineIdx, line := range readmeLines {
+		w := lipgloss.Width(line)
+		if w > m.width {
+			t.Errorf("readme line %d width %d exceeds terminal width %d: %q", lineIdx, w, m.width, line)
+		}
 	}
 
 	// Pressing esc closes the readme

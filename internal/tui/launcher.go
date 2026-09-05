@@ -118,12 +118,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
-			boxWidth := m.width - 2
-			if boxWidth < 40 {
-				boxWidth = 40
+			boxWidth := m.width - 4
+			if boxWidth < 38 {
+				boxWidth = 38
 			}
-			m.viewport.Width = boxWidth - 4
-			vpHeight := m.height - 7
+			m.viewport.Width = boxWidth - 2
+			vpHeight := m.height - 9
 			if vpHeight < 5 {
 				vpHeight = 5
 			}
@@ -186,15 +186,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err == nil {
 						m.viewingReadme = true
 						m.readmeTitle = fmt.Sprintf("README: %s (%s)", cur.Name, filepath.Base(txtPath))
-						boxWidth := m.width - 2
-						if boxWidth < 40 {
-							boxWidth = 40
+						boxWidth := m.width - 4
+						if boxWidth < 38 {
+							boxWidth = 38
 						}
-						vpWidth := boxWidth - 4
+						vpWidth := boxWidth - 2
 						if vpWidth < 36 {
 							vpWidth = 36
 						}
-						vpHeight := m.height - 7
+						vpHeight := m.height - 9
 						if vpHeight < 5 {
 							vpHeight = 5
 						}
@@ -266,9 +266,9 @@ func (m model) View() string {
 	}
 
 	if m.viewingReadme {
-		boxWidth := m.width - 2
-		if boxWidth < 40 {
-			boxWidth = 40
+		boxWidth := m.width - 4
+		if boxWidth < 38 {
+			boxWidth = 38
 		}
 		header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
 		box := panelBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
@@ -285,46 +285,47 @@ func (m model) View() string {
 		interiorHeight int
 		listHeight     int
 		detailsHeight  int
-		leftWidth      = 46
+		leftWidth      = 44
 		gutter         = 2
 		rightWidth     int
 		boxWidth       int
 	)
+	gutterStr := strings.Repeat(" ", gutter)
 
 	if m.width >= 90 {
 		availHeight := m.height - 7
 		if availHeight < 6 {
 			availHeight = 6
 		}
-		interiorHeight = availHeight - 2
-		if interiorHeight < 4 {
-			interiorHeight = 4
+		interiorHeight = availHeight - 3
+		if interiorHeight < 3 {
+			interiorHeight = 3
 		}
 		maxVisible = interiorHeight
-		rightWidth = m.width - leftWidth - gutter - 2
-		if rightWidth < 42 {
-			rightWidth = 42
+		rightWidth = m.width - leftWidth - gutter - 6
+		if rightWidth < 38 {
+			rightWidth = 38
 		}
 	} else {
-		boxWidth = m.width - 2
-		if boxWidth < 40 {
-			boxWidth = 40
+		boxWidth = m.width - 4
+		if boxWidth < 36 {
+			boxWidth = 36
 		}
-		availHeight := m.height - 8
-		if availHeight < 10 {
-			availHeight = 10
+		availHeight := m.height - 9
+		if availHeight < 6 {
+			availHeight = 6
 		}
 		listHeight = availHeight / 2
-		if listHeight < 5 {
-			listHeight = 5
+		if listHeight < 3 {
+			listHeight = 3
 		}
 		detailsHeight = availHeight - listHeight
-		if detailsHeight < 5 {
-			detailsHeight = 5
+		if detailsHeight < 3 {
+			detailsHeight = 3
 		}
 		maxVisible = listHeight - 2
-		if maxVisible < 3 {
-			maxVisible = 3
+		if maxVisible < 1 {
+			maxVisible = 1
 		}
 	}
 
@@ -370,7 +371,9 @@ func (m model) View() string {
 	// Build Preview View for current item
 	var previewLines []string
 	hasReadme := false
-	if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+	if len(m.filtered) == 0 {
+		previewLines = append(previewLines, helpStyle.Render("No preset details available."))
+	} else if m.cursor >= 0 && m.cursor < len(m.filtered) {
 		cur := m.filtered[m.cursor]
 		readmePath, foundReadme := preset.ResolveReadme(m.wadsDir, cur)
 		hasReadme = foundReadme
@@ -442,18 +445,16 @@ func (m model) View() string {
 	// Layout presentation
 	var content string
 	if m.width >= 90 {
-		leftBox := panelBoxStyle.Width(leftWidth).Height(interiorHeight).Render(strings.Join(listLines, "\n"))
-		var rightBox string
-		if len(previewLines) > 0 {
-			rightBox = panelBoxStyle.Width(rightWidth).Height(interiorHeight).Render(strings.Join(previewLines, "\n"))
-		}
-		content = lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "  ", rightBox)
+		leftText := formatBoxContent(listLines, leftWidth-2, interiorHeight)
+		rightText := formatBoxContent(previewLines, rightWidth-2, interiorHeight)
+		leftBox := panelBoxStyle.Width(leftWidth).Render(leftText)
+		rightBox := panelBoxStyle.Width(rightWidth).Render(rightText)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
 	} else {
-		leftBox := panelBoxStyle.Width(boxWidth).Height(listHeight - 2).Render(strings.Join(listLines, "\n"))
-		var rightBox string
-		if len(previewLines) > 0 {
-			rightBox = panelBoxStyle.Width(boxWidth).Height(detailsHeight - 2).Render(strings.Join(previewLines, "\n"))
-		}
+		leftText := formatBoxContent(listLines, boxWidth-2, listHeight-2)
+		rightText := formatBoxContent(previewLines, boxWidth-2, detailsHeight-2)
+		leftBox := panelBoxStyle.Width(boxWidth).Render(leftText)
+		rightBox := panelBoxStyle.Width(boxWidth).Render(rightText)
 		content = leftBox + "\n" + rightBox
 	}
 
@@ -512,4 +513,24 @@ func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*pre
 	}
 
 	return nil, fmt.Errorf("invalid menu selection")
+}
+
+// formatBoxContent wraps and clamps or pads lines to fit exactly targetHeight lines within innerWidth.
+func formatBoxContent(lines []string, innerWidth, targetHeight int) string {
+	if innerWidth < 1 {
+		innerWidth = 1
+	}
+	if targetHeight < 1 {
+		targetHeight = 1
+	}
+	wrapStyle := lipgloss.NewStyle().Width(innerWidth)
+	wrapped := wrapStyle.Render(strings.Join(lines, "\n"))
+	contentLines := strings.Split(wrapped, "\n")
+	if len(contentLines) > targetHeight {
+		contentLines = contentLines[:targetHeight]
+	}
+	for len(contentLines) < targetHeight {
+		contentLines = append(contentLines, "")
+	}
+	return strings.Join(contentLines, "\n")
 }
