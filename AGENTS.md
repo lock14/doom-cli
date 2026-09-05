@@ -65,14 +65,27 @@ Any agent modifying this repository must follow these core principles.
 ## 5. Cross-Platform Parity & Tooling Maintenance
 
 - **Cross-Platform Consistency**: When adding or updating presets in `data/presets.json`, ensure changes compile cleanly across Linux (`DoomRunner/linux/options.json`) and Windows (`DoomRunner/windows/options.json`).
+- **Unified Go Architecture (`cmd/doom` & `internal/`)**:
+  - The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary on Linux, macOS, and Windows.
+  - Package structure:
+    - `cmd/doom/`: Cobra CLI commands (`play`, `launch`, `turnkey`, `wads`, `engines`, `soundfont`, `config`, `presets`).
+    - `internal/config/`: Platform path resolvers adhering strictly to XDG (Linux), `~/Library/Application Support/` (macOS), and `%LOCALAPPDATA%`/`%APPDATA%` (Windows with execution drive auto-mapping).
+    - `internal/display/`: Native display resolution and refresh rate detection.
+    - `internal/engine/`: Source port asset downloading and argument synthesis/execution.
+    - `internal/preset/`: Embedded presets catalog loader and options.json/README compiler.
+    - `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
+    - `internal/templates/`: Embedded engine configuration templates and backup deployer.
+    - `internal/tui/`: Interactive Bubble Tea fuzzy launcher and preview pane.
+    - `internal/wad/`: Multi-mirror archive downloader, `archive/zip` extractor, and SoundFont installer.
+  - Whenever presets or config templates are updated, synchronize both the repository templates and the embedded data in `internal/preset/data/` and `internal/templates/data/`.
 - **Maintain Automation & Sync Targets**:
   - Every config file and script tracked in the repository must be integrated into:
-    1. `make install` & `make install-<target>`
-    2. `make sync` (to pull in-game tweaks from the system back into the repo)
-    3. `make diff` (to inspect differences between repo and active system configs)
-    4. `make check` (validation suite)
-    5. `setup.sh` (Linux fallback script)
-    6. `setup.ps1` (Windows PowerShell script)
+    1. `make build` & `make install` (`install-<target>`)
+    2. `make sync` / `doom config sync` (to pull in-game tweaks from the system back into the repo)
+    3. `make diff` / `doom config diff` (to inspect differences between repo and active system configs)
+    4. `make check` (validation suite including `go test ./...`)
+    5. `setup.sh` (POSIX script compiling native `doom` binary if Go is present)
+    6. `setup.ps1` (PowerShell script compiling `doom.exe` if Go is present)
     7. `README.md` (documentation, commands, and presets table)
 
 ---

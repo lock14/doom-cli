@@ -20,6 +20,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq shellcheck
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run Go test suite
+        run: |
+          go test -v ./...
+
+      - name: Build and verify native doom binary
+        run: |
+          go build -o bin/doom ./cmd/doom
+          ./bin/doom presets list
+          ./bin/doom wads list
+
       - name: Run ShellCheck
         run: |
           shellcheck setup.sh scripts/*.sh
@@ -67,6 +82,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run Go test suite
+        run: |
+          go test -v ./...
+
+      - name: Build and verify native doom binary
+        run: |
+          go build -o bin/doom ./cmd/doom
+          ./bin/doom presets list
+
       - name: Run make check test suite
         run: |
           make check
@@ -98,6 +127,23 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run Go test suite
+        shell: pwsh
+        run: |
+          go test -v ./...
+
+      - name: Build and verify native doom binary on Windows
+        shell: pwsh
+        run: |
+          go build -o bin\doom.exe .\cmd\doom
+          .\bin\doom.exe presets list
+          .\bin\doom.exe wads list
 
       - name: Validate JSON Files
         shell: pwsh

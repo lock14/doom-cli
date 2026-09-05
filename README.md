@@ -13,7 +13,8 @@ A curated collection of configuration files, launcher presets, build targets, an
 
 - **[DSDA-Doom](https://github.com/kraflab/dsda-doom)**: Precision speedrunning and demo-accurate source port preconfigured for MBF21, extended HUD, dynamic resolution scaling, and uncapped framerates.
 - **[UZDoom](https://github.com/UZDoom/uzdoom)**: Modern ZDoom-based engine configured with a Nightdive "Software-Plus" visual profile, auto-detecting aspect ratio, and broad mod compatibility.
-- **`doom-launch`**: Lightweight, lightning-fast terminal UI / CLI launcher with interactive fuzzy search (`fzf`), real-time metadata previews, and direct CLI launching.
+- **`doom` CLI**: Unified, zero-dependency cross-platform CLI tool and interactive terminal launcher with fuzzy search, real-time metadata previews, Steam/GOG auto-discovery, multi-mirror downloading, and configuration management on Linux, macOS, and Windows.
+- **`doom-launch`**: Lightweight POSIX terminal launcher wrapper with fuzzy search (`fzf`) and numbered menu fallback.
 - **[DoomRunner](https://github.com/Youda008/DoomRunner)**: Modern graphical launcher preloaded with 32 community megawad presets mapped to their ideal engines.
 
 ---
@@ -28,13 +29,16 @@ The `Makefile` automatically detects whether you are running **Linux** or **macO
 
 #### Option 1: ⚡ Turnkey Setup (One-Command Everything)
 For players who just want everything ready to play immediately with zero manual steps:
-Downloads all engines (`uzdoom`, `dsda-doom`, `doomrunner`), installs all configurations & `doom-launch`, deploys the Roland SC-55 MIDI SoundFont, auto-extracts official Steam/GOG IWADs, and downloads all 20+ free community megawads:
+Downloads all engines (`uzdoom`, `dsda-doom`, `doomrunner`), installs all configurations & `doom`, deploys the Roland SC-55 MIDI SoundFont, auto-extracts official Steam/GOG IWADs, and downloads all 20+ free community megawads:
 
 ```bash
-make turnkey
-```
+# Using native doom CLI:
+doom turnkey
 
-*(Or without `make`: `./setup.sh --turnkey`)*
+# Or using Make / POSIX script:
+make turnkey
+# or: ./setup.sh --turnkey
+```
 
 > [!TIP]
 > Ensure `~/.local/bin` is in your `$PATH` (e.g. in your `~/.bashrc` or `~/.zshrc`):
@@ -77,6 +81,18 @@ Alternatively, deploy without `make` using the POSIX setup script:
 
 ### Windows
 
+On Windows, you can use the native `doom.exe` CLI for turnkey setup and interactive launching, or deploy DoomRunner via PowerShell:
+
+#### Option 1: Native Turnkey Setup (`doom.exe`)
+```powershell
+# Complete 1-step setup (engines, configs, soundfonts, steam IWADs, and megawads)
+.\doom.exe turnkey
+
+# Interactive fuzzy launcher directly in Windows Terminal / PowerShell
+.\doom.exe play
+```
+
+#### Option 2: DoomRunner Deployment via PowerShell
 To install the preconfigured DoomRunner presets on Windows via PowerShell:
 
 ```powershell
@@ -92,7 +108,7 @@ If your WADs or engines are on a different drive, pass the `-BaseDrive` paramete
 .\setup.ps1 -WadsDir "D:\Games\Doom WADS"
 ```
 
-This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\options.json` and `%APPDATA%\DoomRunner\options.json`, creating timestamped backups beforehand.
+This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\options.json` and `%APPDATA%\DoomRunner\options.json`, creating timestamped backups beforehand. If Go is available, it also compiles `doom.exe` into `%LOCALAPPDATA%\Programs\Doom\bin\`.
 
 ---
 
@@ -142,16 +158,19 @@ make install-soundfonts
 
 ## Launching & Playing Games
 
-### 1. Interactive Terminal Launcher (`doom-launch`)
+### 1. Interactive Terminal Launcher (`doom` / `doom play`)
 
-Launch presets from anywhere in your terminal using `doom-launch` (or `make play`):
+Launch presets from anywhere in your terminal using the native `doom` CLI (or `doom-launch` / `make play`):
 
 ```bash
-# Interactive fuzzy-finder menu (requires fzf) or numbered menu
-doom-launch
+# Interactive fuzzy search & live preview (Linux, macOS, AND Windows!)
+doom play
+# Or simply:
+doom
 
-# Or launch via Makefile
+# Or launch via Makefile / POSIX script
 make play
+# or: doom-launch
 ```
 
 #### Direct CLI Launching & Custom Engine Flags
@@ -159,19 +178,19 @@ You can launch presets directly by name and pass additional engine arguments on 
 
 ```bash
 # Launch a specific preset
-doom-launch "Eviternity II"
+doom launch "Eviternity II"
 
 # Override default engine (e.g. run MBF mapset in DSDA-Doom)
-doom-launch "Ancient Aliens" -e dsda-doom
+doom launch "Ancient Aliens" -e dsda-doom
 
 # Launch with custom skill and warp flags
-doom-launch "Sunlust" -skill 4 -warp 01
+doom launch "Sunlust" -skill 4 -warp 01
 
 # Inspect synthesized launch command without starting the game
-doom-launch --dry-run "Alien Vendetta"
+doom launch "Alien Vendetta" --dry-run
 
 # List all available presets and their mapped engines
-doom-launch --list
+doom presets list
 ```
 
 ### 2. Graphical Launcher (DoomRunner)

@@ -109,4 +109,18 @@ foreach ($Dir in $DataDirs) {
     Install-ConfigWithBackup -Content $PresetsContent -Destination $TargetFile
 }
 
+if (Get-Command go -ErrorAction SilentlyContinue) {
+    Write-Host "Compiling native doom CLI (doom.exe)..."
+    $DoomBinDir = "$env:LOCALAPPDATA\Programs\Doom\bin"
+    if (-not (Test-Path $DoomBinDir)) { New-Item -ItemType Directory -Path $DoomBinDir -Force | Out-Null }
+    $OutExe = Join-Path $DoomBinDir "doom.exe"
+    try {
+        & go build -o $OutExe (Join-Path $ScriptDir "cmd\doom")
+        Write-Host "✓ Installed doom.exe to $OutExe"
+    } catch {
+        Write-Host "Warning: could not compile doom.exe: $_"
+    }
+}
+
 Write-Host "Setup complete!"
+

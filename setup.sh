@@ -87,6 +87,11 @@ echo "Installing doom-launch CLI -> $BIN_DIR/doom-launch..."
 cp "$SCRIPT_DIR/scripts/doom-launch.sh" "$BIN_DIR/doom-launch"
 chmod +x "$BIN_DIR/doom-launch"
 
+if command -v go >/dev/null 2>&1; then
+    echo "Compiling and installing native doom CLI -> $BIN_DIR/doom..."
+    (cd "$SCRIPT_DIR" && go build -o "$BIN_DIR/doom" ./cmd/doom) 2>/dev/null || true
+fi
+
 if [ "$TURNKEY" -eq 1 ]; then
     echo ""
     echo "=== Running Turnkey Step 4/4: Extracting IWADs & Fetching Megawads ==="

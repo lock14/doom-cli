@@ -22,12 +22,18 @@ endif
 
 BIN_DIR ?= $(PREFIX)/.local/bin
 
-.PHONY: all turnkey bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
+.PHONY: all build turnkey bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
         install-data install-launcher install-soundfonts install-engines install-engine-uzdoom \
         install-engine-dsda install-engine-doomrunner build-presets fetch-wads \
         extract-iwads play sync diff help check test
 
-all: install
+all: build install
+
+build:
+	@if command -v go >/dev/null 2>&1; then \
+		echo "Building unified doom CLI binary..."; \
+		mkdir -p bin && go build -o bin/doom ./cmd/doom; \
+	fi
 
 help:
 	@echo "Doom Configs - Available Targets ($(UNAME_S))"
@@ -108,6 +114,10 @@ install-data:
 
 install-launcher:
 	@mkdir -p "$(BIN_DIR)"
+	@if command -v go >/dev/null 2>&1; then \
+		echo "Compiling and installing native doom CLI -> $(BIN_DIR)/doom"; \
+		go build -o "$(BIN_DIR)/doom" ./cmd/doom; \
+	fi
 	@echo "Installing scripts/doom-launch.sh -> $(BIN_DIR)/doom-launch"
 	@cp scripts/doom-launch.sh "$(BIN_DIR)/doom-launch"
 	@chmod +x "$(BIN_DIR)/doom-launch"
@@ -177,6 +187,10 @@ diff:
 check: test
 
 test:
+	@if command -v go >/dev/null 2>&1; then \
+		echo "=== Running Go Test Suite ==="; \
+		go test -v ./... || exit 1; \
+	fi
 	@echo "=== Validating Shell Scripts ==="
 	@bash -n setup.sh
 	@bash -n scripts/install-engines.sh
