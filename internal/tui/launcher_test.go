@@ -422,3 +422,58 @@ func TestComputeLayout(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateInteriorHeight(t *testing.T) {
+	tests := []struct {
+		name       string
+		termHeight int
+		expected   int
+	}{
+		{name: "standard 30-line terminal", termHeight: 30, expected: 22},
+		{name: "standard 24-line terminal", termHeight: 24, expected: 16},
+		{name: "short 14-line terminal", termHeight: 14, expected: 6},
+		{name: "very short 10-line terminal clamped to min", termHeight: 10, expected: 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateInteriorHeight(tt.termHeight)
+			if got != tt.expected {
+				t.Errorf("calculateInteriorHeight(%d) = %d, want %d", tt.termHeight, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCapsuleAndKeyHelpRenderers(t *testing.T) {
+	brand := renderBrandPill()
+	if !strings.Contains(brand, "DOOM") || !strings.Contains(brand, "") || !strings.Contains(brand, "") {
+		t.Errorf("renderBrandPill() = %q, expected DOOM with capsule caps", brand)
+	}
+
+	stats := renderStatsPill(10, 32)
+	if !strings.Contains(stats, "10 / 32 presets") {
+		t.Errorf("renderStatsPill(10, 32) = %q, expected '10 / 32 presets'", stats)
+	}
+
+	topPill := renderScrollPill(0.0)
+	if !strings.Contains(topPill, "Top") {
+		t.Errorf("renderScrollPill(0.0) = %q, expected 'Top'", topPill)
+	}
+	midPill := renderScrollPill(0.5)
+	if !strings.Contains(midPill, "50%") {
+		t.Errorf("renderScrollPill(0.5) = %q, expected '50%%'", midPill)
+	}
+	endPill := renderScrollPill(1.0)
+	if !strings.Contains(endPill, "End") {
+		t.Errorf("renderScrollPill(1.0) = %q, expected 'End'", endPill)
+	}
+
+	help := formatKeyHelp([]keyHelp{
+		{"Enter", "Launch"},
+		{"Esc", "Quit"},
+	})
+	if !strings.Contains(help, "Enter") || !strings.Contains(help, "Launch") || !strings.Contains(help, "•") {
+		t.Errorf("formatKeyHelp() = %q, expected keys and separator", help)
+	}
+}

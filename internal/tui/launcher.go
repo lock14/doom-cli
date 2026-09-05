@@ -132,6 +132,15 @@ func calculateSearchWidth(termWidth int) int {
 	return w
 }
 
+// calculateInteriorHeight returns the shared interior box height for both the main panes and README viewer.
+func calculateInteriorHeight(termHeight int) int {
+	h := termHeight - 8
+	if h < 5 {
+		return 5
+	}
+	return h
+}
+
 // calculateReadmeDimensions returns the responsive outer box and viewport dimensions for the README viewer.
 func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vpHeight int) {
 	boxWidth = termWidth - 2
@@ -142,10 +151,7 @@ func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vp
 	if vpWidth < 36 {
 		vpWidth = 36
 	}
-	vpHeight = termHeight - 8
-	if vpHeight < 5 {
-		vpHeight = 5
-	}
+	vpHeight = calculateInteriorHeight(termHeight)
 	return boxWidth, vpWidth, vpHeight
 }
 
@@ -329,15 +335,8 @@ type layoutGeometry struct {
 }
 
 func (m model) computeLayout() layoutGeometry {
+	interiorHeight := calculateInteriorHeight(m.height)
 	if m.width >= sideBySideMinWidth {
-		availHeight := m.height - 5
-		if availHeight < 6 {
-			availHeight = 6
-		}
-		interiorHeight := availHeight - 3
-		if interiorHeight < minBoxHeight {
-			interiorHeight = minBoxHeight
-		}
 		rightWidth := m.width - leftPanelWidth - gutterWidth - boxBorderColumns
 		if rightWidth < 38 {
 			rightWidth = 38
@@ -551,22 +550,44 @@ func renderBoxWithTitle(content string, width int, title string, focused bool) s
 	return strings.Join(lines, "\n")
 }
 
-func (m model) renderHeader() string {
-	brandPill := brandCapStyle.Render("") + brandBodyStyle.Render(" 💀 DOOM ") + brandCapStyle.Render("")
-	filterPrompt := filterPromptStyle.Render("   Filter: ")
-	leftPart := brandPill + filterPrompt + m.input.View()
+func renderCapsule(capStyle, bodyStyle lipgloss.Style, text string) string {
+	return capStyle.Render("") + bodyStyle.Render(text) + capStyle.Render("")
+}
 
-	statsText := fmt.Sprintf(" %d / %d presets ", len(m.filtered), len(m.catalog.Presets))
-	statsPill := statsCapStyle.Render("") + statsBodyStyle.Render(statsText) + statsCapStyle.Render("")
+func renderBrandPill() string {
+	return renderCapsule(brandCapStyle, brandBodyStyle, " 💀 DOOM ")
+}
 
+func renderStatsPill(count, total int) string {
+	return renderCapsule(statsCapStyle, statsBodyStyle, fmt.Sprintf(" %d / %d presets ", count, total))
+}
+
+func renderScrollPill(percent float64) string {
+	pct := int(percent * 100)
+	pctText := fmt.Sprintf(" %d%% ", pct)
+	if pct <= 0 {
+		pctText = " Top "
+	} else if pct >= 100 {
+		pctText = " End "
+	}
+	return renderCapsule(statsCapStyle, statsBodyStyle, pctText)
+}
+
+func renderHeaderBar(leftPart, rightPart string, width int) string {
 	leftW := lipgloss.Width(leftPart)
-	statsW := lipgloss.Width(statsPill)
+	rightW := lipgloss.Width(rightPart)
 
-	if leftW+statsW < m.width {
-		gap := m.width - leftW - statsW
-		return leftPart + strings.Repeat(" ", gap) + statsPill + "\n\n"
+	if leftW+rightW < width {
+		gap := width - leftW - rightW
+		return leftPart + strings.Repeat(" ", gap) + rightPart + "\n\n"
 	}
 	return leftPart + "\n\n"
+}
+
+func (m model) renderHeader() string {
+	leftPart := renderBrandPill() + filterPromptStyle.Render("   Filter: ") + m.input.View()
+	rightPart := renderStatsPill(len(m.filtered), len(m.catalog.Presets))
+	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
 func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []string) string {
@@ -590,27 +611,9 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 }
 
 func (m model) renderReadmeHeader() string {
-	brandPill := brandCapStyle.Render("") + brandBodyStyle.Render(" 💀 DOOM ") + brandCapStyle.Render("")
-	docLabel := filterPromptStyle.Render("   README Viewer")
-	leftPart := brandPill + docLabel
-
-	pct := int(m.viewport.ScrollPercent() * 100)
-	pctText := fmt.Sprintf(" %d%% ", pct)
-	if pct <= 0 {
-		pctText = " Top "
-	} else if pct >= 100 {
-		pctText = " End "
-	}
-	scrollPill := statsCapStyle.Render("") + statsBodyStyle.Render(pctText) + statsCapStyle.Render("")
-
-	leftW := lipgloss.Width(leftPart)
-	statsW := lipgloss.Width(scrollPill)
-
-	if leftW+statsW < m.width {
-		gap := m.width - leftW - statsW
-		return leftPart + strings.Repeat(" ", gap) + scrollPill + "\n\n"
-	}
-	return leftPart + "\n\n"
+	leftPart := renderBrandPill() + filterPromptStyle.Render("   README Viewer")
+	rightPart := renderScrollPill(m.viewport.ScrollPercent())
+	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
 func (m model) renderReadmeView() string {
@@ -621,16 +624,12 @@ func (m model) renderReadmeView() string {
 	return "\n" + header + box + footer + "\n"
 }
 
-func (m model) renderReadmeFooter() string {
-	type keyHelp struct {
-		key  string
-		desc string
-	}
-	items := []keyHelp{
-		{"↑/↓/PgUp/PgDn", "Scroll"},
-		{"Enter", "Launch"},
-		{"Tab/Esc/q", "Back"},
-	}
+type keyHelp struct {
+	key  string
+	desc string
+}
+
+func formatKeyHelp(items []keyHelp) string {
 	var parts []string
 	for _, item := range items {
 		parts = append(parts, keyHelpKeyStyle.Render(item.key)+" "+keyHelpDescStyle.Render(item.desc))
@@ -639,11 +638,15 @@ func (m model) renderReadmeFooter() string {
 	return "\n\n" + strings.Join(parts, sep)
 }
 
+func (m model) renderReadmeFooter() string {
+	return formatKeyHelp([]keyHelp{
+		{"↑/↓/PgUp/PgDn", "Scroll"},
+		{"Enter", "Launch"},
+		{"Tab/Esc/q", "Back"},
+	})
+}
+
 func (m model) renderFooter(hasReadme bool) string {
-	type keyHelp struct {
-		key  string
-		desc string
-	}
 	items := []keyHelp{
 		{"↑/↓", "Navigate"},
 		{"Enter", "Launch"},
@@ -652,13 +655,7 @@ func (m model) renderFooter(hasReadme bool) string {
 		items = append(items, keyHelp{"Tab", "Readme"})
 	}
 	items = append(items, keyHelp{"Esc", "Quit"})
-
-	var parts []string
-	for _, item := range items {
-		parts = append(parts, keyHelpKeyStyle.Render(item.key)+" "+keyHelpDescStyle.Render(item.desc))
-	}
-	sep := bulletStyle.Render("  •  ")
-	return "\n\n" + strings.Join(parts, sep)
+	return formatKeyHelp(items)
 }
 
 func (m model) View() string {
