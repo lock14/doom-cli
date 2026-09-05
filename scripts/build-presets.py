@@ -17,6 +17,28 @@ import re
 import sys
 from pathlib import Path
 
+# Ensure UTF-8 or safe fallback output on Windows legacy code pages (e.g. cp1252)
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+def safe_print(msg, file=sys.stdout):
+    try:
+        print(msg, file=file)
+    except UnicodeEncodeError:
+        safe_msg = msg.encode(getattr(file, "encoding", "ascii") or "ascii", errors="replace").decode(
+            getattr(file, "encoding", "ascii") or "ascii"
+        )
+        print(safe_msg, file=file)
+
 ROOT_DIR = Path(__file__).resolve().parent.parent
 PRESETS_FILE = ROOT_DIR / "data" / "presets.json"
 LINUX_OPTIONS_FILE = ROOT_DIR / "DoomRunner" / "linux" / "options.json"
@@ -125,7 +147,7 @@ def build_all(update_readme=True):
     with open(LINUX_OPTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(linux_options, f, indent=4)
         f.write("\n")
-    print(f"✓ Generated {LINUX_OPTIONS_FILE} ({len(presets_data)} presets)")
+    safe_print(f"✓ Generated {LINUX_OPTIONS_FILE} ({len(presets_data)} presets)")
 
     # Update Windows options
     with open(WINDOWS_OPTIONS_FILE, "r", encoding="utf-8") as f:
@@ -134,7 +156,7 @@ def build_all(update_readme=True):
     with open(WINDOWS_OPTIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(win_options, f, indent=4)
         f.write("\n")
-    print(f"✓ Generated {WINDOWS_OPTIONS_FILE} ({len(presets_data)} presets)")
+    safe_print(f"✓ Generated {WINDOWS_OPTIONS_FILE} ({len(presets_data)} presets)")
 
     if update_readme and README_FILE.exists():
         with open(README_FILE, "r", encoding="utf-8") as f:
@@ -150,7 +172,7 @@ def build_all(update_readme=True):
         )
         with open(README_FILE, "w", encoding="utf-8") as f:
             f.write(new_content)
-        print(f"✓ Updated presets table in {README_FILE}")
+        safe_print(f"✓ Updated presets table in {README_FILE}")
 
 
 def check_invariants():
@@ -201,12 +223,12 @@ def check_invariants():
             errors.append(f"{README_FILE} presets table is out of sync with data/presets.json. Run 'make build-presets'.")
 
     if errors:
-        print("Validation errors encountered in presets:", file=sys.stderr)
+        safe_print("Validation errors encountered in presets:", file=sys.stderr)
         for err in errors:
-            print(f"  - {err}", file=sys.stderr)
+            safe_print(f"  - {err}", file=sys.stderr)
         sys.exit(1)
     else:
-        print("✓ All preset invariants and cross-platform parity checks passed successfully.")
+        safe_print("✓ All preset invariants and cross-platform parity checks passed successfully.")
 
 
 def main():

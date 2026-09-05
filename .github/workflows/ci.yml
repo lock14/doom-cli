@@ -92,6 +92,8 @@ jobs:
   validate-windows:
     name: Windows - PowerShell & Preset Validation
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
 
     steps:
       - name: Check out repository
