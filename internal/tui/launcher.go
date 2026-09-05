@@ -250,7 +250,8 @@ func (m model) View() string {
 	// Two columns layout if terminal is wide enough
 	var content string
 	if m.width >= 80 {
-		content = lipgloss.JoinHorizontal(lipgloss.Top, lipgloss.NewStyle().Width(38).Render(listPane), "   ", previewPane)
+		listCol := lipgloss.NewStyle().Width(38).Render(listPane)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, listCol, "   ", previewPane)
 	} else {
 		content = listPane + "\n\n" + previewPane
 	}

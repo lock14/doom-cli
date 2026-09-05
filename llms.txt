@@ -1,0 +1,64 @@
+# doom-configs
+
+> Unified cross-platform CLI tool, curated engine configurations, and launcher presets for classic Doom source ports (DSDA-Doom, UZDoom) and DoomRunner.
+
+## Overview
+
+`github.com/lock14/doom-configs` provides a static, zero-dependency Go CLI (`doom`) that automates Doom source port management, engine configuration deployment with display auto-detection, Steam/GOG game file discovery, multi-mirror community megawad downloading, and interactive terminal launching across Linux, macOS, and Windows.
+
+## Quick Start
+
+```bash
+# Automated full setup (engines, configs, soundfonts, Steam IWADs, community WADs)
+doom setup
+
+# Interactive terminal launcher with fuzzy search and preview pane
+doom play
+
+# Direct launch with custom engine or flags
+doom launch "Eviternity II"
+doom launch "Ancient Aliens" -e dsda-doom -skill 4
+```
+
+## CLI Command Tree
+
+- `doom setup`: Full automated turnkey setup in a single step.
+- `doom play`: Interactive TUI preset launcher powered by Bubble Tea.
+- `doom launch <preset>`: Direct preset execution with optional engine overrides and game flags.
+- `doom engines install`: Downloads portable engine binaries (`uzdoom`, `dsda-doom`, `doomrunner`).
+- `doom soundfont install`: Downloads and installs curated Roland SC-55 SoundFont.
+- `doom wads extract`: Auto-discovers and imports official Steam and GOG commercial IWADs.
+- `doom wads fetch [preset]`: Downloads and extracts community megawads from idgames mirrors.
+- `doom wads list`: Inspects installed WADs and missing file statuses.
+- `doom config install`: Deploys engine configuration files with native display auto-detection.
+- `doom config diff`: Shows differences between repository templates and live installed configs.
+- `doom config sync`: Pulls in-game tweaks back from the host system into repository templates.
+- `doom presets list`: Lists all 32 curated presets and mapped source ports.
+- `doom presets build`: Compiles `data/presets.json` into DoomRunner options and README.
+
+## Architecture & Packages
+
+- `cmd/doom/`: Command-line interface definitions using Cobra.
+- `internal/config/`: Cross-platform path resolution adhering to XDG, Library, and AppData standards.
+- `internal/display/`: Native display resolution and refresh rate auto-detection.
+- `internal/engine/`: Source port binary installation and argument synthesis/execution.
+- `internal/preset/`: Embedded presets catalog loader and options.json/README compiler.
+- `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
+- `internal/templates/`: Configuration templates and backup deployment engine.
+- `internal/tui/`: Bubble Tea terminal interface with real-time filtering and split-pane previews.
+- `internal/wad/`: Multi-mirror archive downloader, ZIP extractor, and SoundFont installer.
+
+## Key Design Invariants
+
+- **Single Source of Truth**: All presets are declaratively managed in `data/presets.json`.
+- **Portability**: Configuration templates and options use `__HOME__`, `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholders. Personal usernames and machine paths are strictly prohibited in git.
+- **Destructive Safety**: Timestamped backups (`.bak.<timestamp>`) are created before modifying existing user configurations.
+- **Strict Line Length (120 Columns)**: Code enforced at 120 columns via `revive.toml` and `.editorconfig`.
+
+## References
+
+- Repository: https://github.com/lock14/doom-configs
+- Issues: https://github.com/lock14/doom-configs/issues
+- DSDA-Doom: https://github.com/kraflab/dsda-doom
+- UZDoom: https://github.com/UZDoom/uzdoom
+- DoomRunner: https://github.com/Youda008/DoomRunner

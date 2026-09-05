@@ -43,7 +43,10 @@ func detectResolutionOS(goos string) string {
 
 	case "windows":
 		// Windows PowerShell query for primary monitor resolution
-		cmd := exec.Command("powershell", "-NoProfile", "-Command", "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width.ToString() + 'x' + [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height.ToString()")
+		psScript := "Add-Type -AssemblyName System.Windows.Forms; " +
+			"[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width.ToString() + 'x' + " +
+			"[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height.ToString()"
+		cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
 		if out, err := cmd.Output(); err == nil {
 			str := strings.TrimSpace(string(out))
 			if matched, _ := regexp.MatchString(`^\d+x\d+$`, str); matched {
@@ -102,7 +105,9 @@ func detectRefreshRateOS(goos string) int {
 		}
 
 	case "windows":
-		cmd := exec.Command("powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty CurrentRefreshRate -ErrorAction SilentlyContinue")
+		psScript := "Get-CimInstance Win32_VideoController | " +
+			"Select-Object -ExpandProperty CurrentRefreshRate -ErrorAction SilentlyContinue"
+		cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
 		if out, err := cmd.Output(); err == nil {
 			str := strings.TrimSpace(string(out))
 			if val, err := strconv.Atoi(str); err == nil && val > 0 {

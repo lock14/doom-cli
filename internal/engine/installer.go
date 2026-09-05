@@ -140,25 +140,26 @@ func (ins *Installer) InstallUZDoom() error {
 func (ins *Installer) InstallDSDA() error {
 	fmt.Fprintf(ins.Out, "Installing DSDA-Doom...\n")
 	var pattern, fallback, targetName string
+	const fallbackBase = "https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/"
 
 	switch runtime.GOOS {
 	case "darwin":
 		targetName = "dsda-doom"
 		if runtime.GOARCH == "arm64" {
 			pattern = `dsda-doom-.*-mac-arm64\.zip`
-			fallback = "https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-mac-arm64.zip"
+			fallback = fallbackBase + "dsda-doom-0.29.4-mac-arm64.zip"
 		} else {
 			pattern = `dsda-doom-.*-mac-x86_64\.zip`
-			fallback = "https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-mac-x86_64.zip"
+			fallback = fallbackBase + "dsda-doom-0.29.4-mac-x86_64.zip"
 		}
 	case "windows":
 		targetName = "dsda-doom.exe"
 		pattern = `dsda-doom-.*-win-x64\.zip`
-		fallback = "https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-win-x64.zip"
+		fallback = fallbackBase + "dsda-doom-0.29.4-win-x64.zip"
 	default:
 		targetName = "dsda-doom"
 		pattern = `dsda-doom-.*-linux-x86_64\.appimage`
-		fallback = "https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/dsda-doom-0.29.4-linux-x86_64.appimage"
+		fallback = fallbackBase + "dsda-doom-0.29.4-linux-x86_64.appimage"
 	}
 
 	url := ins.ResolveLatestGitHubURL("kraflab/dsda-doom", pattern, fallback)
@@ -169,25 +170,26 @@ func (ins *Installer) InstallDSDA() error {
 func (ins *Installer) InstallDoomRunner() error {
 	fmt.Fprintf(ins.Out, "Installing DoomRunner...\n")
 	var pattern, fallback, targetName string
+	const fallbackBase = "https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/"
 
 	switch runtime.GOOS {
 	case "darwin":
 		targetName = "doomrunner"
 		if runtime.GOARCH == "arm64" {
 			pattern = `DoomRunner-.*-MacOS-arm64\.dmg`
-			fallback = "https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-MacOS-arm64.dmg"
+			fallback = fallbackBase + "DoomRunner-1.9.2-MacOS-arm64.dmg"
 		} else {
 			pattern = `DoomRunner-.*-MacOS-x86_64\.dmg`
-			fallback = "https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-MacOS-x86_64.dmg"
+			fallback = fallbackBase + "DoomRunner-1.9.2-MacOS-x86_64.dmg"
 		}
 	case "windows":
 		targetName = "DoomRunner.exe"
 		pattern = `DoomRunner-.*-Windows-x64\.zip`
-		fallback = "https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Windows-x64.zip"
+		fallback = fallbackBase + "DoomRunner-1.9.2-Windows-x64.zip"
 	default:
 		targetName = "doomrunner"
 		pattern = `DoomRunner-.*-Linux-x86_64\.AppImage`
-		fallback = "https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/DoomRunner-1.9.2-Linux-x86_64.AppImage"
+		fallback = fallbackBase + "DoomRunner-1.9.2-Linux-x86_64.AppImage"
 	}
 
 	url := ins.ResolveLatestGitHubURL("Youda008/DoomRunner", pattern, fallback)

@@ -1,9 +1,12 @@
 # Doom Configs
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/lock14/doom-configs)](https://go.dev/)
 [![CI](https://github.com/lock14/doom-configs/actions/workflows/ci.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/ci.yml)
+[![Security](https://github.com/lock14/doom-configs/actions/workflows/security.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/security.yml)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
 ![Engines](https://img.shields.io/badge/engines-DSDA--Doom%20%7C%20UZDoom-red)
 ![Presets](https://img.shields.io/badge/presets-32%20megawads-orange)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A unified cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) and the **[DoomRunner](https://github.com/Youda008/DoomRunner)** graphical launcher across Linux, macOS, and Windows.
 
@@ -224,31 +227,24 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 - **Extended HUD (exHUD)**: In-game level splits, secret counters, and completion times.
 - **Built-in Capture**: Ready-to-use `ffmpeg` video recording commands.
 
----
-
-## Developer Makefile Quick Reference
-
-For contributors and developers building or testing the `doom` CLI from source:
-
-| Target | Description |
-| :--- | :--- |
-| `make build` | Compiles the `bin/doom` static binary |
-| `make install` | Compiles and installs `doom` to `~/.local/bin/doom` |
-| `make test` | Runs the full Go test suite with `-race` and `-shuffle=on` |
-| `make lint` | Runs `go vet` and `revive` static analysis |
-| `make format` | Formats all Go source files using `gofmt -s` |
-| `make tidy` | Tidies and verifies `go.mod` / `go.sum` |
-| `make check` | Runs full validation (format check, tidy check, lint, tests, path audit) |
-| `make clean` | Removes build artifacts |
-| `make help` | Displays available developer targets |
-
-*(All Doom gameplay, content downloading, and configuration management tasks are handled directly via the `doom` CLI).*
-
----
-
 ## Source Port Packaging (Linux)
 
 When running Doom source ports on Linux, standalone native binaries or AppImages in `~/.local/bin/` are strongly recommended over sandboxed Flatpaks. 
 
 Flatpaks isolate applications from the rest of the filesystem, preventing launchers (like DoomRunner or `doom play`) from discovering game engines or accessing WADs across custom paths without manual permission overrides. Running `doom setup` or `doom engines install` automatically manages standalone binaries in your user path.
+
+---
+
+## Contributing
+
+We welcome contributions! Please review our [Contributing Guidelines](CONTRIBUTING.md) for architectural invariants, development setup, code style, and pull request verification instructions.
+
+## Security
+
+Please report security issues responsibly according to our [Security Policy](SECURITY.md).
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).
+
 

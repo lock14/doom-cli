@@ -68,7 +68,12 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 		}
 	}
 	if !ok {
-		return nil, fmt.Errorf("base IWAD '%s' not found in %s.\nRun 'doom wads extract-steam' if you own the game on Steam/GOG", p.IWAD, opts.WadsDir)
+		return nil, fmt.Errorf(
+			"base IWAD '%s' not found in %s.\n"+
+				"Run 'doom wads extract-steam' if you own the game on Steam/GOG",
+			p.IWAD,
+			opts.WadsDir,
+		)
 	}
 
 	// Resolve Mappack and DeHackEd files
@@ -85,10 +90,21 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 		fpath, ok := preset.ResolveFile(opts.WadsDir, clean)
 		if !ok {
 			if strings.EqualFold(clean, "idkfa 2024.wad") {
-				fmt.Fprintf(out, "  ℹ Optional soundtrack '%s' not found in %s; launching with default MIDI.\n", clean, opts.WadsDir)
+				fmt.Fprintf(
+					out,
+					"  ℹ Optional soundtrack '%s' not found in %s; launching with default MIDI.\n",
+					clean,
+					opts.WadsDir,
+				)
 				continue
 			}
-			return nil, fmt.Errorf("required mappack file '%s' not found in %s.\nRun 'doom wads fetch %q' to download it", clean, opts.WadsDir, p.Name)
+			return nil, fmt.Errorf(
+				"required mappack file '%s' not found in %s.\n"+
+					"Run 'doom wads fetch %q' to download it",
+				clean,
+				opts.WadsDir,
+				p.Name,
+			)
 		}
 
 		orderedFiles = append(orderedFiles, fpath)
@@ -196,5 +212,10 @@ func resolveEngineBinary(engine, binDir string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("engine binary '%s' not found in %s or system PATH.\nRun 'doom setup' or 'doom engines install' to install it", engine, binDir)
+	return "", fmt.Errorf(
+		"engine binary '%s' not found in %s or system PATH.\n"+
+			"Run 'doom setup' or 'doom engines install' to install it",
+		engine,
+		binDir,
+	)
 }

@@ -54,7 +54,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 		},
 	}
 
-	rootCmd.PersistentFlags().StringVarP(&flagEngineOverride, "engine", "e", "", "Override source port engine (uzdoom or dsda-doom)")
+	rootCmd.PersistentFlags().StringVarP(
+		&flagEngineOverride, "engine", "e", "", "Override source port engine (uzdoom or dsda-doom)",
+	)
 	rootCmd.PersistentFlags().StringVar(&flagWadsDir, "wads-dir", "", "Custom path to WADs directory")
 	rootCmd.PersistentFlags().StringVar(&flagBinDir, "bin-dir", "", "Custom path to engines binary directory")
 	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Print launch command without executing")

@@ -69,7 +69,12 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 		if len(expected) == 0 {
 			return nil
 		}
-		fmt.Fprintf(d.Out, "Note: '%s' is an official commercial release; files must be provided by user or Steam/GOG extractor.\n", p.Name)
+		fmt.Fprintf(
+			d.Out,
+			"Note: '%s' is an official commercial release; "+
+				"files must be provided by user or Steam/GOG extractor.\n",
+			p.Name,
+		)
 		return nil
 	}
 
@@ -78,7 +83,12 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 	}
 
 	if !d.Force && d.IsPresetInstalled(p) {
-		fmt.Fprintf(d.Out, "✓ [%s] All required files already exist in %s. (Use --force to re-download)\n", p.Name, d.WadsDir)
+		fmt.Fprintf(
+			d.Out,
+			"✓ [%s] All required files already exist in %s. (Use --force to re-download)\n",
+			p.Name,
+			d.WadsDir,
+		)
 		return nil
 	}
 

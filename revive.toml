@@ -22,3 +22,6 @@ confidence = 0.8
 [rule.unexported-return]
 [rule.indent-error-flow]
 [rule.errorf]
+[rule.line-length-limit]
+  arguments = [120]
+
