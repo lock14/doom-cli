@@ -279,19 +279,27 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 
 	// Also extract companion files (.wad, .pk3, dlls) in the same directory into BinDir
 	binParent := filepath.Dir(binMatch.Name)
+	cleanBinDir := filepath.Clean(ins.BinDir)
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() || zf == binMatch {
 			continue
 		}
 		if filepath.Dir(zf.Name) == binParent {
-			base := filepath.Base(zf.Name)
+			base := filepath.Base(filepath.Clean(zf.Name))
+			if base == "." || base == ".." || strings.Contains(base, "..") {
+				continue
+			}
 			lower := strings.ToLower(base)
 			if strings.HasSuffix(lower, ".wad") ||
 				strings.HasSuffix(lower, ".pk3") ||
 				strings.HasSuffix(lower, ".dll") ||
 				strings.HasSuffix(lower, ".so") ||
 				strings.HasSuffix(lower, ".dylib") {
-				_ = extractZipEntry(zf, filepath.Join(ins.BinDir, base))
+				companionDest := filepath.Join(cleanBinDir, base)
+				if !strings.HasPrefix(companionDest, cleanBinDir+string(filepath.Separator)) {
+					continue
+				}
+				_ = extractZipEntry(zf, companionDest)
 			}
 		}
 	}
@@ -364,17 +372,18 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 }
 
 func extractZipEntry(zf *zip.File, destPath string) error {
+	cleanDest := filepath.Clean(destPath)
+	if err := os.MkdirAll(filepath.Dir(cleanDest), 0755); err != nil {
+		return err
+	}
+
 	rc, err := zf.Open()
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	out, err := os.OpenFile(cleanDest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}

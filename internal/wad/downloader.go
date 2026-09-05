@@ -296,17 +296,18 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 }
 
 func extractZipFile(zf *zip.File, destPath string) error {
+	cleanDest := filepath.Clean(destPath)
+	if err := os.MkdirAll(filepath.Dir(cleanDest), 0755); err != nil {
+		return err
+	}
+
 	rc, err := zf.Open()
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 
-	if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	out, err := os.OpenFile(cleanDest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
