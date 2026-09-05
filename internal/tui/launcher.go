@@ -21,42 +21,39 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#B30000")).
-			Padding(0, 1)
+			Foreground(lipgloss.Color("1"))
 
 	cursorStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(lipgloss.Color("#00FFFF"))
+			Foreground(lipgloss.Color("6"))
 
 	tagDSDAStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFD700"))
+			Foreground(lipgloss.Color("3"))
 
 	tagUZDoomStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00FF66"))
+			Foreground(lipgloss.Color("2"))
 
 	previewBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#666666")).
+			BorderForeground(lipgloss.Color("8")).
 			Padding(0, 1)
 
 	labelStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888888"))
+			Foreground(lipgloss.Color("8"))
 
 	valueBoldStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("#FFFFFF"))
+			Bold(true)
 
 	foundStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00FF00")).
-			Bold(true)
+			Bold(true).
+			Foreground(lipgloss.Color("2"))
 
 	missingStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF5555")).
-			Bold(true)
+			Bold(true).
+			Foreground(lipgloss.Color("1"))
 
 	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#888888"))
+			Foreground(lipgloss.Color("8"))
 )
 
 type model struct {
@@ -74,6 +71,8 @@ type model struct {
 func initialModel(catalog *preset.Catalog, wadsDir string) model {
 	ti := textinput.New()
 	ti.Placeholder = "Type to search presets..."
+	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	ti.Focus()
 	ti.CharLimit = 100
 	ti.Width = 40
