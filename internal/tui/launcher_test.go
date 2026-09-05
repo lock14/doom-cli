@@ -319,3 +319,106 @@ func TestModel_ReadmeViewer(t *testing.T) {
 		t.Fatalf("expected viewingReadme to be false after esc")
 	}
 }
+
+func TestCalculateSearchWidth(t *testing.T) {
+	tests := []struct {
+		name      string
+		termWidth int
+		expected  int
+	}{
+		{name: "narrow terminal clamped to min", termWidth: 40, expected: minSearchWidth},
+		{name: "medium terminal responsive", termWidth: 60, expected: 44},
+		{name: "wide terminal clamped to max", termWidth: 120, expected: maxSearchWidth},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateSearchWidth(tt.termWidth)
+			if got != tt.expected {
+				t.Errorf("calculateSearchWidth(%d) = %d, want %d", tt.termWidth, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCalculateReadmeDimensions(t *testing.T) {
+	tests := []struct {
+		name           string
+		width, height  int
+		wantBox, wantW int
+		wantH          int
+	}{
+		{
+			name:    "standard dimensions",
+			width:   100,
+			height:  30,
+			wantBox: 98,
+			wantW:   96,
+			wantH:   21,
+		},
+		{
+			name:    "narrow and short dimensions clamped",
+			width:   30,
+			height:  10,
+			wantBox: minBoxWidth,
+			wantW:   36,
+			wantH:   5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			boxW, vpW, vpH := calculateReadmeDimensions(tt.width, tt.height)
+			if boxW != tt.wantBox || vpW != tt.wantW || vpH != tt.wantH {
+				t.Errorf("calculateReadmeDimensions(%d, %d) = (%d, %d, %d), want (%d, %d, %d)",
+					tt.width, tt.height, boxW, vpW, vpH, tt.wantBox, tt.wantW, tt.wantH)
+			}
+		})
+	}
+}
+
+func TestComputeLayout(t *testing.T) {
+	cat := mockCatalog()
+	tests := []struct {
+		name       string
+		width      int
+		height     int
+		wantSide   bool
+		minVisible int
+	}{
+		{name: "standard side-by-side 120x30", width: 120, height: 30, wantSide: true, minVisible: 15},
+		{name: "wide terminal 190x40", width: 190, height: 40, wantSide: true, minVisible: 25},
+		{name: "exact side-by-side boundary 90x24", width: 90, height: 24, wantSide: true, minVisible: 10},
+		{name: "stacked mode 80x24", width: 80, height: 24, wantSide: false, minVisible: 5},
+		{name: "short stacked mode 80x16", width: 80, height: 16, wantSide: false, minVisible: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := initialModel(cat, "")
+			m.width = tt.width
+			m.height = tt.height
+
+			geom := m.computeLayout()
+			if geom.sideBySide != tt.wantSide {
+				t.Fatalf("expected sideBySide=%v, got %v", tt.wantSide, geom.sideBySide)
+			}
+
+			if geom.maxVisible < tt.minVisible {
+				t.Errorf("expected maxVisible >= %d, got %d", tt.minVisible, geom.maxVisible)
+			}
+
+			if geom.sideBySide {
+				totalW := geom.leftWidth + 2 + geom.gutter + geom.rightWidth + 2
+				if totalW != tt.width {
+					t.Errorf("side-by-side total width %d != terminal width %d", totalW, tt.width)
+				}
+			} else {
+				totalW := geom.boxWidth + 2
+				if totalW != tt.width {
+					t.Errorf("stacked total width %d != terminal width %d", totalW, tt.width)
+				}
+			}
+		})
+	}
+}

@@ -20,6 +20,19 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
+const (
+	sideBySideMinWidth = 90
+	leftPanelWidth     = 44 // interior content width (42) + horizontal padding (2)
+	gutterWidth        = 2  // horizontal space between panes
+	boxBorderColumns   = 4  // 2 border chars on left box + 2 border chars on right box
+
+	minSearchWidth = 30
+	maxSearchWidth = 60
+
+	minBoxWidth  = 36
+	minBoxHeight = 3
+)
+
 var (
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -58,6 +71,35 @@ var (
 			Foreground(lipgloss.Color("8"))
 )
 
+// calculateSearchWidth returns the clamped width for the preset search input.
+func calculateSearchWidth(termWidth int) int {
+	w := termWidth - 16
+	if w > maxSearchWidth {
+		return maxSearchWidth
+	}
+	if w < minSearchWidth {
+		return minSearchWidth
+	}
+	return w
+}
+
+// calculateReadmeDimensions returns the responsive outer box and viewport dimensions for the README viewer.
+func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vpHeight int) {
+	boxWidth = termWidth - 2
+	if boxWidth < minBoxWidth {
+		boxWidth = minBoxWidth
+	}
+	vpWidth = boxWidth - 2
+	if vpWidth < 36 {
+		vpWidth = 36
+	}
+	vpHeight = termHeight - 9
+	if vpHeight < 5 {
+		vpHeight = 5
+	}
+	return boxWidth, vpWidth, vpHeight
+}
+
 type model struct {
 	catalog  *preset.Catalog
 	wadsDir  string
@@ -88,14 +130,7 @@ func initialModel(catalog *preset.Catalog, wadsDir string) model {
 	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	ti.Focus()
 	ti.CharLimit = 100
-	searchWidth := w - 16
-	if searchWidth > 60 {
-		searchWidth = 60
-	}
-	if searchWidth < 30 {
-		searchWidth = 30
-	}
-	ti.Width = searchWidth
+	ti.Width = calculateSearchWidth(w)
 
 	return model{
 		catalog:  catalog,
@@ -118,15 +153,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
-			boxWidth := m.width - 2
-			if boxWidth < 38 {
-				boxWidth = 38
-			}
-			m.viewport.Width = boxWidth - 2
-			vpHeight := m.height - 9
-			if vpHeight < 5 {
-				vpHeight = 5
-			}
+			_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
+			m.viewport.Width = vpWidth
 			m.viewport.Height = vpHeight
 			return m, nil
 
@@ -157,14 +185,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		searchWidth := m.width - 16
-		if searchWidth > 60 {
-			searchWidth = 60
-		}
-		if searchWidth < 30 {
-			searchWidth = 30
-		}
-		m.input.Width = searchWidth
+		m.input.Width = calculateSearchWidth(m.width)
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -186,18 +207,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err == nil {
 						m.viewingReadme = true
 						m.readmeTitle = fmt.Sprintf("README: %s (%s)", cur.Name, filepath.Base(txtPath))
-						boxWidth := m.width - 2
-						if boxWidth < 38 {
-							boxWidth = 38
-						}
-						vpWidth := boxWidth - 2
-						if vpWidth < 36 {
-							vpWidth = 36
-						}
-						vpHeight := m.height - 9
-						if vpHeight < 5 {
-							vpHeight = 5
-						}
+						_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 						m.viewport = viewport.New(vpWidth, vpHeight)
 						m.viewport.SetContent(content)
 						return m, nil
@@ -257,86 +267,85 @@ func (m *model) updateFiltered(query string) {
 	m.filtered = result
 }
 
-func (m model) View() string {
-	if m.quitting {
-		return "Cancelled.\n"
-	}
-	if m.selected != nil {
-		return fmt.Sprintf("Launching %s...\n", m.selected.Name)
-	}
+type layoutGeometry struct {
+	sideBySide     bool
+	maxVisible     int
+	interiorHeight int
+	listHeight     int
+	detailsHeight  int
+	leftWidth      int
+	rightWidth     int
+	boxWidth       int
+	gutter         int
+}
 
-	if m.viewingReadme {
-		boxWidth := m.width - 2
-		if boxWidth < 38 {
-			boxWidth = 38
-		}
-		header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
-		box := panelBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
-		footer := "\n\n" + helpStyle.Render("↑/↓/PgUp/PgDn: Scroll • Enter: Launch • Tab/Esc/q: Back")
-		return header + box + footer + "\n"
-	}
-
-	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
-	search := fmt.Sprintf("Search: %s\n\n", m.input.View())
-
-	// Dynamic height and width calculation for responsive dual-pane layout
-	var (
-		maxVisible     int
-		interiorHeight int
-		listHeight     int
-		detailsHeight  int
-		leftWidth      = 44
-		gutter         = 2
-		rightWidth     int
-		boxWidth       int
-	)
-	gutterStr := strings.Repeat(" ", gutter)
-
-	if m.width >= 90 {
+func (m model) computeLayout() layoutGeometry {
+	if m.width >= sideBySideMinWidth {
 		availHeight := m.height - 7
 		if availHeight < 6 {
 			availHeight = 6
 		}
-		interiorHeight = availHeight - 3
-		if interiorHeight < 3 {
-			interiorHeight = 3
+		interiorHeight := availHeight - 3
+		if interiorHeight < minBoxHeight {
+			interiorHeight = minBoxHeight
 		}
-		maxVisible = interiorHeight
-		rightWidth = m.width - leftWidth - gutter - 4
+		rightWidth := m.width - leftPanelWidth - gutterWidth - boxBorderColumns
 		if rightWidth < 38 {
 			rightWidth = 38
 		}
-	} else {
-		boxWidth = m.width - 2
-		if boxWidth < 36 {
-			boxWidth = 36
-		}
-		availHeight := m.height - 9
-		if availHeight < 6 {
-			availHeight = 6
-		}
-		listHeight = availHeight / 2
-		if listHeight < 3 {
-			listHeight = 3
-		}
-		detailsHeight = availHeight - listHeight
-		if detailsHeight < 3 {
-			detailsHeight = 3
-		}
-		maxVisible = listHeight - 2
-		if maxVisible < 1 {
-			maxVisible = 1
+		return layoutGeometry{
+			sideBySide:     true,
+			maxVisible:     interiorHeight,
+			interiorHeight: interiorHeight,
+			leftWidth:      leftPanelWidth,
+			rightWidth:     rightWidth,
+			gutter:         gutterWidth,
 		}
 	}
 
-	startIdx := 0
-	if m.cursor >= maxVisible {
-		startIdx = m.cursor - maxVisible + 1
+	boxWidth := m.width - 2
+	if boxWidth < minBoxWidth {
+		boxWidth = minBoxWidth
 	}
-	endIdx := startIdx + maxVisible
+	availHeight := m.height - 9
+	if availHeight < 6 {
+		availHeight = 6
+	}
+	listHeight := availHeight / 2
+	if listHeight < minBoxHeight {
+		listHeight = minBoxHeight
+	}
+	detailsHeight := availHeight - listHeight
+	if detailsHeight < minBoxHeight {
+		detailsHeight = minBoxHeight
+	}
+	maxVisible := listHeight - 2
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+
+	return layoutGeometry{
+		sideBySide:    false,
+		maxVisible:    maxVisible,
+		listHeight:    listHeight,
+		detailsHeight: detailsHeight,
+		boxWidth:      boxWidth,
+	}
+}
+
+func (m model) renderListLines(geom layoutGeometry) []string {
+	if len(m.filtered) == 0 {
+		return []string{"  No presets matching search."}
+	}
+
+	startIdx := 0
+	if m.cursor >= geom.maxVisible {
+		startIdx = m.cursor - geom.maxVisible + 1
+	}
+	endIdx := startIdx + geom.maxVisible
 	if endIdx > len(m.filtered) {
 		endIdx = len(m.filtered)
-		startIdx = endIdx - maxVisible
+		startIdx = endIdx - geom.maxVisible
 		if startIdx < 0 {
 			startIdx = 0
 		}
@@ -363,107 +372,138 @@ func (m model) View() string {
 			listLines = append(listLines, "  "+paddedName+" "+tag)
 		}
 	}
+	return listLines
+}
 
-	if len(m.filtered) == 0 {
-		listLines = append(listLines, "  No presets matching search.")
+func (m model) renderPreviewLines() ([]string, bool) {
+	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
+		return []string{helpStyle.Render("No preset details available.")}, false
 	}
 
-	// Build Preview View for current item
+	cur := m.filtered[m.cursor]
+	readmePath, hasReadme := preset.ResolveReadme(m.wadsDir, cur)
+
 	var previewLines []string
-	hasReadme := false
-	if len(m.filtered) == 0 {
-		previewLines = append(previewLines, helpStyle.Render("No preset details available."))
-	} else if m.cursor >= 0 && m.cursor < len(m.filtered) {
-		cur := m.filtered[m.cursor]
-		readmePath, foundReadme := preset.ResolveReadme(m.wadsDir, cur)
-		hasReadme = foundReadme
-
+	previewLines = append(previewLines,
+		fmt.Sprintf("%s%s", labelStyle.Render("Preset:        "), valueBoldStyle.Render(cur.Name)),
+	)
+	if cur.Author != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Preset:        "), valueBoldStyle.Render(cur.Name)),
+			fmt.Sprintf("%s%s", labelStyle.Render("Author:        "), cur.Author),
 		)
-		if cur.Author != "" {
-			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Author:        "), cur.Author),
-			)
-		}
-		if cur.ReleaseDate != "" {
-			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Released:      "), cur.ReleaseDate),
-			)
-		}
-		engStr := "UZDoom (Software-Plus / Advanced)"
-		if cur.Engine == "dsda-doom" {
-			engStr = "DSDA-Doom (MBF21 / Speedrun)"
-		}
+	}
+	if cur.ReleaseDate != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Engine:        "), engStr),
+			fmt.Sprintf("%s%s", labelStyle.Render("Released:      "), cur.ReleaseDate),
 		)
-		if cur.Category != "" {
-			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Category:      "), cur.Category),
-			)
-		}
-		if cur.Compatibility != "" {
-			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Compatibility: "), cur.Compatibility),
-			)
-		}
-		if cur.Description != "" {
-			previewLines = append(previewLines,
-				fmt.Sprintf("%s%s", labelStyle.Render("Description:   "), cur.Description),
-			)
-		}
-
-		// Check IWAD
-		iwadStatus := missingStyle.Render("[✗ Missing]")
-		if _, ok := preset.ResolveFile(m.wadsDir, cur.IWAD); ok {
-			iwadStatus = foundStyle.Render("[✓ Found]")
-		}
+	}
+	engStr := "UZDoom (Software-Plus / Advanced)"
+	if cur.Engine == "dsda-doom" {
+		engStr = "DSDA-Doom (MBF21 / Speedrun)"
+	}
+	previewLines = append(previewLines,
+		fmt.Sprintf("%s%s", labelStyle.Render("Engine:        "), engStr),
+	)
+	if cur.Category != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s %s", labelStyle.Render("IWAD:          "), cur.IWAD, iwadStatus),
+			fmt.Sprintf("%s%s", labelStyle.Render("Category:      "), cur.Category),
 		)
+	}
+	if cur.Compatibility != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", labelStyle.Render("Compatibility: "), cur.Compatibility),
+		)
+	}
+	if cur.Description != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", labelStyle.Render("Description:   "), cur.Description),
+		)
+	}
 
-		if len(cur.Mappacks) > 0 || hasReadme {
-			previewLines = append(previewLines, labelStyle.Render("Files:"))
-			for _, mapfile := range cur.Mappacks {
-				fStatus := missingStyle.Render("[✗ Missing]")
-				if _, ok := preset.ResolveFile(m.wadsDir, mapfile); ok {
-					fStatus = foundStyle.Render("[✓ Found]")
-				} else if strings.EqualFold(mapfile, "idkfa 2024.wad") {
-					fStatus = helpStyle.Render("[Optional]")
-				}
-				previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))
+	// Check IWAD
+	iwadStatus := missingStyle.Render("[✗ Missing]")
+	if _, ok := preset.ResolveFile(m.wadsDir, cur.IWAD); ok {
+		iwadStatus = foundStyle.Render("[✓ Found]")
+	}
+	previewLines = append(previewLines,
+		fmt.Sprintf("%s%s %s", labelStyle.Render("IWAD:          "), cur.IWAD, iwadStatus),
+	)
+
+	if len(cur.Mappacks) > 0 || hasReadme {
+		previewLines = append(previewLines, labelStyle.Render("Files:"))
+		for _, mapfile := range cur.Mappacks {
+			fStatus := missingStyle.Render("[✗ Missing]")
+			if _, ok := preset.ResolveFile(m.wadsDir, mapfile); ok {
+				fStatus = foundStyle.Render("[✓ Found]")
+			} else if strings.EqualFold(mapfile, "idkfa 2024.wad") {
+				fStatus = helpStyle.Render("[Optional]")
 			}
-			if hasReadme {
-				previewLines = append(previewLines,
-					fmt.Sprintf("  - %-22s %s", filepath.Base(readmePath), tagUZDoomStyle.Render("[✓ Readme]")),
-				)
-			}
+			previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))
+		}
+		if hasReadme {
+			previewLines = append(previewLines,
+				fmt.Sprintf("  - %-22s %s", filepath.Base(readmePath), tagUZDoomStyle.Render("[✓ Readme]")),
+			)
 		}
 	}
 
-	// Layout presentation
-	var content string
-	if m.width >= 90 {
-		leftText := formatBoxContent(listLines, leftWidth-2, interiorHeight)
-		rightText := formatBoxContent(previewLines, rightWidth-2, interiorHeight)
-		leftBox := panelBoxStyle.Width(leftWidth).Render(leftText)
-		rightBox := panelBoxStyle.Width(rightWidth).Render(rightText)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
-	} else {
-		leftText := formatBoxContent(listLines, boxWidth-2, listHeight-2)
-		rightText := formatBoxContent(previewLines, boxWidth-2, detailsHeight-2)
-		leftBox := panelBoxStyle.Width(boxWidth).Render(leftText)
-		rightBox := panelBoxStyle.Width(boxWidth).Render(rightText)
-		content = leftBox + "\n" + rightBox
+	return previewLines, hasReadme
+}
+
+func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []string) string {
+	if geom.sideBySide {
+		leftText := formatBoxContent(listLines, geom.leftWidth-2, geom.interiorHeight)
+		rightText := formatBoxContent(previewLines, geom.rightWidth-2, geom.interiorHeight)
+		leftBox := panelBoxStyle.Width(geom.leftWidth).Render(leftText)
+		rightBox := panelBoxStyle.Width(geom.rightWidth).Render(rightText)
+		gutterStr := strings.Repeat(" ", geom.gutter)
+		return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
 	}
 
+	leftText := formatBoxContent(listLines, geom.boxWidth-2, geom.listHeight-2)
+	rightText := formatBoxContent(previewLines, geom.boxWidth-2, geom.detailsHeight-2)
+	leftBox := panelBoxStyle.Width(geom.boxWidth).Render(leftText)
+	rightBox := panelBoxStyle.Width(geom.boxWidth).Render(rightText)
+	return leftBox + "\n" + rightBox
+}
+
+func (m model) renderReadmeView() string {
+	boxWidth, _, _ := calculateReadmeDimensions(m.width, m.height)
+	header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
+	box := panelBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
+	footer := "\n\n" + helpStyle.Render("↑/↓/PgUp/PgDn: Scroll • Enter: Launch • Tab/Esc/q: Back")
+	return header + box + footer + "\n"
+}
+
+func (m model) renderFooter(hasReadme bool) string {
 	footerText := "↑/↓: Navigate • Enter: Launch • Esc: Quit"
 	if hasReadme {
 		footerText = "↑/↓: Navigate • Enter: Launch • Tab: Readme • Esc: Quit"
 	}
-	footer := "\n\n" + helpStyle.Render(footerText)
-	return header + search + content + footer + "\n"
+	return "\n\n" + helpStyle.Render(footerText)
+}
+
+func (m model) View() string {
+	if m.quitting {
+		return "Cancelled.\n"
+	}
+	if m.selected != nil {
+		return fmt.Sprintf("Launching %s...\n", m.selected.Name)
+	}
+	if m.viewingReadme {
+		return m.renderReadmeView()
+	}
+
+	geom := m.computeLayout()
+	listLines := m.renderListLines(geom)
+	previewLines, hasReadme := m.renderPreviewLines()
+	panels := m.renderPanels(geom, listLines, previewLines)
+
+	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
+	search := fmt.Sprintf("Search: %s\n\n", m.input.View())
+	footer := m.renderFooter(hasReadme)
+
+	return header + search + panels + footer + "\n"
 }
 
 // RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
