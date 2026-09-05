@@ -29,7 +29,7 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("#00FFFF"))
 
-	tagDSDASStyle = lipgloss.NewStyle().
+	tagDSDAStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FFD700"))
 
 	tagUZDoomStyle = lipgloss.NewStyle().
@@ -39,6 +39,13 @@ var (
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#666666")).
 			Padding(0, 1)
+
+	labelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888"))
+
+	valueBoldStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#FFFFFF"))
 
 	foundStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00FF00")).
@@ -69,7 +76,13 @@ func initialModel(catalog *preset.Catalog, wadsDir string) model {
 	ti.Placeholder = "Type to search presets..."
 	ti.Focus()
 	ti.CharLimit = 100
-	ti.Width = 35
+	ti.Width = 40
+
+	w, h, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || w <= 0 || h <= 0 {
+		w = 100
+		h = 24
+	}
 
 	return model{
 		catalog:  catalog,
@@ -77,8 +90,8 @@ func initialModel(catalog *preset.Catalog, wadsDir string) model {
 		input:    ti,
 		filtered: catalog.Presets,
 		cursor:   0,
-		width:    80,
-		height:   24,
+		width:    w,
+		height:   h,
 	}
 }
 
@@ -168,8 +181,12 @@ func (m model) View() string {
 	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
 	search := fmt.Sprintf("Search: %s\n\n", m.input.View())
 
-	// Build List View (show up to 10 items)
+	// Build List View
 	maxVisible := 10
+	if m.width < 96 && m.height <= 26 {
+		maxVisible = 6
+	}
+
 	startIdx := 0
 	if m.cursor >= maxVisible {
 		startIdx = m.cursor - maxVisible + 1
@@ -182,18 +199,22 @@ func (m model) View() string {
 	var listLines []string
 	for i := startIdx; i < endIdx; i++ {
 		p := m.filtered[i]
-		tag := "[UZDoom]"
-		tagRender := tagUZDoomStyle.Render(tag)
+		tag := tagUZDoomStyle.Render("[UZDoom]")
 		if p.Engine == "dsda-doom" {
-			tag = "[DSDA]"
-			tagRender = tagDSDASStyle.Render(tag)
+			tag = tagDSDAStyle.Render("[DSDA]") + "  "
 		}
 
-		line := fmt.Sprintf("%-28s %s", p.Name, tagRender)
+		name := p.Name
+		runes := []rune(name)
+		if len(runes) > 30 {
+			name = string(runes[:29]) + "…"
+		}
+		paddedName := fmt.Sprintf("%-30s", name)
+
 		if i == m.cursor {
-			listLines = append(listLines, cursorStyle.Render("> "+line))
+			listLines = append(listLines, cursorStyle.Render("> "+paddedName)+" "+tag)
 		} else {
-			listLines = append(listLines, "  "+line)
+			listLines = append(listLines, "  "+paddedName+" "+tag)
 		}
 	}
 
@@ -204,24 +225,33 @@ func (m model) View() string {
 	listPane := strings.Join(listLines, "\n")
 
 	// Build Preview View for current item
-	var previewPane string
+	var previewLines []string
 	if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 		cur := m.filtered[m.cursor]
-		var previewLines []string
-		previewLines = append(previewLines, fmt.Sprintf("Preset:        %s", cur.Name))
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", labelStyle.Render("Preset:        "), valueBoldStyle.Render(cur.Name)),
+		)
 		engStr := "UZDoom (Software-Plus / Advanced)"
 		if cur.Engine == "dsda-doom" {
 			engStr = "DSDA-Doom (MBF21 / Speedrun)"
 		}
-		previewLines = append(previewLines, fmt.Sprintf("Engine:        %s", engStr))
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", labelStyle.Render("Engine:        "), engStr),
+		)
 		if cur.Category != "" {
-			previewLines = append(previewLines, fmt.Sprintf("Category:      %s", cur.Category))
+			previewLines = append(previewLines,
+				fmt.Sprintf("%s%s", labelStyle.Render("Category:      "), cur.Category),
+			)
 		}
 		if cur.Compatibility != "" {
-			previewLines = append(previewLines, fmt.Sprintf("Compatibility: %s", cur.Compatibility))
+			previewLines = append(previewLines,
+				fmt.Sprintf("%s%s", labelStyle.Render("Compatibility: "), cur.Compatibility),
+			)
 		}
 		if cur.Description != "" {
-			previewLines = append(previewLines, fmt.Sprintf("Description:   %s", cur.Description))
+			previewLines = append(previewLines,
+				fmt.Sprintf("%s%s", labelStyle.Render("Description:   "), cur.Description),
+			)
 		}
 
 		// Check IWAD
@@ -229,10 +259,12 @@ func (m model) View() string {
 		if _, ok := preset.ResolveFile(m.wadsDir, cur.IWAD); ok {
 			iwadStatus = foundStyle.Render("[✓ Found]")
 		}
-		previewLines = append(previewLines, fmt.Sprintf("IWAD:          %s %s", cur.IWAD, iwadStatus))
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s %s", labelStyle.Render("IWAD:          "), cur.IWAD, iwadStatus),
+		)
 
 		if len(cur.Mappacks) > 0 {
-			previewLines = append(previewLines, "Files:")
+			previewLines = append(previewLines, labelStyle.Render("Files:"))
 			for _, mapfile := range cur.Mappacks {
 				fStatus := missingStyle.Render("[✗ Missing]")
 				if _, ok := preset.ResolveFile(m.wadsDir, mapfile); ok {
@@ -243,17 +275,38 @@ func (m model) View() string {
 				previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))
 			}
 		}
-
-		previewPane = previewBoxStyle.Width(45).Render(strings.Join(previewLines, "\n"))
 	}
 
-	// Two columns layout if terminal is wide enough
+	// Layout presentation
 	var content string
-	if m.width >= 80 {
-		listCol := lipgloss.NewStyle().Width(38).Render(listPane)
-		content = lipgloss.JoinHorizontal(lipgloss.Top, listCol, "   ", previewPane)
+	listCol := lipgloss.NewStyle().Width(42).Render(listPane)
+	if m.width >= 96 {
+		boxWidth := m.width - 44 - 2 // 42 list + 2 gap + 2 border
+		if boxWidth > 74 {
+			boxWidth = 74
+		}
+		if boxWidth < 50 {
+			boxWidth = 50
+		}
+		var previewPane string
+		if len(previewLines) > 0 {
+			previewPane = previewBoxStyle.Width(boxWidth).Render(strings.Join(previewLines, "\n"))
+		}
+		content = lipgloss.JoinHorizontal(lipgloss.Top, listCol, "  ", previewPane)
 	} else {
-		content = listPane + "\n\n" + previewPane
+		boxWidth := m.width - 4
+		if boxWidth > 74 {
+			boxWidth = 74
+		}
+		if boxWidth < 40 {
+			boxWidth = 40
+		}
+		if len(previewLines) > 0 {
+			previewPane := previewBoxStyle.Width(boxWidth).Render(strings.Join(previewLines, "\n"))
+			content = listCol + "\n\n" + previewPane
+		} else {
+			content = listCol
+		}
 	}
 
 	footer := "\n\n" + helpStyle.Render("↑/↓: Navigate • Enter: Launch • Esc: Quit")
