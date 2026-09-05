@@ -589,11 +589,36 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 	return leftBox + "\n" + rightBox
 }
 
+func (m model) renderReadmeHeader() string {
+	brandPill := brandCapStyle.Render("") + brandBodyStyle.Render(" 💀 DOOM ") + brandCapStyle.Render("")
+	docLabel := filterPromptStyle.Render("   README Viewer")
+	leftPart := brandPill + docLabel
+
+	pct := int(m.viewport.ScrollPercent() * 100)
+	pctText := fmt.Sprintf(" %d%% ", pct)
+	if pct <= 0 {
+		pctText = " Top "
+	} else if pct >= 100 {
+		pctText = " End "
+	}
+	scrollPill := statsCapStyle.Render("") + statsBodyStyle.Render(pctText) + statsCapStyle.Render("")
+
+	leftW := lipgloss.Width(leftPart)
+	statsW := lipgloss.Width(scrollPill)
+
+	if leftW+statsW < m.width {
+		gap := m.width - leftW - statsW
+		return leftPart + strings.Repeat(" ", gap) + scrollPill + "\n\n"
+	}
+	return leftPart + "\n\n"
+}
+
 func (m model) renderReadmeView() string {
 	boxWidth, _, _ := calculateReadmeDimensions(m.width, m.height)
+	header := m.renderReadmeHeader()
 	box := renderBoxWithTitle(m.viewport.View(), boxWidth, m.readmeTitle, true)
 	footer := m.renderReadmeFooter()
-	return "\n" + box + footer + "\n"
+	return "\n" + header + box + footer + "\n"
 }
 
 func (m model) renderReadmeFooter() string {
