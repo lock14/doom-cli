@@ -576,7 +576,7 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 		leftText := formatBoxContent(listLines, geom.leftWidth-2, geom.interiorHeight)
 		rightText := formatBoxContent(previewLines, geom.rightWidth-2, geom.interiorHeight)
 		leftBox := renderBoxWithTitle(leftText, geom.leftWidth, leftTitle, true)
-		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, false)
+		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, true)
 		gutterStr := strings.Repeat(" ", geom.gutter)
 		return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
 	}
@@ -584,7 +584,7 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 	leftText := formatBoxContent(listLines, geom.boxWidth-2, geom.listHeight-2)
 	rightText := formatBoxContent(previewLines, geom.boxWidth-2, geom.detailsHeight-2)
 	leftBox := renderBoxWithTitle(leftText, geom.boxWidth, leftTitle, true)
-	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, false)
+	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, true)
 	return leftBox + "\n" + rightBox
 }
 
