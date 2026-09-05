@@ -2,10 +2,13 @@ package tui
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/lock14/doom-cli/internal/preset"
 )
@@ -13,9 +16,30 @@ import (
 func mockCatalog() *preset.Catalog {
 	return &preset.Catalog{
 		Presets: []preset.Preset{
-			{Name: "Alien Vendetta", Engine: "dsda-doom", IWAD: "doom2.wad", Mappacks: []string{"av.wad"}},
-			{Name: "Eviternity II", Engine: "uzdoom", IWAD: "doom2.wad", Mappacks: []string{"eviternityii.wad"}},
-			{Name: "Sunder", Engine: "dsda-doom", IWAD: "doom2.wad", Mappacks: []string{"sunder.wad"}},
+			{
+				Name:        "Alien Vendetta",
+				Engine:      "dsda-doom",
+				IWAD:        "doom2.wad",
+				Mappacks:    []string{"av.wad"},
+				Author:      "Anders Johnsen, Brad Spencer, et al.",
+				ReleaseDate: "2002",
+			},
+			{
+				Name:        "Eviternity II",
+				Engine:      "uzdoom",
+				IWAD:        "doom2.wad",
+				Mappacks:    []string{"eviternityii.wad"},
+				Author:      "Joshua \"Dragonfly\" O'Sullivan et al.",
+				ReleaseDate: "2023",
+			},
+			{
+				Name:        "Sunder",
+				Engine:      "dsda-doom",
+				IWAD:        "doom2.wad",
+				Mappacks:    []string{"sunder.wad"},
+				Author:      "Insane_Gazebo",
+				ReleaseDate: "2009",
+			},
 		},
 	}
 }
@@ -81,5 +105,421 @@ func TestRunNumberedMenu(t *testing.T) {
 	}
 	if selected != nil {
 		t.Fatalf("expected nil selection on quit, got: %v", selected)
+	}
+}
+
+func TestModel_View_Layouts(t *testing.T) {
+	cat := mockCatalog()
+
+	tests := []struct {
+		name        string
+		width       int
+		height      int
+		expectSide  bool
+		expectTerms []string
+	}{
+		{
+			name:        "wide terminal side-by-side",
+			width:       120,
+			height:      30,
+			expectSide:  true,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+		{
+			name:        "tall wide terminal",
+			width:       120,
+			height:      50,
+			expectSide:  true,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+		{
+			name:        "short wide terminal",
+			width:       100,
+			height:      14,
+			expectSide:  true,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+		{
+			name:        "narrow terminal stacked",
+			width:       80,
+			height:      24,
+			expectSide:  false,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+		{
+			name:        "tall narrow terminal stacked",
+			width:       80,
+			height:      45,
+			expectSide:  false,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+		{
+			name:        "short narrow terminal stacked",
+			width:       80,
+			height:      16,
+			expectSide:  false,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+		{
+			name:        "extra wide terminal side-by-side (190 columns)",
+			width:       190,
+			height:      40,
+			expectSide:  true,
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := initialModel(cat, "")
+			newM, _ := m.Update(tea.WindowSizeMsg{Width: tt.width, Height: tt.height})
+			m = newM.(model)
+
+			view := m.View()
+			for _, term := range tt.expectTerms {
+				if !strings.Contains(view, term) {
+					t.Errorf("expected view to contain %q, view was:\n%s", term, view)
+				}
+			}
+
+			// Verify that every line in view fits within the terminal width and has proper borders
+			lines := strings.Split(strings.TrimSuffix(view, "\n"), "\n")
+			if len(lines) > tt.height {
+				t.Errorf("view height %d exceeds terminal height %d", len(lines), tt.height)
+			}
+			var borderLineCount int
+			for lineIdx, line := range lines {
+				w := lipgloss.Width(line)
+				if w > tt.width {
+					t.Errorf("line %d width %d exceeds terminal width %d: %q", lineIdx, w, tt.width, line)
+				}
+				trimmed := strings.TrimRight(line, " ")
+				if strings.Contains(line, "╭") {
+					borderLineCount++
+					if !strings.HasSuffix(trimmed, "╮") {
+						t.Errorf("top border line %d expected to end with '╮', got %q", lineIdx, trimmed)
+					}
+					if w != tt.width {
+						t.Errorf("top border line %d width %d != terminal width %d", lineIdx, w, tt.width)
+					}
+				}
+				if strings.Contains(line, "╰") {
+					borderLineCount++
+					if !strings.HasSuffix(trimmed, "╯") {
+						t.Errorf("bottom border line %d expected to end with '╯', got %q", lineIdx, trimmed)
+					}
+					if w != tt.width {
+						t.Errorf("bottom border line %d width %d != terminal width %d", lineIdx, w, tt.width)
+					}
+				}
+				if strings.Contains(line, "│") {
+					borderLineCount++
+					if !strings.HasSuffix(trimmed, "│") {
+						t.Errorf("content line %d expected to end with '│', got %q", lineIdx, trimmed)
+					}
+					if w != tt.width {
+						t.Errorf("content line %d width %d != terminal width %d", lineIdx, w, tt.width)
+					}
+				}
+			}
+			if borderLineCount == 0 {
+				t.Errorf("expected border lines in view, found none")
+			}
+
+			// Move cursor down to UZDoom preset
+			newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+			m = newM.(model)
+			viewUZDoom := m.View()
+
+			if !strings.Contains(viewUZDoom, "[UZDoom]") {
+				t.Errorf("expected view to contain [UZDoom], view was:\n%s", viewUZDoom)
+			}
+		})
+	}
+}
+
+func TestModel_View_QuittingAndSelected(t *testing.T) {
+	cat := mockCatalog()
+	m := initialModel(cat, "")
+
+	m.quitting = true
+	if view := m.View(); !strings.Contains(view, "Cancelled.") {
+		t.Errorf("expected 'Cancelled.', got %q", view)
+	}
+
+	m.quitting = false
+	m.selected = &cat.Presets[0]
+	if view := m.View(); !strings.Contains(view, "Launching Alien Vendetta") {
+		t.Errorf("expected 'Launching Alien Vendetta', got %q", view)
+	}
+}
+
+func TestModel_ReadmeViewer(t *testing.T) {
+	tmpDir := t.TempDir()
+	txtPath := filepath.Join(tmpDir, "av.txt")
+	txtContent := []byte(
+		"Title: Alien Vendetta\n\xdb\xb0\xdb\xb1\xdb\xb2\nAuthor: Anders Johnsen\nDescription: Megawad",
+	)
+	if err := os.WriteFile(txtPath, txtContent, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := mockCatalog()
+	m := initialModel(cat, tmpDir)
+
+	// In initial view, readme tag and Author/Released should appear in preview
+	viewInitial := m.View()
+	if !strings.Contains(viewInitial, "Anders Johnsen") {
+		t.Errorf("expected view to contain Author, got:\n%s", viewInitial)
+	}
+	if !strings.Contains(viewInitial, "Released:      2002") {
+		t.Errorf("expected view to contain Released, got:\n%s", viewInitial)
+	}
+	if !strings.Contains(viewInitial, "av.txt") {
+		t.Errorf("expected view to list av.txt, got:\n%s", viewInitial)
+	}
+
+	// Pressing tab opens the readme
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(model)
+	if !m.viewingReadme {
+		t.Fatalf("expected viewingReadme to be true after tab")
+	}
+
+	viewReadme := m.View()
+	if !strings.Contains(viewReadme, "README: Alien Vendetta") {
+		t.Errorf("expected view to contain README header, got:\n%s", viewReadme)
+	}
+	if !strings.Contains(viewReadme, "Title: Alien Vendetta") {
+		t.Errorf("expected view to contain readme content, got:\n%s", viewReadme)
+	}
+	if strings.Contains(viewReadme, "۰") {
+		t.Errorf("expected view not to contain Arabic numeral from CP437, got:\n%s", viewReadme)
+	}
+	if !strings.Contains(viewReadme, "█░█▒█▓") {
+		t.Errorf("expected view to contain decoded CP437 block art █░█▒█▓, got:\n%s", viewReadme)
+	}
+
+	// Verify that readme view lines fit within terminal dimensions
+	readmeLines := strings.Split(strings.TrimSuffix(viewReadme, "\n"), "\n")
+	if len(readmeLines) > m.height {
+		t.Errorf("readme view height %d exceeds terminal height %d", len(readmeLines), m.height)
+	}
+	for lineIdx, line := range readmeLines {
+		w := lipgloss.Width(line)
+		if w > m.width {
+			t.Errorf("readme line %d width %d exceeds terminal width %d: %q", lineIdx, w, m.width, line)
+		}
+	}
+
+	// Pressing esc closes the readme
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = newM.(model)
+	if m.viewingReadme {
+		t.Fatalf("expected viewingReadme to be false after esc")
+	}
+}
+
+func TestCalculateSearchWidth(t *testing.T) {
+	tests := []struct {
+		name      string
+		termWidth int
+		expected  int
+	}{
+		{name: "narrow terminal clamped to min", termWidth: 40, expected: minSearchWidth},
+		{name: "medium terminal responsive", termWidth: 80, expected: 35},
+		{name: "wide terminal clamped to max", termWidth: 120, expected: maxSearchWidth},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateSearchWidth(tt.termWidth)
+			if got != tt.expected {
+				t.Errorf("calculateSearchWidth(%d) = %d, want %d", tt.termWidth, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCalculateReadmeDimensions(t *testing.T) {
+	tests := []struct {
+		name           string
+		width, height  int
+		wantBox, wantW int
+		wantH          int
+	}{
+		{
+			name:    "standard dimensions",
+			width:   100,
+			height:  30,
+			wantBox: 98,
+			wantW:   96,
+			wantH:   22,
+		},
+		{
+			name:    "narrow and short dimensions clamped",
+			width:   30,
+			height:  10,
+			wantBox: minBoxWidth,
+			wantW:   36,
+			wantH:   5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			boxW, vpW, vpH := calculateReadmeDimensions(tt.width, tt.height)
+			if boxW != tt.wantBox || vpW != tt.wantW || vpH != tt.wantH {
+				t.Errorf("calculateReadmeDimensions(%d, %d) = (%d, %d, %d), want (%d, %d, %d)",
+					tt.width, tt.height, boxW, vpW, vpH, tt.wantBox, tt.wantW, tt.wantH)
+			}
+		})
+	}
+}
+
+func TestComputeLayout(t *testing.T) {
+	cat := mockCatalog()
+	tests := []struct {
+		name       string
+		width      int
+		height     int
+		wantSide   bool
+		minVisible int
+	}{
+		{name: "standard side-by-side 120x30", width: 120, height: 30, wantSide: true, minVisible: 15},
+		{name: "wide terminal 190x40", width: 190, height: 40, wantSide: true, minVisible: 25},
+		{name: "exact side-by-side boundary 90x24", width: 90, height: 24, wantSide: true, minVisible: 10},
+		{name: "stacked mode 80x24", width: 80, height: 24, wantSide: false, minVisible: 5},
+		{name: "short stacked mode 80x16", width: 80, height: 16, wantSide: false, minVisible: 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := initialModel(cat, "")
+			m.width = tt.width
+			m.height = tt.height
+
+			geom := m.computeLayout()
+			if geom.sideBySide != tt.wantSide {
+				t.Fatalf("expected sideBySide=%v, got %v", tt.wantSide, geom.sideBySide)
+			}
+
+			if geom.maxVisible < tt.minVisible {
+				t.Errorf("expected maxVisible >= %d, got %d", tt.minVisible, geom.maxVisible)
+			}
+
+			if geom.sideBySide {
+				totalW := geom.leftWidth + 2 + geom.gutter + geom.rightWidth + 2
+				if totalW != tt.width {
+					t.Errorf("side-by-side total width %d != terminal width %d", totalW, tt.width)
+				}
+			} else {
+				totalW := geom.boxWidth + 2
+				if totalW != tt.width {
+					t.Errorf("stacked total width %d != terminal width %d", totalW, tt.width)
+				}
+			}
+		})
+	}
+}
+
+func TestCalculateInteriorHeight(t *testing.T) {
+	tests := []struct {
+		name       string
+		termHeight int
+		expected   int
+	}{
+		{name: "standard 30-line terminal", termHeight: 30, expected: 22},
+		{name: "standard 24-line terminal", termHeight: 24, expected: 16},
+		{name: "short 14-line terminal", termHeight: 14, expected: 6},
+		{name: "very short 10-line terminal clamped to min", termHeight: 10, expected: 5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := calculateInteriorHeight(tt.termHeight)
+			if got != tt.expected {
+				t.Errorf("calculateInteriorHeight(%d) = %d, want %d", tt.termHeight, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCapsuleAndKeyHelpRenderers(t *testing.T) {
+	brand := renderBrandPill()
+	if !strings.Contains(brand, "DOOM") || !strings.Contains(brand, "") || !strings.Contains(brand, "") {
+		t.Errorf("renderBrandPill() = %q, expected DOOM with capsule caps", brand)
+	}
+
+	stats := renderStatsPill(10, 32)
+	if !strings.Contains(stats, "10 / 32 presets") {
+		t.Errorf("renderStatsPill(10, 32) = %q, expected '10 / 32 presets'", stats)
+	}
+
+	topPill := renderScrollPill(0.0)
+	if !strings.Contains(topPill, "Top") {
+		t.Errorf("renderScrollPill(0.0) = %q, expected 'Top'", topPill)
+	}
+	midPill := renderScrollPill(0.5)
+	if !strings.Contains(midPill, "50%") {
+		t.Errorf("renderScrollPill(0.5) = %q, expected '50%%'", midPill)
+	}
+	endPill := renderScrollPill(1.0)
+	if !strings.Contains(endPill, "End") {
+		t.Errorf("renderScrollPill(1.0) = %q, expected 'End'", endPill)
+	}
+
+	help := formatKeyHelp([]keyHelp{
+		{"Enter", "Launch"},
+		{"Esc", "Quit"},
+	})
+	if !strings.Contains(help, "Enter") || !strings.Contains(help, "Launch") || !strings.Contains(help, "•") {
+		t.Errorf("formatKeyHelp() = %q, expected keys and separator", help)
+	}
+}
+
+func TestInitialModel_WithInitialPreset(t *testing.T) {
+	cat := mockCatalog()
+
+	tests := []struct {
+		name          string
+		initialPreset []string
+		expectedIdx   int
+	}{
+		{
+			name:          "no initial preset provided",
+			initialPreset: nil,
+			expectedIdx:   0,
+		},
+		{
+			name:          "empty string initial preset",
+			initialPreset: []string{""},
+			expectedIdx:   0,
+		},
+		{
+			name:          "matching preset exact case",
+			initialPreset: []string{"Eviternity II"},
+			expectedIdx:   1,
+		},
+		{
+			name:          "matching preset case-insensitive",
+			initialPreset: []string{"sunder"},
+			expectedIdx:   2,
+		},
+		{
+			name:          "unknown preset falls back to 0",
+			initialPreset: []string{"NonExistentWad"},
+			expectedIdx:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := initialModel(cat, "", tt.initialPreset...)
+			if m.cursor != tt.expectedIdx {
+				t.Errorf("initialModel(cat, \"\", %v) cursor = %d, expected %d",
+					tt.initialPreset, m.cursor, tt.expectedIdx)
+			}
+		})
 	}
 }

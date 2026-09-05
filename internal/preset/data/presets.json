@@ -42,6 +42,8 @@
       "category": "Community Megawad",
       "compatibility": "Boom",
       "description": "Classic Boom megawad + DEH patch",
+      "author": "Anders Johnsen, Brad Spencer, et al.",
+      "release_date": "2002",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/av.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/av"
@@ -57,6 +59,8 @@
       "category": "Community Megawad",
       "compatibility": "MBF",
       "description": "MBF / Complevel 11 with custom color palette",
+      "author": "Paul \"skillsaw\" DeBruyne",
+      "release_date": "2016",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/aaliens.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens"
@@ -74,6 +78,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla / Boom",
       "description": "Vanilla/Boom compatible with custom soundtrack & palettes",
+      "author": "Esselfortium et al.",
+      "release_date": "2012",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e1.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1"
@@ -91,6 +97,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla / Boom",
       "description": "Vanilla/Boom compatible with custom soundtrack & palettes",
+      "author": "Esselfortium et al.",
+      "release_date": "2014",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e2.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2"
@@ -107,6 +115,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Modern Ultimate Doom episode replacement",
+      "author": "James \"Jimmy\" Paddock",
+      "release_date": "2018",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/deathless.zip",
         "https://www.doomworld.com/idgames/levels/doom/Ports/megawads/deathless"
@@ -122,6 +132,8 @@
       "category": "Official IWAD",
       "compatibility": "Vanilla",
       "description": "Classic IWAD with modern MIDI audio",
+      "author": "id Software",
+      "release_date": "1993",
       "download_urls": []
     },
     {
@@ -134,6 +146,8 @@
       "category": "Official IWAD",
       "compatibility": "Vanilla",
       "description": "Classic IWAD with modern MIDI audio",
+      "author": "id Software",
+      "release_date": "1994",
       "download_urls": []
     },
     {
@@ -148,6 +162,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla / DEH",
       "description": "Anniversary megawad + DEH modifications",
+      "author": "Christopher Golden",
+      "release_date": "2019",
       "download_urls": []
     },
     {
@@ -162,6 +178,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Classic vanilla-style homage megawad",
+      "author": "NoisyVelvet, Jason Baker, et al.",
+      "release_date": "2011",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom/megawads/dtwid.zip",
         "https://www.doomworld.com/idgames/levels/doom/megawads/dtwid"
@@ -179,6 +197,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Classic vanilla-style homage megawad",
+      "author": "Various",
+      "release_date": "2013",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/d2twid.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/d2twid"
@@ -194,6 +214,8 @@
       "category": "Community Megawad",
       "compatibility": "MBF / OTEX",
       "description": "OTEX texture pack & custom monsters",
+      "author": "Joshua \"Dragonfly\" O'Sullivan et al.",
+      "release_date": "2019",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternity.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity"
@@ -209,6 +231,8 @@
       "category": "Community Megawad",
       "compatibility": "MBF21 / OTEX",
       "description": "OTEX texture pack, advanced MBF21 & custom monsters",
+      "author": "Joshua \"Dragonfly\" O'Sullivan et al.",
+      "release_date": "2023",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip"
       ]
@@ -223,6 +247,8 @@
       "category": "Community Megawad",
       "compatibility": "Boom",
       "description": "Fast-paced, compact map pack",
+      "author": "mouldy",
+      "release_date": "2024",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gd.zip"
       ]
@@ -235,6 +261,8 @@
       "category": "Official IWAD",
       "compatibility": "Raven Software",
       "description": "Raven Software classic fantasy shooter",
+      "author": "Raven Software",
+      "release_date": "1994",
       "download_urls": []
     },
     {
@@ -245,6 +273,8 @@
       "category": "Official IWAD",
       "compatibility": "Raven Software",
       "description": "Raven Software hub-based fantasy shooter",
+      "author": "Raven Software",
+      "release_date": "1995",
       "download_urls": []
     },
     {
@@ -262,6 +292,8 @@
       "category": "Official Expansion",
       "compatibility": "ID24",
       "description": "Official ID24 standard episode + weapons & monsters",
+      "author": "id Software & Nightdive Studios",
+      "release_date": "2024",
       "download_urls": []
     },
     {
@@ -275,6 +307,8 @@
       "category": "Official Expansion",
       "compatibility": "Vanilla",
       "description": "Full 20-level classic collection",
+      "author": "Various (Commissioned by id Software)",
+      "release_date": "1995",
       "download_urls": []
     },
     {
@@ -288,6 +322,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Vanilla-compatible megawad",
+      "author": "myolden",
+      "release_date": "2022",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/nostalgia.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/m-o/nostalgia"
@@ -304,6 +340,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla / Ultimate Doom",
       "description": "Classic 4-episode expansion for Ultimate Doom",
+      "author": "Emil \"NaturalTvventy\" Brundage et al.",
+      "release_date": "2016",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/neis.zip",
         "https://www.doomworld.com/idgames/levels/doom/Ports/megawads/neis"
@@ -320,6 +358,8 @@
       "category": "Official Expansion",
       "compatibility": "Vanilla",
       "description": "Official 9-level expansion for Doom II",
+      "author": "Nerve Software",
+      "release_date": "2010",
       "download_urls": []
     },
     {
@@ -332,6 +372,8 @@
       "category": "Community Episode",
       "compatibility": "Vanilla",
       "description": "John Romero's unofficial 5th episode for Ultimate Doom",
+      "author": "John Romero",
+      "release_date": "2019",
       "download_urls": []
     },
     {
@@ -345,6 +387,8 @@
       "category": "Community Episode",
       "compatibility": "Vanilla",
       "description": "John Romero's unofficial 6th episode for Ultimate Doom",
+      "author": "John Romero",
+      "release_date": "2023",
       "download_urls": []
     },
     {
@@ -357,6 +401,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Iconic fast-paced speedrunning megawad",
+      "author": "Erik Alm",
+      "release_date": "2003",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/scythe"
@@ -372,6 +418,8 @@
       "category": "Community Megawad",
       "compatibility": "Boom / DEH",
       "description": "Erik Alm's legendary sequel with custom monsters",
+      "author": "Erik Alm",
+      "release_date": "2005",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/scythe2.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/scythe2"
@@ -387,6 +435,8 @@
       "category": "Community Megawad",
       "compatibility": "Boom",
       "description": "33-level intense challenge megawad",
+      "author": "Joshy & Darkwave0000",
+      "release_date": "2010",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sodfinal.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sodfinal"
@@ -402,6 +452,8 @@
       "category": "Community Megawad",
       "compatibility": "MBF21 / Boom",
       "description": "Monumental architectural slaughter megawad",
+      "author": "Insane_Gazebo",
+      "release_date": "2009",
       "download_urls": []
     },
     {
@@ -414,6 +466,8 @@
       "category": "Community Megawad",
       "compatibility": "Boom",
       "description": "32-level visual and gameplay masterpiece",
+      "author": "Ribbiks & Dannebubinga",
+      "release_date": "2015",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunlust.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunlust"
@@ -429,6 +483,8 @@
       "category": "Official IWAD",
       "compatibility": "Vanilla",
       "description": "Classic Final Doom IWAD with modern soundtrack",
+      "author": "Dario Casali & Milo Casali",
+      "release_date": "1996",
       "download_urls": []
     },
     {
@@ -442,6 +498,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Community sequel to The Plutonia Experiment",
+      "author": "Plutonia 2 Team",
+      "release_date": "2008",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/pl2.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/pl2"
@@ -457,6 +515,8 @@
       "category": "Official IWAD",
       "compatibility": "Vanilla",
       "description": "Classic Final Doom IWAD with modern soundtrack",
+      "author": "TeamTNT",
+      "release_date": "1996",
       "download_urls": []
     },
     {
@@ -470,6 +530,8 @@
       "category": "Community Megawad",
       "compatibility": "Vanilla",
       "description": "Community sequel to TNT: Evilution",
+      "author": "TeamTNT & Various",
+      "release_date": "2017",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/megawads/tntr.zip",
         "https://www.doomworld.com/idgames/levels/doom2/megawads/tntr"
@@ -485,6 +547,8 @@
       "category": "Community Megawad",
       "compatibility": "MBF",
       "description": "MBF-compatible with custom weapons & dehacked",
+      "author": "Paul \"skillsaw\" DeBruyne",
+      "release_date": "2015",
       "download_urls": [
         "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/valiant.zip",
         "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant"

@@ -211,6 +211,7 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 
 	var wadFiles []*zip.File
 	var dehFiles []*zip.File
+	var txtFiles []*zip.File
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() {
 			continue
@@ -220,6 +221,8 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 			wadFiles = append(wadFiles, zf)
 		} else if strings.HasSuffix(baseLower, ".deh") {
 			dehFiles = append(dehFiles, zf)
+		} else if strings.HasSuffix(baseLower, ".txt") {
+			txtFiles = append(txtFiles, zf)
 		}
 	}
 
@@ -290,6 +293,19 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 			return fmt.Errorf("error extracting %s: %w", exp, err)
 		}
 		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", filepath.Base(match.Name), destPath)
+	}
+
+	// Extract accompanying readme (.txt) if present in the archive
+	for _, tf := range txtFiles {
+		base := strings.ToLower(filepath.Base(tf.Name))
+		if strings.EqualFold(base, "license.txt") {
+			continue
+		}
+		destPath := filepath.Join(d.WadsDir, filepath.Base(tf.Name))
+		if err := extractZipFile(tf, destPath); err == nil {
+			fmt.Fprintf(d.Out, "    Readme:    %s -> %s\n", filepath.Base(tf.Name), destPath)
+			break
+		}
 	}
 
 	return nil
