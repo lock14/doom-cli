@@ -51,7 +51,7 @@ func (ins *Installer) ResolveLatestGitHubURL(repo, patternRegex, fallbackURL str
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err == nil {
-		req.Header.Set("User-Agent", "doom-configs/2.0")
+		req.Header.Set("User-Agent", "doom-cli/2.0")
 		resp, err := ins.Client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			defer resp.Body.Close()
@@ -81,7 +81,7 @@ func (ins *Installer) DownloadFile(url, targetPath string) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "doom-configs/2.0")
+	req.Header.Set("User-Agent", "doom-cli/2.0")
 
 	resp, err := ins.Client.Do(req)
 	if err != nil {

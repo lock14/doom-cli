@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lock14/doom-configs/internal/config"
-	"github.com/lock14/doom-configs/internal/display"
+	"github.com/lock14/doom-cli/internal/config"
+	"github.com/lock14/doom-cli/internal/display"
 )
 
 //go:embed data/autoexec.cfg

@@ -1,10 +1,10 @@
-# doom-configs
+# doom-cli
 
 > Unified cross-platform CLI tool, curated engine configurations, and launcher presets for classic Doom source ports (DSDA-Doom, UZDoom) and DoomRunner.
 
 ## Overview
 
-`github.com/lock14/doom-configs` provides a static, zero-dependency Go CLI (`doom`) that automates Doom source port management, engine configuration deployment with display auto-detection, Steam/GOG game file discovery, multi-mirror community megawad downloading, and interactive terminal launching across Linux, macOS, and Windows.
+`github.com/lock14/doom-cli` provides a static, zero-dependency Go CLI (`doom`) that automates Doom source port management, engine configuration deployment with display auto-detection, Steam/GOG game file discovery, multi-mirror community megawad downloading, and interactive terminal launching across Linux, macOS, and Windows.
 
 ## Quick Start
 
@@ -57,8 +57,8 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 
 ## References
 
-- Repository: https://github.com/lock14/doom-configs
-- Issues: https://github.com/lock14/doom-configs/issues
+- Repository: https://github.com/lock14/doom-cli
+- Issues: https://github.com/lock14/doom-cli/issues
 - DSDA-Doom: https://github.com/kraflab/dsda-doom
 - UZDoom: https://github.com/UZDoom/uzdoom
 - DoomRunner: https://github.com/Youda008/DoomRunner

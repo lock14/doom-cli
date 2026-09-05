@@ -1,4 +1,4 @@
-module github.com/lock14/doom-configs
+module github.com/lock14/doom-cli
 
 go 1.27.0
 

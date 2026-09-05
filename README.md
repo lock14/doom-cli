@@ -1,8 +1,8 @@
-# Doom Configs
+# doom-cli
 
-[![Go Version](https://img.shields.io/github/go-mod/go-version/lock14/doom-configs)](https://go.dev/)
-[![CI](https://github.com/lock14/doom-configs/actions/workflows/ci.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/ci.yml)
-[![Security](https://github.com/lock14/doom-configs/actions/workflows/security.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/security.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/lock14/doom-cli)](https://go.dev/)
+[![CI](https://github.com/lock14/doom-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/lock14/doom-cli/actions/workflows/ci.yml)
+[![Security](https://github.com/lock14/doom-cli/actions/workflows/security.yml/badge.svg)](https://github.com/lock14/doom-cli/actions/workflows/security.yml)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
 ![Engines](https://img.shields.io/badge/engines-DSDA--Doom%20%7C%20UZDoom-red)
 ![Presets](https://img.shields.io/badge/presets-32%20megawads-orange)
@@ -28,11 +28,11 @@ A unified cross-platform CLI tool and curated collection of configurations and l
 #### Linux & macOS
 ```bash
 # Clone the repository and build/install the doom binary to ~/.local/bin/doom
-git clone https://github.com/lock14/doom-configs.git
-cd doom-configs
+git clone https://github.com/lock14/doom-cli.git
+cd doom-cli
 make install
 ```
-*(Alternatively, install via Go: `go install ./cmd/doom`)*
+*(Alternatively, install via Go: `go install github.com/lock14/doom-cli/cmd/doom@latest`)*
 
 > [!TIP]
 > Ensure `~/.local/bin` is in your `$PATH` (e.g. in your `~/.bashrc` or `~/.zshrc`):
@@ -44,8 +44,8 @@ make install
 In PowerShell or Windows Terminal:
 ```powershell
 # Clone the repository and build doom.exe
-git clone https://github.com/lock14/doom-configs.git
-cd doom-configs
+git clone https://github.com/lock14/doom-cli.git
+cd doom-cli
 go install ./cmd/doom
 # Or compile directly to a bin folder in your PATH:
 go build -o $HOME/bin/doom.exe ./cmd/doom
