@@ -35,7 +35,7 @@ var (
 	tagUZDoomStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("2"))
 
-	previewBoxStyle = lipgloss.NewStyle().
+	panelBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("8")).
 			Padding(0, 1)
@@ -76,19 +76,26 @@ type model struct {
 }
 
 func initialModel(catalog *preset.Catalog, wadsDir string) model {
+	w, h, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || w <= 0 || h <= 0 {
+		w = 100
+		h = 24
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = "Type to search presets..."
 	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	ti.Focus()
 	ti.CharLimit = 100
-	ti.Width = 40
-
-	w, h, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil || w <= 0 || h <= 0 {
-		w = 100
-		h = 24
+	searchWidth := w - 16
+	if searchWidth > 60 {
+		searchWidth = 60
 	}
+	if searchWidth < 30 {
+		searchWidth = 30
+	}
+	ti.Width = searchWidth
 
 	return model{
 		catalog:  catalog,
@@ -150,6 +157,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		searchWidth := m.width - 16
+		if searchWidth > 60 {
+			searchWidth = 60
+		}
+		if searchWidth < 30 {
+			searchWidth = 30
+		}
+		m.input.Width = searchWidth
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -256,7 +271,7 @@ func (m model) View() string {
 			boxWidth = 40
 		}
 		header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
-		box := previewBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
+		box := panelBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
 		footer := "\n\n" + helpStyle.Render("↑/↓/PgUp/PgDn: Scroll • Enter: Launch • Tab/Esc/q: Back")
 		return header + box + footer + "\n"
 	}
@@ -264,23 +279,52 @@ func (m model) View() string {
 	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
 	search := fmt.Sprintf("Search: %s\n\n", m.input.View())
 
-	// Dynamically scale visible presets to fit available vertical terminal height
-	maxVisible := m.height - 8
-	if m.width < 96 {
-		// In stacked layout, account for preview box height (~10 lines)
-		maxVisible = m.height - 18
-		if maxVisible > 15 {
-			maxVisible = 15
+	// Dynamic height and width calculation for responsive dual-pane layout
+	var (
+		maxVisible     int
+		interiorHeight int
+		listHeight     int
+		detailsHeight  int
+		leftWidth      = 46
+		gutter         = 2
+		rightWidth     int
+		boxWidth       int
+	)
+
+	if m.width >= 90 {
+		availHeight := m.height - 7
+		if availHeight < 6 {
+			availHeight = 6
 		}
-		if maxVisible < 3 {
-			maxVisible = 3
+		interiorHeight = availHeight - 2
+		if interiorHeight < 4 {
+			interiorHeight = 4
+		}
+		maxVisible = interiorHeight
+		rightWidth = m.width - leftWidth - gutter - 2
+		if rightWidth < 42 {
+			rightWidth = 42
 		}
 	} else {
-		if maxVisible > 25 {
-			maxVisible = 25
+		boxWidth = m.width - 2
+		if boxWidth < 40 {
+			boxWidth = 40
 		}
-		if maxVisible < 5 {
-			maxVisible = 5
+		availHeight := m.height - 8
+		if availHeight < 10 {
+			availHeight = 10
+		}
+		listHeight = availHeight / 2
+		if listHeight < 5 {
+			listHeight = 5
+		}
+		detailsHeight = availHeight - listHeight
+		if detailsHeight < 5 {
+			detailsHeight = 5
+		}
+		maxVisible = listHeight - 2
+		if maxVisible < 3 {
+			maxVisible = 3
 		}
 	}
 
@@ -291,6 +335,10 @@ func (m model) View() string {
 	endIdx := startIdx + maxVisible
 	if endIdx > len(m.filtered) {
 		endIdx = len(m.filtered)
+		startIdx = endIdx - maxVisible
+		if startIdx < 0 {
+			startIdx = 0
+		}
 	}
 
 	var listLines []string
@@ -318,8 +366,6 @@ func (m model) View() string {
 	if len(m.filtered) == 0 {
 		listLines = append(listLines, "  No presets matching search.")
 	}
-
-	listPane := strings.Join(listLines, "\n")
 
 	// Build Preview View for current item
 	var previewLines []string
@@ -395,34 +441,20 @@ func (m model) View() string {
 
 	// Layout presentation
 	var content string
-	listCol := lipgloss.NewStyle().Width(42).Render(listPane)
-	if m.width >= 96 {
-		boxWidth := m.width - 44 - 2 // 42 list + 2 gap + 2 border
-		if boxWidth > 74 {
-			boxWidth = 74
-		}
-		if boxWidth < 50 {
-			boxWidth = 50
-		}
-		var previewPane string
+	if m.width >= 90 {
+		leftBox := panelBoxStyle.Width(leftWidth).Height(interiorHeight).Render(strings.Join(listLines, "\n"))
+		var rightBox string
 		if len(previewLines) > 0 {
-			previewPane = previewBoxStyle.Width(boxWidth).Render(strings.Join(previewLines, "\n"))
+			rightBox = panelBoxStyle.Width(rightWidth).Height(interiorHeight).Render(strings.Join(previewLines, "\n"))
 		}
-		content = lipgloss.JoinHorizontal(lipgloss.Top, listCol, "  ", previewPane)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, leftBox, "  ", rightBox)
 	} else {
-		boxWidth := m.width - 4
-		if boxWidth > 74 {
-			boxWidth = 74
-		}
-		if boxWidth < 40 {
-			boxWidth = 40
-		}
+		leftBox := panelBoxStyle.Width(boxWidth).Height(listHeight - 2).Render(strings.Join(listLines, "\n"))
+		var rightBox string
 		if len(previewLines) > 0 {
-			previewPane := previewBoxStyle.Width(boxWidth).Render(strings.Join(previewLines, "\n"))
-			content = listCol + "\n\n" + previewPane
-		} else {
-			content = listCol
+			rightBox = panelBoxStyle.Width(boxWidth).Height(detailsHeight - 2).Render(strings.Join(previewLines, "\n"))
 		}
+		content = leftBox + "\n" + rightBox
 	}
 
 	footerText := "↑/↓: Navigate • Enter: Launch • Esc: Quit"

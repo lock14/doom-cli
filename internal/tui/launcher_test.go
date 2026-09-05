@@ -217,7 +217,7 @@ func TestModel_ReadmeViewer(t *testing.T) {
 
 	// In initial view, readme tag and Author/Released should appear in preview
 	viewInitial := m.View()
-	if !strings.Contains(viewInitial, "Author:        Anders Johnsen, Brad Spencer, et al.") {
+	if !strings.Contains(viewInitial, "Anders Johnsen") {
 		t.Errorf("expected view to contain Author, got:\n%s", viewInitial)
 	}
 	if !strings.Contains(viewInitial, "Released:      2002") {
