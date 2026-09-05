@@ -27,17 +27,17 @@ The `Makefile` automatically detects whether you are running **Linux** or **macO
 - **Linux Destinations**: `~/.config/uzdoom/`, `~/.local/share/dsda-doom/`, `~/.local/share/DoomRunner/`, `~/.local/share/doom-configs/`, `~/.local/bin/`
 - **macOS Destinations**: `~/Library/Application Support/uzdoom/`, `~/Library/Application Support/dsda-doom/`, `~/Library/Application Support/DoomRunner/`, `~/Library/Application Support/doom-configs/`, `~/.local/bin/`
 
-#### Option 1: ⚡ Turnkey Setup (One-Command Everything)
+#### Option 1: ⚡ Automated Setup (One-Command Everything)
 For players who just want everything ready to play immediately with zero manual steps:
 Downloads all engines (`uzdoom`, `dsda-doom`, `doomrunner`), installs all configurations & `doom`, deploys the Roland SC-55 MIDI SoundFont, auto-extracts official Steam/GOG IWADs, and downloads all 20+ free community megawads:
 
 ```bash
 # Using native doom CLI:
-doom turnkey
+doom setup
 
 # Or using Make / POSIX script:
-make turnkey
-# or: ./setup.sh --turnkey
+make setup
+# or: ./setup.sh --all
 ```
 
 > [!TIP]
@@ -81,12 +81,12 @@ Alternatively, deploy without `make` using the POSIX setup script:
 
 ### Windows
 
-On Windows, you can use the native `doom.exe` CLI for turnkey setup and interactive launching, or deploy DoomRunner via PowerShell:
+On Windows, you can use the native `doom.exe` CLI for complete automated setup and interactive launching, or deploy DoomRunner via PowerShell:
 
-#### Option 1: Native Turnkey Setup (`doom.exe`)
+#### Option 1: Native Automated Setup (`doom.exe`)
 ```powershell
 # Complete 1-step setup (engines, configs, soundfonts, steam IWADs, and megawads)
-.\doom.exe turnkey
+.\doom.exe setup
 
 # Interactive fuzzy launcher directly in Windows Terminal / PowerShell
 .\doom.exe play
@@ -270,7 +270,7 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 
 | Category | Target | Description |
 | :--- | :--- | :--- |
-| **🚀 Quick Start** | `make turnkey` | ⚡ **1-Step Setup:** Downloads engines, configs, SoundFont, IWADs & megawads |
+| **🚀 Quick Start** | `make setup` | ⚡ **1-Step Setup:** Downloads engines, configs, SoundFont, IWADs & megawads |
 | | `make bootstrap` | Downloads engine binaries & deploys configs + launcher |
 | | `make install` | Deploys all configuration files & `doom-launch` CLI with backups |
 | | `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |

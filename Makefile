@@ -22,7 +22,7 @@ endif
 
 BIN_DIR ?= $(PREFIX)/.local/bin
 
-.PHONY: all build turnkey bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
+.PHONY: all build setup bootstrap install install-configs install-uzdoom install-dsda install-doomrunner \
         install-data install-launcher install-soundfonts install-engines install-engine-uzdoom \
         install-engine-dsda install-engine-doomrunner build-presets fetch-wads \
         extract-iwads play sync diff help check test
@@ -39,7 +39,7 @@ help:
 	@echo "Doom Configs - Available Targets ($(UNAME_S))"
 	@echo ""
 	@echo "  🚀 Quick Start:"
-	@echo "    make turnkey            ⚡ 1-step setup: engines, configs, soundfonts, IWADs & WADs"
+	@echo "    make setup              ⚡ 1-step setup: engines, configs, soundfonts, IWADs & WADs"
 	@echo "    make bootstrap          Download engine binaries & deploy configs + launcher"
 	@echo "    make install            Deploy all configurations & doom-launch CLI"
 	@echo "    make play               Launch interactive terminal preset picker (fzf / menu)"
@@ -56,13 +56,13 @@ help:
 	@echo "    make check              Run validation suite (presets, scripts, invariants, tests)"
 	@echo "    make build-presets      Recompile data/presets.json into launcher options.json"
 
-# ⚡ Turnkey Setup: All-in-one installation for players who just want everything ready
-turnkey: install-engines install-soundfonts install extract-iwads fetch-wads
+# ⚡ Setup: All-in-one installation for players who just want everything ready
+setup: install-engines install-soundfonts install extract-iwads fetch-wads
 	@echo ""
 	@echo "============================================================"
-	@echo "  ✓ Turnkey Doom setup complete!"
+	@echo "  ✓ Doom setup complete!"
 	@echo "  Engines, configs, soundfonts, and megawads are ready."
-	@echo "  Run 'make play' or 'doom-launch' to start playing!"
+	@echo "  Run 'make play' or 'doom' to start playing!"
 	@echo "============================================================"
 
 # Complete bootstrap: download engines and install configs + launcher
@@ -71,7 +71,7 @@ bootstrap: install-engines install
 install: install-uzdoom install-dsda install-doomrunner install-data install-launcher
 	@echo "All configurations, data files, and launcher successfully installed!"
 	@if [ ! -f "$(SF_DIR)/GeneralUser-GS.sf2" ]; then \
-		echo "  ℹ Tip: Run 'make install-soundfonts' (or 'make turnkey') to download the configured Roland SC-55 SoundFont."; \
+		echo "  ℹ Tip: Run 'make install-soundfonts' (or 'make setup') to download the configured Roland SC-55 SoundFont."; \
 	fi
 
 # Config installation targets
@@ -200,7 +200,7 @@ test:
 	@bash -n scripts/extract-iwads.sh
 	@bash -n scripts/install-soundfonts.sh
 	@bash -n scripts/doom-launch.sh
-	@bash -n scripts/test-turnkey.sh
+	@bash -n scripts/test-setup.sh
 	@bash -n scripts/test-doom-launch.sh
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		echo "Running ShellCheck..."; \
@@ -253,6 +253,6 @@ test:
 	fi && \
 	echo "=== Running doom-launch CLI Test Suite ===" && \
 	./scripts/test-doom-launch.sh && \
-	echo "=== Running End-to-End Turnkey & System Test Suite ===" && \
-	./scripts/test-turnkey.sh && \
+	echo "=== Running End-to-End Setup & System Test Suite ===" && \
+	./scripts/test-setup.sh && \
 	echo "All validation checks passed successfully for $(UNAME_S)!"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# test-turnkey.sh - Comprehensive End-to-End Turnkey & System Test Suite
-# Tests complete turnkey installation, mock Steam discovery, WAD downloads,
+# test-setup.sh - Comprehensive End-to-End Setup & System Test Suite
+# Tests complete setup installation, mock Steam discovery, WAD downloads,
 # and CLI launcher execution in an isolated sandbox.
 
 set -e
@@ -10,11 +10,11 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 OS="$(uname -s)"
 echo "============================================================"
-echo " Starting Turnkey Validation & End-to-End Test Suite ($OS)   "
+echo " Starting Setup Validation & End-to-End Test Suite ($OS)   "
 echo "============================================================"
 
 # Create isolated sandbox environment
-SANDBOX=$(mktemp -d "${TMPDIR:-/tmp}/doom_turnkey_test.XXXXXX")
+SANDBOX=$(mktemp -d "${TMPDIR:-/tmp}/doom_setup_test.XXXXXX")
 trap 'rm -rf "$SANDBOX"' EXIT INT TERM
 
 echo "Sandbox environment: $SANDBOX"
@@ -209,28 +209,28 @@ echo "$OUT_EXEC" | grep -q "MOCK_DSDA_DOOM_EXECUTED:" || {
 echo "✓ Test 5 Passed: doom-launch list, preview, dry-run, and engine invocation verified."
 
 # -----------------------------------------------------------------------------
-# TEST 6: Turnkey All-in-One Execution Test
+# TEST 6: Setup All-in-One Execution Test
 # -----------------------------------------------------------------------------
 echo ""
-echo "[Test 6/6] Testing full turnkey pipeline in fresh sandbox..."
+echo "[Test 6/6] Testing full setup pipeline in fresh sandbox..."
 
-FRESH_SANDBOX=$(mktemp -d "${TMPDIR:-/tmp}/doom_turnkey_fresh.XXXXXX")
+FRESH_SANDBOX=$(mktemp -d "${TMPDIR:-/tmp}/doom_setup_fresh.XXXXXX")
 trap 'rm -rf "$SANDBOX" "$FRESH_SANDBOX"' EXIT INT TERM
 
-# Run make turnkey or setup.sh --turnkey in sandbox
+# Run make setup or setup.sh --all in sandbox
 HOME="$FRESH_SANDBOX" PREFIX="$FRESH_SANDBOX" BIN_DIR="$FRESH_SANDBOX/.local/bin" "$ROOT_DIR/setup.sh"
 
-test -f "$FRESH_SANDBOX/.local/bin/doom-launch" || { echo "FAIL: Turnkey did not install doom-launch"; exit 1; }
+test -f "$FRESH_SANDBOX/.local/bin/doom-launch" || { echo "FAIL: Setup did not install doom-launch"; exit 1; }
 
 if [ "$OS" = "Darwin" ]; then
-    test -f "$FRESH_SANDBOX/Library/Application Support/doom-configs/presets.json" || { echo "FAIL: Turnkey did not install presets.json"; exit 1; }
+    test -f "$FRESH_SANDBOX/Library/Application Support/doom-configs/presets.json" || { echo "FAIL: Setup did not install presets.json"; exit 1; }
 else
-    test -f "$FRESH_SANDBOX/.local/share/doom-configs/presets.json" || { echo "FAIL: Turnkey did not install presets.json"; exit 1; }
+    test -f "$FRESH_SANDBOX/.local/share/doom-configs/presets.json" || { echo "FAIL: Setup did not install presets.json"; exit 1; }
 fi
 
-echo "✓ Test 6 Passed: Turnkey all-in-one setup completed successfully."
+echo "✓ Test 6 Passed: Full setup pipeline completed successfully."
 
 echo ""
 echo "============================================================"
-echo "  ✓ ALL TURNKEY & SYSTEM TESTS PASSED SUCCESSFULLY ($OS)!   "
+echo "  ✓ ALL SETUP & SYSTEM TESTS PASSED SUCCESSFULLY ($OS)!     "
 echo "============================================================"

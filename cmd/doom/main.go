@@ -108,9 +108,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 	}
 	rootCmd.AddCommand(launchCmd)
 
-	// Subcommand: turnkey
-	turnkeyCmd := &cobra.Command{
-		Use:   "turnkey",
+	// Subcommand: setup
+	setupCmd := &cobra.Command{
+		Use:   "setup",
 		Short: "Complete 1-command setup (engines, soundfont, configs, steam IWADs, and community megawads)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
@@ -120,7 +120,7 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 			}
 
 			fmt.Println("============================================================")
-			fmt.Println("  ⚡ Initiating Turnkey Doom Setup")
+			fmt.Println("  ⚡ Initiating Doom Setup")
 			fmt.Println("============================================================")
 			fmt.Println()
 
@@ -162,15 +162,15 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 			fmt.Println()
 
 			fmt.Println("============================================================")
-			fmt.Println("  ✓ Turnkey Doom setup complete!")
+			fmt.Println("  ✓ Doom setup complete!")
 			fmt.Println("  Engines, configs, soundfonts, and megawads are ready.")
 			fmt.Println("  Run 'doom play' or 'doom' to start playing!")
 			fmt.Println("============================================================")
 			return nil
 		},
 	}
-	turnkeyCmd.Flags().BoolVar(&flagForce, "force", false, "Force re-download and overwrite existing files")
-	rootCmd.AddCommand(turnkeyCmd)
+	setupCmd.Flags().BoolVar(&flagForce, "force", false, "Force re-download and overwrite existing files")
+	rootCmd.AddCommand(setupCmd)
 
 	// Subcommand: wads
 	wadsCmd := &cobra.Command{

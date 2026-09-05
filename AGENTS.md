@@ -68,7 +68,7 @@ Any agent modifying this repository must follow these core principles.
 - **Unified Go Architecture (`cmd/doom` & `internal/`)**:
   - The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary on Linux, macOS, and Windows.
   - Package structure:
-    - `cmd/doom/`: Cobra CLI commands (`play`, `launch`, `turnkey`, `wads`, `engines`, `soundfont`, `config`, `presets`).
+    - `cmd/doom/`: Cobra CLI commands (`play`, `launch`, `setup`, `wads`, `engines`, `soundfont`, `config`, `presets`).
     - `internal/config/`: Platform path resolvers adhering strictly to XDG (Linux), `~/Library/Application Support/` (macOS), and `%LOCALAPPDATA%`/`%APPDATA%` (Windows with execution drive auto-mapping).
     - `internal/display/`: Native display resolution and refresh rate detection.
     - `internal/engine/`: Source port asset downloading and argument synthesis/execution.
@@ -87,6 +87,7 @@ Any agent modifying this repository must follow these core principles.
     5. `setup.sh` (POSIX script compiling native `doom` binary if Go is present)
     6. `setup.ps1` (PowerShell script compiling `doom.exe` if Go is present)
     7. `README.md` (documentation, commands, and presets table)
+- **CLI Subcommand Naming & Tone**: Prefer clean, idiomatic imperative verbs (`setup`, `play`, `launch`, `install`, `diff`, `sync`, `fetch`) over corporate jargon or adjectives (use `setup` rather than `turnkey`).
 
 ---
 
@@ -121,7 +122,7 @@ Before completing any changes:
    - Path invariant inspection.
    - Isolated dry installation and backup verification.
    - Comprehensive CLI suite (`scripts/test-doom-launch.sh` testing all 36 CLI options, aliases, engine overrides, and menu modes).
-   - End-to-end turnkey sandbox verification (`scripts/test-turnkey.sh` testing mock Steam libraries, SoundFonts, WAD download, and CLI execution).
+   - End-to-end setup sandbox verification (`scripts/test-setup.sh` testing mock Steam libraries, SoundFonts, WAD download, and CLI execution).
 2. Verify `git diff` contains no hardcoded usernames or personal paths.
 3. Run `make -n install` or `make help` to verify `Makefile` syntax.
 4. If shell scripts were modified, run `shellcheck <script.sh>` and `bash -n <script.sh>`.

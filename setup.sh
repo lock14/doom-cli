@@ -25,9 +25,9 @@ WADS_DIR="${WADS_DIR:-$DEFAULT_WADS_DIR}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 export WADS_DIR BIN_DIR SF_DIR
 
-TURNKEY=0
-if [ "${1:-}" = "--turnkey" ]; then
-    TURNKEY=1
+FULL_SETUP=0
+if [ "${1:-}" = "--full" ] || [ "${1:-}" = "--all" ] || [ "${1:-}" = "--setup" ] || [ "${1:-}" = "--turnkey" ]; then
+    FULL_SETUP=1
 fi
 
 DETECTED_RES=$("$SCRIPT_DIR/scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080")
@@ -65,15 +65,15 @@ copy_with_backup() {
         "$src" > "$dest"
 }
 
-if [ "$TURNKEY" -eq 1 ]; then
+if [ "$FULL_SETUP" -eq 1 ]; then
     echo ""
-    echo "=== Running Turnkey Step 1/4: Downloading Port Engines ==="
+    echo "=== Running Setup Step 1/4: Downloading Port Engines ==="
     "$SCRIPT_DIR/scripts/install-engines.sh" all
     echo ""
-    echo "=== Running Turnkey Step 2/4: Deploying Roland SC-55 SoundFont ==="
+    echo "=== Running Setup Step 2/4: Deploying Roland SC-55 SoundFont ==="
     "$SCRIPT_DIR/scripts/install-soundfonts.sh"
     echo ""
-    echo "=== Running Turnkey Step 3/4: Deploying Configurations & Presets ==="
+    echo "=== Running Setup Step 3/4: Deploying Configurations & Presets ==="
 fi
 
 copy_with_backup "$SCRIPT_DIR/uzdoom/autoexec.cfg" "$UZDOOM_DIR/autoexec.cfg"
@@ -92,20 +92,20 @@ if command -v go >/dev/null 2>&1; then
     (cd "$SCRIPT_DIR" && go build -o "$BIN_DIR/doom" ./cmd/doom) 2>/dev/null || true
 fi
 
-if [ "$TURNKEY" -eq 1 ]; then
+if [ "$FULL_SETUP" -eq 1 ]; then
     echo ""
-    echo "=== Running Turnkey Step 4/4: Extracting IWADs & Fetching Megawads ==="
+    echo "=== Running Setup Step 4/4: Extracting IWADs & Fetching Megawads ==="
     "$SCRIPT_DIR/scripts/extract-iwads.sh"
     "$SCRIPT_DIR/scripts/fetch-wads.sh" all
     echo ""
     echo "============================================================"
-    echo "  ✓ Turnkey Doom setup complete!"
+    echo "  ✓ Doom setup complete!"
     echo "  Engines, configs, soundfonts, and megawads are ready."
-    echo "  Run 'doom-launch' to start playing!"
+    echo "  Run 'doom play' or 'doom-launch' to start playing!"
     echo "============================================================"
 else
-    echo "Setup complete! Run 'make turnkey' or './setup.sh --turnkey' for all-in-one setup."
+    echo "Setup complete! Run 'doom setup' (or 'make setup') for all-in-one setup."
     if [ ! -f "$SF_DIR/GeneralUser-GS.sf2" ]; then
-        echo "  ℹ Tip: Run 'make install-soundfonts' or './setup.sh --turnkey' to download the configured Roland SC-55 SoundFont."
+        echo "  ℹ Tip: Run 'make install-soundfonts' or 'doom setup' to download the configured Roland SC-55 SoundFont."
     fi
 fi
