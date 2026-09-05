@@ -181,10 +181,24 @@ func (m model) View() string {
 	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
 	search := fmt.Sprintf("Search: %s\n\n", m.input.View())
 
-	// Build List View
-	maxVisible := 10
-	if m.width < 96 && m.height <= 26 {
-		maxVisible = 6
+	// Dynamically scale visible presets to fit available vertical terminal height
+	maxVisible := m.height - 8
+	if m.width < 96 {
+		// In stacked layout, account for preview box height (~10 lines)
+		maxVisible = m.height - 18
+		if maxVisible > 15 {
+			maxVisible = 15
+		}
+		if maxVisible < 3 {
+			maxVisible = 3
+		}
+	} else {
+		if maxVisible > 25 {
+			maxVisible = 25
+		}
+		if maxVisible < 5 {
+			maxVisible = 5
+		}
 	}
 
 	startIdx := 0
