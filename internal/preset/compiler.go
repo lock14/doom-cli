@@ -30,7 +30,7 @@ func BuildLinuxPresets(cat *PresetCatalog) []DoomRunnerPreset {
 	for _, p := range cat.Presets {
 		enginePath := fmt.Sprintf("__HOME__/.local/bin/%s", p.Engine)
 		iwadPath := fmt.Sprintf("__HOME__/.local/share/games/uzdoom/%s", p.IWAD)
-		var mappacks []string
+		mappacks := []string{}
 		for _, m := range p.Mappacks {
 			mappacks = append(mappacks, fmt.Sprintf("__HOME__/.local/share/games/uzdoom/%s", m))
 		}
@@ -71,7 +71,7 @@ func BuildWindowsPresets(cat *PresetCatalog) []DoomRunnerPreset {
 			engineID = engineMeta.WindowsID
 		}
 		iwadPath := fmt.Sprintf("E:/Doom WADS/%s", p.IWAD)
-		var mappacks []string
+		mappacks := []string{}
 		for _, m := range p.Mappacks {
 			mappacks = append(mappacks, fmt.Sprintf("E:/Doom WADS/%s", m))
 		}

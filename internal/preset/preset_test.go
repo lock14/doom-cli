@@ -1,8 +1,10 @@
 package preset
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -71,3 +73,77 @@ func TestResolveFile(t *testing.T) {
 		t.Errorf("expected to find gd.wad for gdturbo.wad, got %s, found=%v", path, found)
 	}
 }
+
+func TestPresetParityAndInvariants(t *testing.T) {
+	rootDir := filepath.Join("..", "..")
+	presetsPath := filepath.Join(rootDir, "data", "presets.json")
+	if _, err := os.Stat(presetsPath); os.IsNotExist(err) {
+		t.Skip("data/presets.json not found from relative path, skipping parity test")
+	}
+
+	cat, err := LoadCatalog(presetsPath)
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	// 1. Check duplicate IWADs in mappacks
+	baseIWADs := map[string]bool{
+		"DOOM.WAD": true, "DOOM2.WAD": true, "PLUTONIA.WAD": true,
+		"TNT.WAD": true, "HERETIC.WAD": true, "HEXEN.WAD": true,
+	}
+	for _, p := range cat.Presets {
+		iwadUpper := strings.ToUpper(p.IWAD)
+		for _, m := range p.Mappacks {
+			mUpper := strings.ToUpper(m)
+			if mUpper == iwadUpper || baseIWADs[mUpper] {
+				t.Errorf("Preset '%s' includes base IWAD '%s' in mappacks list", p.Name, m)
+			}
+		}
+	}
+
+	// 2. Parity with Linux options.json
+	linuxFile := filepath.Join(rootDir, "DoomRunner", "linux", "options.json")
+	if data, err := os.ReadFile(linuxFile); err == nil {
+		var obj struct {
+			Presets []DoomRunnerPreset `json:"presets"`
+		}
+		if err := json.Unmarshal(data, &obj); err != nil {
+			t.Errorf("failed to unmarshal %s: %v", linuxFile, err)
+		} else {
+			expected := BuildLinuxPresets(cat)
+			expectedJSON, _ := json.Marshal(expected)
+			actualJSON, _ := json.Marshal(obj.Presets)
+			if string(expectedJSON) != string(actualJSON) {
+				t.Errorf("%s presets are out of sync with data/presets.json. Run 'doom presets build'", linuxFile)
+			}
+		}
+	}
+
+	// 3. Parity with Windows options.json
+	winFile := filepath.Join(rootDir, "DoomRunner", "windows", "options.json")
+	if data, err := os.ReadFile(winFile); err == nil {
+		var obj struct {
+			Presets []DoomRunnerPreset `json:"presets"`
+		}
+		if err := json.Unmarshal(data, &obj); err != nil {
+			t.Errorf("failed to unmarshal %s: %v", winFile, err)
+		} else {
+			expected := BuildWindowsPresets(cat)
+			expectedJSON, _ := json.Marshal(expected)
+			actualJSON, _ := json.Marshal(obj.Presets)
+			if string(expectedJSON) != string(actualJSON) {
+				t.Errorf("%s presets are out of sync with data/presets.json. Run 'doom presets build'", winFile)
+			}
+		}
+	}
+
+	// 4. Parity with README.md table
+	readmeFile := filepath.Join(rootDir, "README.md")
+	if data, err := os.ReadFile(readmeFile); err == nil {
+		expectedTable := GenerateReadmeTable(cat)
+		if !strings.Contains(string(data), expectedTable) {
+			t.Errorf("%s presets table is out of sync with data/presets.json. Run 'doom presets build'", readmeFile)
+		}
+	}
+}
+

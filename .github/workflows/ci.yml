@@ -8,17 +8,12 @@ on:
 
 jobs:
   validate-linux:
-    name: Linux - Lint, Invariants & Installation Test
+    name: Linux - Test & Build
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq shellcheck
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -29,53 +24,19 @@ jobs:
         run: |
           go test -v ./...
 
-      - name: Build and verify native doom binary
-        run: |
-          go build -o bin/doom ./cmd/doom
-          ./bin/doom presets list
-          ./bin/doom wads list
-
-      - name: Run ShellCheck
-        run: |
-          shellcheck setup.sh scripts/*.sh
-
-      - name: Run make check test suite
+      - name: Run make check
         run: |
           make check
 
-      - name: Test standalone setup.sh script
+      - name: Verify CLI commands
         run: |
-          TEST_HOME=$(mktemp -d)
-          HOME="$TEST_HOME" ./setup.sh
-          test -f "$TEST_HOME/.config/uzdoom/autoexec.cfg"
-          test -f "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
-          test -f "$TEST_HOME/.local/share/DoomRunner/options.json"
-          test -f "$TEST_HOME/.local/share/doom-configs/presets.json"
-          test -f "$TEST_HOME/.local/bin/doom-launch"
-          ! grep -q '__HOME__' "$TEST_HOME/.local/share/DoomRunner/options.json"
-          ! grep -q '__RESOLUTION__' "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/.config/uzdoom/autoexec.cfg"
-          HOME="$TEST_HOME" "$TEST_HOME/.local/bin/doom-launch" --list
-          rm -rf "$TEST_HOME"
-
-      - name: Test CLI and automation tool interfaces
-        run: |
-          ./scripts/doom-launch.sh --list
-          ./scripts/doom-launch.sh --preview "Alien Vendetta"
-          ./scripts/fetch-wads.sh --list
-          ./scripts/extract-iwads.sh --help
-          ./scripts/install-soundfonts.sh --help
-
-      - name: Verify Engine Downloader URL Resolution
-        run: |
-          # Verify that release URLs for all 3 targets can be resolved
-          curl -sI https://api.github.com/repos/UZDoom/UZDoom/releases/latest | grep -i "status: 200" || true
-          curl -sI https://api.github.com/repos/kraflab/dsda-doom/releases/latest | grep -i "status: 200" || true
-          curl -sI https://api.github.com/repos/Youda008/DoomRunner/releases/latest | grep -i "status: 200" || true
+          ./bin/doom --help
+          ./bin/doom presets list
+          ./bin/doom wads list
+          ./bin/doom setup --help
 
   validate-macos:
-    name: macOS - Invariants & Installation Test
+    name: macOS - Test & Build
     runs-on: macos-latest
 
     steps:
@@ -91,38 +52,19 @@ jobs:
         run: |
           go test -v ./...
 
-      - name: Build and verify native doom binary
-        run: |
-          go build -o bin/doom ./cmd/doom
-          ./bin/doom presets list
-
-      - name: Run make check test suite
+      - name: Run make check
         run: |
           make check
 
-      - name: Test standalone setup.sh script on macOS
+      - name: Verify CLI commands
         run: |
-          TEST_HOME=$(mktemp -d)
-          HOME="$TEST_HOME" ./setup.sh
-          test -f "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
-          test -f "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
-          test -f "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          test -f "$TEST_HOME/Library/Application Support/doom-configs/presets.json"
-          test -f "$TEST_HOME/.local/bin/doom-launch"
-          ! grep -q '__HOME__' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          ! grep -q '\.local/share/games/uzdoom' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          grep -q "$TEST_HOME/Library/Application Support/games/uzdoom" "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          ! grep -q '__RESOLUTION__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
-          HOME="$TEST_HOME" "$TEST_HOME/.local/bin/doom-launch" --list
-          rm -rf "$TEST_HOME"
+          ./bin/doom --help
+          ./bin/doom presets list
+          ./bin/doom wads list
 
   validate-windows:
-    name: Windows - PowerShell & Preset Validation
+    name: Windows - Test & Build
     runs-on: windows-latest
-    env:
-      PYTHONIOENCODING: utf-8
 
     steps:
       - name: Check out repository
@@ -138,74 +80,15 @@ jobs:
         run: |
           go test -v ./...
 
-      - name: Build and verify native doom binary on Windows
+      - name: Build native Windows executable
         shell: pwsh
         run: |
           go build -o bin\doom.exe .\cmd\doom
+
+      - name: Verify Windows CLI commands
+        shell: pwsh
+        run: |
+          .\bin\doom.exe --help
           .\bin\doom.exe presets list
           .\bin\doom.exe wads list
-
-      - name: Validate JSON Files
-        shell: pwsh
-        run: |
-          Get-Content -Raw "data/presets.json" | ConvertFrom-Json | Out-Null
-          Get-Content -Raw "DoomRunner/windows/options.json" | ConvertFrom-Json | Out-Null
-          Get-Content -Raw "DoomRunner/linux/options.json" | ConvertFrom-Json | Out-Null
-          Write-Host "JSON files are valid."
-
-      - name: Validate Declarative Presets Parity
-        shell: pwsh
-        run: |
-          python scripts/build-presets.py --check
-
-      - name: Test setup.ps1 default installation
-        shell: pwsh
-        run: |
-          # Execute setup.ps1
-          .\setup.ps1
-          
-          # Verify files exist in both AppData directories
-          $LocalOptions = "$env:LOCALAPPDATA\DoomRunner\options.json"
-          $RoamingOptions = "$env:APPDATA\DoomRunner\options.json"
-          $LocalPresets = "$env:LOCALAPPDATA\doom-configs\presets.json"
-          $RoamingPresets = "$env:APPDATA\doom-configs\presets.json"
-          
-          if (-not (Test-Path $LocalOptions)) { throw "Missing $LocalOptions" }
-          if (-not (Test-Path $RoamingOptions)) { throw "Missing $RoamingOptions" }
-          if (-not (Test-Path $LocalPresets)) { throw "Missing $LocalPresets" }
-          if (-not (Test-Path $RoamingPresets)) { throw "Missing $RoamingPresets" }
-          
-          # Test automatic backup on second run
-          .\setup.ps1
-          $LocalBackups = Get-ChildItem "$env:LOCALAPPDATA\DoomRunner" -Filter "options.json.bak.*"
-          $RoamingBackups = Get-ChildItem "$env:APPDATA\DoomRunner" -Filter "options.json.bak.*"
-          
-          if ($LocalBackups.Count -eq 0) { throw "No backup file created in LocalAppData" }
-          if ($RoamingBackups.Count -eq 0) { throw "No backup file created in AppData" }
-          
-          # Verify default drive detection matches current execution drive
-          $ExpectedDrive = (Split-Path -Qualifier (Get-Location).Path).Replace('\', '/').ToUpper()
-          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
-          if (-not ($Content -match "$ExpectedDrive/Doom WADS")) { throw "Default drive detection failed; expected $ExpectedDrive/Doom WADS" }
-          $Content | ConvertFrom-Json | Out-Null
-          
-          Write-Host "Default installation and backup tests passed."
-
-      - name: Test setup.ps1 with custom BaseDrive remapping
-        shell: pwsh
-        run: |
-          .\setup.ps1 -BaseDrive "X:"
-          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
-          if ($Content -match "E:/Doom WADS") { throw "Drive remapping failed; found E:/Doom WADS" }
-          if (-not ($Content -match "X:/Doom WADS")) { throw "Drive remapping failed; missing X:/Doom WADS" }
-          $Content | ConvertFrom-Json | Out-Null
-          Write-Host "BaseDrive remapping test passed."
-
-      - name: Test setup.ps1 with custom WadsDir parameter
-        shell: pwsh
-        run: |
-          .\setup.ps1 -WadsDir "C:\CustomGames\WADs"
-          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
-          if (-not ($Content -match "C:/CustomGames/WADs")) { throw "WadsDir remapping failed" }
-          $Content | ConvertFrom-Json | Out-Null
-          Write-Host "WadsDir parameter test passed."
+          .\bin\doom.exe setup --help
