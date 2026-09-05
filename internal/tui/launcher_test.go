@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/lock14/doom-configs/internal/preset"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 func mockCatalog() *preset.Catalog {

@@ -1,4 +1,4 @@
-// Package config provides platform-idiomatic path resolution for doom-configs.
+// Package config provides platform-idiomatic path resolution for doom-cli.
 package config
 
 import (
@@ -42,7 +42,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DSDADir = filepath.Join(appSupport, "dsda-doom")
 		p.DoomRunnerDir = filepath.Join(appSupport, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(appSupport, "soundfonts")
-		p.DataDir = filepath.Join(appSupport, "doom-configs")
+		p.DataDir = filepath.Join(appSupport, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
 		p.WadsDir = filepath.Join(appSupport, "games", "uzdoom")
 
@@ -61,7 +61,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DoomRunnerDir = filepath.Join(localAppData, "DoomRunner")
 		p.DoomRunnerRoam = filepath.Join(appData, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(localAppData, "soundfonts")
-		p.DataDir = filepath.Join(localAppData, "doom-configs")
+		p.DataDir = filepath.Join(localAppData, "doom-cli")
 		p.BinDir = filepath.Join(localAppData, "Programs", "Doom", "bin")
 
 		// Determine base drive on Windows: defaults to drive of current executable / working dir
@@ -87,7 +87,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DSDADir = filepath.Join(xdgData, "dsda-doom")
 		p.DoomRunnerDir = filepath.Join(xdgData, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(xdgData, "soundfonts")
-		p.DataDir = filepath.Join(xdgData, "doom-configs")
+		p.DataDir = filepath.Join(xdgData, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
 		p.WadsDir = filepath.Join(xdgData, "games", "uzdoom")
 	}

@@ -1,6 +1,6 @@
-# Contributing to doom-configs
+# Contributing to doom-cli
 
-Thank you for your interest in contributing to `github.com/lock14/doom-configs`! This document outlines our repository standards, architectural guidelines, development workflow, testing requirements, and pull request conventions.
+Thank you for your interest in contributing to `github.com/lock14/doom-cli`! This document outlines our repository standards, architectural guidelines, development workflow, testing requirements, and pull request conventions.
 
 ---
 
@@ -34,8 +34,8 @@ All contributions must respect our four foundational principles:
 
 ```bash
 # Clone repository
-git clone https://github.com/lock14/doom-configs.git
-cd doom-configs
+git clone https://github.com/lock14/doom-cli.git
+cd doom-cli
 
 # Compile the static doom CLI binary to bin/doom
 make build

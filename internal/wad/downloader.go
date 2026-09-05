@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lock14/doom-configs/internal/preset"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 // Downloader manages downloading and extracting WAD presets.
@@ -135,7 +135,7 @@ func (d *Downloader) downloadAndExtract(url string, expectedFiles []string) erro
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", "doom-configs/2.0")
+	req.Header.Set("User-Agent", "doom-cli/2.0")
 
 	resp, err := d.Client.Do(req)
 	if err != nil {

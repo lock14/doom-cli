@@ -15,7 +15,7 @@ import (
 	"github.com/sahilm/fuzzy"
 	"golang.org/x/term"
 
-	"github.com/lock14/doom-configs/internal/preset"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 var (

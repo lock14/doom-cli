@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lock14/doom-configs/internal/preset"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 func TestPrepareLaunch_DSDADoom(t *testing.T) {

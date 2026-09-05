@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/lock14/doom-configs/internal/preset"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 // LaunchOptions contains options and overrides for preset execution.

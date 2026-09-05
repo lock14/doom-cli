@@ -6,7 +6,7 @@ PREFIX ?= $(HOME)/.local/bin
 all: build
 
 help:
-	@echo "doom-configs developer targets:"
+	@echo "doom-cli developer targets:"
 	@echo "  make build    - Compile bin/doom static binary"
 	@echo "  make install  - Install binary to $(PREFIX)/doom"
 	@echo "  make test     - Run full Go test suite with -race and -shuffle=on"

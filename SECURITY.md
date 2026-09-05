@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We support security updates for the following versions of `doom-configs`:
+We support security updates for the following versions of `doom-cli`:
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -11,10 +11,10 @@ We support security updates for the following versions of `doom-configs`:
 
 ## Reporting a Vulnerability
 
-We take the security of `doom-configs` seriously. If you discover a security vulnerability, please report it responsibly by following these steps:
+We take the security of `doom-cli` seriously. If you discover a security vulnerability, please report it responsibly by following these steps:
 
 1. **Do not** report security vulnerabilities through public GitHub issues or discussions.
-2. Please use the [GitHub Private Vulnerability Reporting](https://github.com/lock14/doom-configs/security/advisories/new) feature on this repository.
+2. Please use the [GitHub Private Vulnerability Reporting](https://github.com/lock14/doom-cli/security/advisories/new) feature on this repository.
 3. If private vulnerability reporting is unavailable, contact the maintainer directly.
 
 ### What to Include in Your Report

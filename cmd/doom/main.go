@@ -8,13 +8,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/lock14/doom-configs/internal/config"
-	"github.com/lock14/doom-configs/internal/engine"
-	"github.com/lock14/doom-configs/internal/preset"
-	"github.com/lock14/doom-configs/internal/steam"
-	"github.com/lock14/doom-configs/internal/templates"
-	"github.com/lock14/doom-configs/internal/tui"
-	"github.com/lock14/doom-configs/internal/wad"
+	"github.com/lock14/doom-cli/internal/config"
+	"github.com/lock14/doom-cli/internal/engine"
+	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/steam"
+	"github.com/lock14/doom-cli/internal/templates"
+	"github.com/lock14/doom-cli/internal/tui"
+	"github.com/lock14/doom-cli/internal/wad"
 )
 
 var (
