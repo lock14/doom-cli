@@ -666,7 +666,7 @@ func RunInteractiveLauncher(catalog *preset.Catalog, wadsDir string) (*preset.Pr
 	}
 
 	m := initialModel(catalog, wadsDir)
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
 		return nil, err
