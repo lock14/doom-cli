@@ -123,49 +123,49 @@ func TestModel_View_Layouts(t *testing.T) {
 			width:       120,
 			height:      30,
 			expectSide:  true,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 		{
 			name:        "tall wide terminal",
 			width:       120,
 			height:      50,
 			expectSide:  true,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 		{
 			name:        "short wide terminal",
 			width:       100,
 			height:      14,
 			expectSide:  true,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 		{
 			name:        "narrow terminal stacked",
 			width:       80,
 			height:      24,
 			expectSide:  false,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 		{
 			name:        "tall narrow terminal stacked",
 			width:       80,
 			height:      45,
 			expectSide:  false,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 		{
 			name:        "short narrow terminal stacked",
 			width:       80,
 			height:      16,
 			expectSide:  false,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 		{
 			name:        "extra wide terminal side-by-side (190 columns)",
 			width:       190,
 			height:      40,
 			expectSide:  true,
-			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM PRESET LAUNCHER", "Preset:"},
+			expectTerms: []string{"Alien Vendetta", "[DSDA]", "DOOM", "Filter:", "Presets (", "Preset Details"},
 		},
 	}
 
@@ -327,7 +327,7 @@ func TestCalculateSearchWidth(t *testing.T) {
 		expected  int
 	}{
 		{name: "narrow terminal clamped to min", termWidth: 40, expected: minSearchWidth},
-		{name: "medium terminal responsive", termWidth: 60, expected: 44},
+		{name: "medium terminal responsive", termWidth: 80, expected: 35},
 		{name: "wide terminal clamped to max", termWidth: 120, expected: maxSearchWidth},
 	}
 
@@ -354,7 +354,7 @@ func TestCalculateReadmeDimensions(t *testing.T) {
 			height:  30,
 			wantBox: 98,
 			wantW:   96,
-			wantH:   21,
+			wantH:   22,
 		},
 		{
 			name:    "narrow and short dimensions clamped",

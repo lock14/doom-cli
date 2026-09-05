@@ -26,32 +26,69 @@ const (
 	gutterWidth        = 2  // horizontal space between panes
 	boxBorderColumns   = 4  // 2 border chars on left box + 2 border chars on right box
 
-	minSearchWidth = 30
-	maxSearchWidth = 60
+	minSearchWidth = 20
+	maxSearchWidth = 50
 
 	minBoxWidth  = 36
 	minBoxHeight = 3
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().
-			Bold(true).
+	// Brand Capsule (Powerlevel10k rounded pill with matched background)
+	brandCapStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("1"))
+	brandBodyStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("1")).
+			Foreground(lipgloss.Color("7")).
+			Bold(true)
 
-	cursorStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("6"))
+	// Stats Capsule (Powerlevel10k rounded pill with matched background)
+	statsCapStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("8"))
+	statsBodyStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("8")).
+			Foreground(lipgloss.Color("7")).
+			Bold(true)
+
+	// Filter Prompt
+	filterPromptStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("6")).
+				Bold(true)
+
+	// Panel Boxes: Active (Cyan) vs Inactive (Gray)
+	panelBoxFocusedStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("6")).
+				Padding(0, 1)
+
+	panelBoxInactiveStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("8")).
+				Padding(0, 1)
+
+	// Border Embedded Titles
+	borderTitleFocusedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("6")).
+				Bold(true)
+
+	borderTitleInactiveStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("8")).
+					Bold(true)
+
+	// Cursor & Selection Bar
+	cursorBarStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("6")).
+			Bold(true)
+
+	cursorTextStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("6")).
+			Bold(true)
 
 	tagDSDAStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("3"))
 
 	tagUZDoomStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("2"))
-
-	panelBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("8")).
-			Padding(0, 1)
 
 	labelStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))
@@ -69,11 +106,22 @@ var (
 
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("8"))
+
+	// Two-Tone Keybinding Footer
+	keyHelpKeyStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("6"))
+
+	keyHelpDescStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("8"))
+
+	bulletStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("8"))
 )
 
 // calculateSearchWidth returns the clamped width for the preset search input.
 func calculateSearchWidth(termWidth int) int {
-	w := termWidth - 16
+	w := termWidth - 45
 	if w > maxSearchWidth {
 		return maxSearchWidth
 	}
@@ -93,7 +141,7 @@ func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vp
 	if vpWidth < 36 {
 		vpWidth = 36
 	}
-	vpHeight = termHeight - 9
+	vpHeight = termHeight - 8
 	if vpHeight < 5 {
 		vpHeight = 5
 	}
@@ -125,8 +173,8 @@ func initialModel(catalog *preset.Catalog, wadsDir string) model {
 	}
 
 	ti := textinput.New()
+	ti.Prompt = ""
 	ti.Placeholder = "Type to search presets..."
-	ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
 	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	ti.Focus()
 	ti.CharLimit = 100
@@ -281,7 +329,7 @@ type layoutGeometry struct {
 
 func (m model) computeLayout() layoutGeometry {
 	if m.width >= sideBySideMinWidth {
-		availHeight := m.height - 7
+		availHeight := m.height - 5
 		if availHeight < 6 {
 			availHeight = 6
 		}
@@ -307,7 +355,7 @@ func (m model) computeLayout() layoutGeometry {
 	if boxWidth < minBoxWidth {
 		boxWidth = minBoxWidth
 	}
-	availHeight := m.height - 9
+	availHeight := m.height - 5
 	if availHeight < 6 {
 		availHeight = 6
 	}
@@ -367,7 +415,7 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 		paddedName := fmt.Sprintf("%-30s", name)
 
 		if i == m.cursor {
-			listLines = append(listLines, cursorStyle.Render("> "+paddedName)+" "+tag)
+			listLines = append(listLines, cursorBarStyle.Render("▎ ")+cursorTextStyle.Render(paddedName)+" "+tag)
 		} else {
 			listLines = append(listLines, "  "+paddedName+" "+tag)
 		}
@@ -450,37 +498,141 @@ func (m model) renderPreviewLines() ([]string, bool) {
 	return previewLines, hasReadme
 }
 
+func renderBoxWithTitle(content string, width int, title string, focused bool) string {
+	var boxStyle lipgloss.Style
+	var borderFg lipgloss.Style
+	var titleStyle lipgloss.Style
+
+	if focused {
+		boxStyle = panelBoxFocusedStyle
+		borderFg = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+		titleStyle = borderTitleFocusedStyle
+	} else {
+		boxStyle = panelBoxInactiveStyle
+		borderFg = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+		titleStyle = borderTitleInactiveStyle
+	}
+
+	rendered := boxStyle.Width(width).Render(content)
+	lines := strings.Split(rendered, "\n")
+	if len(lines) == 0 {
+		return rendered
+	}
+
+	totalOuterWidth := width + 2
+	maxTitleWidth := totalOuterWidth - 7
+	if maxTitleWidth < 1 {
+		return rendered
+	}
+
+	titleW := lipgloss.Width(title)
+	displayTitle := title
+	if titleW > maxTitleWidth {
+		runes := []rune(title)
+		if len(runes) > maxTitleWidth {
+			displayTitle = string(runes[:maxTitleWidth-1]) + "…"
+		}
+		titleW = lipgloss.Width(displayTitle)
+	}
+
+	remainingDashes := totalOuterWidth - titleW - 6
+	if remainingDashes < 0 {
+		remainingDashes = 0
+	}
+
+	topLine := borderFg.Render("╭── ") +
+		titleStyle.Render(displayTitle) +
+		borderFg.Render(" ") +
+		borderFg.Render(strings.Repeat("─", remainingDashes)) +
+		borderFg.Render("╮")
+
+	lines[0] = topLine
+	return strings.Join(lines, "\n")
+}
+
+func (m model) renderHeader() string {
+	brandPill := brandCapStyle.Render("") + brandBodyStyle.Render(" 💀 DOOM ") + brandCapStyle.Render("")
+	filterPrompt := filterPromptStyle.Render("   Filter: ")
+	leftPart := brandPill + filterPrompt + m.input.View()
+
+	statsText := fmt.Sprintf(" %d / %d presets ", len(m.filtered), len(m.catalog.Presets))
+	statsPill := statsCapStyle.Render("") + statsBodyStyle.Render(statsText) + statsCapStyle.Render("")
+
+	leftW := lipgloss.Width(leftPart)
+	statsW := lipgloss.Width(statsPill)
+
+	if leftW+statsW < m.width {
+		gap := m.width - leftW - statsW
+		return leftPart + strings.Repeat(" ", gap) + statsPill + "\n\n"
+	}
+	return leftPart + "\n\n"
+}
+
 func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []string) string {
+	leftTitle := fmt.Sprintf("Presets (%d)", len(m.filtered))
+	rightTitle := "Preset Details"
+
 	if geom.sideBySide {
 		leftText := formatBoxContent(listLines, geom.leftWidth-2, geom.interiorHeight)
 		rightText := formatBoxContent(previewLines, geom.rightWidth-2, geom.interiorHeight)
-		leftBox := panelBoxStyle.Width(geom.leftWidth).Render(leftText)
-		rightBox := panelBoxStyle.Width(geom.rightWidth).Render(rightText)
+		leftBox := renderBoxWithTitle(leftText, geom.leftWidth, leftTitle, true)
+		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, false)
 		gutterStr := strings.Repeat(" ", geom.gutter)
 		return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
 	}
 
 	leftText := formatBoxContent(listLines, geom.boxWidth-2, geom.listHeight-2)
 	rightText := formatBoxContent(previewLines, geom.boxWidth-2, geom.detailsHeight-2)
-	leftBox := panelBoxStyle.Width(geom.boxWidth).Render(leftText)
-	rightBox := panelBoxStyle.Width(geom.boxWidth).Render(rightText)
+	leftBox := renderBoxWithTitle(leftText, geom.boxWidth, leftTitle, true)
+	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, false)
 	return leftBox + "\n" + rightBox
 }
 
 func (m model) renderReadmeView() string {
 	boxWidth, _, _ := calculateReadmeDimensions(m.width, m.height)
-	header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
-	box := panelBoxStyle.Width(boxWidth).Height(m.viewport.Height).Render(m.viewport.View())
-	footer := "\n\n" + helpStyle.Render("↑/↓/PgUp/PgDn: Scroll • Enter: Launch • Tab/Esc/q: Back")
-	return header + box + footer + "\n"
+	box := renderBoxWithTitle(m.viewport.View(), boxWidth, m.readmeTitle, true)
+	footer := m.renderReadmeFooter()
+	return "\n" + box + footer + "\n"
+}
+
+func (m model) renderReadmeFooter() string {
+	type keyHelp struct {
+		key  string
+		desc string
+	}
+	items := []keyHelp{
+		{"↑/↓/PgUp/PgDn", "Scroll"},
+		{"Enter", "Launch"},
+		{"Tab/Esc/q", "Back"},
+	}
+	var parts []string
+	for _, item := range items {
+		parts = append(parts, keyHelpKeyStyle.Render(item.key)+" "+keyHelpDescStyle.Render(item.desc))
+	}
+	sep := bulletStyle.Render("  •  ")
+	return "\n\n" + strings.Join(parts, sep)
 }
 
 func (m model) renderFooter(hasReadme bool) string {
-	footerText := "↑/↓: Navigate • Enter: Launch • Esc: Quit"
-	if hasReadme {
-		footerText = "↑/↓: Navigate • Enter: Launch • Tab: Readme • Esc: Quit"
+	type keyHelp struct {
+		key  string
+		desc string
 	}
-	return "\n\n" + helpStyle.Render(footerText)
+	items := []keyHelp{
+		{"↑/↓", "Navigate"},
+		{"Enter", "Launch"},
+	}
+	if hasReadme {
+		items = append(items, keyHelp{"Tab", "Readme"})
+	}
+	items = append(items, keyHelp{"Esc", "Quit"})
+
+	var parts []string
+	for _, item := range items {
+		parts = append(parts, keyHelpKeyStyle.Render(item.key)+" "+keyHelpDescStyle.Render(item.desc))
+	}
+	sep := bulletStyle.Render("  •  ")
+	return "\n\n" + strings.Join(parts, sep)
 }
 
 func (m model) View() string {
@@ -499,11 +651,10 @@ func (m model) View() string {
 	previewLines, hasReadme := m.renderPreviewLines()
 	panels := m.renderPanels(geom, listLines, previewLines)
 
-	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
-	search := fmt.Sprintf("Search: %s\n\n", m.input.View())
+	header := m.renderHeader()
 	footer := m.renderFooter(hasReadme)
 
-	return header + search + panels + footer + "\n"
+	return header + panels + footer + "\n"
 }
 
 // RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
