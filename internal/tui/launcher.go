@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sahilm/fuzzy"
@@ -66,6 +68,11 @@ type model struct {
 	width    int
 	height   int
 	quitting bool
+
+	// Readme viewer state
+	viewingReadme bool
+	readmeTitle   string
+	viewport      viewport.Model
 }
 
 func initialModel(catalog *preset.Catalog, wadsDir string) model {
@@ -99,6 +106,36 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.viewingReadme {
+		switch msg := msg.(type) {
+		case tea.WindowSizeMsg:
+			m.width = msg.Width
+			m.height = msg.Height
+			m.viewport.Width = msg.Width - 4
+			m.viewport.Height = msg.Height - 6
+			return m, nil
+
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "ctrl+c":
+				m.quitting = true
+				return m, tea.Quit
+			case "esc", "q", "tab", "ctrl+r":
+				m.viewingReadme = false
+				return m, nil
+			case "enter":
+				if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
+					m.selected = &m.filtered[m.cursor]
+					return m, tea.Quit
+				}
+			}
+		}
+
+		var cmd tea.Cmd
+		m.viewport, cmd = m.viewport.Update(msg)
+		return m, cmd
+	}
+
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -117,6 +154,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = &m.filtered[m.cursor]
 				return m, tea.Quit
 			}
+
+		case "tab", "ctrl+r":
+			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+				cur := m.filtered[m.cursor]
+				if txtPath, ok := preset.ResolveReadme(m.wadsDir, cur); ok {
+					content, err := os.ReadFile(txtPath)
+					if err == nil {
+						m.viewingReadme = true
+						m.readmeTitle = fmt.Sprintf("README: %s (%s)", cur.Name, filepath.Base(txtPath))
+						vpWidth := m.width - 4
+						if vpWidth < 40 {
+							vpWidth = 40
+						}
+						vpHeight := m.height - 6
+						if vpHeight < 5 {
+							vpHeight = 5
+						}
+						m.viewport = viewport.New(vpWidth, vpHeight)
+						m.viewport.SetContent(string(content))
+						return m, nil
+					}
+				}
+			}
+			return m, nil
 
 		case "up", "ctrl+p":
 			if m.cursor > 0 {
@@ -175,6 +236,13 @@ func (m model) View() string {
 	}
 	if m.selected != nil {
 		return fmt.Sprintf("Launching %s...\n", m.selected.Name)
+	}
+
+	if m.viewingReadme {
+		header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6")).Render(m.readmeTitle) + "\n\n"
+		box := previewBoxStyle.Width(m.width - 4).Height(m.viewport.Height).Render(m.viewport.View())
+		footer := "\n\n" + helpStyle.Render("↑/↓/PgUp/PgDn: Scroll • Enter: Launch • Tab/Esc/q: Back")
+		return header + box + footer + "\n"
 	}
 
 	header := titleStyle.Render("DOOM PRESET LAUNCHER") + "\n\n"
@@ -239,11 +307,29 @@ func (m model) View() string {
 
 	// Build Preview View for current item
 	var previewLines []string
+	hasReadme := false
 	if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 		cur := m.filtered[m.cursor]
+		readmePath, foundReadme := preset.ResolveReadme(m.wadsDir, cur)
+		hasReadme = foundReadme
+		var readmeInfo preset.ReadmeInfo
+		if hasReadme {
+			readmeInfo = preset.ParseReadme(readmePath)
+		}
+
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", labelStyle.Render("Preset:        "), valueBoldStyle.Render(cur.Name)),
 		)
+		if readmeInfo.Author != "" {
+			previewLines = append(previewLines,
+				fmt.Sprintf("%s%s", labelStyle.Render("Author:        "), readmeInfo.Author),
+			)
+		}
+		if readmeInfo.ReleaseDate != "" {
+			previewLines = append(previewLines,
+				fmt.Sprintf("%s%s", labelStyle.Render("Released:      "), readmeInfo.ReleaseDate),
+			)
+		}
 		engStr := "UZDoom (Software-Plus / Advanced)"
 		if cur.Engine == "dsda-doom" {
 			engStr = "DSDA-Doom (MBF21 / Speedrun)"
@@ -276,7 +362,7 @@ func (m model) View() string {
 			fmt.Sprintf("%s%s %s", labelStyle.Render("IWAD:          "), cur.IWAD, iwadStatus),
 		)
 
-		if len(cur.Mappacks) > 0 {
+		if len(cur.Mappacks) > 0 || hasReadme {
 			previewLines = append(previewLines, labelStyle.Render("Files:"))
 			for _, mapfile := range cur.Mappacks {
 				fStatus := missingStyle.Render("[✗ Missing]")
@@ -286,6 +372,11 @@ func (m model) View() string {
 					fStatus = helpStyle.Render("[Optional]")
 				}
 				previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))
+			}
+			if hasReadme {
+				previewLines = append(previewLines,
+					fmt.Sprintf("  - %-22s %s", readmeInfo.Filename, tagUZDoomStyle.Render("[✓ Readme]")),
+				)
 			}
 		}
 	}
@@ -322,7 +413,11 @@ func (m model) View() string {
 		}
 	}
 
-	footer := "\n\n" + helpStyle.Render("↑/↓: Navigate • Enter: Launch • Esc: Quit")
+	footerText := "↑/↓: Navigate • Enter: Launch • Esc: Quit"
+	if hasReadme {
+		footerText = "↑/↓: Navigate • Enter: Launch • Tab: Readme • Esc: Quit"
+	}
+	footer := "\n\n" + helpStyle.Render(footerText)
 	return header + search + content + footer + "\n"
 }
 

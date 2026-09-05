@@ -146,3 +146,44 @@ func TestPresetParityAndInvariants(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveReadme_And_ParseReadme(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	txtContent := `===========================================================================
+Title                   : Ancient Aliens
+Filename                : aaliens.zip
+Release date            : May 8, 2016
+Author                  : Paul "skillsaw" DeBruyne
+Description             : A 32-level megawad.
+New levels              : 32
+===========================================================================`
+
+	txtPath := filepath.Join(tmpDir, "aaliens_v1_2.txt")
+	if err := os.WriteFile(txtPath, []byte(txtContent), 0644); err != nil {
+		t.Fatalf("failed writing test txt: %v", err)
+	}
+
+	p := Preset{
+		Name:     "Ancient Aliens",
+		Engine:   "uzdoom",
+		IWAD:     "doom2.wad",
+		Mappacks: []string{"aaliens_v1_2.wad"},
+	}
+
+	resolved, ok := ResolveReadme(tmpDir, p)
+	if !ok || filepath.Base(resolved) != "aaliens_v1_2.txt" {
+		t.Fatalf("expected to resolve aaliens_v1_2.txt, got %s, ok=%v", resolved, ok)
+	}
+
+	info := ParseReadme(resolved)
+	if info.Author != `Paul "skillsaw" DeBruyne` {
+		t.Errorf("expected skillsaw, got %q", info.Author)
+	}
+	if info.ReleaseDate != "May 8, 2016" {
+		t.Errorf("expected May 8, 2016, got %q", info.ReleaseDate)
+	}
+	if info.MapCount != "32" {
+		t.Errorf("expected 32, got %q", info.MapCount)
+	}
+}

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -176,5 +178,48 @@ func TestModel_View_QuittingAndSelected(t *testing.T) {
 	m.selected = &cat.Presets[0]
 	if view := m.View(); !strings.Contains(view, "Launching Alien Vendetta") {
 		t.Errorf("expected 'Launching Alien Vendetta', got %q", view)
+	}
+}
+
+func TestModel_ReadmeViewer(t *testing.T) {
+	tmpDir := t.TempDir()
+	txtPath := filepath.Join(tmpDir, "av.txt")
+	txtContent := "Title: Alien Vendetta\nAuthor: Anders Johnsen\nDescription: Megawad"
+	if err := os.WriteFile(txtPath, []byte(txtContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := mockCatalog()
+	m := initialModel(cat, tmpDir)
+
+	// In initial view, readme tag and Author should appear in preview
+	viewInitial := m.View()
+	if !strings.Contains(viewInitial, "Author:        Anders Johnsen") {
+		t.Errorf("expected view to contain Author, got:\n%s", viewInitial)
+	}
+	if !strings.Contains(viewInitial, "av.txt") {
+		t.Errorf("expected view to list av.txt, got:\n%s", viewInitial)
+	}
+
+	// Pressing tab opens the readme
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(model)
+	if !m.viewingReadme {
+		t.Fatalf("expected viewingReadme to be true after tab")
+	}
+
+	viewReadme := m.View()
+	if !strings.Contains(viewReadme, "README: Alien Vendetta") {
+		t.Errorf("expected view to contain README header, got:\n%s", viewReadme)
+	}
+	if !strings.Contains(viewReadme, "Title: Alien Vendetta") {
+		t.Errorf("expected view to contain readme content, got:\n%s", viewReadme)
+	}
+
+	// Pressing esc closes the readme
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = newM.(model)
+	if m.viewingReadme {
+		t.Fatalf("expected viewingReadme to be false after esc")
 	}
 }

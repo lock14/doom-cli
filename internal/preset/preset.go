@@ -2,10 +2,12 @@
 package preset
 
 import (
+	"bufio"
 	_ "embed"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -153,4 +155,84 @@ func ResolveFile(wadsDir string, targetName string) (string, bool) {
 	}
 
 	return "", false
+}
+
+// ReadmeInfo contains parsed metadata from an accompanying WAD text file.
+type ReadmeInfo struct {
+	Path        string
+	Filename    string
+	Author      string
+	ReleaseDate string
+	MapCount    string
+}
+
+var (
+	authorRegex = regexp.MustCompile(`(?i)^authors?\s*(?:\(s\))?\s*:\s*(.+)`)
+	dateRegex   = regexp.MustCompile(`(?i)^(?:release\s+date|date)\s*:\s*(.+)`)
+	mapsRegex   = regexp.MustCompile(`(?i)^(?:new\s+levels|levels|map\s*#?)\s*:\s*(.+)`)
+)
+
+// ResolveReadme locates an accompanying documentation or text file for the preset.
+func ResolveReadme(wadsDir string, p Preset) (string, bool) {
+	for _, m := range p.Mappacks {
+		ext := filepath.Ext(m)
+		base := strings.TrimSuffix(m, ext)
+		if path, ok := ResolveFile(wadsDir, base+".txt"); ok {
+			return path, true
+		}
+	}
+	nameClean := strings.ReplaceAll(p.Name, " ", "") + ".txt"
+	if path, ok := ResolveFile(wadsDir, nameClean); ok {
+		return path, true
+	}
+	iwadBase := strings.TrimSuffix(p.IWAD, filepath.Ext(p.IWAD))
+	if path, ok := ResolveFile(wadsDir, iwadBase+".txt"); ok {
+		return path, true
+	}
+	return "", false
+}
+
+// ParseReadme reads up to 150 lines of an idgames text file and extracts key metadata.
+func ParseReadme(path string) ReadmeInfo {
+	info := ReadmeInfo{
+		Path:     path,
+		Filename: filepath.Base(path),
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return info
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	lineCount := 0
+	for scanner.Scan() && lineCount < 150 {
+		lineCount++
+		text := strings.TrimSpace(scanner.Text())
+		if info.Author == "" {
+			if m := authorRegex.FindStringSubmatch(text); len(m) > 1 {
+				val := strings.TrimSpace(m[1])
+				if val != "" && !strings.HasPrefix(val, "None") {
+					info.Author = val
+				}
+			}
+		}
+		if info.ReleaseDate == "" {
+			if m := dateRegex.FindStringSubmatch(text); len(m) > 1 {
+				val := strings.TrimSpace(m[1])
+				if val != "" {
+					info.ReleaseDate = val
+				}
+			}
+		}
+		if info.MapCount == "" {
+			if m := mapsRegex.FindStringSubmatch(text); len(m) > 1 {
+				val := strings.TrimSpace(m[1])
+				if val != "" && !strings.EqualFold(val, "none") && !strings.EqualFold(val, "no") {
+					info.MapCount = val
+				}
+			}
+		}
+	}
+	return info
 }
