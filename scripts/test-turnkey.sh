@@ -114,6 +114,11 @@ fi
 if grep -q '__REFRESH_RATE__' "$UZDOOM_DIR/autoexec.cfg"; then
     echo "FAIL: Un-substituted __REFRESH_RATE__ found in $UZDOOM_DIR/autoexec.cfg"; exit 1
 fi
+if [ "$OS" = "Darwin" ]; then
+    if grep -q '\.local/share/games/uzdoom' "$RUNNER_DIR/options.json"; then
+        echo "FAIL: Linux path found in Darwin DoomRunner options.json"; exit 1
+    fi
+fi
 
 # Second install (must trigger backups)
 sleep 1 # Ensure timestamp differs

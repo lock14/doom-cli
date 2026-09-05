@@ -81,6 +81,8 @@ jobs:
           test -f "$TEST_HOME/Library/Application Support/doom-configs/presets.json"
           test -f "$TEST_HOME/.local/bin/doom-launch"
           ! grep -q '__HOME__' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          ! grep -q '\.local/share/games/uzdoom' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
+          grep -q "$TEST_HOME/Library/Application Support/games/uzdoom" "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
           ! grep -q '__RESOLUTION__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
           ! grep -q '__SOUNDFONT__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
           ! grep -q '__SOUNDFONT__' "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
@@ -90,6 +92,8 @@ jobs:
   validate-windows:
     name: Windows - PowerShell & Preset Validation
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
 
     steps:
       - name: Check out repository
@@ -102,6 +106,11 @@ jobs:
           Get-Content -Raw "DoomRunner/windows/options.json" | ConvertFrom-Json | Out-Null
           Get-Content -Raw "DoomRunner/linux/options.json" | ConvertFrom-Json | Out-Null
           Write-Host "JSON files are valid."
+
+      - name: Validate Declarative Presets Parity
+        shell: pwsh
+        run: |
+          python scripts/build-presets.py --check
 
       - name: Test setup.ps1 default installation
         shell: pwsh
@@ -128,13 +137,29 @@ jobs:
           if ($LocalBackups.Count -eq 0) { throw "No backup file created in LocalAppData" }
           if ($RoamingBackups.Count -eq 0) { throw "No backup file created in AppData" }
           
+          # Verify default drive detection matches current execution drive
+          $ExpectedDrive = (Split-Path -Qualifier (Get-Location).Path).Replace('\', '/').ToUpper()
+          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
+          if (-not ($Content -match "$ExpectedDrive/Doom WADS")) { throw "Default drive detection failed; expected $ExpectedDrive/Doom WADS" }
+          $Content | ConvertFrom-Json | Out-Null
+          
           Write-Host "Default installation and backup tests passed."
 
       - name: Test setup.ps1 with custom BaseDrive remapping
         shell: pwsh
         run: |
-          .\setup.ps1 -BaseDrive "D:"
+          .\setup.ps1 -BaseDrive "X:"
           $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
           if ($Content -match "E:/Doom WADS") { throw "Drive remapping failed; found E:/Doom WADS" }
-          if (-not ($Content -match "D:/Doom WADS")) { throw "Drive remapping failed; missing D:/Doom WADS" }
+          if (-not ($Content -match "X:/Doom WADS")) { throw "Drive remapping failed; missing X:/Doom WADS" }
+          $Content | ConvertFrom-Json | Out-Null
           Write-Host "BaseDrive remapping test passed."
+
+      - name: Test setup.ps1 with custom WadsDir parameter
+        shell: pwsh
+        run: |
+          .\setup.ps1 -WadsDir "C:\CustomGames\WADs"
+          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
+          if (-not ($Content -match "C:/CustomGames/WADs")) { throw "WadsDir remapping failed" }
+          $Content | ConvertFrom-Json | Out-Null
+          Write-Host "WadsDir parameter test passed."

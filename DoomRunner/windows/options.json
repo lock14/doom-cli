@@ -16,11 +16,19 @@
             {
                 "name": "TNT.WAD",
                 "path": "E:/Doom WADS/TNT.WAD"
+            },
+            {
+                "name": "HERETIC.WAD",
+                "path": "E:/Doom WADS/HERETIC.WAD"
+            },
+            {
+                "name": "HEXEN.WAD",
+                "path": "E:/Doom WADS/HEXEN.WAD"
             }
         ],
-        "auto_update": false,
+        "auto_update": true,
         "default_iwad": "",
-        "directory": "",
+        "directory": "E:/Doom WADS",
         "search_subdirs": false
     },
     "app_style": null,

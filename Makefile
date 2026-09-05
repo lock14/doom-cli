@@ -34,6 +34,7 @@ help:
 	@echo ""
 	@echo "  🚀 Quick Start:"
 	@echo "    make turnkey            ⚡ 1-step setup: engines, configs, soundfonts, IWADs & WADs"
+	@echo "    make bootstrap          Download engine binaries & deploy configs + launcher"
 	@echo "    make install            Deploy all configurations & doom-launch CLI"
 	@echo "    make play               Launch interactive terminal preset picker (fzf / menu)"
 	@echo ""
@@ -95,7 +96,10 @@ install-doomrunner:
 		cp "$(RUNNER_DIR)/options.json" "$(RUNNER_DIR)/options.json.bak.$$(date +%Y%m%d%H%M%S)"; \
 	fi
 	@echo "Installing DoomRunner/linux/options.json -> $(RUNNER_DIR)/options.json"
-	@sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json > "$(RUNNER_DIR)/options.json"
+	@sed -e 's|__HOME__/.local/share/games/uzdoom|$(WADS_DIR)|g' \
+	     -e 's|__HOME__/.config/uzdoom|$(UZDOOM_DIR)|g' \
+	     -e 's|__HOME__/.local/share/dsda-doom|$(DSDA_DIR)|g' \
+	     -e 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json > "$(RUNNER_DIR)/options.json"
 
 install-data:
 	@mkdir -p "$(DATA_DIR)"
@@ -122,7 +126,7 @@ install-soundfonts:
 	@SF_DIR="$(SF_DIR)" ./scripts/install-soundfonts.sh
 
 build-presets:
-	@python3 scripts/build-presets.py --build
+	@python3 scripts/build-presets.py --build --update-readme
 
 # Engine & Launcher download targets
 install-engines:
@@ -149,7 +153,10 @@ sync:
 	fi
 	@if [ -f "$(RUNNER_DIR)/options.json" ]; then \
 		echo "Syncing $(RUNNER_DIR)/options.json -> DoomRunner/linux/options.json"; \
-		sed 's|$(PREFIX)|__HOME__|g' "$(RUNNER_DIR)/options.json" > DoomRunner/linux/options.json; \
+		sed -e 's|$(WADS_DIR)|__HOME__/.local/share/games/uzdoom|g' \
+		    -e 's|$(UZDOOM_DIR)|__HOME__/.config/uzdoom|g' \
+		    -e 's|$(DSDA_DIR)|__HOME__/.local/share/dsda-doom|g' \
+		    -e 's|$(PREFIX)|__HOME__|g' "$(RUNNER_DIR)/options.json" > DoomRunner/linux/options.json; \
 	fi
 
 # Show differences between repo configs and installed system configs
@@ -161,7 +168,10 @@ diff:
 	@-RES=$$("./scripts/detect-resolution.sh" 2>/dev/null || echo "1920x1080"); \
 	sed -e "s|__RESOLUTION__|$$RES|g" -e "s|__SOUNDFONT__|$(SF_DIR)/GeneralUser-GS.sf2|g" dsda-doom/dsda-doom.cfg | diff -u - "$(DSDA_DIR)/dsda-doom.cfg" || true
 	@echo "=== DoomRunner Diff ==="
-	@-sed 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json | diff -u - "$(RUNNER_DIR)/options.json" || true
+	@-sed -e 's|__HOME__/.local/share/games/uzdoom|$(WADS_DIR)|g' \
+	      -e 's|__HOME__/.config/uzdoom|$(UZDOOM_DIR)|g' \
+	      -e 's|__HOME__/.local/share/dsda-doom|$(DSDA_DIR)|g' \
+	      -e 's|__HOME__|$(PREFIX)|g' DoomRunner/linux/options.json | diff -u - "$(RUNNER_DIR)/options.json" || true
 
 # Test & Validation targets
 check: test
@@ -178,6 +188,10 @@ test:
 	@bash -n scripts/doom-launch.sh
 	@bash -n scripts/test-turnkey.sh
 	@bash -n scripts/test-doom-launch.sh
+	@if command -v shellcheck >/dev/null 2>&1; then \
+		echo "Running ShellCheck..."; \
+		shellcheck setup.sh scripts/*.sh; \
+	fi
 	@echo "=== Validating Declarative Presets & Parity ==="
 	@python3 scripts/build-presets.py --check
 	@echo "=== Validating JSON Files ==="
@@ -203,7 +217,8 @@ test:
 		! grep -q '__SOUNDFONT__' "$$TEST_DIR/Library/Application Support/dsda-doom/dsda-doom.cfg" && \
 		! grep -q '__SOUNDFONT__' "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
 		! grep -q '__REFRESH_RATE__' "$$TEST_DIR/Library/Application Support/uzdoom/autoexec.cfg" && \
-		! grep -q '__HOME__' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json"; \
+		! grep -q '__HOME__' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json" && \
+		! grep -q '\.local/share/games/uzdoom' "$$TEST_DIR/Library/Application Support/DoomRunner/options.json"; \
 	else \
 		test -f "$$TEST_DIR/.config/uzdoom/autoexec.cfg" && \
 		test -f "$$TEST_DIR/.local/share/dsda-doom/dsda-doom.cfg" && \

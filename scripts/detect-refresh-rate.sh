@@ -28,8 +28,8 @@ else
     fi
 fi
 
-# Fallback default if refresh rate could not be determined (headless / CI / virtual)
-if [ -z "$DETECTED_RATE" ] || [ "$DETECTED_RATE" -le 0 ] 2>/dev/null; then
+# Fallback default if refresh rate could not be determined or is invalid (headless / CI / virtual)
+if ! [[ "$DETECTED_RATE" =~ ^[0-9]+$ ]] || [ "$DETECTED_RATE" -le 0 ]; then
     DETECTED_RATE="60"
 fi
 

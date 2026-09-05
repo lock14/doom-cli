@@ -42,8 +42,8 @@ chmod +x "$BIN_DIR/uzdoom"
 touch "$WADS_DIR/DOOM.WAD" "$WADS_DIR/DOOM2.WAD" "$WADS_DIR/PLUTONIA.WAD" "$WADS_DIR/TNT.WAD" "$WADS_DIR/HERETIC.WAD" "$WADS_DIR/HEXEN.WAD"
 touch "$WADS_DIR/aaliens_v1_2.wad" "$WADS_DIR/deathless.wad" "$WADS_DIR/AV.WAD" "$WADS_DIR/AV.DEH" "$WADS_DIR/sunlust.wad"
 
-# Create mock IWADs in CUSTOM_WADS_DIR
-touch "$CUSTOM_WADS_DIR/DOOM2.WAD" "$CUSTOM_WADS_DIR/custom_map.wad"
+# Create mock IWADs and PWADs in CUSTOM_WADS_DIR
+touch "$CUSTOM_WADS_DIR/DOOM2.WAD" "$CUSTOM_WADS_DIR/custom_map.wad" "$CUSTOM_WADS_DIR/sunlust.wad"
 
 DOOM_LAUNCH="$ROOT_DIR/scripts/doom-launch.sh"
 
@@ -158,6 +158,23 @@ echo "Section 6: Custom Engine Flags and WADs Directory Overrides"
 assert_cmd "Extra engine arguments are forwarded correctly" \
     'run_launch --dry-run "Sunlust" -skill 4 -warp 01 -nomonsters | grep -q "Command:.*-skill 4 -warp 01 -nomonsters"'
 
+# Inject temporary additional_args into a preset in sandboxed presets.json
+python3 -c "
+import json
+with open('$DATA_DIR/presets.json', 'r') as f:
+    d = json.load(f)
+for p in d['presets']:
+    if p['name'] == 'Sunlust':
+        p['additional_args'] = '-complevel 21'
+with open('$DATA_DIR/presets.json', 'w') as f:
+    json.dump(d, f)
+"
+assert_cmd "Preset additional_args from presets.json are included in launch command" \
+    'run_launch --dry-run "Sunlust" | grep -q "Command:.*-complevel 21"'
+
+# Restore presets.json
+cp "$ROOT_DIR/data/presets.json" "$DATA_DIR/presets.json"
+
 assert_cmd "--wads-dir overrides search path for IWADs and PWADs" \
     "run_launch --dry-run --wads-dir '$CUSTOM_WADS_DIR' 'Sunlust' | grep -q 'IWAD:\s*$CUSTOM_WADS_DIR/DOOM2.WAD'"
 
@@ -186,6 +203,35 @@ assert_cmd "Missing engine binary exits with error code 1" \
 
 assert_cmd "Missing base IWAD exits with error code 1" \
     "env WADS_DIR='$SANDBOX/empty_wads' run_launch --dry-run 'Ancient Aliens' 2>/dev/null; test \$? -ne 0"
+
+mkdir -p "$SANDBOX/missing_pwad" && touch "$SANDBOX/missing_pwad/DOOM2.WAD"
+assert_cmd "Missing required mappack file exits with error code 1" \
+    "env WADS_DIR='$SANDBOX/missing_pwad' run_launch --dry-run 'Ancient Aliens' 2>/dev/null; test \$? -ne 0"
+
+assert_cmd "Missing optional idkfa 2024.wad launches cleanly with default MIDI" \
+    "run_launch --dry-run 'Doom' | grep '^Command:' | grep -q 'dsda-doom.*-iwad.*DOOM.WAD' && ! (run_launch --dry-run 'Doom' | grep '^Command:' | grep -q 'idkfa 2024.wad')"
+
+# -----------------------------------------------------------------------------
+echo ""
+echo "Section 9: Normalized Filename Matching & Archive Aliases"
+# -----------------------------------------------------------------------------
+touch "$WADS_DIR/Eviternity II.wad"
+assert_cmd "Preview detects spaced file Eviternity II.wad for eviternityii.wad" \
+    'run_launch --preview "Eviternity II" | grep -q "eviternityii.wad.*\[✓ Found\]"'
+
+assert_cmd "Dry-run resolves Eviternity II.wad with space tolerance" \
+    'run_launch --dry-run "Eviternity II" | grep -q "Eviternity II\.wad"'
+
+touch "$WADS_DIR/gd.wad"
+assert_cmd "Preview detects gd.wad alias for Going Down Turbo" \
+    'run_launch --preview "Going Down Turbo" | grep -q "gdturbo.wad.*\[✓ Found\]"'
+
+assert_cmd "Dry-run resolves gd.wad alias for Going Down Turbo" \
+    'run_launch --dry-run "Going Down Turbo" | grep -q "gd\.wad"'
+
+mkdir -p "$SANDBOX/doom1_sandbox" && touch "$SANDBOX/doom1_sandbox/doom1.wad"
+assert_cmd "IWAD discovery resolves doom1.wad fallback for DOOM.WAD" \
+    "WADS_DIR='$SANDBOX/doom1_sandbox' run_launch --dry-run 'Doom' | grep -q 'IWAD:.*doom1\.wad'"
 
 echo ""
 echo "============================================================"

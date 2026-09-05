@@ -12,14 +12,18 @@ if [ "$OS" = "Darwin" ]; then
     RUNNER_DIR="$APP_SUPPORT/DoomRunner"
     DATA_DIR="$APP_SUPPORT/doom-configs"
     SF_DIR="$APP_SUPPORT/soundfonts"
+    DEFAULT_WADS_DIR="$APP_SUPPORT/games/uzdoom"
 else
     UZDOOM_DIR="$HOME/.config/uzdoom"
     DSDA_DIR="$HOME/.local/share/dsda-doom"
     RUNNER_DIR="$HOME/.local/share/DoomRunner"
     DATA_DIR="$HOME/.local/share/doom-configs"
     SF_DIR="$HOME/.local/share/soundfonts"
+    DEFAULT_WADS_DIR="$HOME/.local/share/games/uzdoom"
 fi
+WADS_DIR="${WADS_DIR:-$DEFAULT_WADS_DIR}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
+export WADS_DIR BIN_DIR SF_DIR
 
 TURNKEY=0
 if [ "${1:-}" = "--turnkey" ]; then
@@ -51,7 +55,10 @@ copy_with_backup() {
     fi
 
     echo "Installing $(basename "$dest")..."
-    sed -e "s|__HOME__|$HOME|g" \
+    sed -e "s|__HOME__/.local/share/games/uzdoom|$WADS_DIR|g" \
+        -e "s|__HOME__/.config/uzdoom|$UZDOOM_DIR|g" \
+        -e "s|__HOME__/.local/share/dsda-doom|$DSDA_DIR|g" \
+        -e "s|__HOME__|$HOME|g" \
         -e "s|__RESOLUTION__|$DETECTED_RES|g" \
         -e "s|__REFRESH_RATE__|$DETECTED_RATE|g" \
         -e "s|__SOUNDFONT__|$SF_DIR/GeneralUser-GS.sf2|g" \

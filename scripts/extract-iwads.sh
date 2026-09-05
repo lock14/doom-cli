@@ -131,7 +131,20 @@ TARGET_PATTERNS=(
     "id1.wad:id1.wad"
     "extras.wad:extras.wad"
     "sigil.wad:SIGIL_V1_23.wad"
+    "SIGIL_V1_23.wad:SIGIL_V1_23.wad"
     "sigil_ii.wad:SIGIL_II_V1_0.WAD"
+    "SIGIL_II_V1_0.WAD:SIGIL_II_V1_0.WAD"
+    "DoomZero.wad:DoomZero.wad"
+    "doomzero.wad:DoomZero.wad"
+    "DOOMZERO.DEH:DOOMZERO.DEH"
+    "doomzero.deh:DOOMZERO.DEH"
+    "gdturbo.wad:gdturbo.wad"
+    "gd.wad:gdturbo.wad"
+    "SCYTHE.WAD:SCYTHE.WAD"
+    "scythe.wad:SCYTHE.WAD"
+    "scythe2.wad:scythe2.wad"
+    "SUNDER_V2512.wad:SUNDER_V2512.wad"
+    "sunder.wad:SUNDER_V2512.wad"
 )
 
 FOUND_COUNT=0
@@ -141,7 +154,7 @@ TMP_INDEX=$(mktemp "${TMPDIR:-/tmp}/doom_index.XXXXXX")
 trap 'rm -f "$TMP_INDEX"' EXIT INT TERM
 
 for root in "${EXISTING_ROOTS[@]}"; do
-    find "$root" -maxdepth 6 -type f \( -iname "*.wad" -o -iname "*.pk3" -o -iname "*.deh" \) >> "$TMP_INDEX" 2>/dev/null || true
+    find "$root" -maxdepth 8 -type f \( -iname "*.wad" -o -iname "*.pk3" -o -iname "*.deh" \) >> "$TMP_INDEX" 2>/dev/null || true
 done
 
 for item in "${TARGET_PATTERNS[@]}"; do

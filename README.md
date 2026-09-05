@@ -83,9 +83,13 @@ To install the preconfigured DoomRunner presets on Windows via PowerShell:
 .\setup.ps1
 ```
 
-If your WADs or engines are on a drive other than `E:`, pass the `-BaseDrive` parameter:
+`setup.ps1` automatically detects the drive letter where the setup script is executed from and defaults all engines and WADs to `<Drive>:\Doom WADS`.
+
+If your WADs or engines are on a different drive, pass the `-BaseDrive` parameter (or `-WadsDir` for a custom folder):
 ```powershell
 .\setup.ps1 -BaseDrive "D:"
+# Or customize full path:
+.\setup.ps1 -WadsDir "D:\Games\Doom WADS"
 ```
 
 This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\options.json` and `%APPDATA%\DoomRunner\options.json`, creating timestamped backups beforehand.
@@ -107,7 +111,7 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 Place your game files (`.wad`, `.deh`, `.pk3`) in the standard directory:
 - **Linux Default**: `~/.local/share/games/uzdoom/`
 - **macOS Default**: `~/Library/Application Support/games/uzdoom/`
-- **Windows Default**: `E:\Doom WADS\` (or your customized `-BaseDrive` path)
+- **Windows Default**: `<Drive>:\Doom WADS\` (defaults to the execution drive, e.g. `C:\Doom WADS\` or `E:\Doom WADS\`, or customized via `-BaseDrive`)
 
 ### 1. Steam & GOG IWAD Auto-Extractor
 If you own *Doom + Doom II (2024)* or *Heretic / Hexen* on Steam or GOG, you can automatically discover and copy official IWADs and the modern `idkfa 2024.wad` soundtrack into your WADs folder:
@@ -189,24 +193,37 @@ All presets are declaratively managed in [`data/presets.json`](data/presets.json
 
 | Megawad / Expansion | Engine | Compatibility / Details |
 | :--- | :--- | :--- |
-| **Doom / Doom II** | DSDA-Doom | Classic IWADs with modern MIDI audio (`idkfa 2024.wad`) |
 | **Alien Vendetta** | DSDA-Doom | Classic Boom megawad + DEH patch |
 | **Ancient Aliens** | UZDoom | MBF / Complevel 11 with custom color palette |
-| **Back to Saturn X (Ep 1 & 2)** | DSDA-Doom | Vanilla/Boom compatible with custom soundtrack & palettes |
+| **Back to Saturn X: Episode 1** | DSDA-Doom | Vanilla/Boom compatible with custom soundtrack & palettes |
+| **Back to Saturn X: Episode 2** | DSDA-Doom | Vanilla/Boom compatible with custom soundtrack & palettes |
 | **Deathless** | DSDA-Doom | Modern Ultimate Doom episode replacement |
+| **Doom** | DSDA-Doom | Classic IWAD with modern MIDI audio |
+| **Doom II** | DSDA-Doom | Classic IWAD with modern MIDI audio |
 | **Doom Zero** | DSDA-Doom | Anniversary megawad + DEH modifications |
-| **Doom / Doom II: The Way ID Did** | DSDA-Doom | Classic vanilla-style homage megawads |
-| **Eviternity I & II** | UZDoom | OTEX texture pack, advanced MBF21 & custom monsters |
+| **Doom: The Way ID Did** | DSDA-Doom | Classic vanilla-style homage megawad |
+| **Doom II: The Way ID Did** | DSDA-Doom | Classic vanilla-style homage megawad |
+| **Eviternity** | UZDoom | OTEX texture pack & custom monsters |
+| **Eviternity II** | UZDoom | OTEX texture pack, advanced MBF21 & custom monsters |
 | **Going Down Turbo** | DSDA-Doom | Fast-paced, compact map pack |
-| **Heretic / Hexen** | UZDoom | Raven Software classics |
+| **Heretic** | UZDoom | Raven Software classic fantasy shooter |
+| **Hexen** | UZDoom | Raven Software hub-based fantasy shooter |
 | **Legacy of Rust** | DSDA-Doom | Official ID24 standard episode + weapons & monsters |
-| **Master Levels for Doom II** | DSDA-Doom | Full 20-level classic collection |
-| **No End In Sight / NRFTL** | DSDA-Doom | Classic episode expansions |
+| **Master Levels** | DSDA-Doom | Full 20-level classic collection |
 | **Nostalgia** | DSDA-Doom | Vanilla-compatible megawad |
-| **Plutonia 2 / TNT: Revilution** | DSDA-Doom | Community sequels to Final Doom |
-| **Scythe 1 & 2 / Speed of Doom** | DSDA-Doom | Iconic speedrunning & challenge megawads |
-| **Sigil I & II** | DSDA-Doom | John Romero's unofficial 5th & 6th episodes |
-| **Sunder / Sunlust** | DSDA-Doom | Benchmark slaughter & challenge mapsets |
+| **No End In Sight** | DSDA-Doom | Classic 4-episode expansion for Ultimate Doom |
+| **No Rest for the Living** | DSDA-Doom | Official 9-level expansion for Doom II |
+| **Sigil** | DSDA-Doom | John Romero's unofficial 5th episode for Ultimate Doom |
+| **Sigil II** | DSDA-Doom | John Romero's unofficial 6th episode for Ultimate Doom |
+| **Scythe** | DSDA-Doom | Iconic fast-paced speedrunning megawad |
+| **Scythe 2** | DSDA-Doom | Erik Alm's legendary sequel with custom monsters |
+| **Speed of Doom** | DSDA-Doom | 33-level intense challenge megawad |
+| **Sunder** | DSDA-Doom | Monumental architectural slaughter megawad |
+| **Sunlust** | DSDA-Doom | 32-level visual and gameplay masterpiece |
+| **The Plutonia Experiment** | DSDA-Doom | Classic Final Doom IWAD with modern soundtrack |
+| **Plutonia 2** | DSDA-Doom | Community sequel to The Plutonia Experiment |
+| **TNT: Evilution** | DSDA-Doom | Classic Final Doom IWAD with modern soundtrack |
+| **TNT: Revilution** | DSDA-Doom | Community sequel to TNT: Evilution |
 | **Valiant** | UZDoom | MBF-compatible with custom weapons & dehacked |
 
 ---
@@ -224,7 +241,7 @@ Configured in [`uzdoom/autoexec.cfg`](uzdoom/autoexec.cfg) to reproduce the cris
 ### DSDA-Doom (Speedrunning & Demo Accuracy)
 Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 - **Compatibility**: Default `complevel 21` (MBF21 standard).
-- **Video & Display**: OpenGL mode with integer scaling, 60 FPS limiter, and uncapped framerate.
+- **Video & Display**: OpenGL mode with integer scaling, VSync frame pacing, and uncapped high-refresh support (no artificial 60 FPS cap).
 - **Extended HUD (exHUD)**: In-game level splits, secret counters, and completion times.
 - **Built-in Capture**: Ready-to-use `ffmpeg` video recording commands.
 
@@ -235,6 +252,7 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 | Category | Target | Description |
 | :--- | :--- | :--- |
 | **🚀 Quick Start** | `make turnkey` | ⚡ **1-Step Setup:** Downloads engines, configs, SoundFont, IWADs & megawads |
+| | `make bootstrap` | Downloads engine binaries & deploys configs + launcher |
 | | `make install` | Deploys all configuration files & `doom-launch` CLI with backups |
 | | `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |
 | **📦 Content & Assets** | `make fetch-wads` | Auto-downloads and unpacks 20+ free community megawads |
