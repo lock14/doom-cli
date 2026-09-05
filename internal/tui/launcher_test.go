@@ -199,17 +199,26 @@ func TestModel_View_Layouts(t *testing.T) {
 					if !strings.HasSuffix(trimmed, "╮") {
 						t.Errorf("top border line %d expected to end with '╮', got %q", lineIdx, trimmed)
 					}
+					if w != tt.width {
+						t.Errorf("top border line %d width %d != terminal width %d", lineIdx, w, tt.width)
+					}
 				}
 				if strings.Contains(line, "╰") {
 					borderLineCount++
 					if !strings.HasSuffix(trimmed, "╯") {
 						t.Errorf("bottom border line %d expected to end with '╯', got %q", lineIdx, trimmed)
 					}
+					if w != tt.width {
+						t.Errorf("bottom border line %d width %d != terminal width %d", lineIdx, w, tt.width)
+					}
 				}
 				if strings.Contains(line, "│") {
 					borderLineCount++
 					if !strings.HasSuffix(trimmed, "│") {
 						t.Errorf("content line %d expected to end with '│', got %q", lineIdx, trimmed)
+					}
+					if w != tt.width {
+						t.Errorf("content line %d width %d != terminal width %d", lineIdx, w, tt.width)
 					}
 				}
 			}

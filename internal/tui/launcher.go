@@ -118,7 +118,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
-			boxWidth := m.width - 4
+			boxWidth := m.width - 2
 			if boxWidth < 38 {
 				boxWidth = 38
 			}
@@ -186,7 +186,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err == nil {
 						m.viewingReadme = true
 						m.readmeTitle = fmt.Sprintf("README: %s (%s)", cur.Name, filepath.Base(txtPath))
-						boxWidth := m.width - 4
+						boxWidth := m.width - 2
 						if boxWidth < 38 {
 							boxWidth = 38
 						}
@@ -266,7 +266,7 @@ func (m model) View() string {
 	}
 
 	if m.viewingReadme {
-		boxWidth := m.width - 4
+		boxWidth := m.width - 2
 		if boxWidth < 38 {
 			boxWidth = 38
 		}
@@ -302,12 +302,12 @@ func (m model) View() string {
 			interiorHeight = 3
 		}
 		maxVisible = interiorHeight
-		rightWidth = m.width - leftWidth - gutter - 6
+		rightWidth = m.width - leftWidth - gutter - 4
 		if rightWidth < 38 {
 			rightWidth = 38
 		}
 	} else {
-		boxWidth = m.width - 4
+		boxWidth = m.width - 2
 		if boxWidth < 36 {
 			boxWidth = 36
 		}
