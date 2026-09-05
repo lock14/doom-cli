@@ -1,29 +1,30 @@
 package config
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestResolveForLinux(t *testing.T) {
 	p := ResolveFor("linux", "")
-	if !strings.Contains(p.UZDoomDir, ".config/uzdoom") {
+	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), ".config/uzdoom") {
 		t.Errorf("expected .config/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
 	}
-	if !strings.Contains(p.DSDADir, ".local/share/dsda-doom") {
+	if !strings.Contains(filepath.ToSlash(p.DSDADir), ".local/share/dsda-doom") {
 		t.Errorf("expected .local/share/dsda-doom in DSDADir, got %s", p.DSDADir)
 	}
-	if !strings.Contains(p.WadsDir, ".local/share/games/uzdoom") {
+	if !strings.Contains(filepath.ToSlash(p.WadsDir), ".local/share/games/uzdoom") {
 		t.Errorf("expected .local/share/games/uzdoom in WadsDir, got %s", p.WadsDir)
 	}
 }
 
 func TestResolveForDarwin(t *testing.T) {
 	p := ResolveFor("darwin", "")
-	if !strings.Contains(p.UZDoomDir, "Library/Application Support/uzdoom") {
+	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Library/Application Support/uzdoom") {
 		t.Errorf("expected Library/Application Support/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
 	}
-	if !strings.Contains(p.WadsDir, "Library/Application Support/games/uzdoom") {
+	if !strings.Contains(filepath.ToSlash(p.WadsDir), "Library/Application Support/games/uzdoom") {
 		t.Errorf("expected Library/Application Support/games/uzdoom in WadsDir, got %s", p.WadsDir)
 	}
 }

@@ -68,8 +68,9 @@ func TestPrepareLaunch_DSDADoom(t *testing.T) {
 		"-complevel 2",
 		"-skill 4",
 	}
+	lowerArgs := strings.ToLower(joinedArgs)
 	for _, part := range expectedParts {
-		if !strings.Contains(joinedArgs, part) {
+		if !strings.Contains(lowerArgs, strings.ToLower(part)) {
 			t.Errorf("expected args to contain %q, got: %s", part, joinedArgs)
 		}
 	}
