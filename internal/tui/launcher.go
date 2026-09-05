@@ -172,7 +172,7 @@ type model struct {
 	viewport      viewport.Model
 }
 
-func initialModel(catalog *preset.Catalog, wadsDir string) model {
+func initialModel(catalog *preset.Catalog, wadsDir string, initialPreset ...string) model {
 	w, h, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || w <= 0 || h <= 0 {
 		w = 100
@@ -187,12 +187,22 @@ func initialModel(catalog *preset.Catalog, wadsDir string) model {
 	ti.CharLimit = 100
 	ti.Width = calculateSearchWidth(w)
 
+	cursor := 0
+	if len(initialPreset) > 0 && initialPreset[0] != "" && catalog != nil {
+		for i, p := range catalog.Presets {
+			if strings.EqualFold(p.Name, initialPreset[0]) {
+				cursor = i
+				break
+			}
+		}
+	}
+
 	return model{
 		catalog:  catalog,
 		wadsDir:  wadsDir,
 		input:    ti,
 		filtered: catalog.Presets,
-		cursor:   0,
+		cursor:   cursor,
 		width:    w,
 		height:   h,
 	}
@@ -681,13 +691,14 @@ func (m model) View() string {
 }
 
 // RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
-func RunInteractiveLauncher(catalog *preset.Catalog, wadsDir string) (*preset.Preset, error) {
+// If initialPreset is provided, the launcher pre-selects that preset.
+func RunInteractiveLauncher(catalog *preset.Catalog, wadsDir string, initialPreset ...string) (*preset.Preset, error) {
 	// If not running in a terminal, fallback to numbered menu
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
-	m := initialModel(catalog, wadsDir)
+	m := initialModel(catalog, wadsDir, initialPreset...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

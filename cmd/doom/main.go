@@ -2,11 +2,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/engine"
@@ -23,6 +26,7 @@ var (
 	flagBinDir         string
 	flagDryRun         bool
 	flagForce          bool
+	flagOnce           bool
 	flagPresetsFile    string
 )
 
@@ -69,6 +73,8 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE:               runPlay,
 	}
+	playCmd.Flags().BoolVar(&flagOnce, "once", false, "Exit after playing a single preset")
+	rootCmd.Flags().BoolVar(&flagOnce, "once", false, "Exit after playing a single preset")
 	rootCmd.AddCommand(playCmd)
 
 	// Subcommand: launch
@@ -380,29 +386,63 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	}
 
 	paths := getPaths()
-	selected, err := tui.RunInteractiveLauncher(cat, paths.WadsDir)
-	if err != nil {
-		return err
-	}
-	if selected == nil {
-		return nil
-	}
+	extraArgs := extractEngineArgs("play", os.Args)
 
-	opts := engine.LaunchOptions{
-		EngineOverride: flagEngineOverride,
-		WadsDir:        paths.WadsDir,
-		BinDir:         paths.BinDir,
-		DryRun:         flagDryRun,
-		ExtraArgs:      extractEngineArgs("play", os.Args),
-		Out:            os.Stdout,
-	}
+	isInteractive := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+	singleShot := flagOnce || flagDryRun || !isInteractive
 
-	plan, err := engine.PrepareLaunch(*selected, opts)
-	if err != nil {
-		return err
-	}
+	var lastPreset string
+	for {
+		selected, err := tui.RunInteractiveLauncher(cat, paths.WadsDir, lastPreset)
+		if err != nil {
+			return err
+		}
+		if selected == nil {
+			return nil
+		}
 
-	return engine.Execute(plan, os.Stdout, os.Stderr)
+		lastPreset = selected.Name
+		opts := engine.LaunchOptions{
+			EngineOverride: flagEngineOverride,
+			WadsDir:        paths.WadsDir,
+			BinDir:         paths.BinDir,
+			DryRun:         flagDryRun,
+			ExtraArgs:      extraArgs,
+			Out:            os.Stdout,
+		}
+
+		plan, err := engine.PrepareLaunch(*selected, opts)
+		if err != nil {
+			if singleShot {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "\nLaunch error: %v\nPress Enter to return to launcher...", err)
+			waitForEnter(os.Stdin)
+			continue
+		}
+
+		if flagDryRun {
+			return engine.Execute(plan, os.Stdout, os.Stderr)
+		}
+
+		if err := engine.Execute(plan, os.Stdout, os.Stderr); err != nil {
+			if singleShot {
+				return err
+			}
+			fmt.Fprintf(os.Stderr, "\nEngine exited with error: %v\nPress Enter to return to launcher...", err)
+			waitForEnter(os.Stdin)
+		}
+
+		if singleShot {
+			return nil
+		}
+	}
+}
+
+// waitForEnter pauses execution until the user presses Enter on the provided reader.
+func waitForEnter(r io.Reader) {
+	reader := bufio.NewReader(r)
+	_, _ = reader.ReadString('\n')
 }
 
 func extractEngineArgs(subcommand string, rawArgs []string) []string {
@@ -426,6 +466,7 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 	knownBoolFlags := map[string]bool{
 		"--dry-run": true,
 		"--force":   true,
+		"--once":    true,
 		"-h":        true, "--help": true,
 	}
 

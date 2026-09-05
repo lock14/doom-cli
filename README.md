@@ -135,7 +135,8 @@ Features:
 - Real-time fuzzy filtering across all 32 presets
 - Side-by-side preview pane displaying IWAD, required PWADs, DeHackEd patches, and description
 - Instant missing file status indicator (`✓ Ready` vs `✗ Missing`)
-- Fallback numbered menu mode when running in non-TTY or basic terminal environments
+- Automatic return to launcher with cursor memory on game exit (or use `--once` to exit immediately)
+- Fallback numbered menu mode when running in basic or non-TTY terminal environments
 
 #### Direct Launching & Engine Overrides
 Launch any preset directly by name with custom engine flags:

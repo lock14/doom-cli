@@ -477,3 +477,49 @@ func TestCapsuleAndKeyHelpRenderers(t *testing.T) {
 		t.Errorf("formatKeyHelp() = %q, expected keys and separator", help)
 	}
 }
+
+func TestInitialModel_WithInitialPreset(t *testing.T) {
+	cat := mockCatalog()
+
+	tests := []struct {
+		name          string
+		initialPreset []string
+		expectedIdx   int
+	}{
+		{
+			name:          "no initial preset provided",
+			initialPreset: nil,
+			expectedIdx:   0,
+		},
+		{
+			name:          "empty string initial preset",
+			initialPreset: []string{""},
+			expectedIdx:   0,
+		},
+		{
+			name:          "matching preset exact case",
+			initialPreset: []string{"Eviternity II"},
+			expectedIdx:   1,
+		},
+		{
+			name:          "matching preset case-insensitive",
+			initialPreset: []string{"sunder"},
+			expectedIdx:   2,
+		},
+		{
+			name:          "unknown preset falls back to 0",
+			initialPreset: []string{"NonExistentWad"},
+			expectedIdx:   0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := initialModel(cat, "", tt.initialPreset...)
+			if m.cursor != tt.expectedIdx {
+				t.Errorf("initialModel(cat, \"\", %v) cursor = %d, expected %d",
+					tt.initialPreset, m.cursor, tt.expectedIdx)
+			}
+		})
+	}
+}
