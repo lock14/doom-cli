@@ -655,7 +655,7 @@ func (m model) View() string {
 	header := m.renderHeader()
 	footer := m.renderFooter(hasReadme)
 
-	return header + panels + footer + "\n"
+	return "\n" + header + panels + footer + "\n"
 }
 
 // RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
