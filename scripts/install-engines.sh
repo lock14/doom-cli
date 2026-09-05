@@ -63,7 +63,7 @@ download_binary() {
     trap 'rm -f "$tmp_file"' EXIT INT TERM
 
     if command -v curl >/dev/null 2>&1; then
-        curl -L --progress-bar -o "$tmp_file" "$url"
+        curl -f -L --progress-bar -o "$tmp_file" "$url"
     elif command -v wget >/dev/null 2>&1; then
         wget -q --show-progress -O "$tmp_file" "$url"
     else
@@ -73,6 +73,12 @@ download_binary() {
     fi
 
     if [[ "$url" == *.zip ]]; then
+        if ! command -v unzip >/dev/null 2>&1; then
+            echo "Error: 'unzip' utility is required to extract zip archives but was not found in PATH." >&2
+            echo "Please install 'unzip' (e.g. 'sudo apt install unzip' or 'brew install unzip')." >&2
+            rm -f "$tmp_file"
+            return 1
+        fi
         local extract_dir
         extract_dir=$(mktemp -d "${TMPDIR:-/tmp}/doom_zip.XXXXXX")
         trap 'rm -rf "$extract_dir" "$tmp_file"' EXIT INT TERM
@@ -81,6 +87,11 @@ download_binary() {
         bin_match=$(find "$extract_dir" -type f -perm -111 -name "$name*" | head -n 1)
         if [ -n "$bin_match" ]; then
             cp "$bin_match" "$dest"
+            local bin_parent
+            bin_parent=$(dirname "$bin_match")
+            # Also copy companion resource files and libraries if present
+            find "$bin_parent" -maxdepth 1 -name "*.wad" -exec cp {} "$BIN_DIR/" \; 2>/dev/null || true
+            find "$bin_parent" -maxdepth 1 -type d -name "libs*" -exec cp -r {} "$BIN_DIR/" \; 2>/dev/null || true
         else
             cp -r "$extract_dir"/* "$BIN_DIR/"
         fi
@@ -94,10 +105,20 @@ download_binary() {
         local app_match
         app_match=$(find "$mount_point" -maxdepth 2 -name "*.app" | head -n 1)
         if [ -n "$app_match" ]; then
+            local apps_dir="$HOME/Applications"
+            mkdir -p "$apps_dir"
+            local app_dest
+            app_dest="$apps_dir/$(basename "$app_match")"
+            rm -rf "$app_dest"
+            cp -R "$app_match" "$apps_dir/"
             local app_bin
-            app_bin=$(find "$app_match/Contents/MacOS" -type f -perm -111 | head -n 1)
+            app_bin=$(find "$app_dest/Contents/MacOS" -type f -perm -111 | head -n 1)
             if [ -n "$app_bin" ]; then
-                cp "$app_bin" "$dest"
+                # Create a wrapper launcher in BIN_DIR pointing into the installed .app bundle
+                cat << EOF > "$dest"
+#!/bin/sh
+exec "$app_bin" "\$@"
+EOF
             fi
         fi
         hdiutil detach "$mount_point" -quiet || true
@@ -118,8 +139,13 @@ install_uzdoom() {
     local pattern
     local fallback
     if [ "$OS" = "Darwin" ]; then
-        pattern=".*(macos|mac|darwin).*uzdoom.*(\.dmg|\.zip)"
-        fallback="https://github.com/UZDoom/UZDoom/releases/download/5.0.0/MacOS-UZDoom-Release-ARM64.dmg"
+        if [ "$ARCH" = "arm64" ]; then
+            pattern=".*(macos|mac|darwin).*uzdoom.*arm64.*(\.dmg|\.zip)"
+            fallback="https://github.com/UZDoom/UZDoom/releases/download/5.0.0/MacOS-UZDoom-Release-ARM64.dmg"
+        else
+            pattern=".*(macos|mac|darwin).*uzdoom.*(x86_64|x64|intel).*(\.dmg|\.zip)"
+            fallback="https://github.com/UZDoom/UZDoom/releases/download/5.0.0/MacOS-UZDoom-Release-ARM64.dmg"
+        fi
     else
         pattern="linux.*uzdoom.*\.appimage"
         fallback="https://github.com/UZDoom/UZDoom/releases/download/5.0.0/Linux-UZDoom-Release-x86_64.AppImage"

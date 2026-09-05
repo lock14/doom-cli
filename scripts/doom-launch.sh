@@ -32,6 +32,14 @@ fi
 WADS_DIR="${WADS_DIR:-$DEFAULT_WADS_DIR}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 
+# Export environment so child processes (such as fzf --preview) inherit overrides
+export WADS_DIR PRESETS_FILE BIN_DIR
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Error: python3 is required by doom-launch but was not found in PATH." >&2
+    exit 1
+fi
+
 # Resolve absolute self path for fzf subshell preview execution
 SELF_BIN="$(command -v "$0" 2>/dev/null || true)"
 if [ -z "$SELF_BIN" ] || [ ! -x "$SELF_BIN" ]; then
@@ -62,22 +70,22 @@ usage() {
 list_presets() {
     echo "=== Available Doom Presets ==="
     python3 -c "
-import json
-with open('$PRESETS_FILE') as f:
+import json, sys
+with open(sys.argv[1]) as f:
     data = json.load(f)
 for i, p in enumerate(data['presets'], 1):
     eng = 'DSDA-Doom' if p['engine'] == 'dsda-doom' else 'UZDoom'
     print(f\"{i:2d}. {p['name']:<30} [{eng}] - {p.get('description', '')}\")
-"
+" "$PRESETS_FILE"
 }
 
 get_preset_json() {
     local target="$1"
     python3 -c "
 import json, sys
-with open('$PRESETS_FILE') as f:
+with open(sys.argv[1]) as f:
     data = json.load(f)
-target = sys.argv[1].strip().lower()
+target = sys.argv[2].strip().lower()
 matched = [p for p in data['presets'] if p['name'].lower() == target]
 if not matched:
     # Try prefix matching
@@ -85,7 +93,7 @@ if not matched:
 if not matched:
     sys.exit(1)
 print(json.dumps(matched[0]))
-" "$target"
+" "$PRESETS_FILE" "$target"
 }
 
 launch_preset() {
@@ -93,11 +101,11 @@ launch_preset() {
     shift
     local extra_args=("$@")
 
-    local name engine iwad mappacks_str
-    IFS=$'\t' read -r name engine iwad mappacks_str < <(python3 -c "
+    local name engine iwad mappacks_str preset_args
+    IFS=$'\t' read -r name engine iwad mappacks_str preset_args < <(python3 -c "
 import json, sys
 d = json.loads(sys.argv[1])
-print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', []))}\")
+print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', []))}\t{d.get('additional_args', '')}\")
 " "$preset_json")
 
     # Apply engine override if requested via --engine / -e
@@ -133,6 +141,13 @@ print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', 
         # Check case variation
         local alt_iwad
         alt_iwad=$(find "$WADS_DIR" -maxdepth 1 -type f -iname "$iwad" 2>/dev/null | head -n 1 || true)
+        if [ -z "$alt_iwad" ] || [ ! -f "$alt_iwad" ]; then
+            case "$(echo "$iwad" | tr '[:upper:]' '[:lower:]')" in
+                "doom.wad")
+                    alt_iwad=$(find "$WADS_DIR" -maxdepth 1 -type f -iname "doom1.wad" 2>/dev/null | head -n 1 || true)
+                    ;;
+            esac
+        fi
         if [ -n "$alt_iwad" ] && [ -f "$alt_iwad" ]; then
             iwad_path="$alt_iwad"
         else
@@ -145,6 +160,7 @@ print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', 
     # Build file arguments
     local wads=()
     local dehs=()
+    local ordered_files=()
     if [ -n "$mappacks_str" ]; then
         IFS='###' read -ra files <<< "$mappacks_str"
         for f in "${files[@]}"; do
@@ -152,14 +168,50 @@ print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', 
             local fpath="$WADS_DIR/$f"
             if [ ! -f "$fpath" ]; then
                 local alt_f
+                # 1. Exact case-insensitive match
                 alt_f=$(find "$WADS_DIR" -maxdepth 1 -type f -iname "$f" 2>/dev/null | head -n 1 || true)
+                # 2. Normalized match (stripping spaces, dashes, underscores)
+                if [ -z "$alt_f" ] || [ ! -f "$alt_f" ]; then
+                    local f_norm
+                    f_norm=$(echo "$f" | tr '[:upper:]' '[:lower:]' | tr -d ' _-')
+                    while IFS= read -r cand; do
+                        [ -z "$cand" ] && continue
+                        local cand_norm
+                        cand_norm=$(basename "$cand" | tr '[:upper:]' '[:lower:]' | tr -d ' _-')
+                        if [ "$f_norm" = "$cand_norm" ]; then
+                            alt_f="$cand"
+                            break
+                        fi
+                    done < <(find "$WADS_DIR" -maxdepth 1 -type f 2>/dev/null || true)
+                fi
+                # 3. Known aliases (e.g. gdturbo.wad <-> gd.wad)
+                if [ -z "$alt_f" ] || [ ! -f "$alt_f" ]; then
+                    case "$(echo "$f" | tr '[:upper:]' '[:lower:]')" in
+                        "gdturbo.wad")
+                            alt_f=$(find "$WADS_DIR" -maxdepth 1 -type f -iname "gd.wad" 2>/dev/null | head -n 1 || true)
+                            ;;
+                        "gd.wad")
+                            alt_f=$(find "$WADS_DIR" -maxdepth 1 -type f -iname "gdturbo.wad" 2>/dev/null | head -n 1 || true)
+                            ;;
+                    esac
+                fi
                 if [ -n "$alt_f" ] && [ -f "$alt_f" ]; then
                     fpath="$alt_f"
                 else
-                    echo "Warning: Mappack file '$f' not found in $WADS_DIR."
-                    echo "Run 'make fetch-wads' to download community megawads."
+                    case "$(echo "$f" | tr '[:upper:]' '[:lower:]')" in
+                        "idkfa 2024.wad")
+                            echo "  ℹ Optional soundtrack '$f' not found in $WADS_DIR; launching with default MIDI."
+                            continue
+                            ;;
+                        *)
+                            echo "Error: Required mappack file '$f' not found in $WADS_DIR." >&2
+                            echo "Run 'make fetch-wads' or './scripts/fetch-wads.sh \"$name\"' to download it." >&2
+                            return 1
+                            ;;
+                    esac
                 fi
             fi
+            ordered_files+=("$fpath")
             if [[ "$f" =~ \.deh$|\.DEH$ ]]; then
                 dehs+=("$fpath")
             else
@@ -178,11 +230,15 @@ print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', 
             cmd+=("-deh" "${dehs[@]}")
         fi
     else
-        # UZDoom accepts all files under -file
-        local all_files=("${wads[@]}" "${dehs[@]}")
-        if [ ${#all_files[@]} -gt 0 ]; then
-            cmd+=("-file" "${all_files[@]}")
+        # UZDoom accepts all files under -file while maintaining exact declared order
+        if [ ${#ordered_files[@]} -gt 0 ]; then
+            cmd+=("-file" "${ordered_files[@]}")
         fi
+    fi
+
+    if [ -n "$preset_args" ]; then
+        read -ra preset_args_array <<< "$preset_args"
+        cmd+=("${preset_args_array[@]}")
     fi
 
     if [ ${#extra_args[@]} -gt 0 ]; then
@@ -193,8 +249,8 @@ print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', 
     echo "Launching Preset: $name"
     echo "Engine: $engine ($engine_bin)"
     echo "IWAD:   $iwad_path"
-    if [ ${#wads[@]} -gt 0 ] || [ ${#dehs[@]} -gt 0 ]; then
-        echo "Files:  ${wads[*]} ${dehs[*]}"
+    if [ ${#ordered_files[@]} -gt 0 ]; then
+        echo "Files:  ${ordered_files[*]}"
     fi
     echo "=========================================="
     echo "Command: ${cmd[*]}"
@@ -211,23 +267,41 @@ print(f\"{d['name']}\t{d['engine']}\t{d['iwad']}\t{'###'.join(d.get('mappacks', 
 generate_preview() {
     local preset_name="$1"
     python3 -c "
-import json, sys, os
+import json, re, sys
 from pathlib import Path
 
-with open('$PRESETS_FILE') as f:
-    data = json.load(f)
+presets_file = sys.argv[1]
+wads_dir = Path(sys.argv[2])
+name = sys.argv[3].strip()
 
-name = sys.argv[1].strip()
-wads_dir = Path('$WADS_DIR')
+with open(presets_file) as f:
+    data = json.load(f)
 
 matched = [p for p in data['presets'] if p['name'] == name]
 if not matched:
     sys.exit(0)
 p = matched[0]
 
+def check_file(target):
+    if (wads_dir / target).exists():
+        return True
+    t_norm = re.sub(r'[\s_\-]', '', target).lower()
+    if wads_dir.is_dir():
+        for item in wads_dir.iterdir():
+            if item.is_file():
+                if item.name.lower() == target.lower():
+                    return True
+                if re.sub(r'[\s_\-]', '', item.name).lower() == t_norm:
+                    return True
+                if target.lower() == 'gdturbo.wad' and item.name.lower() == 'gd.wad':
+                    return True
+                if target.lower() == 'doom.wad' and item.name.lower() == 'doom1.wad':
+                    return True
+    return False
+
 eng = 'DSDA-Doom (MBF21 / Speedrunning)' if p['engine'] == 'dsda-doom' else 'UZDoom (Software-Plus / ZDoom)'
 iwad = p['iwad']
-iwad_ok = '✓ Found' if (wads_dir / iwad).exists() else '✗ Missing'
+iwad_ok = '✓ Found' if check_file(iwad) else '✗ Missing'
 
 print(f'Preset:        {p[\"name\"]}')
 print(f'Engine:        {eng}')
@@ -237,9 +311,9 @@ print(f'Description:   {p.get(\"description\", \"N/A\")}')
 print(f'IWAD:          {iwad} [{iwad_ok}]')
 print('Mappack Files:')
 for m in p.get('mappacks', []):
-    f_ok = '✓ Found' if (wads_dir / m).exists() else '✗ Missing'
+    f_ok = '✓ Found' if check_file(m) else '✗ Missing'
     print(f'  - {m:<25} [{f_ok}]')
-" "$preset_name"
+" "$PRESETS_FILE" "$WADS_DIR" "$preset_name"
 }
 
 DRY_RUN=0
@@ -302,12 +376,12 @@ fi
 # Interactive Selection
 if [ -t 0 ] && command -v fzf >/dev/null 2>&1; then
     PRESET_NAMES=$(python3 -c "
-import json
-with open('$PRESETS_FILE') as f:
+import json, sys
+with open(sys.argv[1]) as f:
     data = json.load(f)
 for p in data['presets']:
     print(p['name'])
-")
+" "$PRESETS_FILE")
     CHOICE=$(echo "$PRESET_NAMES" | fzf \
         --prompt="Select Doom Preset > " \
         --height=60% \
@@ -330,12 +404,12 @@ else
     if [[ "$SELECTION" =~ ^[0-9]+$ ]]; then
         preset_json=$(python3 -c "
 import json, sys
-with open('$PRESETS_FILE') as f:
+with open(sys.argv[1]) as f:
     data = json.load(f)
-idx = int(sys.argv[1]) - 1
+idx = int(sys.argv[2]) - 1
 if 0 <= idx < len(data['presets']):
     print(json.dumps(data['presets'][idx]))
-" "$SELECTION" || true)
+" "$PRESETS_FILE" "$SELECTION" || true)
         if [ -n "$preset_json" ]; then
             launch_preset "$preset_json" "${EXTRA_ARGS[@]}"
         else

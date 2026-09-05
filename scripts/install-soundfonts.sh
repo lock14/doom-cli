@@ -64,7 +64,7 @@ TMP_DL=$(mktemp "${TMPDIR:-/tmp}/soundfont.XXXXXX")
 trap 'rm -f "$TMP_DL"' EXIT INT TERM
 
 if command -v curl >/dev/null 2>&1; then
-    curl -L --progress-bar -o "$TMP_DL" "$SF_URL"
+    curl -f -L --progress-bar -o "$TMP_DL" "$SF_URL"
 elif command -v wget >/dev/null 2>&1; then
     wget -q --show-progress -O "$TMP_DL" "$SF_URL"
 else
@@ -82,4 +82,4 @@ echo "  $SF_FILE"
 echo ""
 echo "To use with DSDA-Doom or UZDoom, ensure your config or launch command points to this SoundFont:"
 echo "  dsda-doom.cfg : snd_soundfont \"$SF_FILE\""
-echo "  autoexec.cfg  : snd_soundfont \"$SF_FILE\""
+echo "  autoexec.cfg  : fluid_patchset \"$SF_FILE\""

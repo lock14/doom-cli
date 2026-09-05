@@ -33,8 +33,8 @@ else
     fi
 fi
 
-# Fallback default if resolution could not be determined (headless / CI)
-if [ -z "$DETECTED_RES" ]; then
+# Fallback default if resolution could not be determined or is invalid (headless / CI)
+if ! [[ "$DETECTED_RES" =~ ^[0-9]+x[0-9]+$ ]]; then
     DETECTED_RES="1920x1080"
 fi
 

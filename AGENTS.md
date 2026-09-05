@@ -9,8 +9,8 @@ Any agent modifying this repository must follow these core principles.
 ## 1. Declarative Presets & Single Source of Truth
 
 - **`data/presets.json` is the Single Source of Truth**: All preset definitions, engine assignments, IWAD mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs are defined declaratively in [`data/presets.json`](data/presets.json).
-- **Never Manually Edit Generated Preset JSONs**: Do not manually edit `DoomRunner/linux/options.json` or `DoomRunner/windows/options.json`. Run `python3 scripts/build-presets.py --build` or `make build-presets` to compile `data/presets.json` into both launcher options files.
-- **Parity Verification**: Run `make check` (or `python3 scripts/build-presets.py --check`) to verify that launcher options match `data/presets.json` and comply with all path invariants.
+- **Never Manually Edit Generated Preset JSONs**: Do not manually edit `DoomRunner/linux/options.json` or `DoomRunner/windows/options.json`. Run `python3 scripts/build-presets.py --build` or `make build-presets` to compile `data/presets.json` into both launcher options files and update `README.md`.
+- **Parity Verification**: Run `make check` (or `python3 scripts/build-presets.py --check`) to verify that launcher options and `README.md` match `data/presets.json` and comply with all path invariants.
 
 ---
 
@@ -22,6 +22,7 @@ Any agent modifying this repository must follow these core principles.
   - In `dsda-doom/dsda-doom.cfg`, `screen_resolution` must use `__RESOLUTION__` and `snd_soundfont` must use `__SOUNDFONT__`.
   - In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use `__REFRESH_RATE__`.
   - Deployment tooling (`Makefile`, `setup.sh`) dynamically substitutes `__HOME__`, `__RESOLUTION__` (via `scripts/detect-resolution.sh`), `__REFRESH_RATE__` (via `scripts/detect-refresh-rate.sh`), and `__SOUNDFONT__` at installation time.
+  - On macOS, deployment tooling dynamically remaps `options.json` paths to standard `Library/Application Support/` directories so DoomRunner works seamlessly across platforms.
 - **Respect Standard Directory Structures**:
   - **UZDoom Config (Linux)**: `~/.config/uzdoom/autoexec.cfg`
   - **UZDoom Config (macOS)**: `~/Library/Application Support/uzdoom/autoexec.cfg`
@@ -33,7 +34,7 @@ Any agent modifying this repository must follow these core principles.
   - **Linux / macOS Binaries**: `~/.local/bin/` (`uzdoom`, `dsda-doom`, `doomrunner`, `doom-launch`)
   - **Linux WADs Directory**: `~/.local/share/games/uzdoom/`
   - **macOS WADs Directory**: `~/Library/Application Support/games/uzdoom/`
-  - **Windows WADs Directory**: `E:\Doom WADS\` (default, configurable via `-BaseDrive` in `setup.ps1`)
+  - **Windows WADs Directory**: `<BaseDrive>\Doom WADS\` (defaults to the drive where `setup.ps1` is executed from, configurable via `-BaseDrive` or `-WadsDir` in `setup.ps1`)
   - **SoundFonts Directory**: `~/.local/share/soundfonts/` (Linux) / `~/Library/Application Support/soundfonts/` (macOS)
 
 ---
@@ -52,9 +53,12 @@ Any agent modifying this repository must follow these core principles.
   - **UZDoom**: Use for mapsets requiring ZDoom/GZDoom features, advanced scripting, high-res texture packs like OTEX (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
 - **Preset Hygiene in DoomRunner & `doom-launch`**:
   - **No Duplicate IWADs**: Never include the base game IWAD (`DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`) inside `mappacks`. The IWAD must only be specified in `iwad` / `selected_IWAD`.
-  - **Proper Load Ordering**: Ensure DeHackEd patches (`.deh`) and resource files are ordered correctly relative to map PWADs and music wads (`idkfa 2024.wad`).
-- **Visual Aesthetic Intent**:
+  - **Proper Load Ordering**: Ensure DeHackEd patches (`.deh`) and resource files are ordered correctly relative to map PWADs and music wads (`idkfa 2024.wad`). In UZDoom, preserve the declared order across all files under `-file`.
+  - **Optional Asset Graceful Degradation**: Optional soundtrack enhancements like `idkfa 2024.wad` must not prevent base games from running when absent (falling back to standard MIDI) and must not be treated as downloadable community megawad files by `fetch-wads.sh`. Missing required map files must cleanly abort execution with an error code before engine invocation.
+  - **Filename Normalization & Alias Tolerance**: idgames archives and user directories frequently vary in case, spacing, and roman numerals (e.g., `Eviternity II.wad` in idgames vs `eviternityii.wad` in presets, or `gd.wad` vs `gdturbo.wad`). Both `scripts/fetch-wads.sh` and `scripts/doom-launch.sh` must apply case-insensitive and whitespace/dash/underscore-normalized matching so maps and DeHackEd patches resolve reliably regardless of user file naming. Known commercial rerelease add-on aliases (`gdturbo.wad` mapping to `gd.wad`, `doomzero.wad`/`DOOMZERO.DEH`) must also be discovered and extracted by `scripts/extract-iwads.sh`.
+- **Visual Aesthetic & Display Refresh Intent**:
   - Maintain UZDoom’s curated Nightdive "Software-Plus" visual profile (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`, and nearest-neighbor texture sampling with 16x anisotropic filtering) unless explicitly instructed otherwise.
+  - In DSDA-Doom, keep `dsda_fps_limit 0` with `render_vsync 1` and `uncapped_framerate 1` so high-refresh monitors (144Hz, 240Hz+) pace frames smoothly to native monitor refresh rates rather than being artificially throttled.
 
 ---
 
@@ -103,7 +107,7 @@ Before completing any changes:
    - JSON format validation.
    - Path invariant inspection.
    - Isolated dry installation and backup verification.
-   - Comprehensive CLI suite (`scripts/test-doom-launch.sh` testing all 28 CLI options, aliases, engine overrides, and menu modes).
+   - Comprehensive CLI suite (`scripts/test-doom-launch.sh` testing all 36 CLI options, aliases, engine overrides, and menu modes).
    - End-to-end turnkey sandbox verification (`scripts/test-turnkey.sh` testing mock Steam libraries, SoundFonts, WAD download, and CLI execution).
 2. Verify `git diff` contains no hardcoded usernames or personal paths.
 3. Run `make -n install` or `make help` to verify `Makefile` syntax.

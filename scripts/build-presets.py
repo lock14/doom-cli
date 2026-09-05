@@ -113,7 +113,7 @@ def generate_readme_table(presets_data):
     return "\n".join(lines)
 
 
-def build_all(update_readme=False):
+def build_all(update_readme=True):
     data = load_presets()
     presets_data = data["presets"]
     engines_meta = data["engines"]
@@ -192,6 +192,14 @@ def check_invariants():
     else:
         errors.append(f"Missing {WINDOWS_OPTIONS_FILE}")
 
+    # 5. Check parity with README.md presets table
+    if README_FILE.exists():
+        with open(README_FILE, "r", encoding="utf-8") as f:
+            readme_content = f.read()
+        expected_table = generate_readme_table(presets_data)
+        if expected_table not in readme_content:
+            errors.append(f"{README_FILE} presets table is out of sync with data/presets.json. Run 'make build-presets'.")
+
     if errors:
         print("Validation errors encountered in presets:", file=sys.stderr)
         for err in errors:
@@ -206,12 +214,12 @@ def main():
     parser.add_argument(
         "--build",
         action="store_true",
-        help="Compile data/presets.json into Linux and Windows options.json",
+        help="Compile data/presets.json into Linux/Windows options.json and README.md",
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Validate that options.json files are synchronized with data/presets.json",
+        help="Validate that options.json files and README.md are synchronized with data/presets.json",
     )
     parser.add_argument(
         "--update-readme",
@@ -224,7 +232,7 @@ def main():
     if args.check:
         check_invariants()
     elif args.build or args.update_readme:
-        build_all(update_readme=args.update_readme)
+        build_all(update_readme=True)
     else:
         parser.print_help()
 
