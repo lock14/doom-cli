@@ -6,160 +6,147 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  validate-linux:
-    name: Linux - Lint, Invariants & Installation Test
+  format-and-tidy:
+    name: Format & Module Hygiene
     runs-on: ubuntu-latest
-
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Verify dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y jq shellcheck
+          go mod verify
+          go mod download
 
-      - name: Run ShellCheck
+      - name: Check formatting
         run: |
-          shellcheck setup.sh scripts/*.sh
+          if [ -n "$(gofmt -s -l .)" ]; then
+            echo "The following files are not formatted properly:"
+            gofmt -s -l .
+            echo "Please run 'gofmt -s -w .' locally and commit the changes."
+            exit 1
+          fi
 
-      - name: Run make check test suite
+      - name: Check go mod tidy
         run: |
-          make check
+          go mod tidy
+          git diff --exit-code go.mod go.sum
 
-      - name: Test standalone setup.sh script
-        run: |
-          TEST_HOME=$(mktemp -d)
-          HOME="$TEST_HOME" ./setup.sh
-          test -f "$TEST_HOME/.config/uzdoom/autoexec.cfg"
-          test -f "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
-          test -f "$TEST_HOME/.local/share/DoomRunner/options.json"
-          test -f "$TEST_HOME/.local/share/doom-configs/presets.json"
-          test -f "$TEST_HOME/.local/bin/doom-launch"
-          ! grep -q '__HOME__' "$TEST_HOME/.local/share/DoomRunner/options.json"
-          ! grep -q '__RESOLUTION__' "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/.local/share/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/.config/uzdoom/autoexec.cfg"
-          HOME="$TEST_HOME" "$TEST_HOME/.local/bin/doom-launch" --list
-          rm -rf "$TEST_HOME"
-
-      - name: Test CLI and automation tool interfaces
-        run: |
-          ./scripts/doom-launch.sh --list
-          ./scripts/doom-launch.sh --preview "Alien Vendetta"
-          ./scripts/fetch-wads.sh --list
-          ./scripts/extract-iwads.sh --help
-          ./scripts/install-soundfonts.sh --help
-
-      - name: Verify Engine Downloader URL Resolution
-        run: |
-          # Verify that release URLs for all 3 targets can be resolved
-          curl -sI https://api.github.com/repos/UZDoom/UZDoom/releases/latest | grep -i "status: 200" || true
-          curl -sI https://api.github.com/repos/kraflab/dsda-doom/releases/latest | grep -i "status: 200" || true
-          curl -sI https://api.github.com/repos/Youda008/DoomRunner/releases/latest | grep -i "status: 200" || true
-
-  validate-macos:
-    name: macOS - Invariants & Installation Test
-    runs-on: macos-latest
-
+  lint:
+    name: Lint & Static Analysis
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run make check test suite
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Install and run revive
         run: |
-          make check
+          go install github.com/mgechev/revive@latest
+          revive -config revive.toml -formatter friendly ./...
 
-      - name: Test standalone setup.sh script on macOS
-        run: |
-          TEST_HOME=$(mktemp -d)
-          HOME="$TEST_HOME" ./setup.sh
-          test -f "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
-          test -f "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
-          test -f "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          test -f "$TEST_HOME/Library/Application Support/doom-configs/presets.json"
-          test -f "$TEST_HOME/.local/bin/doom-launch"
-          ! grep -q '__HOME__' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          ! grep -q '\.local/share/games/uzdoom' "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          grep -q "$TEST_HOME/Library/Application Support/games/uzdoom" "$TEST_HOME/Library/Application Support/DoomRunner/options.json"
-          ! grep -q '__RESOLUTION__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/Library/Application Support/dsda-doom/dsda-doom.cfg"
-          ! grep -q '__SOUNDFONT__' "$TEST_HOME/Library/Application Support/uzdoom/autoexec.cfg"
-          HOME="$TEST_HOME" "$TEST_HOME/.local/bin/doom-launch" --list
-          rm -rf "$TEST_HOME"
-
-  validate-windows:
-    name: Windows - PowerShell & Preset Validation
-    runs-on: windows-latest
-    env:
-      PYTHONIOENCODING: utf-8
-
+  govulncheck:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Validate JSON Files
-        shell: pwsh
-        run: |
-          Get-Content -Raw "data/presets.json" | ConvertFrom-Json | Out-Null
-          Get-Content -Raw "DoomRunner/windows/options.json" | ConvertFrom-Json | Out-Null
-          Get-Content -Raw "DoomRunner/linux/options.json" | ConvertFrom-Json | Out-Null
-          Write-Host "JSON files are valid."
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
 
-      - name: Validate Declarative Presets Parity
-        shell: pwsh
-        run: |
-          python scripts/build-presets.py --check
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version: 'stable'
 
-      - name: Test setup.ps1 default installation
-        shell: pwsh
-        run: |
-          # Execute setup.ps1
-          .\setup.ps1
-          
-          # Verify files exist in both AppData directories
-          $LocalOptions = "$env:LOCALAPPDATA\DoomRunner\options.json"
-          $RoamingOptions = "$env:APPDATA\DoomRunner\options.json"
-          $LocalPresets = "$env:LOCALAPPDATA\doom-configs\presets.json"
-          $RoamingPresets = "$env:APPDATA\doom-configs\presets.json"
-          
-          if (-not (Test-Path $LocalOptions)) { throw "Missing $LocalOptions" }
-          if (-not (Test-Path $RoamingOptions)) { throw "Missing $RoamingOptions" }
-          if (-not (Test-Path $LocalPresets)) { throw "Missing $LocalPresets" }
-          if (-not (Test-Path $RoamingPresets)) { throw "Missing $RoamingPresets" }
-          
-          # Test automatic backup on second run
-          .\setup.ps1
-          $LocalBackups = Get-ChildItem "$env:LOCALAPPDATA\DoomRunner" -Filter "options.json.bak.*"
-          $RoamingBackups = Get-ChildItem "$env:APPDATA\DoomRunner" -Filter "options.json.bak.*"
-          
-          if ($LocalBackups.Count -eq 0) { throw "No backup file created in LocalAppData" }
-          if ($RoamingBackups.Count -eq 0) { throw "No backup file created in AppData" }
-          
-          # Verify default drive detection matches current execution drive
-          $ExpectedDrive = (Split-Path -Qualifier (Get-Location).Path).Replace('\', '/').ToUpper()
-          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
-          if (-not ($Content -match "$ExpectedDrive/Doom WADS")) { throw "Default drive detection failed; expected $ExpectedDrive/Doom WADS" }
-          $Content | ConvertFrom-Json | Out-Null
-          
-          Write-Host "Default installation and backup tests passed."
+  test:
+    name: Test & Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Test setup.ps1 with custom BaseDrive remapping
-        shell: pwsh
-        run: |
-          .\setup.ps1 -BaseDrive "X:"
-          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
-          if ($Content -match "E:/Doom WADS") { throw "Drive remapping failed; found E:/Doom WADS" }
-          if (-not ($Content -match "X:/Doom WADS")) { throw "Drive remapping failed; missing X:/Doom WADS" }
-          $Content | ConvertFrom-Json | Out-Null
-          Write-Host "BaseDrive remapping test passed."
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
 
-      - name: Test setup.ps1 with custom WadsDir parameter
+      - name: Run tests (Linux / macOS with race detector)
+        if: runner.os != 'Windows'
+        run: go test -v -race -shuffle=on ./...
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
+        run: go test -v -shuffle=on ./...
+
+      - name: Build binary
+        shell: bash
         run: |
-          .\setup.ps1 -WadsDir "C:\CustomGames\WADs"
-          $Content = Get-Content -Raw "$env:LOCALAPPDATA\DoomRunner\options.json"
-          if (-not ($Content -match "C:/CustomGames/WADs")) { throw "WadsDir remapping failed" }
-          $Content | ConvertFrom-Json | Out-Null
-          Write-Host "WadsDir parameter test passed."
+          mkdir -p bin
+          go build -o bin/doom ./cmd/doom
+
+      - name: Verify CLI commands
+        shell: bash
+        run: |
+          ./bin/doom --help
+          ./bin/doom presets list
+          ./bin/doom wads list
+          ./bin/doom setup --help
+
+  # CI Gatekeeper Aggregator Job
+  # Acts as the single required status check for branch protection rules.
+  ci-gatekeeper:
+    name: CI Gatekeeper
+    runs-on: ubuntu-latest
+    needs:
+      - format-and-tidy
+      - lint
+      - govulncheck
+      - test
+    if: always()
+    steps:
+      - name: Evaluate Upstream Job Statuses
+        run: |
+          echo "Evaluating CI pipeline job results:"
+          echo "Format & Tidy: ${{ needs.format-and-tidy.result }}"
+          echo "Lint:          ${{ needs.lint.result }}"
+          echo "Govulncheck:   ${{ needs.govulncheck.result }}"
+          echo "Test Matrix:   ${{ needs.test.result }}"
+
+          if [ "${{ needs.format-and-tidy.result }}" != "success" ] || \
+             [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.govulncheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ]; then
+            echo "❌ CI Gatekeeper failed: One or more upstream checks did not succeed."
+            exit 1
+          fi
+
+          echo "✅ All required CI checks passed successfully!"

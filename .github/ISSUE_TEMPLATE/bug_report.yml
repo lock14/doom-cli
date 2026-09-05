@@ -1,0 +1,86 @@
+name: 🐛 Bug Report
+description: Report a bug, launch failure, download issue, or unexpected behavior in doom-configs
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please provide as much detail as possible to help us diagnose and fix the problem.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: What part of doom-configs is experiencing the issue?
+      options:
+        - "CLI: doom setup"
+        - "CLI: doom play (Interactive TUI)"
+        - "CLI: doom launch"
+        - "CLI: doom wads (extract/fetch)"
+        - "CLI: doom engines"
+        - "CLI: doom config (install/diff/sync)"
+        - "Source Port Config: DSDA-Doom"
+        - "Source Port Config: UZDoom"
+        - "Launcher: DoomRunner Preset"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps or commands executed to reproduce the issue.
+      placeholder: |
+        1. Run 'doom setup'
+        2. Launch preset 'Eviternity II' with 'doom launch "Eviternity II"'
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: Explain what behavior was expected...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output & Error Logs
+      description: Terminal output, error messages, or engine crash logs.
+      placeholder: |
+        Paste command line output or error messages here...
+    validations:
+      required: false
+
+  - type: input
+    id: environment
+    attributes:
+      label: Operating System & Architecture
+      description: OS and Architecture (e.g. Ubuntu 24.04 amd64, macOS Sonoma arm64, Windows 11 x64)
+      placeholder: e.g. Linux x86_64
+    validations:
+      required: true
+
+  - type: input
+    id: doom-version
+    attributes:
+      label: doom CLI Version
+      description: Output of `doom --version` or commit SHA
+      placeholder: e.g. v1.0.0 or commit 99b4f70
+    validations:
+      required: false

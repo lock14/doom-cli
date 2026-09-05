@@ -12,3 +12,10 @@ Thumbs.db
 # Backup files
 *.bak
 *.bak.*
+
+# Build artifacts
+bin/
+/doom
+/doom.exe
+
+

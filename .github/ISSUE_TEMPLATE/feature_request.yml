@@ -1,0 +1,55 @@
+name: 💡 Feature Request
+description: Propose a new preset, engine integration, CLI feature, or config profile enhancement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature or preset! Please describe your proposal in detail.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Feature Category
+      options:
+        - "New Preset (data/presets.json)"
+        - "CLI Feature (cmd/doom)"
+        - "Engine Support or Config Profile"
+        - "Game Asset Extraction / WAD Fetching"
+        - "DoomRunner Integration"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature related to a specific workflow problem, missing megawad preset, or engine need?
+      placeholder: I would like to be able to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution / Implementation Details
+      description: |
+        Describe the feature or preset details (e.g. megawad title, engine choice, IWAD, PWAD order, DeHackEd file, idgames download URL).
+      placeholder: |
+        Preset Name: ...
+        Engine: dsda-doom / uzdoom
+        IWAD: doom2.wad
+        PWADs: ...
+        Download URLs: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions or workarounds you have considered.
+    validations:
+      required: false

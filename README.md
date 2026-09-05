@@ -1,40 +1,38 @@
 # Doom Configs
 
+[![Go Version](https://img.shields.io/github/go-mod/go-version/lock14/doom-configs)](https://go.dev/)
 [![CI](https://github.com/lock14/doom-configs/actions/workflows/ci.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/ci.yml)
+[![Security](https://github.com/lock14/doom-configs/actions/workflows/security.yml/badge.svg)](https://github.com/lock14/doom-configs/actions/workflows/security.yml)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-blue)
 ![Engines](https://img.shields.io/badge/engines-DSDA--Doom%20%7C%20UZDoom-red)
 ![Presets](https://img.shields.io/badge/presets-32%20megawads-orange)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A curated collection of configuration files, launcher presets, build targets, and CLI automation tools for playing Doom using modern source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) with both the **[DoomRunner](https://github.com/Youda008/DoomRunner)** graphical launcher and the lightweight **`doom-launch`** terminal launcher across Linux, macOS, and Windows.
+A unified cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) and the **[DoomRunner](https://github.com/Youda008/DoomRunner)** graphical launcher across Linux, macOS, and Windows.
 
 ---
 
 ## Supported Source Ports & Launchers
 
+- **`doom` CLI**: Unified, zero-dependency cross-platform CLI tool and interactive terminal launcher with fuzzy search, real-time metadata previews, Steam/GOG auto-discovery, multi-mirror downloading, and configuration management on Linux, macOS, and Windows.
 - **[DSDA-Doom](https://github.com/kraflab/dsda-doom)**: Precision speedrunning and demo-accurate source port preconfigured for MBF21, extended HUD, dynamic resolution scaling, and uncapped framerates.
 - **[UZDoom](https://github.com/UZDoom/uzdoom)**: Modern ZDoom-based engine configured with a Nightdive "Software-Plus" visual profile, auto-detecting aspect ratio, and broad mod compatibility.
-- **`doom-launch`**: Lightweight, lightning-fast terminal UI / CLI launcher with interactive fuzzy search (`fzf`), real-time metadata previews, and direct CLI launching.
 - **[DoomRunner](https://github.com/Youda008/DoomRunner)**: Modern graphical launcher preloaded with 32 community megawad presets mapped to their ideal engines.
 
 ---
 
 ## Installation & Setup
 
-### Linux & macOS
+### 1. Install the `doom` CLI
 
-The `Makefile` automatically detects whether you are running **Linux** or **macOS (Darwin)** and maps configuration directories accordingly:
-- **Linux Destinations**: `~/.config/uzdoom/`, `~/.local/share/dsda-doom/`, `~/.local/share/DoomRunner/`, `~/.local/share/doom-configs/`, `~/.local/bin/`
-- **macOS Destinations**: `~/Library/Application Support/uzdoom/`, `~/Library/Application Support/dsda-doom/`, `~/Library/Application Support/DoomRunner/`, `~/Library/Application Support/doom-configs/`, `~/.local/bin/`
-
-#### Option 1: ⚡ Turnkey Setup (One-Command Everything)
-For players who just want everything ready to play immediately with zero manual steps:
-Downloads all engines (`uzdoom`, `dsda-doom`, `doomrunner`), installs all configurations & `doom-launch`, deploys the Roland SC-55 MIDI SoundFont, auto-extracts official Steam/GOG IWADs, and downloads all 20+ free community megawads:
-
+#### Linux & macOS
 ```bash
-make turnkey
+# Clone the repository and build/install the doom binary to ~/.local/bin/doom
+git clone https://github.com/lock14/doom-configs.git
+cd doom-configs
+make install
 ```
-
-*(Or without `make`: `./setup.sh --turnkey`)*
+*(Alternatively, install via Go: `go install ./cmd/doom`)*
 
 > [!TIP]
 > Ensure `~/.local/bin` is in your `$PATH` (e.g. in your `~/.bashrc` or `~/.zshrc`):
@@ -42,57 +40,68 @@ make turnkey
 > export PATH="$HOME/.local/bin:$PATH"
 > ```
 
-#### Option 2: Bootstrap (Engines + Configs + Launcher)
-To download the engine binaries into `~/.local/bin/` and deploy all configurations and `doom-launch`:
-
-```bash
-make bootstrap
-```
-
-#### Option 3: Configs Only
-To deploy only configuration files (with automatic `.bak` backups of existing configs):
-
-```bash
-make install
-```
-
-Or install individual components:
-- `make install-uzdoom` — Deploys `autoexec.cfg` (auto-detects display refresh rate)
-- `make install-dsda` — Deploys `dsda-doom.cfg` (auto-detects display resolution)
-- `make install-doomrunner` — Deploys `options.json`
-- `make install-launcher` — Installs `doom-launch` to `~/.local/bin/`
-- `make install-engines` — Downloads only the engine binaries into `~/.local/bin/`
-
-#### Managing In-Game Changes
-- `make diff` — Compare current repository configs against live configs on your system.
-- `make sync` — Pull changes made in-game back into the repository so you can commit them.
-
-#### Standalone Shell Script
-Alternatively, deploy without `make` using the POSIX setup script:
-```bash
-./setup.sh
+#### Windows
+In PowerShell or Windows Terminal:
+```powershell
+# Clone the repository and build doom.exe
+git clone https://github.com/lock14/doom-configs.git
+cd doom-configs
+go install ./cmd/doom
+# Or compile directly to a bin folder in your PATH:
+go build -o $HOME/bin/doom.exe ./cmd/doom
 ```
 
 ---
 
-### Windows
+### 2. ⚡ Automated Setup (`doom setup`)
 
-To install the preconfigured DoomRunner presets on Windows via PowerShell:
+For players who want everything ready to play immediately in a single step:
 
-```powershell
-.\setup.ps1
+```bash
+doom setup
 ```
 
-`setup.ps1` automatically detects the drive letter where the setup script is executed from and defaults all engines and WADs to `<Drive>:\Doom WADS`.
+`doom setup` automatically:
+1. **Installs Game Engines**: Downloads portable binaries for UZDoom, DSDA-Doom, and DoomRunner into your local bin path.
+2. **Deploys Engine Configurations**: Installs optimized configs for UZDoom and DSDA-Doom, auto-detecting your display resolution and native monitor refresh rate, while creating timestamped backups (`.bak.<timestamp>`) of any existing files.
+3. **Deploys MIDI SoundFont**: Downloads and installs the curated Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth MIDI playback.
+4. **Extracts Official Game Files**: Scans all Steam and GOG library folders across drives for *Doom + Doom II (2024)*, *Heretic*, and *Hexen*, copying commercial IWADs and the modern `idkfa 2024.wad` soundtrack into your WADs directory.
+5. **Downloads Community Megawads**: Fetches and extracts all 20+ free community megawads (*Eviternity I & II*, *Back to Saturn X 1 & 2*, *Ancient Aliens*, *Sunder*, *Sunlust*, *Sigil I & II*, etc.) and DeHackEd patches from idgames/Doomworld mirrors.
 
-If your WADs or engines are on a different drive, pass the `-BaseDrive` parameter (or `-WadsDir` for a custom folder):
-```powershell
-.\setup.ps1 -BaseDrive "D:"
-# Or customize full path:
-.\setup.ps1 -WadsDir "D:\Games\Doom WADS"
-```
+---
 
-This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\options.json` and `%APPDATA%\DoomRunner\options.json`, creating timestamped backups beforehand.
+### 3. Modular Management Commands
+
+If you prefer to perform individual tasks or maintain your setup over time:
+
+#### Content & Assets
+- `doom engines install` — Downloads portable engine binaries (`uzdoom`, `dsda-doom`, `doomrunner`).
+- `doom soundfont install` — Downloads and deploys the Roland SC-55 SoundFont.
+- `doom wads extract` — Auto-discovers and imports official Steam and GOG IWADs.
+- `doom wads fetch` — Downloads and extracts all community megawads.
+- `doom wads fetch "Eviternity II"` — Downloads a specific megawad by name.
+
+#### Engine Configurations
+- `doom config install` — Deploys engine configurations and DoomRunner options with display auto-detection and timestamped backups.
+- `doom config diff` — Shows a diff comparing repository config templates against live configs on your system.
+- `doom config sync` — Pulls in-game tweaks (keybindings, sensitivity, video settings) from your system back into the repository so you can commit them.
+
+---
+
+## Directory Layouts
+
+The `doom` CLI automatically respects standard, platform-idiomatic paths:
+
+| Component | Linux (XDG) | macOS | Windows |
+| :--- | :--- | :--- | :--- |
+| **Binaries** | `~/.local/bin/` | `~/.local/bin/` | `%LOCALAPPDATA%\Programs\Doom\bin\` |
+| **WADs & Mods** | `~/.local/share/games/uzdoom/` | `~/Library/Application Support/games/uzdoom/` | `<Drive>:\Doom WADS\` (or `%LOCALAPPDATA%\Doom WADS\`) |
+| **UZDoom Config** | `~/.config/uzdoom/autoexec.cfg` | `~/Library/Application Support/uzdoom/autoexec.cfg` | `%APPDATA%\uzdoom\autoexec.cfg` |
+| **DSDA-Doom Config** | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%LOCALAPPDATA%\dsda-doom\dsda-doom.cfg` |
+| **DoomRunner Options** | `~/.local/share/DoomRunner/options.json` | `~/Library/Application Support/DoomRunner/options.json` | `%LOCALAPPDATA%\DoomRunner\options.json` |
+| **SoundFonts** | `~/.local/share/soundfonts/` | `~/Library/Application Support/soundfonts/` | `%LOCALAPPDATA%\soundfonts\` |
+
+*(Custom WAD directories can be passed to any command via `--wads-dir <path>` or set via the `DOOM_WADS_DIR` environment variable).*
 
 ---
 
@@ -101,77 +110,51 @@ This deploys `DoomRunner/windows/options.json` to `%LOCALAPPDATA%\DoomRunner\opt
 > [!IMPORTANT]
 > **Commercial Game Files Are Not Tracked in Git**
 > 
-> This repository contains configuration files, launcher presets, and automated fetch scripts. You must provide your own legally acquired game files:
+> This repository contains configuration files, launcher presets, and automated fetch tools. You must provide your own legally acquired game files:
 > - **Commercial IWADs** (`DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`, `HERETIC.WAD`, `HEXEN.WAD`) can be acquired from digital storefronts:
 >   - **Doom + Doom II**: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) / [GOG](https://www.gog.com/en/game/doom_doom_ii)
 >   - **Heretic + Hexen**: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) / [GOG](https://www.gog.com/en/game/heretic_hexen)
->   *(Tip: Use `make extract-iwads` to auto-import them from Steam/GOG).*
-> - **Community Megawads & Expansions** (*Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*, *Sunder*, etc.) can be fetched automatically via `make fetch-wads` or manually downloaded from **[Doomworld / idgames](https://www.doomworld.com/idgames/)**.
-
-Place your game files (`.wad`, `.deh`, `.pk3`) in the standard directory:
-- **Linux Default**: `~/.local/share/games/uzdoom/`
-- **macOS Default**: `~/Library/Application Support/games/uzdoom/`
-- **Windows Default**: `<Drive>:\Doom WADS\` (defaults to the execution drive, e.g. `C:\Doom WADS\` or `E:\Doom WADS\`, or customized via `-BaseDrive`)
-
-### 1. Steam & GOG IWAD Auto-Extractor
-If you own *Doom + Doom II (2024)* or *Heretic / Hexen* on Steam or GOG, you can automatically discover and copy official IWADs and the modern `idkfa 2024.wad` soundtrack into your WADs folder:
-
-```bash
-make extract-iwads
-```
-
-### 2. Community Megawad Auto-Downloader
-Download and extract all 20+ free community megawads and DeHackEd patches (*Eviternity I & II*, *BTSX 1 & 2*, *Ancient Aliens*, *Sunder*, *Sunlust*, *Sigil I & II*, etc.) directly from idgames / Doomworld mirrors:
-
-```bash
-# Download all community megawads
-make fetch-wads
-
-# Or download a specific megawad via script
-./scripts/fetch-wads.sh "Eviternity II"
-```
-
-### 3. Curated Roland SC-55 MIDI SoundFont
-Download and deploy the balanced `GeneralUser-GS.sf2` SoundFont for high-definition FluidSynth MIDI playback:
-
-```bash
-make install-soundfonts
-```
+>   *(Tip: Run `doom wads extract` to auto-discover and import them directly from your Steam/GOG libraries).*
+> - **Community Megawads & Expansions** (*Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*, *Sunder*, etc.) can be fetched automatically via `doom wads fetch` or manually downloaded from **[Doomworld / idgames](https://www.doomworld.com/idgames/)**.
 
 ---
 
 ## Launching & Playing Games
 
-### 1. Interactive Terminal Launcher (`doom-launch`)
+### 1. Interactive Terminal Launcher (`doom play`)
 
-Launch presets from anywhere in your terminal using `doom-launch` (or `make play`):
+Launch presets from anywhere in your terminal using the interactive fuzzy search launcher:
 
 ```bash
-# Interactive fuzzy-finder menu (requires fzf) or numbered menu
-doom-launch
-
-# Or launch via Makefile
-make play
+doom play
+# Or simply:
+doom
 ```
 
-#### Direct CLI Launching & Custom Engine Flags
-You can launch presets directly by name and pass additional engine arguments on the fly:
+Features:
+- Real-time fuzzy filtering across all 32 presets
+- Side-by-side preview pane displaying IWAD, required PWADs, DeHackEd patches, and description
+- Instant missing file status indicator (`✓ Ready` vs `✗ Missing`)
+- Fallback numbered menu mode when running in non-TTY or basic terminal environments
+
+#### Direct Launching & Engine Overrides
+Launch any preset directly by name with custom engine flags:
 
 ```bash
 # Launch a specific preset
-doom-launch "Eviternity II"
+doom launch "Eviternity II"
 
 # Override default engine (e.g. run MBF mapset in DSDA-Doom)
-doom-launch "Ancient Aliens" -e dsda-doom
+doom launch "Ancient Aliens" -e dsda-doom
 
-# Launch with custom skill and warp flags
-doom-launch "Sunlust" -skill 4 -warp 01
+# Launch with custom warp and skill flags
+doom launch "Sunlust" -skill 4 -warp 01
 
 # Inspect synthesized launch command without starting the game
-doom-launch --dry-run "Alien Vendetta"
+doom launch "Alien Vendetta" --dry-run
 
 # List all available presets and their mapped engines
-doom-launch --list
+doom presets list
 ```
 
 ### 2. Graphical Launcher (DoomRunner)
@@ -179,7 +162,6 @@ doom-launch --list
 Launch DoomRunner from your application menu or terminal:
 
 ```bash
-# Start the graphical launcher
 doomrunner
 ```
 
@@ -245,32 +227,24 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 - **Extended HUD (exHUD)**: In-game level splits, secret counters, and completion times.
 - **Built-in Capture**: Ready-to-use `ffmpeg` video recording commands.
 
----
+## Source Port Packaging (Linux)
 
-## Makefile Quick Reference
+When running Doom source ports on Linux, standalone native binaries or AppImages in `~/.local/bin/` are strongly recommended over sandboxed Flatpaks. 
 
-| Category | Target | Description |
-| :--- | :--- | :--- |
-| **🚀 Quick Start** | `make turnkey` | ⚡ **1-Step Setup:** Downloads engines, configs, SoundFont, IWADs & megawads |
-| | `make bootstrap` | Downloads engine binaries & deploys configs + launcher |
-| | `make install` | Deploys all configuration files & `doom-launch` CLI with backups |
-| | `make play` | Opens interactive terminal preset launcher (`fzf` or numbered menu) |
-| **📦 Content & Assets** | `make fetch-wads` | Auto-downloads and unpacks 20+ free community megawads |
-| | `make extract-iwads` | Auto-discovers and copies official IWADs from Steam / GOG |
-| | `make install-soundfonts` | Deploys curated GeneralUser GS SoundFont for FluidSynth |
-| | `make install-engines` | Downloads latest binaries (UZDoom, DSDA-Doom, DoomRunner) to `~/.local/bin/` |
-| **🔧 Maintenance** | `make diff` | Shows diff between repository configs and live system configs |
-| | `make sync` | Syncs in-game configuration tweaks back into the git repository |
-| | `make check` | Runs full validation suite (presets, scripts, invariants, tests) |
-| | `make build-presets` | Compiles `data/presets.json` into launcher `options.json` files |
+Flatpaks isolate applications from the rest of the filesystem, preventing launchers (like DoomRunner or `doom play`) from discovering game engines or accessing WADs across custom paths without manual permission overrides. Running `doom setup` or `doom engines install` automatically manages standalone binaries in your user path.
 
 ---
 
-## Installation Recommendations (Linux)
+## Contributing
 
-When installing Doom tools on Linux, using **AppImages** or native binaries is strongly recommended over Flatpaks. 
+We welcome contributions! Please review our [Contributing Guidelines](CONTRIBUTING.md) for architectural invariants, development setup, code style, and pull request verification instructions.
 
-Flatpaks run inside a sandbox that isolates them from the rest of the filesystem, preventing launchers (like DoomRunner or `doom-launch`) from easily discovering game engines (like UZDoom or DSDA-Doom) or accessing WADs across custom paths without manual permission overrides.
+## Security
 
-- Run `make bootstrap` or `make install-engines` to place portable AppImages in `~/.local/bin/`.
-- Alternatively, download binaries directly from each project's GitHub Releases page.
+Please report security issues responsibly according to our [Security Policy](SECURITY.md).
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).
+
+

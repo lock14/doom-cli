@@ -1,0 +1,27 @@
+# Revive configuration file
+# https://github.com/mgechev/revive
+
+ignoreGeneratedHeader = false
+severity = "warning"
+confidence = 0.8
+
+[rule.blank-imports]
+[rule.context-as-argument]
+[rule.dot-imports]
+[rule.error-return]
+[rule.error-strings]
+[rule.error-naming]
+[rule.exported]
+[rule.if-return]
+[rule.increment-decrement]
+[rule.var-naming]
+[rule.package-comments]
+[rule.range]
+[rule.receiver-naming]
+[rule.time-naming]
+[rule.unexported-return]
+[rule.indent-error-flow]
+[rule.errorf]
+[rule.line-length-limit]
+  arguments = [120]
+
