@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -28,6 +29,7 @@ var (
 	flagForce          bool
 	flagOnce           bool
 	flagPresetsFile    string
+	flagTheme          string
 )
 
 func getCatalog() (*preset.Catalog, error) {
@@ -65,6 +67,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 	rootCmd.PersistentFlags().StringVar(&flagBinDir, "bin-dir", "", "Custom path to engines binary directory")
 	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Print launch command without executing")
 	rootCmd.PersistentFlags().StringVar(&flagPresetsFile, "presets-file", "", "Custom presets.json file path")
+	rootCmd.PersistentFlags().StringVar(
+		&flagTheme, "theme", "", "Color theme for launcher (default, cyberpunk, blood, matrix, monochrome)",
+	)
 
 	// Subcommand: play
 	playCmd := &cobra.Command{
@@ -374,9 +379,93 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 	presetsCmd.AddCommand(presetsListCmd, presetsBuildCmd)
 	rootCmd.AddCommand(presetsCmd)
 
+	// Subcommand: themes
+	themesCmd := &cobra.Command{
+		Use:   "themes",
+		Short: "Browse, preview, and set color themes for the launcher",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runThemesList(cmd, args)
+		},
+	}
+	themesListCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all available color themes with visual swatches",
+		RunE:  runThemesList,
+	}
+	themesSetCmd := &cobra.Command{
+		Use:   "set <theme_name>",
+		Short: "Set the default color theme in user config",
+		Args:  cobra.ExactArgs(1),
+		RunE:  runThemesSet,
+	}
+	themesCmd.AddCommand(themesListCmd, themesSetCmd)
+	rootCmd.AddCommand(themesCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+func runThemesList(cmd *cobra.Command, args []string) error {
+	paths := getPaths()
+	cfg, err := config.LoadConfig(paths)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	activeTheme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
+
+	fmt.Println("=== Available Doom Themes ===")
+	fmt.Println()
+
+	themes := tui.ListBuiltinThemes()
+	for _, t := range themes {
+		marker := "  "
+		if strings.EqualFold(t.Name, activeTheme.Name) {
+			marker = "* "
+		}
+
+		styles := tui.CompileStyles(t)
+		sample := styles.RenderBrandPill() + " " +
+			styles.TagDSDA.Render("[DSDA]") + " " +
+			styles.TagUZDoom.Render("[UZDoom]") + " " +
+			styles.CursorBar.Render("▎ ") +
+			styles.CursorText.Render("Select")
+
+		fmt.Printf("%s%-11s [%-9s] %-42s %s\n", marker, t.Name, t.Type, t.Description, sample)
+	}
+
+	fmt.Println()
+	fmt.Printf("Active theme: %s\n", activeTheme.Name)
+	fmt.Printf("Run 'doom themes set <name>' to save a default theme to %s\n", paths.ConfigFile)
+	return nil
+}
+
+func runThemesSet(cmd *cobra.Command, args []string) error {
+	target := strings.TrimSpace(args[0])
+	paths := getPaths()
+
+	if _, ok := tui.GetBuiltinTheme(target); !ok {
+		customFile := filepath.Join(paths.ThemesDir, target+".json")
+		if _, err := os.Stat(customFile); err != nil {
+			if _, errPath := os.Stat(target); errPath != nil {
+				return fmt.Errorf("unknown theme %q. Run 'doom themes list' to see available themes", target)
+			}
+		}
+	}
+
+	cfg, err := config.LoadConfig(paths)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	cfg.Theme = target
+	if err := config.SaveConfig(paths, cfg); err != nil {
+		return fmt.Errorf("saving config: %w", err)
+	}
+
+	fmt.Printf("✓ Active theme set to %q in %s\n", target, paths.ConfigFile)
+	return nil
 }
 
 func runPlay(cmd *cobra.Command, args []string) error {
@@ -386,6 +475,12 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	}
 
 	paths := getPaths()
+	cfg, err := config.LoadConfig(paths)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+
+	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
 	extraArgs := extractEngineArgs("play", os.Args)
 
 	isInteractive := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
@@ -393,7 +488,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 
 	var lastPreset string
 	for {
-		selected, err := tui.RunInteractiveLauncher(cat, paths.WadsDir, lastPreset)
+		selected, err := tui.RunInteractiveLauncher(cat, paths.WadsDir, theme, lastPreset)
 		if err != nil {
 			return err
 		}
@@ -462,6 +557,7 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 		"--wads-dir":     true,
 		"--bin-dir":      true,
 		"--presets-file": true,
+		"--theme":        true,
 	}
 	knownBoolFlags := map[string]bool{
 		"--dry-run": true,
@@ -493,7 +589,8 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 		if strings.HasPrefix(arg, "--wads-dir=") ||
 			strings.HasPrefix(arg, "--bin-dir=") ||
 			strings.HasPrefix(arg, "--engine=") ||
-			strings.HasPrefix(arg, "--presets-file=") {
+			strings.HasPrefix(arg, "--presets-file=") ||
+			strings.HasPrefix(arg, "--theme=") {
 			continue
 		}
 

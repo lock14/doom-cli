@@ -18,6 +18,9 @@ type Paths struct {
 	SoundFontsDir  string
 	BinDir         string
 	DataDir        string
+	ConfigDir      string
+	ConfigFile     string
+	ThemesDir      string
 	SoundFontFile  string
 }
 
@@ -43,6 +46,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DoomRunnerDir = filepath.Join(appSupport, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(appSupport, "soundfonts")
 		p.DataDir = filepath.Join(appSupport, "doom-cli")
+		p.ConfigDir = filepath.Join(appSupport, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
 		p.WadsDir = filepath.Join(appSupport, "games", "uzdoom")
 
@@ -62,6 +66,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DoomRunnerRoam = filepath.Join(appData, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(localAppData, "soundfonts")
 		p.DataDir = filepath.Join(localAppData, "doom-cli")
+		p.ConfigDir = filepath.Join(localAppData, "doom-cli")
 		p.BinDir = filepath.Join(localAppData, "Programs", "Doom", "bin")
 
 		// Determine base drive on Windows: defaults to drive of current executable / working dir
@@ -88,8 +93,18 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DoomRunnerDir = filepath.Join(xdgData, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(xdgData, "soundfonts")
 		p.DataDir = filepath.Join(xdgData, "doom-cli")
+		p.ConfigDir = filepath.Join(xdgConfig, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
 		p.WadsDir = filepath.Join(xdgData, "games", "uzdoom")
+	}
+
+	p.ConfigFile = filepath.Join(p.ConfigDir, "config.json")
+	p.ThemesDir = filepath.Join(p.ConfigDir, "themes")
+
+	if envConfig := os.Getenv("DOOM_CONFIG_DIR"); envConfig != "" {
+		p.ConfigDir = envConfig
+		p.ConfigFile = filepath.Join(p.ConfigDir, "config.json")
+		p.ThemesDir = filepath.Join(p.ConfigDir, "themes")
 	}
 
 	if envWads := os.Getenv("WADS_DIR"); envWads != "" {

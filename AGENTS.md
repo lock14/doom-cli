@@ -18,6 +18,7 @@
         *   **Binaries**: `~/.local/bin/` (Linux/macOS) / `%LOCALAPPDATA%\Programs\Doom\bin\` (Windows)
         *   **WADs Directory**: `~/.local/share/games/uzdoom/` (Linux) / `~/Library/Application Support/games/uzdoom/` (macOS) / `<Drive>:\Doom WADS\` (Windows)
         *   **SoundFonts**: `~/.local/share/soundfonts/` (Linux) / `~/Library/Application Support/soundfonts/` (macOS) / `%LOCALAPPDATA%\soundfonts\` (Windows)
+        *   **CLI Config & Themes**: `~/.config/doom-cli/` (Linux) / `~/Library/Application Support/doom-cli/` (macOS) / `%LOCALAPPDATA%\doom-cli\` (Windows)
 *   **Destructive Safety & Backup Policy**:
     *   **Mandatory Non-Destructive Backups**: Any configuration deployment target or command (`doom config install`, `doom setup`) must create timestamped backups (`.bak.<timestamp>`) before overwriting or modifying any existing user configuration file.
     *   **Preserve Unrelated Configuration**: When adding new engine variables, aliases, or keybindings, avoid modifying or removing unrelated settings unless explicitly requested.
@@ -34,14 +35,14 @@
 
 The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary on Linux, macOS, and Windows:
 
-*   `cmd/doom/`: Cobra CLI commands (`setup`, `play`, `launch`, `wads`, `engines`, `soundfont`, `config`, `presets`).
-*   `internal/config/`: Platform path resolvers adhering strictly to XDG (Linux), Library (macOS), and AppData (Windows).
+*   `cmd/doom/`: Cobra CLI commands (`setup`, `play`, `launch`, `wads`, `engines`, `soundfont`, `config`, `presets`, `themes`).
+*   `internal/config/`: Platform path resolvers adhering strictly to XDG (Linux), Library (macOS), and AppData (Windows), plus user config persistence (`config.json`).
 *   `internal/display/`: Native display resolution and refresh rate detection.
 *   `internal/engine/`: Source port asset downloading and argument synthesis/execution.
 *   `internal/preset/`: Embedded presets catalog loader and options.json/README compiler.
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
 *   `internal/templates/`: Embedded engine configuration templates and backup deployer.
-*   `internal/tui/`: Interactive Bubble Tea fuzzy launcher and preview pane.
+*   `internal/tui/`: Interactive Bubble Tea fuzzy launcher, preview pane, and customizable themes engine.
 *   `internal/wad/`: Multi-mirror archive downloader, `archive/zip` extractor, and SoundFont installer.
 *   **Data Synchronization**: Whenever presets or config templates are updated, synchronize both the repository templates and the embedded data in `internal/preset/data/` and `internal/templates/data/`.
 
