@@ -78,7 +78,7 @@ func newSetupCmd() *cobra.Command {
 			fmt.Println()
 
 			// 2. Engines
-			fmt.Println(">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom, DoomRunner)...")
+			fmt.Println(">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
 			installer := engine.NewInstaller(paths.BinDir, os.Stdout)
 			if err := installer.InstallAll(); err != nil {
 				fmt.Printf("Warning: engine installer encountered: %v\n", err)
@@ -191,10 +191,10 @@ func newWadsCmd() *cobra.Command {
 func newEnginesCmd() *cobra.Command {
 	enginesCmd := &cobra.Command{
 		Use:   "engines",
-		Short: "Download and manage source port engines (UZDoom, DSDA-Doom, DoomRunner)",
+		Short: "Download and manage source port engines (UZDoom, DSDA-Doom)",
 	}
 	enginesInstallCmd := &cobra.Command{
-		Use:   "install [uzdoom|dsda-doom|doomrunner|all]",
+		Use:   "install [uzdoom|dsda-doom|all]",
 		Short: "Download and deploy engine binaries",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
@@ -209,12 +209,10 @@ func newEnginesCmd() *cobra.Command {
 				return ins.InstallUZDoom()
 			case "dsda", "dsda-doom", "dsdadoom":
 				return ins.InstallDSDA()
-			case "doomrunner":
-				return ins.InstallDoomRunner()
 			case "all":
 				return ins.InstallAll()
 			default:
-				return fmt.Errorf("unknown engine target: %s (choose uzdoom, dsda-doom, doomrunner, or all)", target)
+				return fmt.Errorf("unknown engine target: %s (choose uzdoom, dsda-doom, or all)", target)
 			}
 		},
 	}
@@ -267,16 +265,16 @@ func newPresetsCmd() *cobra.Command {
 	}
 	presetsBuildCmd := &cobra.Command{
 		Use:   "build",
-		Short: "Compile data/presets.json into DoomRunner options.json and update README.md",
+		Short: "Synchronize data/presets.json into README.md",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := "."
 			if len(args) > 0 {
 				root = args[0]
 			}
-			if err := preset.CompileOptionsFiles(root); err != nil {
+			if err := preset.SyncReadme(root); err != nil {
 				return err
 			}
-			fmt.Println("✓ Successfully compiled DoomRunner options.json and updated README.md")
+			fmt.Println("✓ Successfully synchronized README.md with data/presets.json")
 			return nil
 		},
 	}

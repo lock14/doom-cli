@@ -42,7 +42,7 @@ func newRootCmd() *cobra.Command {
 		Use:   "doom",
 		Short: "Unified cross-platform Doom source port manager & launcher",
 		Long: `doom is a modern, unified CLI and interactive terminal launcher for classic Doom.
-It manages source ports (UZDoom, DSDA-Doom, DoomRunner), official Steam/GOG IWADs,
+It manages source ports (UZDoom, DSDA-Doom), official Steam/GOG IWADs,
 Roland SC-55 SoundFonts, curated community megawads, and platform-native configurations.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If no subcommands or arguments are passed, run interactive launcher (doom play)

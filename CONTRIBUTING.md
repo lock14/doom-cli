@@ -8,7 +8,7 @@ Thank you for your interest in contributing to `github.com/lock14/doom-cli`! Thi
 
 All contributions must respect our four foundational principles:
 
-*   **Declarative Presets & Single Source of Truth**: All preset definitions, source port engine assignments, IWAD mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs are defined declaratively in [`data/presets.json`](data/presets.json). Never manually edit generated launcher files (`DoomRunner/linux/options.json` or `DoomRunner/windows/options.json`). Use `doom presets build` to regenerate them and update documentation.
+*   **Declarative Presets & Single Source of Truth**: All preset definitions, source port engine assignments, IWAD mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs are defined declaratively in [`data/presets.json`](data/presets.json). Use `doom presets build` to synchronize them with `README.md`.
 *   **Portability & Path Invariants**:
     *   **Never commit personal user paths, display resolutions, or refresh rates**: Do not commit paths like `/home/<user>/`, hardcoded display resolutions, or fixed monitor refresh rates into configurations, presets, or code.
     *   **Use Placeholder Tokens**: Use `__HOME__`, `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` in configuration templates and presets. The CLI deployment tooling dynamically substitutes these based on runtime display and filesystem detection.
@@ -78,7 +78,7 @@ We maintain a streamlined `Makefile` for developer verification and local builds
 *   **Table-Driven Tests**: Use table-driven tests for unit testing with descriptive test case names.
 *   **Hardened Concurrency & Randomization**: All tests must pass cleanly under `-race` (race detector) and `-shuffle=on` (test order randomization).
 *   **Filesystem Isolation**: File resolution, deployment, and extraction tests must execute within isolated temporary directories (`t.TempDir()` or `os.MkdirTemp`) and clean up after themselves.
-*   **Preset Parity Test**: Any modifications to presets must pass `TestPresetParityAndInvariants`, verifying launcher JSON options and `README.md` match `data/presets.json` and comply with all path invariants.
+*   **Preset Parity Test**: Any modifications to presets must pass `TestPresetParityAndInvariants`, verifying `README.md` matches `data/presets.json` and complies with all path invariants.
 
 ---
 

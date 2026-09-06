@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -22,12 +21,6 @@ var embeddedAutoexec []byte
 
 //go:embed data/dsda-doom.cfg
 var embeddedDSDADoom []byte
-
-//go:embed data/options_linux.json
-var embeddedOptionsLinux []byte
-
-//go:embed data/options_windows.json
-var embeddedOptionsWindows []byte
 
 // BackupFile copies dest to dest.bak.YYYYMMDDHHMMSS if it exists.
 func BackupFile(dest string) (string, error) {
@@ -49,15 +42,10 @@ func BackupFile(dest string) (string, error) {
 	return backupPath, nil
 }
 
-// DeployConfigs installs autoexec.cfg, dsda-doom.cfg, and DoomRunner options.json with backups.
+// DeployConfigs installs autoexec.cfg and dsda-doom.cfg with backups.
 func DeployConfigs(paths *config.Paths) error {
 	res := display.DetectResolution()
 	rate := display.DetectRefreshRate()
-
-	home, _ := os.UserHomeDir()
-	if home == "" {
-		home = os.Getenv("HOME")
-	}
 
 	// 1. Deploy UZDoom autoexec.cfg
 	if err := os.MkdirAll(paths.UZDoomDir, 0755); err != nil {
@@ -90,58 +78,6 @@ func DeployConfigs(paths *config.Paths) error {
 		return err
 	}
 	fmt.Printf("✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
-
-	// 3. Deploy DoomRunner options.json
-	if runtime.GOOS == "windows" {
-		targetDirs := []string{paths.DoomRunnerDir, paths.DoomRunnerRoam}
-		baseDrive := "C:"
-		if len(paths.WadsDir) >= 2 && paths.WadsDir[1] == ':' {
-			baseDrive = strings.ToUpper(paths.WadsDir[:2])
-		}
-
-		winContent := string(embeddedOptionsWindows)
-		if baseDrive != "E:" {
-			winContent = strings.ReplaceAll(winContent, "E:/", baseDrive+"/")
-		}
-		if paths.WadsDir != "" && paths.WadsDir != baseDrive+`/Doom WADS` {
-			normalizedWads := filepath.ToSlash(paths.WadsDir)
-			winContent = strings.ReplaceAll(winContent, baseDrive+"/Doom WADS", normalizedWads)
-		}
-
-		for _, dir := range targetDirs {
-			if dir == "" {
-				continue
-			}
-			_ = os.MkdirAll(dir, 0755)
-			dest := filepath.Join(dir, "options.json")
-			if bkp, _ := BackupFile(dest); bkp != "" {
-				fmt.Printf("Backing up existing options.json -> %s\n", filepath.Base(bkp))
-			}
-			if err := os.WriteFile(dest, []byte(winContent), 0644); err != nil {
-				return err
-			}
-			fmt.Printf("✓ Installed DoomRunner options -> %s\n", dest)
-		}
-	} else {
-		if err := os.MkdirAll(paths.DoomRunnerDir, 0755); err != nil {
-			return err
-		}
-		runnerDest := filepath.Join(paths.DoomRunnerDir, "options.json")
-		if bkp, _ := BackupFile(runnerDest); bkp != "" {
-			fmt.Printf("Backing up existing options.json -> %s\n", filepath.Base(bkp))
-		}
-
-		runnerContent := string(embeddedOptionsLinux)
-		runnerContent = strings.ReplaceAll(runnerContent, "__HOME__/.local/share/games/uzdoom", paths.WadsDir)
-		runnerContent = strings.ReplaceAll(runnerContent, "__HOME__/.config/uzdoom", paths.UZDoomDir)
-		runnerContent = strings.ReplaceAll(runnerContent, "__HOME__/.local/share/dsda-doom", paths.DSDADir)
-		runnerContent = strings.ReplaceAll(runnerContent, "__HOME__", home)
-
-		if err := os.WriteFile(runnerDest, []byte(runnerContent), 0644); err != nil {
-			return err
-		}
-		fmt.Printf("✓ Installed DoomRunner options -> %s\n", runnerDest)
-	}
 
 	return nil
 }

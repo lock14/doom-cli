@@ -14,7 +14,7 @@ import (
 func newConfigCmd() *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",
-		Short: "Manage CLI settings, engine configurations, and DoomRunner options",
+		Short: "Manage CLI settings and engine configurations",
 	}
 
 	configShowCmd := &cobra.Command{
@@ -41,7 +41,7 @@ func newConfigCmd() *cobra.Command {
 	}
 	configInstallCmd := &cobra.Command{
 		Use:   "install",
-		Short: "Deploy autoexec.cfg, dsda-doom.cfg, and options.json with backups",
+		Short: "Deploy autoexec.cfg and dsda-doom.cfg with backups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
 			return templates.DeployConfigs(paths)
