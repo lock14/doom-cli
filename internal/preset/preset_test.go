@@ -255,3 +255,223 @@ func TestDecodeText_And_ReadReadme(t *testing.T) {
 		t.Errorf("expected multiline CP437 %q, got %q", expectedMulti, decodedMulti)
 	}
 }
+
+func TestEffectiveArgsStyle(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      EngineConfig
+		expected string
+	}{
+		{
+			name:     "explicit boom",
+			cfg:      EngineConfig{Name: "custom", ArgsStyle: "boom"},
+			expected: "boom",
+		},
+		{
+			name:     "explicit zdoom",
+			cfg:      EngineConfig{Name: "custom", ArgsStyle: "zdoom"},
+			expected: "zdoom",
+		},
+		{
+			name:     "inferred dsda",
+			cfg:      EngineConfig{Name: "dsda-doom"},
+			expected: "boom",
+		},
+		{
+			name:     "inferred woof",
+			cfg:      EngineConfig{Name: "woof"},
+			expected: "boom",
+		},
+		{
+			name:     "inferred crispy",
+			cfg:      EngineConfig{Name: "crispy-doom"},
+			expected: "boom",
+		},
+		{
+			name:     "inferred chocolate",
+			cfg:      EngineConfig{Name: "chocolate-doom"},
+			expected: "boom",
+		},
+		{
+			name:     "inferred gzdoom",
+			cfg:      EngineConfig{Name: "gzdoom"},
+			expected: "zdoom",
+		},
+		{
+			name:     "inferred by family PrBoom",
+			cfg:      EngineConfig{Name: "myport", Family: "PrBoom"},
+			expected: "boom",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.cfg.EffectiveArgsStyle(); got != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestCatalog_Clone(t *testing.T) {
+	cat, err := LoadCatalog("")
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	cloned := cat.Clone()
+	if cloned == nil {
+		t.Fatal("expected non-nil clone")
+	}
+	if len(cloned.Presets) != len(cat.Presets) {
+		t.Fatalf("expected %d presets, got %d", len(cat.Presets), len(cloned.Presets))
+	}
+
+	// Modifying clone does not mutate original
+	cloned.Presets[0].Name = "Mutated Name"
+	if cat.Presets[0].Name == "Mutated Name" {
+		t.Error("clone mutation leaked into original catalog")
+	}
+}
+
+func TestCatalog_MergeAndLayer(t *testing.T) {
+	base, err := LoadCatalog("")
+	if err != nil {
+		t.Fatalf("LoadCatalog failed: %v", err)
+	}
+
+	cat := base.Clone()
+
+	// 1. Merge custom engine
+	customEngines := map[string]EngineConfig{
+		"woof": {
+			Name:        "woof",
+			Binary:      "/usr/local/bin/woof",
+			ArgsStyle:   "boom",
+			Description: "Woof MBF21 port",
+		},
+	}
+	cat.MergeEngines(customEngines)
+	if _, ok := cat.Engines["woof"]; !ok {
+		t.Error("expected woof engine to be merged")
+	}
+
+	// 2. Merge custom preset
+	customPresets := []Preset{
+		{
+			Name:        "KDiZD",
+			Engine:      "uzdoom",
+			IWAD:        "DOOM.WAD",
+			Mappacks:    []string{"kdizd_12.pk3"},
+			Description: "Knee-Deep in ZDoom",
+		},
+	}
+	cat.MergePresets(customPresets)
+	p := cat.Find("KDiZD")
+	if p == nil {
+		t.Fatal("expected KDiZD preset to be found")
+	}
+	if !p.Custom {
+		t.Error("expected custom flag to be true for added preset")
+	}
+
+	// 3. Apply launch options overrides to existing preset
+	launchOptions := map[string]WadLaunchOptions{
+		"Alien Vendetta": {
+			Engine:         "woof",
+			AdditionalArgs: "-skill 4",
+			ExtraFiles:     []string{"av_custom_music.wad"},
+		},
+	}
+	cat.ApplyLaunchOptions(launchOptions)
+
+	av := cat.Find("Alien Vendetta")
+	if av == nil {
+		t.Fatal("expected Alien Vendetta to be found")
+	}
+	if av.Engine != "woof" {
+		t.Errorf("expected engine to be overridden to woof, got %s", av.Engine)
+	}
+	if !strings.Contains(av.AdditionalArgs, "-skill 4") {
+		t.Errorf("expected AdditionalArgs to contain '-skill 4', got %s", av.AdditionalArgs)
+	}
+	foundMusic := false
+	for _, m := range av.Mappacks {
+		if m == "av_custom_music.wad" {
+			foundMusic = true
+			break
+		}
+	}
+	if !foundMusic {
+		t.Error("expected av_custom_music.wad to be appended to mappacks")
+	}
+}
+
+func TestLoadLayeredCatalog(t *testing.T) {
+	tmpDir := t.TempDir()
+	userPresetsFile := filepath.Join(tmpDir, "user_presets.json")
+
+	userJSON := `{
+		"engines": {
+			"crispy-doom": {
+				"name": "crispy-doom",
+				"args_style": "boom"
+			}
+		},
+		"presets": [
+			{
+				"name": "DropInWad",
+				"engine": "crispy-doom",
+				"iwad": "DOOM2.WAD",
+				"mappacks": ["dropin.wad"]
+			}
+		]
+	}`
+	if err := os.WriteFile(userPresetsFile, []byte(userJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	customEngines := map[string]EngineConfig{
+		"woof": {
+			Name:      "woof",
+			ArgsStyle: "boom",
+		},
+	}
+	customPresets := []Preset{
+		{
+			Name:     "ConfigWad",
+			Engine:   "woof",
+			IWAD:     "DOOM2.WAD",
+			Mappacks: []string{"cfg.wad"},
+		},
+	}
+	launchOptions := map[string]WadLaunchOptions{
+		"Sunlust": {
+			AdditionalArgs: "-skill 4",
+		},
+	}
+
+	cat, err := LoadLayeredCatalog("", userPresetsFile, customEngines, customPresets, launchOptions)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog failed: %v", err)
+	}
+
+	// Curated defaults preserved (32 base + 1 dropin + 1 config = 34 total)
+	if len(cat.Presets) != 34 {
+		t.Errorf("expected 34 presets, got %d", len(cat.Presets))
+	}
+
+	// Verify engines present
+	if _, ok := cat.Engines["crispy-doom"]; !ok {
+		t.Error("expected crispy-doom engine in catalog")
+	}
+	if _, ok := cat.Engines["woof"]; !ok {
+		t.Error("expected woof engine in catalog")
+	}
+
+	// Verify launch options applied
+	sl := cat.Find("Sunlust")
+	if sl == nil || sl.AdditionalArgs != "-skill 4" {
+		t.Errorf("expected Sunlust AdditionalArgs to be '-skill 4', got %v", sl)
+	}
+}

@@ -18,6 +18,7 @@ type Paths struct {
 	DataDir       string
 	ConfigDir     string
 	ConfigFile    string
+	PresetsFile   string
 	ThemesDir     string
 	SoundFontFile string
 }
@@ -89,11 +90,13 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 	}
 
 	p.ConfigFile = filepath.Join(p.ConfigDir, "config.json")
+	p.PresetsFile = filepath.Join(p.ConfigDir, "presets.json")
 	p.ThemesDir = filepath.Join(p.ConfigDir, "themes")
 
 	if envConfig := os.Getenv("DOOM_CONFIG_DIR"); envConfig != "" {
 		p.ConfigDir = envConfig
 		p.ConfigFile = filepath.Join(p.ConfigDir, "config.json")
+		p.PresetsFile = filepath.Join(p.ConfigDir, "presets.json")
 		p.ThemesDir = filepath.Join(p.ConfigDir, "themes")
 	}
 

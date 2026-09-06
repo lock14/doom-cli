@@ -25,6 +25,9 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom setup`: Full automated turnkey setup in a single step.
 - `doom play`: Interactive TUI preset launcher powered by Bubble Tea.
 - `doom launch <preset>`: Direct preset execution with optional engine overrides and game flags.
+- `doom engines list`: Lists all configured engines (built-in and custom) and checks binary paths.
+- `doom engines add <name>`: Registers a custom source port engine with custom binary path and argument style.
+- `doom engines remove <name>`: Removes a custom engine from user configuration.
 - `doom engines install`: Downloads portable engine binaries (`uzdoom`, `dsda-doom`).
 - `doom soundfont install`: Downloads and installs curated Roland SC-55 SoundFont.
 - `doom wads extract`: Auto-discovers and imports official Steam and GOG commercial IWADs.
@@ -33,7 +36,11 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom config install`: Deploys engine configuration files with native display auto-detection.
 - `doom config diff`: Shows differences between repository templates and live installed configs.
 - `doom config sync`: Pulls in-game tweaks back from the host system into repository templates.
-- `doom presets list`: Lists all 32 curated presets and mapped source ports.
+- `doom presets list`: Lists all presets (built-in and custom) and engine assignments.
+- `doom presets show <name>`: Displays resolved launch configuration and file availability for a preset.
+- `doom presets add <name>`: Adds a custom WAD or preset to your personal library.
+- `doom presets config <name>`: Configures per-WAD launch options (preferred engine, launch flags, custom IWAD).
+- `doom presets remove <name>`: Removes a custom preset or resets overrides for a built-in preset.
 - `doom presets build`: Synchronizes preset catalog table into README.md.
 
 ## Architecture & Packages

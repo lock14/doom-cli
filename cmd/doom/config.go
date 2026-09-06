@@ -92,6 +92,44 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Config File: %s\n", paths.ConfigFile)
 	fmt.Printf("  Theme:       %s\n", theme)
 	fmt.Printf("  Nerd Fonts:  %s\n", nerdStatus)
+
+	if len(cfg.Engines) > 0 {
+		fmt.Printf("\nCustom Engines (%d):\n", len(cfg.Engines))
+		for name, eng := range cfg.Engines {
+			binTarget := eng.Binary
+			if binTarget == "" {
+				binTarget = name
+			}
+			fmt.Printf("  • %-12s [%-5s] (binary: %s)\n", name, eng.EffectiveArgsStyle(), binTarget)
+		}
+	}
+
+	if len(cfg.Presets) > 0 {
+		fmt.Printf("\nCustom Presets (%d):\n", len(cfg.Presets))
+		for _, p := range cfg.Presets {
+			fmt.Printf("  • %-20s [%s] (IWAD: %s)\n", p.Name, p.Engine, p.IWAD)
+		}
+	}
+
+	if len(cfg.LaunchOptions) > 0 {
+		fmt.Printf("\nLaunch Options Overrides (%d):\n", len(cfg.LaunchOptions))
+		for name, opt := range cfg.LaunchOptions {
+			var details []string
+			if opt.Engine != "" {
+				details = append(details, "engine: "+opt.Engine)
+			}
+			if opt.IWAD != "" {
+				details = append(details, "iwad: "+opt.IWAD)
+			}
+			if opt.AdditionalArgs != "" {
+				details = append(details, "args: "+opt.AdditionalArgs)
+			}
+			if len(opt.ExtraFiles) > 0 {
+				details = append(details, fmt.Sprintf("extra files: %d", len(opt.ExtraFiles)))
+			}
+			fmt.Printf("  • %-20s (%s)\n", name, strings.Join(details, ", "))
+		}
+	}
 	return nil
 }
 

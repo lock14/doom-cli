@@ -344,10 +344,7 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 	var listLines []string
 	for i := startIdx; i < endIdx; i++ {
 		p := m.filtered[i]
-		tag := m.styles.TagUZDoom.Render("[UZDoom]")
-		if p.Engine == "dsda-doom" {
-			tag = m.styles.TagDSDA.Render("[DSDA]") + "  "
-		}
+		tag := formatEngineTag(p.Engine, m.styles)
 
 		name := p.Name
 		runes := []rune(name)
@@ -366,6 +363,23 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 	return listLines
 }
 
+func formatEngineTag(engine string, styles ThemeStyles) string {
+	switch strings.ToLower(engine) {
+	case "dsda-doom", "dsda":
+		return styles.TagDSDA.Render("[DSDA]") + "  "
+	case "uzdoom", "zdoom":
+		return styles.TagUZDoom.Render("[UZDoom]")
+	default:
+		tagText := strings.ToUpper(engine)
+		runes := []rune(tagText)
+		if len(runes) > 6 {
+			tagText = string(runes[:6])
+		}
+		formatted := fmt.Sprintf("[%-6s]", tagText)
+		return styles.TagUZDoom.Render(formatted)
+	}
+}
+
 func (m model) renderPreviewLines() ([]string, bool) {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
 		return []string{m.styles.Help.Render("No preset details available.")}, false
@@ -378,6 +392,11 @@ func (m model) renderPreviewLines() ([]string, bool) {
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s", m.styles.Label.Render("Preset:        "), m.styles.ValueBold.Render(cur.Name)),
 	)
+	if cur.Custom {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Type:          "), m.styles.TagUZDoom.Render("[Custom WAD]")),
+		)
+	}
 	if cur.Author != "" {
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Author:        "), cur.Author),
@@ -388,13 +407,25 @@ func (m model) renderPreviewLines() ([]string, bool) {
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Released:      "), cur.ReleaseDate),
 		)
 	}
-	engStr := "UZDoom (Software-Plus / Advanced)"
-	if cur.Engine == "dsda-doom" {
+	engStr := cur.Engine
+	if m.catalog != nil && m.catalog.Engines != nil {
+		if engCfg, ok := m.catalog.Engines[cur.Engine]; ok && engCfg.Description != "" {
+			engStr = engCfg.Description
+		}
+	}
+	if engStr == "uzdoom" {
+		engStr = "UZDoom (Software-Plus / Advanced)"
+	} else if engStr == "dsda-doom" {
 		engStr = "DSDA-Doom (MBF21 / Speedrun)"
 	}
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s", m.styles.Label.Render("Engine:        "), engStr),
 	)
+	if cur.AdditionalArgs != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), cur.AdditionalArgs),
+		)
+	}
 	if cur.Category != "" {
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Category:      "), cur.Category),

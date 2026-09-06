@@ -21,6 +21,7 @@ type LaunchOptions struct {
 	DryRun         bool
 	ExtraArgs      []string
 	Out            io.Writer
+	Engines        map[string]preset.EngineConfig
 }
 
 // LaunchPlan contains the resolved engine binary and constructed arguments ready for execution.
@@ -43,18 +44,32 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 
 	engine := p.Engine
 	if opts.EngineOverride != "" {
-		switch strings.ToLower(opts.EngineOverride) {
-		case "dsda", "dsda-doom", "dsdadoom":
-			engine = "dsda-doom"
-		case "uzdoom", "gzdoom", "zdoom":
-			engine = "uzdoom"
-		default:
-			engine = opts.EngineOverride
+		override := strings.TrimSpace(opts.EngineOverride)
+		if _, exists := opts.Engines[override]; !exists {
+			switch strings.ToLower(override) {
+			case "dsda", "dsda-doom", "dsdadoom":
+				override = "dsda-doom"
+			case "uzdoom", "zdoom":
+				override = "uzdoom"
+			}
 		}
+		engine = override
+	}
+
+	// Resolve engine configuration
+	var engCfg preset.EngineConfig
+	if cfg, ok := opts.Engines[engine]; ok {
+		engCfg = cfg
+	} else {
+		engCfg = preset.EngineConfig{Name: engine}
 	}
 
 	// Resolve engine binary
-	engineBin, err := resolveEngineBinary(engine, opts.BinDir)
+	binTarget := engCfg.Binary
+	if strings.TrimSpace(binTarget) == "" {
+		binTarget = engine
+	}
+	engineBin, err := resolveEngineBinary(binTarget, opts.BinDir)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +134,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	var args []string
 	args = append(args, "-iwad", iwadPath)
 
-	if engine == "dsda-doom" {
+	if engCfg.EffectiveArgsStyle() == "boom" {
 		if len(wads) > 0 {
 			args = append(args, "-file")
 			args = append(args, wads...)
@@ -129,11 +144,16 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 			args = append(args, dehs...)
 		}
 	} else {
-		// UZDoom accepts all files under -file while maintaining declared order
+		// ZDoom style accepts all files under -file while maintaining declared order
 		if len(orderedFiles) > 0 {
 			args = append(args, "-file")
 			args = append(args, orderedFiles...)
 		}
+	}
+
+	// Engine default args
+	if len(engCfg.DefaultArgs) > 0 {
+		args = append(args, engCfg.DefaultArgs...)
 	}
 
 	// Preset additional args
@@ -189,6 +209,19 @@ func Execute(plan *LaunchPlan, out, errOut io.Writer) error {
 }
 
 func resolveEngineBinary(engine, binDir string) (string, error) {
+	// If engine is an explicit path (contains separator or is absolute)
+	if filepath.IsAbs(engine) || strings.ContainsRune(engine, filepath.Separator) || strings.ContainsRune(engine, '/') {
+		if fi, err := os.Stat(engine); err == nil && !fi.IsDir() {
+			return engine, nil
+		}
+		if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(engine), ".exe") {
+			if fi, err := os.Stat(engine + ".exe"); err == nil && !fi.IsDir() {
+				return engine + ".exe", nil
+			}
+		}
+		return "", fmt.Errorf("engine binary '%s' not found", engine)
+	}
+
 	candidates := []string{
 		filepath.Join(binDir, engine),
 	}

@@ -24,6 +24,7 @@
 *   **Doom Engine Selection & Preset Hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics, and speedrunning precision are desired (e.g. *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*, *Legacy of Rust*, *Sigil*).
     *   **UZDoom**: Use for mapsets requiring ZDoom/GZDoom features, advanced scripting, high-res texture packs like OTEX (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
+    *   **User Extensibility & Layered Catalogs**: Users can register custom engines (`doom engines add`), custom WAD presets (`doom presets add`), or override launch options (`doom presets config`). Built-in presets in `data/presets.json` serve as the immutable curated defaults. User configurations layer cleanly without mutating repo defaults.
     *   **No Duplicate IWADs**: Never include the base game IWAD (`DOOM.WAD`, `DOOM2.WAD`, etc.) inside `mappacks`. The IWAD must only be specified in `iwad`.
     *   **Load Ordering**: Ensure DeHackEd patches (`.deh`) and resource files are ordered correctly relative to map PWADs and music wads (`idkfa 2024.wad`).
     *   **Optional Asset Degradation**: Optional soundtrack enhancements like `idkfa 2024.wad` must not prevent base games from running when absent (falling back cleanly to standard MIDI). Missing required map files must cleanly abort execution with a descriptive error before engine invocation.

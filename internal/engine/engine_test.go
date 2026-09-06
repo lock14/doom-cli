@@ -175,3 +175,68 @@ func TestPrepareLaunch_EngineOverride(t *testing.T) {
 		t.Errorf("expected overridden engine dsda-doom, got %s", plan.Engine)
 	}
 }
+
+func TestPrepareLaunch_CustomEngineAndArgs(t *testing.T) {
+	tmpDir := t.TempDir()
+	binDir := filepath.Join(tmpDir, "bin")
+	customBinDir := filepath.Join(tmpDir, "custom_bin")
+	wadsDir := filepath.Join(tmpDir, "wads")
+	_ = os.MkdirAll(binDir, 0755)
+	_ = os.MkdirAll(customBinDir, 0755)
+	_ = os.MkdirAll(wadsDir, 0755)
+
+	customBinPath := filepath.Join(customBinDir, "woof")
+	_ = os.WriteFile(customBinPath, []byte("#!/bin/sh\n"), 0755)
+
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "sunlust.wad"), []byte("wad"), 0644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "sunlust.deh"), []byte("deh"), 0644)
+
+	customEngines := map[string]preset.EngineConfig{
+		"woof": {
+			Name:        "woof",
+			Binary:      customBinPath,
+			ArgsStyle:   "boom",
+			DefaultArgs: []string{"-geometry", "1920x1080"},
+		},
+	}
+
+	p := preset.Preset{
+		Name:           "Sunlust",
+		Engine:         "woof",
+		IWAD:           "DOOM2.WAD",
+		Mappacks:       []string{"sunlust.wad", "sunlust.deh"},
+		AdditionalArgs: "-skill 4",
+	}
+
+	opts := LaunchOptions{
+		BinDir:    binDir,
+		WadsDir:   wadsDir,
+		Engines:   customEngines,
+		DryRun:    true,
+		ExtraArgs: []string{"-warp", "15"},
+	}
+
+	plan, err := PrepareLaunch(p, opts)
+	if err != nil {
+		t.Fatalf("PrepareLaunch failed: %v", err)
+	}
+
+	if plan.EngineBin != customBinPath {
+		t.Errorf("expected engine binary %s, got %s", customBinPath, plan.EngineBin)
+	}
+
+	joined := strings.Join(plan.Args, " ")
+	expectedTokens := []string{
+		"-file " + filepath.Join(wadsDir, "sunlust.wad"),
+		"-deh " + filepath.Join(wadsDir, "sunlust.deh"),
+		"-geometry 1920x1080",
+		"-skill 4",
+		"-warp 15",
+	}
+	for _, tok := range expectedTokens {
+		if !strings.Contains(joined, tok) {
+			t.Errorf("expected args to contain %q, got: %s", tok, joined)
+		}
+	}
+}
