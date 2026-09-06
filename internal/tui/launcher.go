@@ -33,92 +33,7 @@ const (
 	minBoxHeight = 3
 )
 
-var (
-	// Brand Capsule (Powerlevel10k rounded pill with matched background)
-	brandCapStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("1"))
-	brandBodyStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("1")).
-			Foreground(lipgloss.Color("7")).
-			Bold(true)
-
-	// Stats Capsule (Powerlevel10k rounded pill with matched background)
-	statsCapStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8"))
-	statsBodyStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("8")).
-			Foreground(lipgloss.Color("7")).
-			Bold(true)
-
-	// Filter Prompt
-	filterPromptStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("6")).
-				Bold(true)
-
-	// Panel Boxes: Active (Cyan) vs Inactive (Gray)
-	panelBoxFocusedStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("6")).
-				Padding(0, 1)
-
-	panelBoxInactiveStyle = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("8")).
-				Padding(0, 1)
-
-	// Border Embedded Titles
-	borderTitleFocusedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("6")).
-				Bold(true)
-
-	borderTitleInactiveStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("8")).
-					Bold(true)
-
-	// Cursor & Selection Bar
-	cursorBarStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("6")).
-			Bold(true)
-
-	cursorTextStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("6")).
-			Bold(true)
-
-	tagDSDAStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("3"))
-
-	tagUZDoomStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("2"))
-
-	labelStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("6"))
-
-	valueBoldStyle = lipgloss.NewStyle().
-			Bold(true)
-
-	foundStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("2"))
-
-	missingStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("1"))
-
-	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8"))
-
-	// Two-Tone Keybinding Footer
-	keyHelpKeyStyle = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("6"))
-
-	keyHelpDescStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("8"))
-
-	bulletStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8"))
-)
+var defaultStyles = CompileStyles(DefaultTheme)
 
 // calculateSearchWidth returns the clamped width for the preset search input.
 func calculateSearchWidth(termWidth int) int {
@@ -156,15 +71,18 @@ func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vp
 }
 
 type model struct {
-	catalog  *preset.Catalog
-	wadsDir  string
-	input    textinput.Model
-	filtered []preset.Preset
-	cursor   int
-	selected *preset.Preset
-	width    int
-	height   int
-	quitting bool
+	theme     Theme
+	styles    ThemeStyles
+	nerdFonts bool
+	catalog   *preset.Catalog
+	wadsDir   string
+	input     textinput.Model
+	filtered  []preset.Preset
+	cursor    int
+	selected  *preset.Preset
+	width     int
+	height    int
+	quitting  bool
 
 	// Readme viewer state
 	viewingReadme bool
@@ -172,7 +90,18 @@ type model struct {
 	viewport      viewport.Model
 }
 
-func initialModel(catalog *preset.Catalog, wadsDir string, initialPreset ...string) model {
+func initialModel(
+	catalog *preset.Catalog,
+	wadsDir string,
+	theme Theme,
+	nerdFonts bool,
+	initialPreset ...string,
+) model {
+	if theme.Name == "" {
+		theme = DefaultTheme
+	}
+	styles := CompileStyles(theme)
+
 	w, h, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || w <= 0 || h <= 0 {
 		w = 100
@@ -182,7 +111,7 @@ func initialModel(catalog *preset.Catalog, wadsDir string, initialPreset ...stri
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.Placeholder = "Type to search presets..."
-	ti.PlaceholderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	ti.PlaceholderStyle = styles.Placeholder
 	ti.Focus()
 	ti.CharLimit = 100
 	ti.Width = calculateSearchWidth(w)
@@ -198,13 +127,16 @@ func initialModel(catalog *preset.Catalog, wadsDir string, initialPreset ...stri
 	}
 
 	return model{
-		catalog:  catalog,
-		wadsDir:  wadsDir,
-		input:    ti,
-		filtered: catalog.Presets,
-		cursor:   cursor,
-		width:    w,
-		height:   h,
+		theme:     theme,
+		styles:    styles,
+		nerdFonts: nerdFonts,
+		catalog:   catalog,
+		wadsDir:   wadsDir,
+		input:     ti,
+		filtered:  catalog.Presets,
+		cursor:    cursor,
+		width:     w,
+		height:    h,
 	}
 }
 
@@ -412,9 +344,9 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 	var listLines []string
 	for i := startIdx; i < endIdx; i++ {
 		p := m.filtered[i]
-		tag := tagUZDoomStyle.Render("[UZDoom]")
+		tag := m.styles.TagUZDoom.Render("[UZDoom]")
 		if p.Engine == "dsda-doom" {
-			tag = tagDSDAStyle.Render("[DSDA]") + "  "
+			tag = m.styles.TagDSDA.Render("[DSDA]") + "  "
 		}
 
 		name := p.Name
@@ -425,7 +357,8 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 		paddedName := fmt.Sprintf("%-30s", name)
 
 		if i == m.cursor {
-			listLines = append(listLines, cursorBarStyle.Render("▎ ")+cursorTextStyle.Render(paddedName)+" "+tag)
+			selected := m.styles.CursorBar.Render("▎ ") + m.styles.CursorText.Render(paddedName) + " " + tag
+			listLines = append(listLines, selected)
 		} else {
 			listLines = append(listLines, "  "+paddedName+" "+tag)
 		}
@@ -435,7 +368,7 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 
 func (m model) renderPreviewLines() ([]string, bool) {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
-		return []string{helpStyle.Render("No preset details available.")}, false
+		return []string{m.styles.Help.Render("No preset details available.")}, false
 	}
 
 	cur := m.filtered[m.cursor]
@@ -443,16 +376,16 @@ func (m model) renderPreviewLines() ([]string, bool) {
 
 	var previewLines []string
 	previewLines = append(previewLines,
-		fmt.Sprintf("%s%s", labelStyle.Render("Preset:        "), valueBoldStyle.Render(cur.Name)),
+		fmt.Sprintf("%s%s", m.styles.Label.Render("Preset:        "), m.styles.ValueBold.Render(cur.Name)),
 	)
 	if cur.Author != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Author:        "), cur.Author),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Author:        "), cur.Author),
 		)
 	}
 	if cur.ReleaseDate != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Released:      "), cur.ReleaseDate),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Released:      "), cur.ReleaseDate),
 		)
 	}
 	engStr := "UZDoom (Software-Plus / Advanced)"
@@ -460,47 +393,47 @@ func (m model) renderPreviewLines() ([]string, bool) {
 		engStr = "DSDA-Doom (MBF21 / Speedrun)"
 	}
 	previewLines = append(previewLines,
-		fmt.Sprintf("%s%s", labelStyle.Render("Engine:        "), engStr),
+		fmt.Sprintf("%s%s", m.styles.Label.Render("Engine:        "), engStr),
 	)
 	if cur.Category != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Category:      "), cur.Category),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Category:      "), cur.Category),
 		)
 	}
 	if cur.Compatibility != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Compatibility: "), cur.Compatibility),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Compatibility: "), cur.Compatibility),
 		)
 	}
 	if cur.Description != "" {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", labelStyle.Render("Description:   "), cur.Description),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Description:   "), cur.Description),
 		)
 	}
 
 	// Check IWAD
-	iwadStatus := missingStyle.Render("[✗ Missing]")
+	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")
 	if _, ok := preset.ResolveFile(m.wadsDir, cur.IWAD); ok {
-		iwadStatus = foundStyle.Render("[✓ Found]")
+		iwadStatus = m.styles.StatusReady.Render("[✓ Found]")
 	}
 	previewLines = append(previewLines,
-		fmt.Sprintf("%s%s %s", labelStyle.Render("IWAD:          "), cur.IWAD, iwadStatus),
+		fmt.Sprintf("%s%s %s", m.styles.Label.Render("IWAD:          "), cur.IWAD, iwadStatus),
 	)
 
 	if len(cur.Mappacks) > 0 || hasReadme {
-		previewLines = append(previewLines, labelStyle.Render("Files:"))
+		previewLines = append(previewLines, m.styles.Label.Render("Files:"))
 		for _, mapfile := range cur.Mappacks {
-			fStatus := missingStyle.Render("[✗ Missing]")
+			fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
 			if _, ok := preset.ResolveFile(m.wadsDir, mapfile); ok {
-				fStatus = foundStyle.Render("[✓ Found]")
+				fStatus = m.styles.StatusReady.Render("[✓ Found]")
 			} else if strings.EqualFold(mapfile, "idkfa 2024.wad") {
-				fStatus = helpStyle.Render("[Optional]")
+				fStatus = m.styles.Help.Render("[Optional]")
 			}
 			previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))
 		}
 		if hasReadme {
 			previewLines = append(previewLines,
-				fmt.Sprintf("  - %-22s %s", filepath.Base(readmePath), tagUZDoomStyle.Render("[✓ Readme]")),
+				fmt.Sprintf("  - %-22s %s", filepath.Base(readmePath), m.styles.TagUZDoom.Render("[✓ Readme]")),
 			)
 		}
 	}
@@ -508,19 +441,24 @@ func (m model) renderPreviewLines() ([]string, bool) {
 	return previewLines, hasReadme
 }
 
-func renderBoxWithTitle(content string, width int, title string, focused bool) string {
+func renderBoxWithTitle(content string, width int, title string, focused bool, styles ...ThemeStyles) string {
+	s := defaultStyles
+	if len(styles) > 0 {
+		s = styles[0]
+	}
+
 	var boxStyle lipgloss.Style
 	var borderFg lipgloss.Style
 	var titleStyle lipgloss.Style
 
 	if focused {
-		boxStyle = panelBoxFocusedStyle
-		borderFg = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-		titleStyle = borderTitleFocusedStyle
+		boxStyle = s.BoxActive
+		borderFg = s.BorderFgActive
+		titleStyle = s.TitleActive
 	} else {
-		boxStyle = panelBoxInactiveStyle
-		borderFg = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-		titleStyle = borderTitleInactiveStyle
+		boxStyle = s.BoxInactive
+		borderFg = s.BorderFgInactive
+		titleStyle = s.TitleInactive
 	}
 
 	rendered := boxStyle.Width(width).Render(content)
@@ -565,22 +503,15 @@ func renderCapsule(capStyle, bodyStyle lipgloss.Style, text string) string {
 }
 
 func renderBrandPill() string {
-	return renderCapsule(brandCapStyle, brandBodyStyle, " 💀 DOOM ")
+	return defaultStyles.RenderBrandPill(false)
 }
 
 func renderStatsPill(count, total int) string {
-	return renderCapsule(statsCapStyle, statsBodyStyle, fmt.Sprintf(" %d / %d presets ", count, total))
+	return defaultStyles.RenderStatsPill(count, total, false)
 }
 
 func renderScrollPill(percent float64) string {
-	pct := int(percent * 100)
-	pctText := fmt.Sprintf(" %d%% ", pct)
-	if pct <= 0 {
-		pctText = " Top "
-	} else if pct >= 100 {
-		pctText = " End "
-	}
-	return renderCapsule(statsCapStyle, statsBodyStyle, pctText)
+	return defaultStyles.RenderScrollPill(percent, false)
 }
 
 func renderHeaderBar(leftPart, rightPart string, width int) string {
@@ -595,8 +526,8 @@ func renderHeaderBar(leftPart, rightPart string, width int) string {
 }
 
 func (m model) renderHeader() string {
-	leftPart := renderBrandPill() + filterPromptStyle.Render("   Filter: ") + m.input.View()
-	rightPart := renderStatsPill(len(m.filtered), len(m.catalog.Presets))
+	leftPart := m.styles.RenderBrandPill(m.nerdFonts) + m.styles.FilterPrompt.Render("  Filter: ") + m.input.View()
+	rightPart := m.styles.RenderStatsPill(len(m.filtered), len(m.catalog.Presets), m.nerdFonts)
 	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
@@ -607,29 +538,29 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 	if geom.sideBySide {
 		leftText := formatBoxContent(listLines, geom.leftWidth-2, geom.interiorHeight)
 		rightText := formatBoxContent(previewLines, geom.rightWidth-2, geom.interiorHeight)
-		leftBox := renderBoxWithTitle(leftText, geom.leftWidth, leftTitle, true)
-		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, true)
+		leftBox := renderBoxWithTitle(leftText, geom.leftWidth, leftTitle, true, m.styles)
+		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, true, m.styles)
 		gutterStr := strings.Repeat(" ", geom.gutter)
 		return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
 	}
 
 	leftText := formatBoxContent(listLines, geom.boxWidth-2, geom.listHeight-2)
 	rightText := formatBoxContent(previewLines, geom.boxWidth-2, geom.detailsHeight-2)
-	leftBox := renderBoxWithTitle(leftText, geom.boxWidth, leftTitle, true)
-	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, true)
+	leftBox := renderBoxWithTitle(leftText, geom.boxWidth, leftTitle, true, m.styles)
+	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, true, m.styles)
 	return leftBox + "\n" + rightBox
 }
 
 func (m model) renderReadmeHeader() string {
-	leftPart := renderBrandPill() + filterPromptStyle.Render("   README Viewer")
-	rightPart := renderScrollPill(m.viewport.ScrollPercent())
+	leftPart := m.styles.RenderBrandPill(m.nerdFonts) + m.styles.FilterPrompt.Render("  README Viewer")
+	rightPart := m.styles.RenderScrollPill(m.viewport.ScrollPercent(), m.nerdFonts)
 	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
 func (m model) renderReadmeView() string {
 	boxWidth, _, _ := calculateReadmeDimensions(m.width, m.height)
 	header := m.renderReadmeHeader()
-	box := renderBoxWithTitle(m.viewport.View(), boxWidth, m.readmeTitle, true)
+	box := renderBoxWithTitle(m.viewport.View(), boxWidth, m.readmeTitle, true, m.styles)
 	footer := m.renderReadmeFooter()
 	return "\n" + header + box + footer + "\n"
 }
@@ -640,16 +571,11 @@ type keyHelp struct {
 }
 
 func formatKeyHelp(items []keyHelp) string {
-	var parts []string
-	for _, item := range items {
-		parts = append(parts, keyHelpKeyStyle.Render(item.key)+" "+keyHelpDescStyle.Render(item.desc))
-	}
-	sep := bulletStyle.Render("  •  ")
-	return "\n\n" + strings.Join(parts, sep)
+	return defaultStyles.FormatKeyHelp(items)
 }
 
 func (m model) renderReadmeFooter() string {
-	return formatKeyHelp([]keyHelp{
+	return m.styles.FormatKeyHelp([]keyHelp{
 		{"↑/↓/PgUp/PgDn", "Scroll"},
 		{"Enter", "Launch"},
 		{"Tab/Esc/q", "Back"},
@@ -665,7 +591,7 @@ func (m model) renderFooter(hasReadme bool) string {
 		items = append(items, keyHelp{"Tab", "Readme"})
 	}
 	items = append(items, keyHelp{"Esc", "Quit"})
-	return formatKeyHelp(items)
+	return m.styles.FormatKeyHelp(items)
 }
 
 func (m model) View() string {
@@ -692,13 +618,19 @@ func (m model) View() string {
 
 // RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
 // If initialPreset is provided, the launcher pre-selects that preset.
-func RunInteractiveLauncher(catalog *preset.Catalog, wadsDir string, initialPreset ...string) (*preset.Preset, error) {
+func RunInteractiveLauncher(
+	catalog *preset.Catalog,
+	wadsDir string,
+	theme Theme,
+	nerdFonts bool,
+	initialPreset ...string,
+) (*preset.Preset, error) {
 	// If not running in a terminal, fallback to numbered menu
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
-	m := initialModel(catalog, wadsDir, initialPreset...)
+	m := initialModel(catalog, wadsDir, theme, nerdFonts, initialPreset...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

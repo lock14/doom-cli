@@ -18,6 +18,7 @@
         *   **Binaries**: `~/.local/bin/` (Linux/macOS) / `%LOCALAPPDATA%\Programs\Doom\bin\` (Windows)
         *   **WADs Directory**: `~/.local/share/games/uzdoom/` (Linux) / `~/Library/Application Support/games/uzdoom/` (macOS) / `<Drive>:\Doom WADS\` (Windows)
         *   **SoundFonts**: `~/.local/share/soundfonts/` (Linux) / `~/Library/Application Support/soundfonts/` (macOS) / `%LOCALAPPDATA%\soundfonts\` (Windows)
+        *   **CLI Config & Themes**: `~/.config/doom-cli/` (Linux) / `~/Library/Application Support/doom-cli/` (macOS) / `%LOCALAPPDATA%\doom-cli\` (Windows)
 *   **Destructive Safety & Backup Policy**:
     *   **Mandatory Non-Destructive Backups**: Any configuration deployment target or command (`doom config install`, `doom setup`) must create timestamped backups (`.bak.<timestamp>`) before overwriting or modifying any existing user configuration file.
     *   **Preserve Unrelated Configuration**: When adding new engine variables, aliases, or keybindings, avoid modifying or removing unrelated settings unless explicitly requested.
@@ -29,19 +30,22 @@
     *   **Optional Asset Degradation**: Optional soundtrack enhancements like `idkfa 2024.wad` must not prevent base games from running when absent (falling back cleanly to standard MIDI). Missing required map files must cleanly abort execution with a descriptive error before engine invocation.
     *   **Filename Normalization & Alias Tolerance**: Case-insensitive and whitespace/dash/underscore-normalized matching ensures maps and DeHackEd patches resolve reliably regardless of user file naming. Rerelease add-on aliases (`gdturbo.wad` -> `gd.wad`, `doomzero.wad`/`DOOMZERO.DEH`) must be discovered by `doom wads extract`.
     *   **Visual Aesthetic & Frame Pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`, and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0` with `render_vsync 1` and `uncapped_framerate 1` so high-refresh monitors pace frames smoothly to native monitor refresh rates.
+*   **TUI Styling & Font Glyph Hygiene**:
+    *   **Clean Typography Over Emojis**: Emojis (e.g. `💀`) render with fixed vendor bitmaps/colors regardless of ANSI foreground escapes. They clash with light backgrounds (such as monochrome white pills). Use clean typography (`DOOM`) instead of emojis for branded badges.
+    *   **Universal Fallback by Default**: Avoid Unicode Private Use Area (PUA) glyphs (such as ``, ``, ``, ``) in standard rendering. Default to universal rectangular badges and plain text prompts (`Filter: `, `README Viewer`) that render flawlessly in 100% of standard system fonts. Keep Powerlevel10k rounded capsule ends opt-in via `--nerd-fonts` / `nerd_fonts: true`.
 
 # Package Structure & Architecture Conventions
 
 The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary on Linux, macOS, and Windows:
 
-*   `cmd/doom/`: Cobra CLI commands (`setup`, `play`, `launch`, `wads`, `engines`, `soundfont`, `config`, `presets`).
-*   `internal/config/`: Platform path resolvers adhering strictly to XDG (Linux), Library (macOS), and AppData (Windows).
+*   `cmd/doom/`: Cobra CLI commands (`setup`, `play`, `launch`, `wads`, `engines`, `soundfont`, `config`, `presets`, `themes`).
+*   `internal/config/`: Platform path resolvers adhering strictly to XDG (Linux), Library (macOS), and AppData (Windows), plus user config persistence (`config.json`).
 *   `internal/display/`: Native display resolution and refresh rate detection.
 *   `internal/engine/`: Source port asset downloading and argument synthesis/execution.
 *   `internal/preset/`: Embedded presets catalog loader and options.json/README compiler.
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
 *   `internal/templates/`: Embedded engine configuration templates and backup deployer.
-*   `internal/tui/`: Interactive Bubble Tea fuzzy launcher and preview pane.
+*   `internal/tui/`: Interactive Bubble Tea fuzzy launcher, preview pane, and customizable themes engine.
 *   `internal/wad/`: Multi-mirror archive downloader, `archive/zip` extractor, and SoundFont installer.
 *   **Data Synchronization**: Whenever presets or config templates are updated, synchronize both the repository templates and the embedded data in `internal/preset/data/` and `internal/templates/data/`.
 

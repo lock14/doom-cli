@@ -17,6 +17,12 @@ func TestResolveForLinux(t *testing.T) {
 	if !strings.Contains(filepath.ToSlash(p.WadsDir), ".local/share/games/uzdoom") {
 		t.Errorf("expected .local/share/games/uzdoom in WadsDir, got %s", p.WadsDir)
 	}
+	if !strings.Contains(filepath.ToSlash(p.ConfigDir), ".config/doom-cli") {
+		t.Errorf("expected .config/doom-cli in ConfigDir, got %s", p.ConfigDir)
+	}
+	if !strings.Contains(filepath.ToSlash(p.ConfigFile), "config.json") {
+		t.Errorf("expected config.json in ConfigFile, got %s", p.ConfigFile)
+	}
 }
 
 func TestResolveForDarwin(t *testing.T) {
@@ -27,6 +33,9 @@ func TestResolveForDarwin(t *testing.T) {
 	if !strings.Contains(filepath.ToSlash(p.WadsDir), "Library/Application Support/games/uzdoom") {
 		t.Errorf("expected Library/Application Support/games/uzdoom in WadsDir, got %s", p.WadsDir)
 	}
+	if !strings.Contains(filepath.ToSlash(p.ConfigDir), "Library/Application Support/doom-cli") {
+		t.Errorf("expected Library/Application Support/doom-cli in ConfigDir, got %s", p.ConfigDir)
+	}
 }
 
 func TestResolveForWindows(t *testing.T) {
@@ -36,6 +45,9 @@ func TestResolveForWindows(t *testing.T) {
 	}
 	if !strings.Contains(p.WadsDir, "Doom WADS") {
 		t.Errorf("expected Doom WADS in WadsDir, got %s", p.WadsDir)
+	}
+	if !strings.Contains(p.ConfigDir, "doom-cli") {
+		t.Errorf("expected doom-cli in ConfigDir, got %s", p.ConfigDir)
 	}
 }
 

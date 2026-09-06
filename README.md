@@ -86,6 +86,10 @@ If you prefer to perform individual tasks or maintain your setup over time:
 - `doom config diff` — Shows a diff comparing repository config templates against live configs on your system.
 - `doom config sync` — Pulls in-game tweaks (keybindings, sensitivity, video settings) from your system back into the repository so you can commit them.
 
+#### Visual Themes & Styling
+- `doom themes` / `doom themes list` — Lists available color themes with visual ANSI swatches and indicates active theme.
+- `doom themes set <theme>` — Sets your persistent default launcher theme in user configuration.
+
 ---
 
 ## Directory Layouts
@@ -99,6 +103,7 @@ The `doom` CLI automatically respects standard, platform-idiomatic paths:
 | **UZDoom Config** | `~/.config/uzdoom/autoexec.cfg` | `~/Library/Application Support/uzdoom/autoexec.cfg` | `%APPDATA%\uzdoom\autoexec.cfg` |
 | **DSDA-Doom Config** | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%LOCALAPPDATA%\dsda-doom\dsda-doom.cfg` |
 | **DoomRunner Options** | `~/.local/share/DoomRunner/options.json` | `~/Library/Application Support/DoomRunner/options.json` | `%LOCALAPPDATA%\DoomRunner\options.json` |
+| **CLI Config & Themes** | `~/.config/doom-cli/` | `~/Library/Application Support/doom-cli/` | `%LOCALAPPDATA%\doom-cli\` |
 | **SoundFonts** | `~/.local/share/soundfonts/` | `~/Library/Application Support/soundfonts/` | `%LOCALAPPDATA%\soundfonts\` |
 
 *(Custom WAD directories can be passed to any command via `--wads-dir <path>` or set via the `DOOM_WADS_DIR` environment variable).*
@@ -136,6 +141,7 @@ Features:
 - Side-by-side preview pane displaying IWAD, required PWADs, DeHackEd patches, and description
 - Instant missing file status indicator (`✓ Ready` vs `✗ Missing`)
 - Automatic return to launcher with cursor memory on game exit (or use `--once` to exit immediately)
+- Curated color themes adhering to the 60-30-10 design principle (`--theme <name>`)
 - Fallback numbered menu mode when running in basic or non-TTY terminal environments
 
 #### Direct Launching & Engine Overrides
@@ -158,7 +164,92 @@ doom launch "Alien Vendetta" --dry-run
 doom presets list
 ```
 
-### 2. Graphical Launcher (DoomRunner)
+### 2. Terminal Themes & Visual Customization
+
+The interactive launcher includes a semantic color system adhering to the 60-30-10 terminal design principle (60% canvas neutral, 30% structural framing, 10% focused accent), guaranteeing high contrast and readability across dark and light terminals:
+
+```bash
+# Preview all available themes with live color swatches
+doom themes list
+
+# Persistently set your default theme
+doom themes set blood
+
+# Temporarily override theme for a single run
+doom play --theme cyberpunk
+```
+
+#### Built-in Themes
+
+| Theme | Type | Description |
+| :--- | :--- | :--- |
+| `classic` | ANSI-16 | Classic Doom Semantic ANSI palette that adapts naturally to your terminal's color scheme (`default`) |
+| `blood` | TrueColor | Gothic Crimson (`#9B111E`) & Bone White Nightdive software-plus aesthetic |
+| `toxic` | TrueColor | Radioactive Nukage Green (`#70E000`) & Hazard Amber (`#FFB703`) Phobos techbase aesthetic |
+| `inferno` | TrueColor | Volcanic Molten Magma (`#FF5400`) & Charred Basalt Episode 3 aesthetic |
+| `frost` | TrueColor | Glacial Cyan (`#56CFE1`) & Midnight Polar Navy Cocytus aesthetic (soothing for nighttime play) |
+| `plasma` | TrueColor | Plasma Rifle coils electric cyan (`#05D9E8`) & hot neon pink (`#FF2A6D`) |
+| `heretic` | TrueColor | Raven Software dark fantasy mystic amethyst (`#BD93F9`) & elven emerald (`#50FA7B`) |
+| `amber` | TrueColor | Vintage 1980s DEC VT220 / Hercules warm amber phosphor CRT monitor (`#FFB000`) |
+| `sigil` | TrueColor | Romero occult velvet maroon (`#5E0B15`) & pentagram red (`#D90429`) |
+| `monochrome` | ANSI | High-contrast Black & White for minimalists or monochrome terminals |
+
+#### Custom JSON Themes
+
+Create custom themes in `<config_dir>/themes/<theme_name>.json`. For example, `~/.config/doom-cli/themes/solarized.json`:
+
+```json
+{
+  "name": "solarized",
+  "type": "dark",
+  "description": "Solarized dark palette",
+  "brand_fg": "#FFFFFF",
+  "brand_bg": "#CB4B16",
+  "accent_primary": "#268BD2",
+  "accent_secondary": "#2AA198",
+  "text_primary": "#93A1A1",
+  "text_muted": "#586E75",
+  "border": "#073642",
+  "border_focus": "#268BD2",
+  "cursor_fg": "#002B36",
+  "cursor_bg": "#268BD2",
+  "tag_uzdoom_fg": "#B58900",
+  "tag_uzdoom_bg": "#073642",
+  "tag_dsda_fg": "#859900",
+  "tag_dsda_bg": "#073642",
+  "status_ok": "#859900",
+  "status_missing": "#DC322F"
+}
+```
+
+Theme resolution follows standard precedence:
+1. `--theme <name>` CLI flag
+2. `DOOM_THEME` environment variable
+3. `theme` setting in user configuration (`config.json`)
+4. `default` built-in theme
+
+#### Universal Font Compatibility & Nerd Fonts
+
+By default, the launcher uses universal rectangular badges (` DOOM `) and standard text prompts (`Filter: `),
+guaranteeing clean rendering on 100% of terminal emulators and standard fonts without requiring patched fonts.
+
+If your terminal font includes Nerd Font glyphs (e.g. JetBrains Mono NF, MesloLGS NF, FiraCode NF), you can enable
+Powerlevel10k-style rounded capsule badges (` DOOM `):
+
+```bash
+# Temporarily enable rounded capsules for a single run
+doom play --nerd-fonts
+
+# Permanently enable or toggle via CLI
+doom config set nerd-fonts on
+doom config set nerd-fonts off
+doom config toggle nerd-fonts
+
+# Inspect current CLI settings
+doom config show
+```
+
+### 3. Graphical Launcher (DoomRunner)
 
 Launch DoomRunner from your application menu or terminal:
 
