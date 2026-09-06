@@ -11,6 +11,7 @@ import (
 	"github.com/lock14/doom-cli/internal/templates"
 )
 
+// newConfigCmd creates the CLI configuration management command.
 func newConfigCmd() *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",

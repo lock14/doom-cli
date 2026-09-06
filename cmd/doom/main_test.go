@@ -447,3 +447,49 @@ func TestPresetsCommands(t *testing.T) {
 		t.Fatalf("expected 0 custom presets, got %d", len(cfg.Presets))
 	}
 }
+
+func TestWadsCommands(t *testing.T) {
+	wadsCmd := newWadsCmd()
+	subCommands := wadsCmd.Commands()
+
+	tests := []struct {
+		name        string
+		commandName string
+		wantAliases []string
+	}{
+		{
+			name:        "fetch subcommand exists",
+			commandName: "fetch",
+		},
+		{
+			name:        "list subcommand exists",
+			commandName: "list",
+		},
+		{
+			name:        "extract-steam subcommand has extract alias",
+			commandName: "extract-steam",
+			wantAliases: []string{"extract"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var found bool
+			for _, cmd := range subCommands {
+				if cmd.Name() == tt.commandName {
+					found = true
+					if len(tt.wantAliases) > 0 {
+						if !reflect.DeepEqual(cmd.Aliases, tt.wantAliases) {
+							t.Errorf("cmd %q aliases = %v, want %v",
+								cmd.Name(), cmd.Aliases, tt.wantAliases)
+						}
+					}
+					break
+				}
+			}
+			if !found {
+				t.Fatalf("subcommand %q not found in wads command", tt.commandName)
+			}
+		})
+	}
+}

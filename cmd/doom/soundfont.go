@@ -8,6 +8,7 @@ import (
 	"github.com/lock14/doom-cli/internal/wad"
 )
 
+// newSoundfontCmd creates the SoundFont management command.
 func newSoundfontCmd() *cobra.Command {
 	sfCmd := &cobra.Command{
 		Use:   "soundfont",

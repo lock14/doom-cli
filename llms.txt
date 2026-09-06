@@ -1,10 +1,13 @@
 # doom-cli
 
-> Unified cross-platform CLI tool, curated engine configurations, and launcher presets for classic Doom source ports (DSDA-Doom, UZDoom).
+> Unified cross-platform CLI tool, curated engine configurations, and launcher presets for classic Doom source
+> ports (DSDA-Doom, UZDoom).
 
 ## Overview
 
-`github.com/lock14/doom-cli` provides a static, zero-dependency Go CLI (`doom`) that automates Doom source port management, engine configuration deployment with display auto-detection, Steam/GOG game file discovery, multi-mirror community megawad downloading, and interactive terminal launching across Linux, macOS, and Windows.
+`github.com/lock14/doom-cli` provides a static, zero-dependency Go CLI (`doom`) that automates Doom source port
+management, engine configuration deployment with display auto-detection, Steam/GOG game file discovery,
+multi-mirror community megawad downloading, and interactive terminal launching across Linux, macOS, and Windows.
 
 ## Quick Start
 
@@ -24,42 +27,65 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 
 - `doom setup`: Full automated turnkey setup in a single step.
 - `doom play`: Interactive TUI preset launcher powered by Bubble Tea.
-- `doom launch <preset>`: Direct preset execution with optional engine overrides and game flags.
+- `doom launch <preset> [args]`: Direct preset execution with optional engine overrides and game flags.
 - `doom engines list`: Lists all configured engines (built-in and custom) and checks binary paths.
 - `doom engines add <name>`: Registers a custom source port engine with custom binary path and argument style.
 - `doom engines remove <name>`: Removes a custom engine from user configuration.
 - `doom engines install`: Downloads portable engine binaries (`uzdoom`, `dsda-doom`).
-- `doom soundfont install`: Downloads and installs curated Roland SC-55 SoundFont.
-- `doom wads extract`: Auto-discovers and imports official Steam and GOG commercial IWADs.
-- `doom wads fetch [preset]`: Downloads and extracts community megawads from idgames mirrors.
-- `doom wads list`: Inspects installed WADs and missing file statuses.
-- `doom config install`: Deploys engine configuration files with native display auto-detection.
-- `doom config diff`: Shows differences between repository templates and live installed configs.
-- `doom config sync`: Pulls in-game tweaks back from the host system into repository templates.
+- `doom soundfont install`: Downloads and installs curated Roland SC-55 SoundFont (`GeneralUser-GS.sf2`).
+- `doom wads extract`: Auto-discovers and imports official Steam and GOG commercial IWADs (`extract-steam` alias).
+- `doom wads fetch [preset|all]`: Downloads and extracts community megawads from idgames mirrors.
+- `doom wads list`: Inspects downloadable community megawads and expected files.
 - `doom presets list`: Lists all presets (built-in and custom) and engine assignments.
 - `doom presets show <name>`: Displays resolved launch configuration and file availability for a preset.
 - `doom presets add <name>`: Adds a custom WAD or preset to your personal library.
 - `doom presets config <name>`: Configures per-WAD launch options (preferred engine, launch flags, custom IWAD).
 - `doom presets remove <name>`: Removes a custom preset or resets overrides for a built-in preset.
 - `doom presets build`: Synchronizes preset catalog table into README.md.
+- `doom config show`: Displays active CLI user configuration (`config.json`).
+- `doom config get <key>`: Retrieves a specific configuration value.
+- `doom config set <key> <val>`: Sets a configuration value.
+- `doom config toggle <key>`: Toggles a boolean configuration setting (e.g. `nerd-fonts`).
+- `doom config install`: Deploys engine configuration files with native display auto-detection and backups.
+- `doom config diff`: Shows differences between repository templates and live installed configs.
+- `doom config sync`: Pulls in-game tweaks back from the host system into repository templates.
+- `doom themes list`: Lists available color themes with ANSI color swatches.
+- `doom themes set <name>`: Sets persistent launcher color theme.
+- `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
 
-## Architecture & Packages
+## Architecture & Modular Packages
 
-- `cmd/doom/`: Command-line interface definitions using Cobra.
-- `internal/config/`: Cross-platform path resolution adhering to XDG, Library, and AppData standards.
+- `cmd/doom/`: Modular Cobra CLI commands:
+  - `main.go`: Entrypoint, root command, global flags, and path helpers.
+  - `play.go`: `doom play` interactive Bubble Tea launcher.
+  - `launch.go`: `doom launch` direct execution.
+  - `setup.go`: `doom setup` automated turnkey workflow.
+  - `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract-steam` / `extract`).
+  - `engines.go`: `doom engines` subcommands (`list`, `add`, `remove`, `install`).
+  - `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build`).
+  - `soundfont.go`: `doom soundfont install`.
+  - `config.go`: `doom config` subcommands (`show`, `get`, `set`, `toggle`, `install`, `diff`, `sync`).
+  - `themes.go`: `doom themes` subcommands (`list`, `set`).
+- `internal/config/`: Cross-platform path resolution adhering to XDG, Library, and AppData, plus config persistence.
 - `internal/display/`: Native display resolution and refresh rate auto-detection.
-- `internal/engine/`: Source port binary installation and argument synthesis/execution.
-- `internal/preset/`: Embedded presets catalog loader and README table synchronizer.
+- `internal/engine/`: Source port binary installation and argument synthesis (`runner.go`, `installer.go`).
+- `internal/preset/`: Catalog management, file resolution, text decoding, and README sync
+  (`preset.go`, `resolve.go`, `decode.go`, `compiler.go`).
 - `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
 - `internal/templates/`: Configuration templates and backup deployment engine.
-- `internal/tui/`: Bubble Tea terminal interface with real-time filtering and split-pane previews.
-- `internal/wad/`: Multi-mirror archive downloader, ZIP extractor, and SoundFont installer.
+- `internal/tui/`: Interactive Bubble Tea launcher
+  (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
+- `internal/wad/`: Multi-mirror downloader, Zip Slip hardened extractor, and SoundFont installer
+  (`downloader.go`, `extract.go`, `soundfont.go`).
 
 ## Key Design Invariants
 
 - **Single Source of Truth**: All presets are declaratively managed in `data/presets.json`.
-- **Portability**: Configuration templates use `__HOME__`, `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholders. Personal usernames and machine paths are strictly prohibited in git.
-- **Destructive Safety**: Timestamped backups (`.bak.<timestamp>`) are created before modifying existing user configurations.
+- **Portability**: Configuration templates use `__HOME__`, `__RESOLUTION__`, `__REFRESH_RATE__`, and
+  `__SOUNDFONT__` placeholders.
+- **Destructive Safety**: Timestamped backups (`.bak.<timestamp>`) are created before modifying
+  existing user configurations.
+- **Archive Security**: Zip Slip hardened path traversal prevention (`strings.HasPrefix` destination verification).
 - **Strict Line Length (120 Columns)**: Code enforced at 120 columns via `revive.toml` and `.editorconfig`.
 
 ## References

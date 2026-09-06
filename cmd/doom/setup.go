@@ -12,6 +12,7 @@ import (
 	"github.com/lock14/doom-cli/internal/wad"
 )
 
+// newSetupCmd creates the turnkey automated setup command.
 func newSetupCmd() *cobra.Command {
 	setupCmd := &cobra.Command{
 		Use:   "setup",

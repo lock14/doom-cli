@@ -11,6 +11,7 @@ import (
 	"github.com/lock14/doom-cli/internal/wad"
 )
 
+// newWadsCmd creates the WAD, megawad, and expansion management command.
 func newWadsCmd() *cobra.Command {
 	wadsCmd := &cobra.Command{
 		Use:   "wads",
@@ -66,8 +67,9 @@ func newWadsCmd() *cobra.Command {
 	}
 
 	wadsExtractCmd := &cobra.Command{
-		Use:   "extract-steam",
-		Short: "Auto-discover and copy official IWADs and expansions from Steam/GOG",
+		Use:     "extract-steam",
+		Aliases: []string{"extract"},
+		Short:   "Auto-discover and copy official IWADs and expansions from Steam/GOG",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
 			_, err := steam.DiscoverAndExtract(nil, paths.WadsDir, flagForce, os.Stdout)

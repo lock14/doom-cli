@@ -12,6 +12,7 @@ import (
 	"github.com/lock14/doom-cli/internal/tui"
 )
 
+// newThemesCmd creates the theme browsing and selection command.
 func newThemesCmd() *cobra.Command {
 	themesCmd := &cobra.Command{
 		Use:   "themes",

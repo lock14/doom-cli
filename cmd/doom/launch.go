@@ -9,6 +9,7 @@ import (
 	"github.com/lock14/doom-cli/internal/engine"
 )
 
+// newLaunchCmd creates the direct preset launch command.
 func newLaunchCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "launch <preset_name> [engine_args...]",

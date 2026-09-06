@@ -15,6 +15,7 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
+// newEnginesCmd creates the source port engine management command.
 func newEnginesCmd() *cobra.Command {
 	enginesCmd := &cobra.Command{
 		Use:   "engines",
