@@ -239,14 +239,20 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 		return fmt.Errorf("binary %s not found in zip", targetName)
 	}
 
-	if err := extractZipEntry(binMatch, dest); err != nil {
+	cleanDest := filepath.Clean(dest)
+	cleanBinDir := filepath.Clean(ins.BinDir)
+	prefix := cleanBinDir + string(filepath.Separator)
+	if !strings.HasPrefix(cleanDest, prefix) {
+		return fmt.Errorf("illegal binary target: %s", targetName)
+	}
+
+	if err := extractZipEntry(binMatch, cleanBinDir, cleanDest); err != nil {
 		return err
 	}
 	_ = os.Chmod(dest, 0755)
 
 	// Also extract companion files (.wad, .pk3, dlls) in the same directory into BinDir
 	binParent := filepath.Dir(binMatch.Name)
-	cleanBinDir := filepath.Clean(ins.BinDir)
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() || zf == binMatch {
 			continue
@@ -262,11 +268,11 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 				strings.HasSuffix(lower, ".dll") ||
 				strings.HasSuffix(lower, ".so") ||
 				strings.HasSuffix(lower, ".dylib") {
-				companionDest := filepath.Join(cleanBinDir, base)
-				if !strings.HasPrefix(companionDest, cleanBinDir+string(filepath.Separator)) {
+				companionDest := filepath.Clean(filepath.Join(cleanBinDir, base))
+				if !strings.HasPrefix(companionDest, prefix) {
 					continue
 				}
-				_ = extractZipEntry(zf, companionDest)
+				_ = extractZipEntry(zf, cleanBinDir, companionDest)
 			}
 		}
 	}
@@ -309,12 +315,15 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 		return fmt.Errorf("no .app bundle found in DMG")
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("resolving user home directory: %w", err)
+	}
 	appsDir := filepath.Join(home, "Applications")
 	_ = os.MkdirAll(appsDir, 0755)
 	appDest := filepath.Join(appsDir, filepath.Base(appEntry))
 
-	_ = exec.Command("rm", "-rf", appDest).Run()
+	_ = os.RemoveAll(appDest)
 	if err := exec.Command("cp", "-R", appEntry, appsDir+"/").Run(); err != nil {
 		return fmt.Errorf("failed to copy .app to %s: %w", appsDir, err)
 	}
@@ -338,8 +347,14 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 	return nil
 }
 
-func extractZipEntry(zf *zip.File, destPath string) error {
+func extractZipEntry(zf *zip.File, destDir, destPath string) error {
+	cleanDir := filepath.Clean(destDir)
 	cleanDest := filepath.Clean(destPath)
+	prefix := cleanDir + string(filepath.Separator)
+	if !strings.HasPrefix(cleanDest, prefix) {
+		return fmt.Errorf("illegal file path in archive: %s", zf.Name)
+	}
+
 	if err := os.MkdirAll(filepath.Dir(cleanDest), 0755); err != nil {
 		return err
 	}

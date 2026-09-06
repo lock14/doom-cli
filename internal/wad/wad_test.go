@@ -173,3 +173,36 @@ func TestInstallSoundFont(t *testing.T) {
 		t.Errorf("expected path %s, got %s", installed, installed2)
 	}
 }
+
+func TestDownloader_ExtractFromZip_ZipSlipProtection(t *testing.T) {
+	tmpDir := t.TempDir()
+	zipBytes := createTestZip(t, map[string]string{
+		"../escape.wad": "malicious-content",
+		"../readme.txt": "malicious-readme",
+		"normal.wad":    "normal-content",
+	})
+
+	zipPath := filepath.Join(tmpDir, "traversal.zip")
+	if err := os.WriteFile(zipPath, zipBytes, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	wadsDir := filepath.Join(tmpDir, "wads")
+	dl := NewDownloader(wadsDir, false, nil)
+
+	// Attempt to extract entry that tries to escape directory
+	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{"normal.wad"})
+	if err != nil {
+		t.Fatalf("unexpected error extracting normal file: %v", err)
+	}
+
+	// Verify that escaped file was not created outside wadsDir
+	escapedPath := filepath.Join(tmpDir, "escape.wad")
+	if _, err := os.Stat(escapedPath); !os.IsNotExist(err) {
+		t.Errorf("security violation: escaped file was extracted to %s", escapedPath)
+	}
+	escapedTxt := filepath.Join(tmpDir, "readme.txt")
+	if _, err := os.Stat(escapedTxt); !os.IsNotExist(err) {
+		t.Errorf("security violation: escaped readme was extracted to %s", escapedTxt)
+	}
+}

@@ -323,3 +323,127 @@ func TestNewRootCmd(t *testing.T) {
 		}
 	}
 }
+
+func TestEnginesCommands(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("BIN_DIR", tempDir)
+	t.Setenv("WADS_DIR", tempDir)
+	t.Setenv("PATH", tempDir)
+
+	enginesCmd := newEnginesCmd()
+
+	// 1. engines list
+	enginesCmd.SetArgs([]string{"list"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines list failed: %v", err)
+	}
+
+	// 2. engines add
+	enginesCmd.SetArgs([]string{"add", "woof", "--bin", "woof", "--args-style", "boom", "--desc", "Woof MBF21"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines add failed: %v", err)
+	}
+
+	// Verify added in config
+	paths := getPaths()
+	cfg, err := config.LoadConfig(paths)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if eng, ok := cfg.Engines["woof"]; !ok || eng.Name != "woof" {
+		t.Fatalf("expected woof in cfg.Engines, got %+v", cfg.Engines)
+	}
+
+	// 3. engines remove built-in (fails)
+	enginesCmd.SetArgs([]string{"remove", "uzdoom"})
+	if err := enginesCmd.Execute(); err == nil {
+		t.Errorf("expected error removing built-in uzdoom, got nil")
+	}
+
+	// 4. engines remove custom (succeeds)
+	enginesCmd.SetArgs([]string{"remove", "woof"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines remove woof failed: %v", err)
+	}
+
+	cfg, _ = config.LoadConfig(paths)
+	if _, ok := cfg.Engines["woof"]; ok {
+		t.Errorf("expected woof removed from cfg.Engines, got %+v", cfg.Engines)
+	}
+}
+
+func TestPresetsCommands(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("BIN_DIR", tempDir)
+	t.Setenv("WADS_DIR", tempDir)
+
+	presetsCmd := newPresetsCmd()
+
+	// 1. presets list
+	presetsCmd.SetArgs([]string{"list"})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets list failed: %v", err)
+	}
+
+	// 2. presets show built-in
+	presetsCmd.SetArgs([]string{"show", "Alien Vendetta"})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets show Alien Vendetta failed: %v", err)
+	}
+
+	// 3. presets add custom
+	presetsCmd.SetArgs([]string{
+		"add", "CustomMap",
+		"--engine", "uzdoom",
+		"--iwad", "DOOM2.WAD",
+		"--files", "custom.wad",
+		"--desc", "My Custom Map",
+	})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets add failed: %v", err)
+	}
+
+	// 4. presets show custom
+	presetsCmd.SetArgs([]string{"show", "CustomMap"})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets show CustomMap failed: %v", err)
+	}
+
+	// 5. presets config
+	presetsCmd.SetArgs([]string{
+		"config", "Sunlust",
+		"--engine", "uzdoom",
+		"--args", "-skill 4",
+	})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets config failed: %v", err)
+	}
+
+	paths := getPaths()
+	cfg, _ := config.LoadConfig(paths)
+	if opt, ok := cfg.LaunchOptions["Sunlust"]; !ok || opt.Engine != "uzdoom" || opt.AdditionalArgs != "-skill 4" {
+		t.Fatalf("expected Sunlust launch options in config, got %+v", cfg.LaunchOptions)
+	}
+
+	// 6. presets config reset
+	presetsCmd.SetArgs([]string{"config", "Sunlust", "--reset"})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets config --reset failed: %v", err)
+	}
+	cfg, _ = config.LoadConfig(paths)
+	if _, ok := cfg.LaunchOptions["Sunlust"]; ok {
+		t.Fatalf("expected Sunlust launch options cleared, got %+v", cfg.LaunchOptions)
+	}
+
+	// 7. presets remove custom
+	presetsCmd.SetArgs([]string{"remove", "CustomMap"})
+	if err := presetsCmd.Execute(); err != nil {
+		t.Fatalf("presets remove failed: %v", err)
+	}
+	cfg, _ = config.LoadConfig(paths)
+	if len(cfg.Presets) != 0 {
+		t.Fatalf("expected 0 custom presets, got %d", len(cfg.Presets))
+	}
+}

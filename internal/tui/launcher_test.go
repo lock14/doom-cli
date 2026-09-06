@@ -542,3 +542,62 @@ func TestModel_WithCustomTheme(t *testing.T) {
 		t.Errorf("expected view to contain Alien Vendetta with custom theme")
 	}
 }
+
+func TestFormatEngineTag(t *testing.T) {
+	styles := CompileStyles(DefaultTheme)
+	tests := []struct {
+		engine   string
+		contains string
+	}{
+		{"dsda-doom", "[DSDA]"},
+		{"uzdoom", "[UZDoom]"},
+		{"woof", "[WOOF"},
+		{"crispy-doom", "[CRISPY]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.engine, func(t *testing.T) {
+			rendered := formatEngineTag(tt.engine, styles)
+			if !strings.Contains(rendered, tt.contains) {
+				t.Errorf("expected tag for %s to contain %q, got %q", tt.engine, tt.contains, rendered)
+			}
+		})
+	}
+}
+
+func TestModel_CustomPresetAndEngine(t *testing.T) {
+	cat := &preset.Catalog{
+		Engines: map[string]preset.EngineConfig{
+			"woof": {
+				Name:        "woof",
+				Description: "Woof! MBF21 Engine",
+			},
+		},
+		Presets: []preset.Preset{
+			{
+				Name:           "CustomMap",
+				Engine:         "woof",
+				IWAD:           "DOOM2.WAD",
+				Mappacks:       []string{"custom.wad"},
+				AdditionalArgs: "-skill 4",
+				Custom:         true,
+			},
+		},
+	}
+
+	m := initialModel(cat, "", DefaultTheme, false)
+	view := m.View()
+
+	if !strings.Contains(view, "[WOOF") {
+		t.Errorf("expected custom engine tag [WOOF] in view:\n%s", view)
+	}
+	if !strings.Contains(view, "[Custom WAD]") {
+		t.Errorf("expected [Custom WAD] badge in view:\n%s", view)
+	}
+	if !strings.Contains(view, "Woof! MBF21 Engine") {
+		t.Errorf("expected custom engine description in preview:\n%s", view)
+	}
+	if !strings.Contains(view, "-skill 4") {
+		t.Errorf("expected launch args in preview:\n%s", view)
+	}
+}

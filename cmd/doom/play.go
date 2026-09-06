@@ -63,6 +63,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 			DryRun:         flagDryRun,
 			ExtraArgs:      extraArgs,
 			Out:            os.Stdout,
+			Engines:        cat.Engines,
 		}
 
 		plan, err := engine.PrepareLaunch(*selected, opts)

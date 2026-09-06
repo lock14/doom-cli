@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -23,7 +24,28 @@ var (
 )
 
 func getCatalog() (*preset.Catalog, error) {
-	return preset.LoadCatalog(flagPresetsFile)
+	paths := getPaths()
+	cfg, err := config.LoadConfig(paths)
+	if err != nil {
+		return nil, fmt.Errorf("loading config: %w", err)
+	}
+
+	var customEngines map[string]preset.EngineConfig
+	var customPresets []preset.Preset
+	var launchOptions map[string]preset.WadLaunchOptions
+	if cfg != nil {
+		customEngines = cfg.Engines
+		customPresets = cfg.Presets
+		launchOptions = cfg.LaunchOptions
+	}
+
+	return preset.LoadLayeredCatalog(
+		flagPresetsFile,
+		paths.PresetsFile,
+		customEngines,
+		customPresets,
+		launchOptions,
+	)
 }
 
 func getPaths() *config.Paths {

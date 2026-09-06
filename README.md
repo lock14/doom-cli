@@ -74,11 +74,21 @@ doom setup
 If you prefer to perform individual tasks or maintain your setup over time:
 
 #### Content & Assets
+- `doom engines` / `doom engines list` — Lists all engines (built-in and custom) and checks binary existence.
+- `doom engines add <name>` — Registers a custom source port engine with custom binary path and argument style.
+- `doom engines remove <name>` — Removes a custom engine from user configuration.
 - `doom engines install` — Downloads portable engine binaries (`uzdoom`, `dsda-doom`).
 - `doom soundfont install` — Downloads and deploys the Roland SC-55 SoundFont.
 - `doom wads extract` — Auto-discovers and imports official Steam and GOG IWADs.
 - `doom wads fetch` — Downloads and extracts all community megawads.
 - `doom wads fetch "Eviternity II"` — Downloads a specific megawad by name.
+
+#### Presets & Custom WADs
+- `doom presets` / `doom presets list` — Lists all presets (built-in and custom) with engine badges and status.
+- `doom presets show <name>` — Displays resolved launch configuration and file availability for a preset.
+- `doom presets add <name>` — Adds a custom WAD or preset to your personal library.
+- `doom presets config <name>` — Configures per-WAD launch options (preferred engine, launch flags, custom IWAD).
+- `doom presets remove <name>` — Removes a custom preset or resets overrides for a built-in preset.
 
 #### Engine Configurations
 - `doom config install` — Deploys engine configurations with display auto-detection and timestamped backups.
@@ -245,6 +255,52 @@ doom config toggle nerd-fonts
 
 # Inspect current CLI settings
 doom config show
+```
+
+### 3. Extensibility: Custom Engines, Custom WADs & Launch Options
+
+`doom-cli` is fully extensible while keeping curated defaults as the baseline foundation:
+
+#### Add Custom Engines
+Register any source port installed on your system (e.g., Woof!, Crispy Doom, GZDoom, PrBoom+):
+
+```bash
+# Add Woof! source port (Boom argument style with -file and -deh)
+doom engines add woof --bin woof --args-style boom --desc "Woof! MBF21 port"
+
+# Add GZDoom pointing to an explicit binary path
+doom engines add gzdoom --bin /usr/bin/gzdoom --args-style zdoom --desc "GZDoom OpenGL/Vulkan"
+
+# List all available engines and binary verification status
+doom engines list
+```
+
+#### Add Custom WADs & Presets
+Add custom mapsets or community mods to your library. They automatically integrate into `doom play` fuzzy search and direct execution (`doom launch`):
+
+```bash
+# Add a custom mapset with required IWAD and PWADs
+doom presets add "KDiZD" --engine uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --desc "Knee-Deep in ZDoom"
+
+# Inspect preset details and missing file status
+doom presets show "KDiZD"
+
+# Launch your custom preset
+doom launch "KDiZD"
+```
+
+#### Configure Per-WAD Launch Options
+Customize launch preferences for any WAD without losing defaults:
+
+```bash
+# Always launch Sunlust in Woof! with ultra-violence skill
+doom presets config "Sunlust" --engine woof --args "-skill 4"
+
+# Set Ancient Aliens to always run with Boom complevel 11
+doom presets config "Ancient Aliens" --args "-complevel 11"
+
+# Reset custom launch options back to curated defaults
+doom presets config "Sunlust" --reset
 ```
 
 ---
