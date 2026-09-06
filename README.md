@@ -14,7 +14,6 @@ A unified, cross-platform CLI tool and curated collection of configurations and 
 
 ## Table of Contents
 
-- [Architecture & Workflow](#architecture--workflow)
 - [Quick Start](#quick-start)
 - [Installation](#installation)
   - [Linux & macOS](#linux--macos)
@@ -53,52 +52,6 @@ A unified, cross-platform CLI tool and curated collection of configurations and 
 - [Contributing](#contributing)
 - [Security](#security)
 - [License](#license)
-
----
-
-## Architecture & Workflow
-
-```mermaid
-flowchart TD
-    subgraph CLI ["doom CLI (Single Static Binary)"]
-        TUI["Interactive TUI Launcher\n(Bubble Tea / Lip Gloss)"]
-        Setup["Turnkey Automated Setup\n(doom setup)"]
-        Launch["Direct Launcher\n(doom launch)"]
-        ConfigMgr["Config & Theme Manager\n(doom config / themes)"]
-        PresetMgr["Preset & Engine Manager\n(doom presets / engines)"]
-    end
-
-    subgraph Data ["Declarative Catalogs & Storage"]
-        PresetsJSON["data/presets.json\n(Curated Defaults)"]
-        UserConfig["~/.config/doom-cli/config.json\n(Custom Engines, Presets & Overrides)"]
-        WADsDir["WADs Directory\n(IWADs, PWADs, .deh Patches)"]
-        SoundFontsDir["SoundFonts Directory\n(GeneralUser-GS.sf2)"]
-    end
-
-    subgraph External ["External Content Discovery"]
-        Steam["Steam & GOG Libraries\n(Auto-Discover IWADs)"]
-        Mirrors["Doomworld / idgames Mirrors\n(Multi-Mirror Community WADs)"]
-    end
-
-    subgraph Engines ["Target Source Ports"]
-        DSDA["DSDA-Doom\n(MBF21 / Vanilla / Demo-Accurate)"]
-        UZDoom["UZDoom\n(ZDoom / OTEX / Raven Software)"]
-        CustomEngines["Custom Ports\n(Woof!, GZDoom, Crispy, etc.)"]
-    end
-
-    Setup -->|Auto-Discover| Steam
-    Setup -->|Multi-Mirror Fetch| Mirrors
-    Steam -->|Extract IWADs| WADsDir
-    Mirrors -->|Extract PWADs| WADsDir
-
-    PresetsJSON --> CLI
-    UserConfig --> CLI
-    WADsDir --> CLI
-    SoundFontsDir --> CLI
-
-    TUI -->|Launch| Engines
-    Launch -->|Launch| Engines
-```
 
 ---
 
