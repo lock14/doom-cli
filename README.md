@@ -183,10 +183,15 @@ doom play --theme cyberpunk
 
 | Theme | Type | Description |
 | :--- | :--- | :--- |
-| `default` | ANSI-16 | Classic Doom semantic ANSI palette that adapts naturally to your terminal's color scheme |
-| `cyberpunk` | TrueColor | Vibrant 24-bit neon palette (Electric Cyan `#00E5FF`, Neon Magenta `#FF2A85`, Dark Slate) |
-| `blood` | TrueColor | Gothic Crimson (`#E63946`) & Bone White Nightdive software-plus aesthetic |
-| `matrix` | TrueColor | Retro monochrome Phosphor Green (`#39FF14`, `#00FF41`) hacker aesthetic |
+| `classic` | ANSI-16 | Classic Doom Semantic ANSI palette that adapts naturally to your terminal's color scheme (`default`) |
+| `blood` | TrueColor | Gothic Crimson (`#9B111E`) & Bone White Nightdive software-plus aesthetic |
+| `toxic` | TrueColor | Radioactive Nukage Green (`#70E000`) & Hazard Amber (`#FFB703`) Phobos techbase aesthetic |
+| `inferno` | TrueColor | Volcanic Molten Magma (`#FF5400`) & Charred Basalt Episode 3 aesthetic |
+| `frost` | TrueColor | Glacial Cyan (`#56CFE1`) & Midnight Polar Navy Cocytus aesthetic (soothing for nighttime play) |
+| `plasma` | TrueColor | Plasma Rifle coils electric cyan (`#05D9E8`) & hot neon pink (`#FF2A6D`) |
+| `heretic` | TrueColor | Raven Software dark fantasy mystic amethyst (`#BD93F9`) & elven emerald (`#50FA7B`) |
+| `amber` | TrueColor | Vintage 1980s DEC VT220 / Hercules warm amber phosphor CRT monitor (`#FFB000`) |
+| `sigil` | TrueColor | Romero occult velvet maroon (`#5E0B15`) & pentagram red (`#D90429`) |
 | `monochrome` | ANSI | High-contrast Black & White for minimalists or monochrome terminals |
 
 #### Custom JSON Themes

@@ -531,10 +531,10 @@ func TestInitialModel_WithInitialPreset(t *testing.T) {
 
 func TestModel_WithCustomTheme(t *testing.T) {
 	cat := mockCatalog()
-	m := initialModel(cat, "", CyberpunkTheme, false)
+	m := initialModel(cat, "", PlasmaTheme, false)
 
-	if m.theme.Name != "cyberpunk" {
-		t.Fatalf("expected theme 'cyberpunk', got %q", m.theme.Name)
+	if m.theme.Name != "plasma" {
+		t.Fatalf("expected theme 'plasma', got %q", m.theme.Name)
 	}
 
 	view := m.View()

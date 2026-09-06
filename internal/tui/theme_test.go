@@ -17,19 +17,19 @@ func TestGetBuiltinTheme(t *testing.T) {
 		{
 			name:     "exact default",
 			input:    "default",
-			expected: "default",
+			expected: "classic",
+			found:    true,
+		},
+		{
+			name:     "exact classic",
+			input:    "classic",
+			expected: "classic",
 			found:    true,
 		},
 		{
 			name:     "alias doom",
 			input:    "doom",
-			expected: "default",
-			found:    true,
-		},
-		{
-			name:     "case-insensitive cyberpunk",
-			input:    "CyberPunk",
-			expected: "cyberpunk",
+			expected: "classic",
 			found:    true,
 		},
 		{
@@ -39,9 +39,69 @@ func TestGetBuiltinTheme(t *testing.T) {
 			found:    true,
 		},
 		{
-			name:     "matrix theme",
+			name:     "toxic theme",
+			input:    "toxic",
+			expected: "toxic",
+			found:    true,
+		},
+		{
+			name:     "alias phobos",
+			input:    "phobos",
+			expected: "toxic",
+			found:    true,
+		},
+		{
+			name:     "inferno theme",
+			input:    "inferno",
+			expected: "inferno",
+			found:    true,
+		},
+		{
+			name:     "frost theme",
+			input:    "frost",
+			expected: "frost",
+			found:    true,
+		},
+		{
+			name:     "plasma theme",
+			input:    "plasma",
+			expected: "plasma",
+			found:    true,
+		},
+		{
+			name:     "alias cyberpunk",
+			input:    "cyberpunk",
+			expected: "plasma",
+			found:    true,
+		},
+		{
+			name:     "heretic theme",
+			input:    "heretic",
+			expected: "heretic",
+			found:    true,
+		},
+		{
+			name:     "alias dracula",
+			input:    "dracula",
+			expected: "heretic",
+			found:    true,
+		},
+		{
+			name:     "amber theme",
+			input:    "amber",
+			expected: "amber",
+			found:    true,
+		},
+		{
+			name:     "alias matrix",
 			input:    "matrix",
-			expected: "matrix",
+			expected: "amber",
+			found:    true,
+		},
+		{
+			name:     "sigil theme",
+			input:    "sigil",
+			expected: "sigil",
 			found:    true,
 		},
 		{
@@ -73,10 +133,13 @@ func TestGetBuiltinTheme(t *testing.T) {
 
 func TestListBuiltinThemes(t *testing.T) {
 	list := ListBuiltinThemes()
-	if len(list) != 5 {
-		t.Fatalf("expected 5 built-in themes, got %d", len(list))
+	if len(list) != 10 {
+		t.Fatalf("expected 10 built-in themes, got %d", len(list))
 	}
-	expectedNames := []string{"default", "cyberpunk", "blood", "matrix", "monochrome"}
+	expectedNames := []string{
+		"classic", "blood", "toxic", "inferno", "frost",
+		"plasma", "heretic", "amber", "sigil", "monochrome",
+	}
 	for i, name := range expectedNames {
 		if list[i].Name != name {
 			t.Errorf("theme at index %d = %q, expected %q", i, list[i].Name, name)
@@ -139,7 +202,7 @@ func TestResolveTheme(t *testing.T) {
 			name:      "flag precedence over env and config",
 			flagTheme: "cyberpunk",
 			envTheme:  "blood",
-			expected:  "cyberpunk",
+			expected:  "plasma",
 		},
 		{
 			name:        "env precedence over config",
@@ -153,7 +216,7 @@ func TestResolveTheme(t *testing.T) {
 			flagTheme:   "",
 			envTheme:    "",
 			configTheme: "matrix",
-			expected:    "matrix",
+			expected:    "amber",
 		},
 		{
 			name:        "custom file path via flag",
@@ -175,7 +238,7 @@ func TestResolveTheme(t *testing.T) {
 			flagTheme:   "",
 			envTheme:    "",
 			configTheme: "",
-			expected:    "default",
+			expected:    "classic",
 		},
 	}
 
