@@ -115,10 +115,11 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 
 	knownFlagsWithValue := map[string]bool{
 		"--engine": true, "-e": true,
-		"--wads-dir":     true,
-		"--bin-dir":      true,
-		"--presets-file": true,
-		"--theme":        true,
+		"--wads-dir":       true,
+		"--bin-dir":        true,
+		"--soundfonts-dir": true,
+		"--presets-file":   true,
+		"--theme":          true,
 	}
 	knownBoolFlags := map[string]bool{
 		"--dry-run":    true,
@@ -148,13 +149,10 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 			i++ // skip flag value
 			continue
 		}
-		if strings.HasPrefix(arg, "--wads-dir=") ||
-			strings.HasPrefix(arg, "--bin-dir=") ||
-			strings.HasPrefix(arg, "--engine=") ||
-			strings.HasPrefix(arg, "--presets-file=") ||
-			strings.HasPrefix(arg, "--theme=") ||
-			strings.HasPrefix(arg, "--nerd-fonts=") {
-			continue
+		if flagName, _, hasEq := strings.Cut(arg, "="); hasEq {
+			if knownFlagsWithValue[flagName] || knownBoolFlags[flagName] {
+				continue
+			}
 		}
 
 		if !presetSkipped && !strings.HasPrefix(arg, "-") {

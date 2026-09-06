@@ -21,14 +21,16 @@
             installation time.
     *   **Respect Platform Standard Directories**:
         *   **UZDoom Config**: `~/.config/uzdoom/autoexec.cfg` (Linux) /
-            `~/Library/Application Support/uzdoom/` (macOS) / `%APPDATA%\uzdoom\` (Windows)
+            `~/Library/Application Support/uzdoom/` (macOS) /
+            `%USERPROFILE%\Games\Doom\bin\autoexec.cfg` (Windows)
         *   **DSDA-Doom Config**: `~/.local/share/dsda-doom/dsda-doom.cfg` (Linux) /
-            `~/Library/Application Support/dsda-doom/` (macOS) / `%LOCALAPPDATA%\dsda-doom\` (Windows)
-        *   **Binaries**: `~/.local/bin/` (Linux/macOS) / `%LOCALAPPDATA%\Programs\Doom\bin\` (Windows)
+            `~/Library/Application Support/dsda-doom/` (macOS) /
+            `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` (Windows)
+        *   **Binaries**: `~/.local/bin/` (Linux/macOS) / `%USERPROFILE%\Games\Doom\bin\` (Windows)
         *   **WADs Directory**: `~/.local/share/games/uzdoom/` (Linux) /
-            `~/Library/Application Support/games/uzdoom/` (macOS) / `<Drive>:\Doom WADS\` (Windows)
+            `~/Library/Application Support/games/uzdoom/` (macOS) / `%USERPROFILE%\Games\Doom\wads\` (Windows)
         *   **SoundFonts**: `~/.local/share/soundfonts/` (Linux) /
-            `~/Library/Application Support/soundfonts/` (macOS) / `%LOCALAPPDATA%\soundfonts\` (Windows)
+            `~/Library/Application Support/soundfonts/` (macOS) / `%USERPROFILE%\Games\Doom\soundfonts\` (Windows)
         *   **CLI Config & Themes**: `~/.config/doom-cli/` (Linux) /
             `~/Library/Application Support/doom-cli/` (macOS) / `%LOCALAPPDATA%\doom-cli\` (Windows)
 *   **Destructive Safety & Backup Policy**:
@@ -170,6 +172,16 @@ Linux, macOS, and Windows:
 *   **Persist User Corrections**: Whenever an agent is corrected, redirected, or receives feedback on repository
     conventions, it **must immediately encode the underlying principle into `AGENTS.md`** before concluding the task.
     This ensures all future agent sessions automatically inherit the correction.
+*   **Windows Engine Configuration Locality**: On Windows, source ports (DSDA-Doom, UZDoom) operate in portable
+    mode and read configurations relative to their program directory (`$PROGDIR` / `BinDir`), NOT Unix-style AppData
+    subdirectories. Deploying `dsda-doom.cfg` and `autoexec.cfg` directly to `BinDir` (defaulting to
+    `%USERPROFILE%\Games\Doom\bin\`) ensures both launcher-mediated and direct executable invocations load the
+    intended configs.
+*   **Persistent Asset Directory Hierarchy**: Users can override and persist all three asset and execution directories
+    (`wads-dir`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json`. The resolution
+    hierarchy strictly respects: CLI flags (`--wads-dir`, `--bin-dir`, `--soundfonts-dir`) > Environment variables
+    (`DOOM_WADS_DIR`/`WADS_DIR`, `DOOM_BIN_DIR`/`BIN_DIR`, `DOOM_SF_DIR`/`SF_DIR`) > User configuration (`config.json`)
+    > Platform defaults. Engine launch synthesis and configuration deployment always adhere to this resolved hierarchy.
 
 # Pre-Completion Verification Checklist
 

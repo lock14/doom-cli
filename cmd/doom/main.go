@@ -15,6 +15,7 @@ var (
 	flagEngineOverride string
 	flagWadsDir        string
 	flagBinDir         string
+	flagSoundFontsDir  string
 	flagDryRun         bool
 	flagForce          bool
 	flagOnce           bool
@@ -50,11 +51,29 @@ func getCatalog() (*preset.Catalog, error) {
 
 func getPaths() *config.Paths {
 	paths := config.GetPaths()
+	cfg, _ := config.LoadConfig(paths)
+	if cfg != nil {
+		hasWadsEnv := os.Getenv("WADS_DIR") != "" || os.Getenv("DOOM_WADS_DIR") != ""
+		if cfg.WadsDir != "" && !hasWadsEnv {
+			paths.WadsDir = cfg.WadsDir
+		}
+		hasBinEnv := os.Getenv("BIN_DIR") != "" || os.Getenv("DOOM_BIN_DIR") != ""
+		if cfg.BinDir != "" && !hasBinEnv {
+			paths.SetBinDir(cfg.BinDir)
+		}
+		hasSFEnv := os.Getenv("SF_DIR") != "" || os.Getenv("DOOM_SF_DIR") != ""
+		if cfg.SoundFontsDir != "" && !hasSFEnv {
+			paths.SetSoundFontsDir(cfg.SoundFontsDir)
+		}
+	}
 	if flagWadsDir != "" {
 		paths.WadsDir = flagWadsDir
 	}
 	if flagBinDir != "" {
-		paths.BinDir = flagBinDir
+		paths.SetBinDir(flagBinDir)
+	}
+	if flagSoundFontsDir != "" {
+		paths.SetSoundFontsDir(flagSoundFontsDir)
 	}
 	return paths
 }
@@ -77,6 +96,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 	)
 	rootCmd.PersistentFlags().StringVar(&flagWadsDir, "wads-dir", "", "Custom path to WADs directory")
 	rootCmd.PersistentFlags().StringVar(&flagBinDir, "bin-dir", "", "Custom path to engines binary directory")
+	rootCmd.PersistentFlags().StringVar(
+		&flagSoundFontsDir, "soundfonts-dir", "", "Custom path to SoundFonts directory",
+	)
 	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Print launch command without executing")
 	rootCmd.PersistentFlags().StringVar(&flagPresetsFile, "presets-file", "", "Custom presets.json file path")
 	rootCmd.PersistentFlags().StringVar(
