@@ -29,8 +29,11 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 
 	cfg := &AppConfig{
-		Theme:     "cyberpunk",
-		NerdFonts: true,
+		Theme:         "cyberpunk",
+		NerdFonts:     true,
+		WadsDir:       "/custom/wads",
+		BinDir:        "/custom/bin",
+		SoundFontsDir: "/custom/soundfonts",
 	}
 
 	if err := SaveConfig(p, cfg); err != nil {
@@ -47,6 +50,15 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 	if !loaded.NerdFonts {
 		t.Errorf("expected loaded NerdFonts true, got false")
+	}
+	if loaded.WadsDir != "/custom/wads" {
+		t.Errorf("expected loaded WadsDir '/custom/wads', got %q", loaded.WadsDir)
+	}
+	if loaded.BinDir != "/custom/bin" {
+		t.Errorf("expected loaded BinDir '/custom/bin', got %q", loaded.BinDir)
+	}
+	if loaded.SoundFontsDir != "/custom/soundfonts" {
+		t.Errorf("expected loaded SoundFontsDir '/custom/soundfonts', got %q", loaded.SoundFontsDir)
 	}
 }
 

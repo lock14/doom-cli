@@ -343,6 +343,24 @@ doom config toggle nerd-fonts
 doom config set nerd-fonts on
 ```
 
+### Persistent Directory Overrides
+
+Set default directories permanently in `config.json` without needing CLI flags or environment variables:
+
+```bash
+# Set custom WADs directory permanently
+doom config set wads-dir "E:\DOOM\WADS"
+
+# Set custom engine binaries directory permanently
+doom config set bin-dir "E:\DOOM\bin"
+
+# Set custom SoundFonts directory permanently
+doom config set soundfonts-dir "E:\DOOM\soundfonts"
+
+# Display all current configuration settings
+doom config show
+```
+
 ---
 
 ## Extensibility
@@ -404,6 +422,9 @@ User configurations are persisted in `~/.config/doom-cli/config.json` (Linux), `
 {
   "theme": "blood",
   "nerd_fonts": false,
+  "wads_dir": "E:\\DOOM\\WADS",
+  "bin_dir": "E:\\DOOM\\bin",
+  "soundfonts_dir": "E:\\DOOM\\soundfonts",
   "engines": {
     "woof": {
       "name": "woof",
@@ -442,8 +463,9 @@ The `doom` CLI respects the following environment variables:
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `DOOM_THEME` | Color theme for the interactive launcher | `default` (or value in `config.json`) |
-| `DOOM_WADS_DIR` | Directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
-| `DOOM_BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |
+| `DOOM_WADS_DIR` / `WADS_DIR` | Directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
+| `DOOM_BIN_DIR` / `BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |
+| `DOOM_SF_DIR` / `SF_DIR` | Directory containing SoundFonts (`GeneralUser-GS.sf2`) | Platform standard soundfonts directory |
 | `DOOM_PRESETS_FILE` | Custom path to external presets JSON file | Embedded `data/presets.json` |
 
 ---
@@ -454,12 +476,12 @@ The `doom` CLI automatically respects standard, platform-idiomatic paths:
 
 | Component | Linux (XDG) | macOS | Windows |
 | :--- | :--- | :--- | :--- |
-| **Binaries** | `~/.local/bin/` | `~/.local/bin/` | `%LOCALAPPDATA%\Programs\Doom\bin\` |
-| **WADs & Mods** | `~/.local/share/games/uzdoom/` | `~/Library/Application Support/games/uzdoom/` | `<Drive>:\Doom WADS\` (or `%LOCALAPPDATA%\Doom WADS\`) |
-| **UZDoom Config** | `~/.config/uzdoom/autoexec.cfg` | `~/Library/Application Support/uzdoom/autoexec.cfg` | `%APPDATA%\uzdoom\autoexec.cfg` |
-| **DSDA-Doom Config** | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%LOCALAPPDATA%\dsda-doom\dsda-doom.cfg` |
+| **Binaries** | `~/.local/bin/` | `~/.local/bin/` | `%USERPROFILE%\Games\Doom\bin\` |
+| **WADs & Mods** | `~/.local/share/games/uzdoom/` | `~/Library/Application Support/games/uzdoom/` | `%USERPROFILE%\Games\Doom\wads\` |
+| **UZDoom Config** | `~/.config/uzdoom/autoexec.cfg` | `~/Library/Application Support/uzdoom/autoexec.cfg` | `%USERPROFILE%\Games\Doom\bin\autoexec.cfg` |
+| **DSDA-Doom Config** | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` |
 | **CLI Config & Themes** | `~/.config/doom-cli/` | `~/Library/Application Support/doom-cli/` | `%LOCALAPPDATA%\doom-cli\` |
-| **SoundFonts** | `~/.local/share/soundfonts/` | `~/Library/Application Support/soundfonts/` | `%LOCALAPPDATA%\soundfonts\` |
+| **SoundFonts** | `~/.local/share/soundfonts/` | `~/Library/Application Support/soundfonts/` | `%USERPROFILE%\Games\Doom\soundfonts\` |
 
 ---
 

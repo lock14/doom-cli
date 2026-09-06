@@ -202,6 +202,7 @@ func Execute(plan *LaunchPlan, out, errOut io.Writer) error {
 	}
 
 	cmd := exec.Command(plan.EngineBin, plan.Args...)
+	cmd.Dir = filepath.Dir(plan.EngineBin)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = out
 	cmd.Stderr = errOut

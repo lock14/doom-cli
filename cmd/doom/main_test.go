@@ -71,6 +71,18 @@ func TestExtractEngineArgs(t *testing.T) {
 			rawArgs:    []string{"doom", "play", "--nerd-fonts=true", "-fast"},
 			expected:   []string{"-fast"},
 		},
+		{
+			name:       "play with --soundfonts-dir= flag syntax",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "play", "--soundfonts-dir=/tmp/sf", "-fast"},
+			expected:   []string{"-fast"},
+		},
+		{
+			name:       "play with --bin-dir= and --wads-dir= flag syntax",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "play", "--bin-dir=/tmp/bin", "--wads-dir=/tmp/wads", "-skill", "4"},
+			expected:   []string{"-skill", "4"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -291,6 +303,41 @@ func TestRunConfigCommands(t *testing.T) {
 	}
 	if err := runConfigGet(nil, []string{"invalid-key"}); err == nil {
 		t.Errorf("runConfigGet(invalid-key) expected error, got nil")
+	}
+}
+
+func TestCanonicalConfigKey(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{name: "theme exact", input: "theme", expected: "theme", wantErr: false},
+		{name: "theme with spaces", input: "  THEME  ", expected: "theme", wantErr: false},
+		{name: "nerd-fonts standard", input: "nerd-fonts", expected: "nerd-fonts", wantErr: false},
+		{name: "nerd_fonts underscore", input: "nerd_fonts", expected: "nerd-fonts", wantErr: false},
+		{name: "nerdfonts squashed", input: "nerdfonts", expected: "nerd-fonts", wantErr: false},
+		{name: "wads-dir dash", input: "wads-dir", expected: "wads-dir", wantErr: false},
+		{name: "wads_dir underscore", input: "wads_dir", expected: "wads-dir", wantErr: false},
+		{name: "bin-dir dash", input: "bin-dir", expected: "bin-dir", wantErr: false},
+		{name: "bin_dir underscore", input: "bin_dir", expected: "bin-dir", wantErr: false},
+		{name: "soundfonts-dir dash", input: "soundfonts-dir", expected: "soundfonts-dir", wantErr: false},
+		{name: "sf-dir short", input: "sf-dir", expected: "soundfonts-dir", wantErr: false},
+		{name: "sf_dir short underscore", input: "sf_dir", expected: "soundfonts-dir", wantErr: false},
+		{name: "unknown key", input: "unknown", expected: "", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := canonicalConfigKey(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("canonicalConfigKey(%q) error = %v, wantErr = %v", tt.input, err, tt.wantErr)
+			}
+			if got != tt.expected {
+				t.Errorf("canonicalConfigKey(%q) = %q, expected %q", tt.input, got, tt.expected)
+			}
+		})
 	}
 }
 

@@ -219,15 +219,33 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	var binMatch *zip.File
 	cleanTarget := strings.TrimSuffix(strings.ToLower(targetName), ".exe")
 
+	// 1. Exact match on targetName (e.g. "uzdoom.exe" or "dsda-doom.exe")
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() {
 			continue
 		}
 		base := strings.ToLower(filepath.Base(zf.Name))
-		baseClean := strings.TrimSuffix(base, ".exe")
-		if baseClean == cleanTarget || strings.HasPrefix(baseClean, cleanTarget) {
+		if base == strings.ToLower(targetName) {
 			binMatch = zf
 			break
+		}
+	}
+
+	// 2. Fallback: match without .exe extension, ensuring on Windows it has .exe extension
+	if binMatch == nil {
+		for _, zf := range zr.File {
+			if zf.FileInfo().IsDir() {
+				continue
+			}
+			base := strings.ToLower(filepath.Base(zf.Name))
+			if runtime.GOOS == "windows" && !strings.HasSuffix(base, ".exe") {
+				continue
+			}
+			baseClean := strings.TrimSuffix(base, ".exe")
+			if baseClean == cleanTarget {
+				binMatch = zf
+				break
+			}
 		}
 	}
 
@@ -251,34 +269,47 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	}
 	_ = os.Chmod(dest, 0755)
 
-	// Also extract companion files (.wad, .pk3, dlls) in the same directory into BinDir
+	// Also extract companion files (.wad, .pk3, dlls, soundfonts, etc.) in the same directory or subdirectories
 	binParent := filepath.Dir(binMatch.Name)
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() || zf == binMatch {
 			continue
 		}
-		if filepath.Dir(zf.Name) == binParent {
-			base := filepath.Base(filepath.Clean(zf.Name))
-			if base == "." || base == ".." || strings.Contains(base, "..") {
+		relPath, err := filepath.Rel(binParent, zf.Name)
+		if err != nil || strings.HasPrefix(relPath, "..") {
+			continue
+		}
+		base := filepath.Base(filepath.Clean(zf.Name))
+		if base == "." || base == ".." || strings.Contains(base, "..") {
+			continue
+		}
+		if isCompanionFile(base) {
+			companionDest := filepath.Clean(filepath.Join(cleanBinDir, filepath.FromSlash(relPath)))
+			if !strings.HasPrefix(companionDest, prefix) {
 				continue
 			}
-			lower := strings.ToLower(base)
-			if strings.HasSuffix(lower, ".wad") ||
-				strings.HasSuffix(lower, ".pk3") ||
-				strings.HasSuffix(lower, ".dll") ||
-				strings.HasSuffix(lower, ".so") ||
-				strings.HasSuffix(lower, ".dylib") {
-				companionDest := filepath.Clean(filepath.Join(cleanBinDir, base))
-				if !strings.HasPrefix(companionDest, prefix) {
-					continue
-				}
-				_ = extractZipEntry(zf, cleanBinDir, companionDest)
-			}
+			_ = extractZipEntry(zf, cleanBinDir, companionDest)
 		}
 	}
 
 	fmt.Fprintf(ins.Out, "✓ Installed %s to %s\n\n", targetName, dest)
 	return nil
+}
+
+var companionExtensions = map[string]bool{
+	".wad":   true,
+	".pk3":   true,
+	".dll":   true,
+	".so":    true,
+	".dylib": true,
+	".sf2":   true,
+	".wopl":  true,
+	".wopn":  true,
+}
+
+func isCompanionFile(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	return companionExtensions[ext]
 }
 
 func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {

@@ -25,12 +25,12 @@ func newConfigCmd() *cobra.Command {
 	}
 	configGetCmd := &cobra.Command{
 		Use:   "get [key]",
-		Short: "Get a CLI configuration setting (theme, nerd-fonts)",
+		Short: "Get a CLI configuration setting (theme, nerd-fonts, wads-dir, bin-dir, soundfonts-dir)",
 		RunE:  runConfigGet,
 	}
 	configSetCmd := &cobra.Command{
 		Use:   "set <key> <value>",
-		Short: "Set a CLI configuration setting (theme, nerd-fonts)",
+		Short: "Set a CLI configuration setting (theme, nerd-fonts, wads-dir, bin-dir, soundfonts-dir)",
 		Args:  cobra.ExactArgs(2),
 		RunE:  runConfigSet,
 	}
@@ -90,9 +90,24 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("=== Doom CLI Configuration ===")
-	fmt.Printf("  Config File: %s\n", paths.ConfigFile)
-	fmt.Printf("  Theme:       %s\n", theme)
-	fmt.Printf("  Nerd Fonts:  %s\n", nerdStatus)
+	fmt.Printf("  Config File:    %s\n", paths.ConfigFile)
+	fmt.Printf("  Theme:          %s\n", theme)
+	fmt.Printf("  Nerd Fonts:     %s\n", nerdStatus)
+	if cfg.WadsDir != "" {
+		fmt.Printf("  WADs Dir:       %s\n", cfg.WadsDir)
+	} else {
+		fmt.Printf("  WADs Dir:       %s (default)\n", paths.WadsDir)
+	}
+	if cfg.BinDir != "" {
+		fmt.Printf("  Bin Dir:        %s\n", cfg.BinDir)
+	} else {
+		fmt.Printf("  Bin Dir:        %s (default)\n", paths.BinDir)
+	}
+	if cfg.SoundFontsDir != "" {
+		fmt.Printf("  SoundFonts Dir: %s\n", cfg.SoundFontsDir)
+	} else {
+		fmt.Printf("  SoundFonts Dir: %s (default)\n", paths.SoundFontsDir)
+	}
 
 	if len(cfg.Engines) > 0 {
 		fmt.Printf("\nCustom Engines (%d):\n", len(cfg.Engines))
@@ -139,27 +154,50 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 		return runConfigShow(cmd, args)
 	}
 
+	canonKey, err := canonicalConfigKey(args[0])
+	if err != nil {
+		return err
+	}
+
 	paths := getPaths()
 	cfg, err := config.LoadConfig(paths)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	key := strings.ToLower(strings.TrimSpace(args[0]))
-	switch key {
+	switch canonKey {
 	case "theme":
 		fmt.Println(cfg.Theme)
-		return nil
-	case "nerd-fonts", "nerd_fonts", "nerdfonts":
+	case "nerd-fonts":
 		fmt.Println(cfg.NerdFonts)
-		return nil
-	default:
-		return fmt.Errorf("unknown config key %q (valid keys: theme, nerd-fonts)", key)
+	case "wads-dir":
+		if cfg.WadsDir != "" {
+			fmt.Println(cfg.WadsDir)
+		} else {
+			fmt.Println(paths.WadsDir)
+		}
+	case "bin-dir":
+		if cfg.BinDir != "" {
+			fmt.Println(cfg.BinDir)
+		} else {
+			fmt.Println(paths.BinDir)
+		}
+	case "soundfonts-dir":
+		if cfg.SoundFontsDir != "" {
+			fmt.Println(cfg.SoundFontsDir)
+		} else {
+			fmt.Println(paths.SoundFontsDir)
+		}
 	}
+	return nil
 }
 
 func runConfigSet(cmd *cobra.Command, args []string) error {
-	key := strings.ToLower(strings.TrimSpace(args[0]))
+	canonKey, err := canonicalConfigKey(args[0])
+	if err != nil {
+		return err
+	}
+
 	val := strings.TrimSpace(args[1])
 	paths := getPaths()
 
@@ -168,16 +206,16 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("loading config: %w", err)
 	}
 
-	switch key {
+	switch canonKey {
 	case "theme":
 		return runThemesSet(cmd, []string{val})
-	case "nerd-fonts", "nerd_fonts", "nerdfonts":
+	case "nerd-fonts":
 		if strings.EqualFold(val, "toggle") {
 			cfg.NerdFonts = !cfg.NerdFonts
 		} else {
 			parsed, err := parseBool(val)
 			if err != nil {
-				return fmt.Errorf("invalid value for %s: %w", key, err)
+				return fmt.Errorf("invalid value for %s: %w", canonKey, err)
 			}
 			cfg.NerdFonts = parsed
 		}
@@ -190,18 +228,60 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Printf("✓ Set nerd_fonts to %t (%s) in %s\n", cfg.NerdFonts, status, paths.ConfigFile)
 		return nil
-	default:
-		return fmt.Errorf("unknown config key %q (valid keys: theme, nerd-fonts)", key)
+	case "wads-dir":
+		cfg.WadsDir = val
+		if err := config.SaveConfig(paths, cfg); err != nil {
+			return fmt.Errorf("saving config: %w", err)
+		}
+		fmt.Printf("✓ Set wads_dir to %s in %s\n", val, paths.ConfigFile)
+		return nil
+	case "bin-dir":
+		cfg.BinDir = val
+		if err := config.SaveConfig(paths, cfg); err != nil {
+			return fmt.Errorf("saving config: %w", err)
+		}
+		fmt.Printf("✓ Set bin_dir to %s in %s\n", val, paths.ConfigFile)
+		return nil
+	case "soundfonts-dir":
+		cfg.SoundFontsDir = val
+		if err := config.SaveConfig(paths, cfg); err != nil {
+			return fmt.Errorf("saving config: %w", err)
+		}
+		fmt.Printf("✓ Set soundfonts_dir to %s in %s\n", val, paths.ConfigFile)
+		return nil
 	}
+	return nil
 }
 
 func runConfigToggle(cmd *cobra.Command, args []string) error {
-	key := strings.ToLower(strings.TrimSpace(args[0]))
+	canonKey, err := canonicalConfigKey(args[0])
+	if err != nil {
+		return err
+	}
+	if canonKey != "nerd-fonts" {
+		return fmt.Errorf("cannot toggle non-boolean config key %q (valid toggleable keys: nerd-fonts)", args[0])
+	}
+	return runConfigSet(cmd, []string{canonKey, "toggle"})
+}
+
+func canonicalConfigKey(rawKey string) (string, error) {
+	key := strings.ToLower(strings.TrimSpace(rawKey))
 	switch key {
+	case "theme":
+		return "theme", nil
 	case "nerd-fonts", "nerd_fonts", "nerdfonts":
-		return runConfigSet(cmd, []string{key, "toggle"})
+		return "nerd-fonts", nil
+	case "wads-dir", "wads_dir", "wadsdir":
+		return "wads-dir", nil
+	case "bin-dir", "bin_dir", "bindir":
+		return "bin-dir", nil
+	case "soundfonts-dir", "soundfonts_dir", "soundfont-dir", "soundfont_dir", "sf-dir", "sf_dir":
+		return "soundfonts-dir", nil
 	default:
-		return fmt.Errorf("cannot toggle non-boolean config key %q (valid toggleable keys: nerd-fonts)", key)
+		return "", fmt.Errorf(
+			"unknown config key %q (valid keys: theme, nerd-fonts, wads-dir, bin-dir, soundfonts-dir)",
+			rawKey,
+		)
 	}
 }
 

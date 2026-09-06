@@ -14,6 +14,9 @@ import (
 type AppConfig struct {
 	Theme         string                             `json:"theme,omitempty"`
 	NerdFonts     bool                               `json:"nerd_fonts,omitempty"`
+	WadsDir       string                             `json:"wads_dir,omitempty"`
+	BinDir        string                             `json:"bin_dir,omitempty"`
+	SoundFontsDir string                             `json:"soundfonts_dir,omitempty"`
 	Engines       map[string]preset.EngineConfig     `json:"engines,omitempty"`
 	Presets       []preset.Preset                    `json:"presets,omitempty"`
 	LaunchOptions map[string]preset.WadLaunchOptions `json:"launch_options,omitempty"`
