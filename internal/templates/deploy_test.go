@@ -49,7 +49,6 @@ func TestDeployConfigs_And_Diff(t *testing.T) {
 		SoundFontFile: filepath.Join(tmpDir, "soundfonts", "GeneralUser-GS.sf2"),
 		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
 		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
-		DoomRunnerDir: filepath.Join(tmpDir, "DoomRunner"),
 	}
 
 	if err := DeployConfigs(paths); err != nil {

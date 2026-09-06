@@ -1,4 +1,4 @@
-// Package preset manages the declarative preset catalog, lookup, and DoomRunner options compilation.
+// Package preset manages the declarative preset catalog, lookup, and documentation synchronization.
 package preset
 
 import (

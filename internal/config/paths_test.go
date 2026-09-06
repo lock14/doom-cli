@@ -40,8 +40,11 @@ func TestResolveForDarwin(t *testing.T) {
 
 func TestResolveForWindows(t *testing.T) {
 	p := ResolveFor("windows", "")
-	if !strings.Contains(p.DoomRunnerRoam, "AppData") && !strings.Contains(p.DoomRunnerRoam, "DoomRunner") {
-		t.Errorf("expected AppData/DoomRunner in DoomRunnerRoam, got %s", p.DoomRunnerRoam)
+	if !strings.Contains(p.UZDoomDir, "AppData") || !strings.Contains(p.UZDoomDir, "uzdoom") {
+		t.Errorf("expected AppData/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
+	}
+	if !strings.Contains(p.DSDADir, "AppData") || !strings.Contains(p.DSDADir, "dsda-doom") {
+		t.Errorf("expected AppData/dsda-doom in DSDADir, got %s", p.DSDADir)
 	}
 	if !strings.Contains(p.WadsDir, "Doom WADS") {
 		t.Errorf("expected Doom WADS in WadsDir, got %s", p.WadsDir)

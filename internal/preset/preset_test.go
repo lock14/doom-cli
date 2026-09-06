@@ -1,7 +1,6 @@
 package preset
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,49 +100,67 @@ func TestPresetParityAndInvariants(t *testing.T) {
 		}
 	}
 
-	// 2. Parity with Linux options.json
-	linuxFile := filepath.Join(rootDir, "DoomRunner", "linux", "options.json")
-	if data, err := os.ReadFile(linuxFile); err == nil {
-		var obj struct {
-			Presets []DoomRunnerPreset `json:"presets"`
-		}
-		if err := json.Unmarshal(data, &obj); err != nil {
-			t.Errorf("failed to unmarshal %s: %v", linuxFile, err)
-		} else {
-			expected := BuildLinuxPresets(cat)
-			expectedJSON, _ := json.Marshal(expected)
-			actualJSON, _ := json.Marshal(obj.Presets)
-			if string(expectedJSON) != string(actualJSON) {
-				t.Errorf("%s presets are out of sync with data/presets.json. Run 'doom presets build'", linuxFile)
-			}
-		}
-	}
-
-	// 3. Parity with Windows options.json
-	winFile := filepath.Join(rootDir, "DoomRunner", "windows", "options.json")
-	if data, err := os.ReadFile(winFile); err == nil {
-		var obj struct {
-			Presets []DoomRunnerPreset `json:"presets"`
-		}
-		if err := json.Unmarshal(data, &obj); err != nil {
-			t.Errorf("failed to unmarshal %s: %v", winFile, err)
-		} else {
-			expected := BuildWindowsPresets(cat)
-			expectedJSON, _ := json.Marshal(expected)
-			actualJSON, _ := json.Marshal(obj.Presets)
-			if string(expectedJSON) != string(actualJSON) {
-				t.Errorf("%s presets are out of sync with data/presets.json. Run 'doom presets build'", winFile)
-			}
-		}
-	}
-
-	// 4. Parity with README.md table
+	// 2. Parity with README.md table
 	readmeFile := filepath.Join(rootDir, "README.md")
 	if data, err := os.ReadFile(readmeFile); err == nil {
 		expectedTable := GenerateReadmeTable(cat)
 		if !strings.Contains(string(data), expectedTable) {
 			t.Errorf("%s presets table is out of sync with data/presets.json. Run 'doom presets build'", readmeFile)
 		}
+	}
+}
+
+func TestSyncReadme(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Setup data/presets.json
+	dataDir := filepath.Join(tmpDir, "data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(data) error = %v", err)
+	}
+
+	presetContent := `{
+		"presets": [
+			{
+				"name": "Test Megawad",
+				"engine": "dsda-doom",
+				"iwad": "DOOM2.WAD",
+				"description": "A test megawad"
+			}
+		]
+	}`
+	if err := os.WriteFile(filepath.Join(dataDir, "presets.json"), []byte(presetContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(presets.json) error = %v", err)
+	}
+
+	readmeContent := `# Title
+
+## Preconfigured Presets
+
+Some intro text
+
+| Old Table |
+| :--- |
+| Old Content |
+
+---
+`
+	readmePath := filepath.Join(tmpDir, "README.md")
+	if err := os.WriteFile(readmePath, []byte(readmeContent), 0o644); err != nil {
+		t.Fatalf("WriteFile(README.md) error = %v", err)
+	}
+
+	if err := SyncReadme(tmpDir); err != nil {
+		t.Fatalf("SyncReadme() error = %v", err)
+	}
+
+	updated, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("ReadFile(README.md) error = %v", err)
+	}
+
+	if !strings.Contains(string(updated), "Test Megawad") {
+		t.Errorf("expected updated README to contain 'Test Megawad', got:\n%s", string(updated))
 	}
 }
 

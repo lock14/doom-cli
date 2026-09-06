@@ -10,18 +10,16 @@ import (
 
 // Paths holds the resolved platform-idiomatic paths for Doom source ports and tools.
 type Paths struct {
-	UZDoomDir      string
-	DSDADir        string
-	DoomRunnerDir  string
-	DoomRunnerRoam string // Used on Windows (%APPDATA%\DoomRunner)
-	WadsDir        string
-	SoundFontsDir  string
-	BinDir         string
-	DataDir        string
-	ConfigDir      string
-	ConfigFile     string
-	ThemesDir      string
-	SoundFontFile  string
+	UZDoomDir     string
+	DSDADir       string
+	WadsDir       string
+	SoundFontsDir string
+	BinDir        string
+	DataDir       string
+	ConfigDir     string
+	ConfigFile    string
+	ThemesDir     string
+	SoundFontFile string
 }
 
 // GetPaths returns the platform-idiomatic paths for the current running OS.
@@ -43,7 +41,6 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		appSupport := filepath.Join(home, "Library", "Application Support")
 		p.UZDoomDir = filepath.Join(appSupport, "uzdoom")
 		p.DSDADir = filepath.Join(appSupport, "dsda-doom")
-		p.DoomRunnerDir = filepath.Join(appSupport, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(appSupport, "soundfonts")
 		p.DataDir = filepath.Join(appSupport, "doom-cli")
 		p.ConfigDir = filepath.Join(appSupport, "doom-cli")
@@ -55,15 +52,9 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		if localAppData == "" {
 			localAppData = filepath.Join(home, "AppData", "Local")
 		}
-		appData := os.Getenv("APPDATA")
-		if appData == "" {
-			appData = filepath.Join(home, "AppData", "Roaming")
-		}
 
 		p.UZDoomDir = filepath.Join(localAppData, "uzdoom")
 		p.DSDADir = filepath.Join(localAppData, "dsda-doom")
-		p.DoomRunnerDir = filepath.Join(localAppData, "DoomRunner")
-		p.DoomRunnerRoam = filepath.Join(appData, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(localAppData, "soundfonts")
 		p.DataDir = filepath.Join(localAppData, "doom-cli")
 		p.ConfigDir = filepath.Join(localAppData, "doom-cli")
@@ -90,7 +81,6 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 
 		p.UZDoomDir = filepath.Join(xdgConfig, "uzdoom")
 		p.DSDADir = filepath.Join(xdgData, "dsda-doom")
-		p.DoomRunnerDir = filepath.Join(xdgData, "DoomRunner")
 		p.SoundFontsDir = filepath.Join(xdgData, "soundfonts")
 		p.DataDir = filepath.Join(xdgData, "doom-cli")
 		p.ConfigDir = filepath.Join(xdgConfig, "doom-cli")

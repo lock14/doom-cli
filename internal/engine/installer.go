@@ -166,45 +166,12 @@ func (ins *Installer) InstallDSDA() error {
 	return ins.deployAsset(targetName, url)
 }
 
-// InstallDoomRunner downloads and installs DoomRunner for current platform.
-func (ins *Installer) InstallDoomRunner() error {
-	fmt.Fprintf(ins.Out, "Installing DoomRunner...\n")
-	var pattern, fallback, targetName string
-	const fallbackBase = "https://github.com/Youda008/DoomRunner/releases/download/v1.9.2/"
-
-	switch runtime.GOOS {
-	case "darwin":
-		targetName = "doomrunner"
-		if runtime.GOARCH == "arm64" {
-			pattern = `DoomRunner-.*-MacOS-arm64\.dmg`
-			fallback = fallbackBase + "DoomRunner-1.9.2-MacOS-arm64.dmg"
-		} else {
-			pattern = `DoomRunner-.*-MacOS-x86_64\.dmg`
-			fallback = fallbackBase + "DoomRunner-1.9.2-MacOS-x86_64.dmg"
-		}
-	case "windows":
-		targetName = "DoomRunner.exe"
-		pattern = `DoomRunner-.*-Windows-x64\.zip`
-		fallback = fallbackBase + "DoomRunner-1.9.2-Windows-x64.zip"
-	default:
-		targetName = "doomrunner"
-		pattern = `DoomRunner-.*-Linux-x86_64\.AppImage`
-		fallback = fallbackBase + "DoomRunner-1.9.2-Linux-x86_64.AppImage"
-	}
-
-	url := ins.ResolveLatestGitHubURL("Youda008/DoomRunner", pattern, fallback)
-	return ins.deployAsset(targetName, url)
-}
-
-// InstallAll installs UZDoom, DSDA-Doom, and DoomRunner.
+// InstallAll installs UZDoom and DSDA-Doom source ports.
 func (ins *Installer) InstallAll() error {
 	if err := ins.InstallUZDoom(); err != nil {
 		return err
 	}
-	if err := ins.InstallDSDA(); err != nil {
-		return err
-	}
-	return ins.InstallDoomRunner()
+	return ins.InstallDSDA()
 }
 
 func (ins *Installer) deployAsset(targetName, url string) error {
