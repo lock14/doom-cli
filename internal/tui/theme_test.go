@@ -3,6 +3,7 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -185,5 +186,36 @@ func TestResolveTheme(t *testing.T) {
 				t.Errorf("ResolveTheme() = %q, expected %q", res.Name, tt.expected)
 			}
 		})
+	}
+}
+
+func TestRenderBrandPill_CustomIcon(t *testing.T) {
+	theme := DefaultTheme
+	theme.BrandIcon = "☠"
+	styles := CompileStyles(theme)
+	rendered := styles.RenderBrandPill()
+	if !strings.Contains(rendered, "☠") || !strings.Contains(rendered, "DOOM") {
+		t.Errorf("RenderBrandPill() = %q, expected custom icon ☠ and DOOM", rendered)
+	}
+
+	// Empty icon falls back to skull
+	theme.BrandIcon = ""
+	styles = CompileStyles(theme)
+	rendered = styles.RenderBrandPill()
+	if !strings.Contains(rendered, "💀") || !strings.Contains(rendered, "DOOM") {
+		t.Errorf("RenderBrandPill() = %q, expected default icon 💀 and DOOM", rendered)
+	}
+}
+
+func TestMonochromeThemeContrast(t *testing.T) {
+	styles := CompileStyles(MonochromeTheme)
+	brandPill := styles.RenderBrandPill()
+	if !strings.Contains(brandPill, "DOOM") {
+		t.Errorf("monochrome brand pill = %q, expected 'DOOM'", brandPill)
+	}
+
+	// Verify BrandBg and StatsBg are distinct for contrast
+	if MonochromeTheme.BrandBg == MonochromeTheme.StatsBg {
+		t.Errorf("expected BrandBg and StatsBg to differ in MonochromeTheme for visual contrast")
 	}
 }

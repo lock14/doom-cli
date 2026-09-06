@@ -16,6 +16,7 @@ type Theme struct {
 	Name           string
 	Description    string
 	Type           string // "ANSI-16" or "TrueColor"
+	BrandIcon      string
 	BrandCap       lipgloss.TerminalColor
 	BrandText      lipgloss.TerminalColor
 	BrandBg        lipgloss.TerminalColor
@@ -41,6 +42,7 @@ type Theme struct {
 
 // ThemeStyles holds pre-compiled lipgloss.Style instances derived from a Theme.
 type ThemeStyles struct {
+	BrandIcon        string
 	BrandCap         lipgloss.Style
 	BrandBody        lipgloss.Style
 	StatsCap         lipgloss.Style
@@ -71,6 +73,7 @@ type ThemeStyles struct {
 type CustomThemeFile struct {
 	Name           string `json:"name"`
 	Description    string `json:"description"`
+	BrandIcon      string `json:"brand_icon,omitempty"`
 	BrandCap       string `json:"brand_cap,omitempty"`
 	BrandText      string `json:"brand_text,omitempty"`
 	BrandBg        string `json:"brand_bg,omitempty"`
@@ -211,26 +214,27 @@ var MonochromeTheme = Theme{
 	Name:           "monochrome",
 	Description:    "Minimalist high-contrast Black & White",
 	Type:           "ANSI",
-	BrandCap:       lipgloss.Color("7"),
-	BrandText:      lipgloss.Color("0"),
-	BrandBg:        lipgloss.Color("7"),
-	StatsCap:       lipgloss.Color("8"),
-	StatsText:      lipgloss.Color("7"),
-	StatsBg:        lipgloss.Color("8"),
-	Prompt:         lipgloss.Color("7"),
-	CursorBar:      lipgloss.Color("7"),
-	CursorText:     lipgloss.Color("7"),
-	BorderActive:   lipgloss.Color("7"),
+	BrandIcon:      "💀",
+	BrandCap:       lipgloss.Color("8"),
+	BrandText:      lipgloss.Color("15"),
+	BrandBg:        lipgloss.Color("8"),
+	StatsCap:       lipgloss.Color("7"),
+	StatsText:      lipgloss.Color("0"),
+	StatsBg:        lipgloss.Color("7"),
+	Prompt:         lipgloss.Color("15"),
+	CursorBar:      lipgloss.Color("15"),
+	CursorText:     lipgloss.Color("15"),
+	BorderActive:   lipgloss.Color("15"),
 	BorderInactive: lipgloss.Color("8"),
-	TitleActive:    lipgloss.Color("7"),
+	TitleActive:    lipgloss.Color("15"),
 	TitleInactive:  lipgloss.Color("8"),
-	Label:          lipgloss.Color("7"),
-	Keycap:         lipgloss.Color("7"),
+	Label:          lipgloss.Color("15"),
+	Keycap:         lipgloss.Color("15"),
 	KeyDesc:        lipgloss.Color("8"),
-	TagDSDA:        lipgloss.Color("7"),
+	TagDSDA:        lipgloss.Color("15"),
 	TagUZDoom:      lipgloss.Color("7"),
-	StatusReady:    lipgloss.Color("7"),
-	StatusMissing:  lipgloss.Color("7"),
+	StatusReady:    lipgloss.Color("15"),
+	StatusMissing:  lipgloss.Color("8"),
 	Muted:          lipgloss.Color("8"),
 }
 
@@ -264,7 +268,13 @@ func ListBuiltinThemes() []Theme {
 
 // CompileStyles constructs pre-compiled lipgloss.Style instances from a Theme.
 func CompileStyles(t Theme) ThemeStyles {
+	icon := t.BrandIcon
+	if icon == "" {
+		icon = "💀"
+	}
+
 	return ThemeStyles{
+		BrandIcon:    icon,
 		BrandCap:     lipgloss.NewStyle().Foreground(t.BrandCap),
 		BrandBody:    lipgloss.NewStyle().Background(t.BrandBg).Foreground(t.BrandText).Bold(true),
 		StatsCap:     lipgloss.NewStyle().Foreground(t.StatsCap),
@@ -322,6 +332,9 @@ func LoadThemeFile(path string) (Theme, error) {
 		theme.Description = "Custom user theme"
 	}
 	theme.Type = "Custom"
+	if c.BrandIcon != "" {
+		theme.BrandIcon = c.BrandIcon
+	}
 
 	assignColor(&theme.BrandCap, c.BrandCap)
 	assignColor(&theme.BrandText, c.BrandText)
@@ -385,7 +398,15 @@ func ResolveTheme(flagTheme, envTheme, configTheme, themesDir string) Theme {
 
 // RenderBrandPill renders the DOOM pill using this theme's brand styles.
 func (s ThemeStyles) RenderBrandPill() string {
-	return renderCapsule(s.BrandCap, s.BrandBody, " 💀 DOOM ")
+	icon := s.BrandIcon
+	if icon == "" {
+		icon = "💀"
+	}
+	text := fmt.Sprintf(" %s DOOM ", icon)
+	if strings.TrimSpace(icon) == "" {
+		text = " DOOM "
+	}
+	return renderCapsule(s.BrandCap, s.BrandBody, text)
 }
 
 // RenderStatsPill renders the preset count pill using this theme's stats styles.
