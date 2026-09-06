@@ -33,30 +33,7 @@ const (
 	minBoxHeight = 3
 )
 
-var (
-	defaultStyles = CompileStyles(DefaultTheme)
-
-	// Legacy package-level references preserved for backward-compatibility in tests
-	brandCapStyle         = defaultStyles.BrandCap
-	brandBodyStyle        = defaultStyles.BrandBody
-	statsCapStyle         = defaultStyles.StatsCap
-	statsBodyStyle        = defaultStyles.StatsBody
-	filterPromptStyle     = defaultStyles.FilterPrompt
-	panelBoxFocusedStyle  = defaultStyles.BoxActive
-	panelBoxInactiveStyle = defaultStyles.BoxInactive
-	cursorBarStyle        = defaultStyles.CursorBar
-	cursorTextStyle       = defaultStyles.CursorText
-	tagDSDAStyle          = defaultStyles.TagDSDA
-	tagUZDoomStyle        = defaultStyles.TagUZDoom
-	labelStyle            = defaultStyles.Label
-	valueBoldStyle        = defaultStyles.ValueBold
-	foundStyle            = defaultStyles.StatusReady
-	missingStyle          = defaultStyles.StatusMissing
-	helpStyle             = defaultStyles.Help
-	keyHelpKeyStyle       = defaultStyles.KeyHelpKey
-	keyHelpDescStyle      = defaultStyles.KeyHelpDesc
-	bulletStyle           = defaultStyles.Bullet
-)
+var defaultStyles = CompileStyles(DefaultTheme)
 
 // calculateSearchWidth returns the clamped width for the preset search input.
 func calculateSearchWidth(termWidth int) int {

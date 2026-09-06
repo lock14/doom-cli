@@ -293,3 +293,33 @@ func TestRunConfigCommands(t *testing.T) {
 		t.Errorf("runConfigGet(invalid-key) expected error, got nil")
 	}
 }
+
+func TestNewRootCmd(t *testing.T) {
+	cmd := newRootCmd()
+	if cmd == nil {
+		t.Fatal("expected non-nil root command")
+	}
+
+	expectedSubcommands := []string{
+		"play", "launch", "setup", "wads", "engines",
+		"soundfont", "config", "presets", "themes",
+	}
+
+	foundSubcommands := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		foundSubcommands[sub.Name()] = true
+	}
+
+	for _, expected := range expectedSubcommands {
+		if !foundSubcommands[expected] {
+			t.Errorf("expected subcommand %q not found in root command", expected)
+		}
+	}
+
+	// Verify persistent flags
+	for _, flag := range []string{"engine", "wads-dir", "bin-dir", "dry-run", "presets-file", "theme", "nerd-fonts"} {
+		if cmd.PersistentFlags().Lookup(flag) == nil {
+			t.Errorf("expected persistent flag %q on root command", flag)
+		}
+	}
+}
