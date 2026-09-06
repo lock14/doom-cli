@@ -10,8 +10,6 @@
 
 A unified, cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) across Linux, macOS, and Windows.
 
-![Doom Presets Launcher](assets/tui-presets.png)
-
 ---
 
 ## Table of Contents
@@ -228,6 +226,8 @@ doom completion powershell | Out-String | Invoke-Expression
 ## Interactive TUI Launcher
 
 The interactive launcher (`doom play` or `doom`) provides a responsive, split-pane terminal interface powered by Bubble Tea:
+
+![Interactive Preset Browser](assets/tui-presets.png)
 
 - **Fuzzy Search**: Filter across all presets instantly as you type.
 - **Side-by-Side Preview Pane**: Displays required IWAD, PWAD file list, DeHackEd patches, and descriptive metadata.
