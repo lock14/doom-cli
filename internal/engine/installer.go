@@ -309,12 +309,15 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 		return fmt.Errorf("no .app bundle found in DMG")
 	}
 
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("resolving user home directory: %w", err)
+	}
 	appsDir := filepath.Join(home, "Applications")
 	_ = os.MkdirAll(appsDir, 0755)
 	appDest := filepath.Join(appsDir, filepath.Base(appEntry))
 
-	_ = exec.Command("rm", "-rf", appDest).Run()
+	_ = os.RemoveAll(appDest)
 	if err := exec.Command("cp", "-R", appEntry, appsDir+"/").Run(); err != nil {
 		return fmt.Errorf("failed to copy .app to %s: %w", appsDir, err)
 	}

@@ -56,6 +56,8 @@ func DefaultTargetPatterns() []TargetPattern {
 	}
 }
 
+var vdfPathRegex = regexp.MustCompile(`^\s*"path"\s*"([^"]+)"`)
+
 // ParseLibraryFolders extracts secondary library folder paths from Steam's libraryfolders.vdf.
 func ParseLibraryFolders(vdfPath string) []string {
 	f, err := os.Open(vdfPath)
@@ -65,11 +67,10 @@ func ParseLibraryFolders(vdfPath string) []string {
 	defer f.Close()
 
 	var paths []string
-	re := regexp.MustCompile(`^\s*"path"\s*"([^"]+)"`)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		matches := re.FindStringSubmatch(line)
+		matches := vdfPathRegex.FindStringSubmatch(line)
 		if len(matches) > 1 {
 			p := strings.TrimSpace(matches[1])
 			// Handle Windows escaped backslashes in VDF
@@ -194,8 +195,8 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 	// Build indexed map: lowercase filename -> slice of paths
 	indexed := make(map[string][]string)
 	for _, root := range existingRoots {
-		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info == nil || info.IsDir() {
+		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d == nil || d.IsDir() {
 				return nil
 			}
 			// Limit depth to avoid scanning irrelevant deep trees
@@ -204,7 +205,7 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 				return filepath.SkipDir
 			}
 
-			lowerName := strings.ToLower(info.Name())
+			lowerName := strings.ToLower(d.Name())
 			if strings.HasSuffix(lowerName, ".wad") ||
 				strings.HasSuffix(lowerName, ".pk3") ||
 				strings.HasSuffix(lowerName, ".deh") {
