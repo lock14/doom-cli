@@ -235,10 +235,13 @@ Powerlevel10k-style rounded capsule badges (` DOOM `):
 # Temporarily enable rounded capsules for a single run
 doom play --nerd-fonts
 
-# Or enable permanently in ~/.config/doom-cli/config.json
-{
-  "nerd_fonts": true
-}
+# Permanently enable or toggle via CLI
+doom config set nerd-fonts on
+doom config set nerd-fonts off
+doom config toggle nerd-fonts
+
+# Inspect current CLI settings
+doom config show
 ```
 
 ### 3. Graphical Launcher (DoomRunner)
