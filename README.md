@@ -10,7 +10,7 @@
 
 A unified, cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) across Linux, macOS, and Windows.
 
-![Doom Presets Launcher](assets/presets.png)
+![Doom Presets Launcher](assets/tui-presets.png)
 
 ---
 
@@ -251,7 +251,7 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 
 ### README Document Viewer Controls
 
-![Built-in README Viewer](assets/readme.png)
+![Built-in README Viewer](assets/tui-readme.png)
 
 When viewing a preset's documentation via `Tab`:
 
