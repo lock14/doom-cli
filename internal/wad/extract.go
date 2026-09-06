@@ -33,6 +33,8 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 	}
 	defer zr.Close()
 
+	cleanWadsDir := filepath.Clean(d.WadsDir)
+
 	var wadFiles []*zip.File
 	var dehFiles []*zip.File
 	var txtFiles []*zip.File
@@ -40,7 +42,15 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 		if zf.FileInfo().IsDir() {
 			continue
 		}
-		baseLower := strings.ToLower(filepath.Base(zf.Name))
+		// CodeQL / Zip Slip defense: skip entries containing path traversal
+		cleanName := filepath.Clean(zf.Name)
+		if strings.HasPrefix(cleanName, "..") ||
+			strings.Contains(cleanName, "/../") ||
+			strings.Contains(cleanName, "\\..\\") {
+			continue
+		}
+
+		baseLower := strings.ToLower(filepath.Base(cleanName))
 		if strings.HasSuffix(baseLower, ".wad") {
 			wadFiles = append(wadFiles, zf)
 		} else if strings.HasSuffix(baseLower, ".deh") {
@@ -112,8 +122,14 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 			return fmt.Errorf("could not find matching file in archive for %s", exp)
 		}
 
-		destPath := filepath.Join(d.WadsDir, exp)
-		if err := extractZipFile(match, destPath); err != nil {
+		cleanExp := filepath.Base(filepath.Clean(exp))
+		destPath := filepath.Clean(filepath.Join(cleanWadsDir, cleanExp))
+		prefix := cleanWadsDir + string(filepath.Separator)
+		if !strings.HasPrefix(destPath, prefix) {
+			return fmt.Errorf("illegal file destination %q for entry %s", destPath, match.Name)
+		}
+
+		if err := extractZipFile(match, cleanWadsDir, destPath); err != nil {
 			return fmt.Errorf("error extracting %s: %w", exp, err)
 		}
 		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", filepath.Base(match.Name), destPath)
@@ -125,9 +141,18 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 		if strings.EqualFold(base, "license.txt") {
 			continue
 		}
-		destPath := filepath.Join(d.WadsDir, filepath.Base(tf.Name))
-		if err := extractZipFile(tf, destPath); err == nil {
-			fmt.Fprintf(d.Out, "    Readme:    %s -> %s\n", filepath.Base(tf.Name), destPath)
+		cleanName := filepath.Base(filepath.Clean(tf.Name))
+		if cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "..") {
+			continue
+		}
+		destPath := filepath.Clean(filepath.Join(cleanWadsDir, cleanName))
+		prefix := cleanWadsDir + string(filepath.Separator)
+		if !strings.HasPrefix(destPath, prefix) {
+			continue
+		}
+
+		if err := extractZipFile(tf, cleanWadsDir, destPath); err == nil {
+			fmt.Fprintf(d.Out, "    Readme:    %s -> %s\n", cleanName, destPath)
 			break
 		}
 	}
@@ -135,8 +160,14 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 	return nil
 }
 
-func extractZipFile(zf *zip.File, destPath string) error {
+func extractZipFile(zf *zip.File, targetDir, destPath string) error {
+	cleanTarget := filepath.Clean(targetDir)
 	cleanDest := filepath.Clean(destPath)
+	prefix := cleanTarget + string(filepath.Separator)
+	if !strings.HasPrefix(cleanDest, prefix) {
+		return fmt.Errorf("illegal file path in archive: %s", zf.Name)
+	}
+
 	if err := os.MkdirAll(filepath.Dir(cleanDest), 0755); err != nil {
 		return err
 	}
