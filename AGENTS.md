@@ -21,6 +21,7 @@
 *   **Destructive Safety & Backup Policy**:
     *   **Mandatory Non-Destructive Backups**: Any configuration deployment target or command (`doom config install`, `doom setup`) must create timestamped backups (`.bak.<timestamp>`) before overwriting or modifying any existing user configuration file.
     *   **Preserve Unrelated Configuration**: When adding new engine variables, aliases, or keybindings, avoid modifying or removing unrelated settings unless explicitly requested.
+    *   **Archive Security & Zip Slip Hardening**: All archive extractions (`archive/zip`) must sanitize entry paths against `..` traversal sequences and verify `strings.HasPrefix(cleanDest, cleanTargetDir + string(filepath.Separator))` before any filesystem write.
 *   **Doom Engine Selection & Preset Hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics, and speedrunning precision are desired (e.g. *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*, *Legacy of Rust*, *Sigil*).
     *   **UZDoom**: Use for mapsets requiring ZDoom/GZDoom features, advanced scripting, high-res texture packs like OTEX (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
