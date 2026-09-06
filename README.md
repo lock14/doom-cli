@@ -10,6 +10,8 @@
 
 A unified, cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) across Linux, macOS, and Windows.
 
+![Doom Presets Launcher](assets/tui-presets.png)
+
 ---
 
 ## Table of Contents
@@ -230,7 +232,7 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 - **Fuzzy Search**: Filter across all presets instantly as you type.
 - **Side-by-Side Preview Pane**: Displays required IWAD, PWAD file list, DeHackEd patches, and descriptive metadata.
 - **File Readiness Indicators**: Displays `✓ Ready` when all required files are present, or `✗ Missing` listing the exact missing files.
-- **In-App README Viewer**: Press `r` on any preset to read its bundled idgames `.txt` or documentation file in a full-screen scrollable viewport with automatic CP437/DOS box-drawing decoding.
+- **In-App README Viewer**: Press `Tab` on any preset to read its bundled idgames `.txt` or documentation file in a full-screen scrollable viewport with automatic CP437/DOS box-drawing decoding.
 - **Session Memory**: Remembers cursor position across launches when returning to the launcher.
 
 ### Main Preset Browser Controls
@@ -240,7 +242,7 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 | `↑` / `k` | Move selection up |
 | `↓` / `j` | Move selection down |
 | `Enter` | Launch selected preset |
-| `r` | Open bundled README / text file in document viewer |
+| `Tab` / `Ctrl+R` | Open bundled README / text file in document viewer |
 | `t` | Cycle to next color theme |
 | `n` | Toggle Nerd Fonts rounded capsule badges |
 | `/` | Focus search filter input |
@@ -249,7 +251,9 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 
 ### README Document Viewer Controls
 
-When viewing a preset's documentation via `r`:
+![Built-in README Viewer](assets/tui-readme.png)
+
+When viewing a preset's documentation via `Tab`:
 
 | Key | Action |
 | :--- | :--- |
@@ -259,7 +263,7 @@ When viewing a preset's documentation via `r`:
 | `PgDn` / `f` | Scroll down one full page |
 | `Home` / `g` | Jump to beginning of document |
 | `End` / `G` | Jump to end of document |
-| `Esc` / `q` / `Enter` / `r` | Close document viewer and return to preset list |
+| `Esc` / `q` / `Enter` / `Tab` | Close document viewer and return to preset list |
 
 ---
 
