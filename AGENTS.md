@@ -30,6 +30,9 @@
     *   **Optional Asset Degradation**: Optional soundtrack enhancements like `idkfa 2024.wad` must not prevent base games from running when absent (falling back cleanly to standard MIDI). Missing required map files must cleanly abort execution with a descriptive error before engine invocation.
     *   **Filename Normalization & Alias Tolerance**: Case-insensitive and whitespace/dash/underscore-normalized matching ensures maps and DeHackEd patches resolve reliably regardless of user file naming. Rerelease add-on aliases (`gdturbo.wad` -> `gd.wad`, `doomzero.wad`/`DOOMZERO.DEH`) must be discovered by `doom wads extract`.
     *   **Visual Aesthetic & Frame Pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`, and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0` with `render_vsync 1` and `uncapped_framerate 1` so high-refresh monitors pace frames smoothly to native monitor refresh rates.
+*   **TUI Styling & Font Glyph Hygiene**:
+    *   **Clean Typography Over Emojis**: Emojis (e.g. `💀`) render with fixed vendor bitmaps/colors regardless of ANSI foreground escapes. They clash with light backgrounds (such as monochrome white pills). Use clean typography (`DOOM`) instead of emojis for branded badges.
+    *   **Universal Fallback by Default**: Avoid Unicode Private Use Area (PUA) glyphs (such as ``, ``, ``, ``) in standard rendering. Default to universal rectangular badges and plain text prompts (`Filter: `, `README Viewer`) that render flawlessly in 100% of standard system fonts. Keep Powerlevel10k rounded capsule ends opt-in via `--nerd-fonts` / `nerd_fonts: true`.
 
 # Package Structure & Architecture Conventions
 

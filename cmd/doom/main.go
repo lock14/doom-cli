@@ -30,6 +30,7 @@ var (
 	flagOnce           bool
 	flagPresetsFile    string
 	flagTheme          string
+	flagNerdFonts      bool
 )
 
 func getCatalog() (*preset.Catalog, error) {
@@ -69,6 +70,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 	rootCmd.PersistentFlags().StringVar(&flagPresetsFile, "presets-file", "", "Custom presets.json file path")
 	rootCmd.PersistentFlags().StringVar(
 		&flagTheme, "theme", "", "Color theme for launcher (default, cyberpunk, blood, matrix, monochrome)",
+	)
+	rootCmd.PersistentFlags().BoolVar(
+		&flagNerdFonts, "nerd-fonts", false, "Use Powerlevel10k rounded capsule ends (requires a Nerd Font)",
 	)
 
 	// Subcommand: play
@@ -414,6 +418,7 @@ func runThemesList(cmd *cobra.Command, args []string) error {
 	}
 
 	activeTheme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
+	nerdFonts := flagNerdFonts || cfg.NerdFonts
 
 	fmt.Println("=== Available Doom Themes ===")
 	fmt.Println()
@@ -426,7 +431,7 @@ func runThemesList(cmd *cobra.Command, args []string) error {
 		}
 
 		styles := tui.CompileStyles(t)
-		sample := styles.RenderBrandPill() + " " +
+		sample := styles.RenderBrandPill(nerdFonts) + " " +
 			styles.TagDSDA.Render("[DSDA]") + " " +
 			styles.TagUZDoom.Render("[UZDoom]") + " " +
 			styles.CursorBar.Render("▎ ") +
@@ -481,6 +486,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	}
 
 	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
+	nerdFonts := flagNerdFonts || cfg.NerdFonts
 	extraArgs := extractEngineArgs("play", os.Args)
 
 	isInteractive := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
@@ -488,7 +494,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 
 	var lastPreset string
 	for {
-		selected, err := tui.RunInteractiveLauncher(cat, paths.WadsDir, theme, lastPreset)
+		selected, err := tui.RunInteractiveLauncher(cat, paths.WadsDir, theme, nerdFonts, lastPreset)
 		if err != nil {
 			return err
 		}
@@ -560,10 +566,11 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 		"--theme":        true,
 	}
 	knownBoolFlags := map[string]bool{
-		"--dry-run": true,
-		"--force":   true,
-		"--once":    true,
-		"-h":        true, "--help": true,
+		"--dry-run":    true,
+		"--force":      true,
+		"--once":       true,
+		"--nerd-fonts": true,
+		"-h":           true, "--help": true,
 	}
 
 	var engineArgs []string
@@ -590,7 +597,8 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 			strings.HasPrefix(arg, "--bin-dir=") ||
 			strings.HasPrefix(arg, "--engine=") ||
 			strings.HasPrefix(arg, "--presets-file=") ||
-			strings.HasPrefix(arg, "--theme=") {
+			strings.HasPrefix(arg, "--theme=") ||
+			strings.HasPrefix(arg, "--nerd-fonts=") {
 			continue
 		}
 

@@ -9,7 +9,8 @@ import (
 
 // AppConfig represents persistent user configuration for doom-cli.
 type AppConfig struct {
-	Theme string `json:"theme,omitempty"`
+	Theme     string `json:"theme,omitempty"`
+	NerdFonts bool   `json:"nerd_fonts,omitempty"`
 }
 
 // LoadConfig reads the user configuration file if present, returning defaults if not found.

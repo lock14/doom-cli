@@ -27,7 +27,8 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 
 	cfg := &AppConfig{
-		Theme: "cyberpunk",
+		Theme:     "cyberpunk",
+		NerdFonts: true,
 	}
 
 	if err := SaveConfig(p, cfg); err != nil {
@@ -41,5 +42,8 @@ func TestSaveAndLoadConfig(t *testing.T) {
 
 	if loaded.Theme != "cyberpunk" {
 		t.Errorf("expected loaded theme 'cyberpunk', got %q", loaded.Theme)
+	}
+	if !loaded.NerdFonts {
+		t.Errorf("expected loaded NerdFonts true, got false")
 	}
 }

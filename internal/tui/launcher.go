@@ -94,17 +94,18 @@ func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vp
 }
 
 type model struct {
-	theme    Theme
-	styles   ThemeStyles
-	catalog  *preset.Catalog
-	wadsDir  string
-	input    textinput.Model
-	filtered []preset.Preset
-	cursor   int
-	selected *preset.Preset
-	width    int
-	height   int
-	quitting bool
+	theme     Theme
+	styles    ThemeStyles
+	nerdFonts bool
+	catalog   *preset.Catalog
+	wadsDir   string
+	input     textinput.Model
+	filtered  []preset.Preset
+	cursor    int
+	selected  *preset.Preset
+	width     int
+	height    int
+	quitting  bool
 
 	// Readme viewer state
 	viewingReadme bool
@@ -112,7 +113,13 @@ type model struct {
 	viewport      viewport.Model
 }
 
-func initialModel(catalog *preset.Catalog, wadsDir string, theme Theme, initialPreset ...string) model {
+func initialModel(
+	catalog *preset.Catalog,
+	wadsDir string,
+	theme Theme,
+	nerdFonts bool,
+	initialPreset ...string,
+) model {
 	if theme.Name == "" {
 		theme = DefaultTheme
 	}
@@ -143,15 +150,16 @@ func initialModel(catalog *preset.Catalog, wadsDir string, theme Theme, initialP
 	}
 
 	return model{
-		theme:    theme,
-		styles:   styles,
-		catalog:  catalog,
-		wadsDir:  wadsDir,
-		input:    ti,
-		filtered: catalog.Presets,
-		cursor:   cursor,
-		width:    w,
-		height:   h,
+		theme:     theme,
+		styles:    styles,
+		nerdFonts: nerdFonts,
+		catalog:   catalog,
+		wadsDir:   wadsDir,
+		input:     ti,
+		filtered:  catalog.Presets,
+		cursor:    cursor,
+		width:     w,
+		height:    h,
 	}
 }
 
@@ -518,15 +526,15 @@ func renderCapsule(capStyle, bodyStyle lipgloss.Style, text string) string {
 }
 
 func renderBrandPill() string {
-	return defaultStyles.RenderBrandPill()
+	return defaultStyles.RenderBrandPill(false)
 }
 
 func renderStatsPill(count, total int) string {
-	return defaultStyles.RenderStatsPill(count, total)
+	return defaultStyles.RenderStatsPill(count, total, false)
 }
 
 func renderScrollPill(percent float64) string {
-	return defaultStyles.RenderScrollPill(percent)
+	return defaultStyles.RenderScrollPill(percent, false)
 }
 
 func renderHeaderBar(leftPart, rightPart string, width int) string {
@@ -541,8 +549,8 @@ func renderHeaderBar(leftPart, rightPart string, width int) string {
 }
 
 func (m model) renderHeader() string {
-	leftPart := m.styles.RenderBrandPill() + m.styles.FilterPrompt.Render("   Filter: ") + m.input.View()
-	rightPart := m.styles.RenderStatsPill(len(m.filtered), len(m.catalog.Presets))
+	leftPart := m.styles.RenderBrandPill(m.nerdFonts) + m.styles.FilterPrompt.Render("  Filter: ") + m.input.View()
+	rightPart := m.styles.RenderStatsPill(len(m.filtered), len(m.catalog.Presets), m.nerdFonts)
 	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
@@ -567,8 +575,8 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 }
 
 func (m model) renderReadmeHeader() string {
-	leftPart := m.styles.RenderBrandPill() + m.styles.FilterPrompt.Render("   README Viewer")
-	rightPart := m.styles.RenderScrollPill(m.viewport.ScrollPercent())
+	leftPart := m.styles.RenderBrandPill(m.nerdFonts) + m.styles.FilterPrompt.Render("  README Viewer")
+	rightPart := m.styles.RenderScrollPill(m.viewport.ScrollPercent(), m.nerdFonts)
 	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
@@ -637,6 +645,7 @@ func RunInteractiveLauncher(
 	catalog *preset.Catalog,
 	wadsDir string,
 	theme Theme,
+	nerdFonts bool,
 	initialPreset ...string,
 ) (*preset.Preset, error) {
 	// If not running in a terminal, fallback to numbered menu
@@ -644,7 +653,7 @@ func RunInteractiveLauncher(
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
-	m := initialModel(catalog, wadsDir, theme, initialPreset...)
+	m := initialModel(catalog, wadsDir, theme, nerdFonts, initialPreset...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

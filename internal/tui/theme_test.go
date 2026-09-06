@@ -189,27 +189,25 @@ func TestResolveTheme(t *testing.T) {
 	}
 }
 
-func TestRenderBrandPill_CustomIcon(t *testing.T) {
-	theme := DefaultTheme
-	theme.BrandIcon = "☠"
-	styles := CompileStyles(theme)
-	rendered := styles.RenderBrandPill()
-	if !strings.Contains(rendered, "☠") || !strings.Contains(rendered, "DOOM") {
-		t.Errorf("RenderBrandPill() = %q, expected custom icon ☠ and DOOM", rendered)
+func TestRenderBrandPill_NerdFonts(t *testing.T) {
+	styles := CompileStyles(DefaultTheme)
+
+	// Solid badge without Nerd Fonts
+	standard := styles.RenderBrandPill(false)
+	if !strings.Contains(standard, "DOOM") || strings.Contains(standard, "") {
+		t.Errorf("RenderBrandPill(false) = %q, expected plain DOOM without capsule caps", standard)
 	}
 
-	// Empty icon falls back to skull
-	theme.BrandIcon = ""
-	styles = CompileStyles(theme)
-	rendered = styles.RenderBrandPill()
-	if !strings.Contains(rendered, "💀") || !strings.Contains(rendered, "DOOM") {
-		t.Errorf("RenderBrandPill() = %q, expected default icon 💀 and DOOM", rendered)
+	// Rounded capsule with Nerd Fonts
+	nerd := styles.RenderBrandPill(true)
+	if !strings.Contains(nerd, "DOOM") || !strings.Contains(nerd, "") || !strings.Contains(nerd, "") {
+		t.Errorf("RenderBrandPill(true) = %q, expected DOOM with capsule caps", nerd)
 	}
 }
 
 func TestMonochromeThemeContrast(t *testing.T) {
 	styles := CompileStyles(MonochromeTheme)
-	brandPill := styles.RenderBrandPill()
+	brandPill := styles.RenderBrandPill(false)
 	if !strings.Contains(brandPill, "DOOM") {
 		t.Errorf("monochrome brand pill = %q, expected 'DOOM'", brandPill)
 	}

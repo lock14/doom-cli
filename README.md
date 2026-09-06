@@ -223,6 +223,24 @@ Theme resolution follows standard precedence:
 3. `theme` setting in user configuration (`config.json`)
 4. `default` built-in theme
 
+#### Universal Font Compatibility & Nerd Fonts
+
+By default, the launcher uses universal rectangular badges (` DOOM `) and standard text prompts (`Filter: `),
+guaranteeing clean rendering on 100% of terminal emulators and standard fonts without requiring patched fonts.
+
+If your terminal font includes Nerd Font glyphs (e.g. JetBrains Mono NF, MesloLGS NF, FiraCode NF), you can enable
+Powerlevel10k-style rounded capsule badges (` DOOM `):
+
+```bash
+# Temporarily enable rounded capsules for a single run
+doom play --nerd-fonts
+
+# Or enable permanently in ~/.config/doom-cli/config.json
+{
+  "nerd_fonts": true
+}
+```
+
 ### 3. Graphical Launcher (DoomRunner)
 
 Launch DoomRunner from your application menu or terminal:

@@ -59,6 +59,18 @@ func TestExtractEngineArgs(t *testing.T) {
 			rawArgs:    []string{"doom", "play", "--theme=matrix", "-fast"},
 			expected:   []string{"-fast"},
 		},
+		{
+			name:       "play with --nerd-fonts flag",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "play", "--nerd-fonts", "-skill", "4"},
+			expected:   []string{"-skill", "4"},
+		},
+		{
+			name:       "play with --nerd-fonts=true flag syntax",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "play", "--nerd-fonts=true", "-fast"},
+			expected:   []string{"-fast"},
+		},
 	}
 
 	for _, tt := range tests {
