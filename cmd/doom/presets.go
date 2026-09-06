@@ -10,6 +10,7 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
+// newPresetsCmd creates the preset catalog and custom WAD management command.
 func newPresetsCmd() *cobra.Command {
 	presetsCmd := &cobra.Command{
 		Use:   "presets",

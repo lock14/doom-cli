@@ -15,6 +15,7 @@ import (
 	"github.com/lock14/doom-cli/internal/tui"
 )
 
+// newPlayCmd creates the interactive terminal launcher command.
 func newPlayCmd() *cobra.Command {
 	playCmd := &cobra.Command{
 		Use:                "play [flags] [-- extra_engine_args...]",
