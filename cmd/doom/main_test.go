@@ -83,6 +83,24 @@ func TestExtractEngineArgs(t *testing.T) {
 			rawArgs:    []string{"doom", "play", "--bin-dir=/tmp/bin", "--wads-dir=/tmp/wads", "-skill", "4"},
 			expected:   []string{"-skill", "4"},
 		},
+		{
+			name:       "bare doom with engine args",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "-fast"},
+			expected:   []string{"-fast"},
+		},
+		{
+			name:       "bare doom with known flags and engine args",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "--theme", "blood", "-skill", "4"},
+			expected:   []string{"-skill", "4"},
+		},
+		{
+			name:       "bare doom with dash-dash arguments",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "--theme", "blood", "--", "-nomonsters", "-fast"},
+			expected:   []string{"-nomonsters", "-fast"},
+		},
 	}
 
 	for _, tt := range tests {

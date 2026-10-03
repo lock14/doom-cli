@@ -90,7 +90,7 @@ flowchart TD
 The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary:
 
 ```
-doom-configs/
+doom-cli/
 ├── cmd/doom/               # Command-line interface definitions using Cobra
 │   ├── main.go             # Entrypoint, root command, global flags, path helpers
 │   ├── play.go             # 'doom play' interactive launcher with Bubble Tea
@@ -215,7 +215,7 @@ We maintain a streamlined `Makefile` for developer verification and local builds
 | Target | Command | Description |
 | :--- | :--- | :--- |
 | `make build` | `go build -o bin/doom ./cmd/doom` | Compiles the `bin/doom` static binary |
-| `make install` | `go install ./cmd/doom` | Installs the binary to `~/.local/bin/doom` |
+| `make install` | `cp bin/doom $(PREFIX)/doom` | Builds and installs binary to `~/.local/bin/doom` |
 | `make test` | `go test -v -race -shuffle=on ./...` | Runs test suite under race detector with randomized order |
 | `make lint` | `go vet && revive` | Performs static analysis via `go vet` and Revive |
 | `make format` | `gofmt -s -w .` | Simplifies and formats all Go source files |

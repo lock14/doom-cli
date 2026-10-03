@@ -73,6 +73,82 @@ func TestResolveFile(t *testing.T) {
 	}
 }
 
+func TestResolveFile_Aliases(t *testing.T) {
+	tests := []struct {
+		name          string
+		existingFiles []string
+		target        string
+		wantFound     bool
+		wantFile      string
+	}{
+		{
+			name:          "neither gdturbo.wad nor gd.wad exists - no stack overflow",
+			existingFiles: []string{"doom2.wad"},
+			target:        "gdturbo.wad",
+			wantFound:     false,
+		},
+		{
+			name:          "neither gd.wad nor gdturbo.wad exists - no stack overflow",
+			existingFiles: []string{"doom2.wad"},
+			target:        "gd.wad",
+			wantFound:     false,
+		},
+		{
+			name:          "gdturbo.wad requested and gd.wad exists",
+			existingFiles: []string{"gd.wad"},
+			target:        "gdturbo.wad",
+			wantFound:     true,
+			wantFile:      "gd.wad",
+		},
+		{
+			name:          "gd.wad requested and gdturbo.wad exists",
+			existingFiles: []string{"gdturbo.wad"},
+			target:        "gd.wad",
+			wantFound:     true,
+			wantFile:      "gdturbo.wad",
+		},
+		{
+			name:          "exact match preferred over alias",
+			existingFiles: []string{"gdturbo.wad", "gd.wad"},
+			target:        "gdturbo.wad",
+			wantFound:     true,
+			wantFile:      "gdturbo.wad",
+		},
+		{
+			name:          "doom.wad requested and doom1.wad exists",
+			existingFiles: []string{"doom1.wad"},
+			target:        "doom.wad",
+			wantFound:     true,
+			wantFile:      "doom1.wad",
+		},
+		{
+			name:          "doom.wad requested and neither exists",
+			existingFiles: []string{"doom2.wad"},
+			target:        "doom.wad",
+			wantFound:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			for _, f := range tt.existingFiles {
+				if err := os.WriteFile(filepath.Join(tmpDir, f), []byte("wad"), 0644); err != nil {
+					t.Fatalf("WriteFile failed: %v", err)
+				}
+			}
+
+			path, found := ResolveFile(tmpDir, tt.target)
+			if found != tt.wantFound {
+				t.Fatalf("ResolveFile(%q) found = %v, want %v", tt.target, found, tt.wantFound)
+			}
+			if tt.wantFound && filepath.Base(path) != tt.wantFile {
+				t.Errorf("ResolveFile(%q) resolved to %q, want %q", tt.target, filepath.Base(path), tt.wantFile)
+			}
+		})
+	}
+}
+
 func TestPresetParityAndInvariants(t *testing.T) {
 	rootDir := filepath.Join("..", "..")
 	presetsPath := filepath.Join(rootDir, "data", "presets.json")

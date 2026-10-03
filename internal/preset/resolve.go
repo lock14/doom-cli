@@ -19,6 +19,39 @@ func ResolveFile(wadsDir string, targetName string) (string, bool) {
 		return "", false
 	}
 
+	entries, err := os.ReadDir(wadsDir)
+	if err != nil {
+		return "", false
+	}
+
+	if path, ok := resolveSingle(wadsDir, entries, targetName); ok {
+		return path, true
+	}
+
+	// Check known aliases without recursion
+	targetLower := strings.ToLower(targetName)
+	var alias string
+	switch targetLower {
+	case "gdturbo.wad":
+		alias = "gd.wad"
+	case "gd.wad":
+		alias = "gdturbo.wad"
+	case "doom.wad":
+		alias = "doom1.wad"
+	}
+
+	if alias != "" {
+		return resolveSingle(wadsDir, entries, alias)
+	}
+
+	return "", false
+}
+
+func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (string, bool) {
+	if wadsDir == "" || targetName == "" {
+		return "", false
+	}
+
 	exact := filepath.Join(wadsDir, targetName)
 	if _, err := os.Stat(exact); err == nil {
 		return exact, true
@@ -26,11 +59,6 @@ func ResolveFile(wadsDir string, targetName string) (string, bool) {
 
 	targetLower := strings.ToLower(targetName)
 	targetNorm := NormalizeFilename(targetName)
-
-	entries, err := os.ReadDir(wadsDir)
-	if err != nil {
-		return "", false
-	}
 
 	// 1. Case-insensitive match
 	for _, entry := range entries {
@@ -52,16 +80,6 @@ func ResolveFile(wadsDir string, targetName string) (string, bool) {
 		if NormalizeFilename(name) == targetNorm {
 			return filepath.Join(wadsDir, name), true
 		}
-	}
-
-	// 3. Known aliases
-	switch targetLower {
-	case "gdturbo.wad":
-		return ResolveFile(wadsDir, "gd.wad")
-	case "gd.wad":
-		return ResolveFile(wadsDir, "gdturbo.wad")
-	case "doom.wad":
-		return ResolveFile(wadsDir, "doom1.wad")
 	}
 
 	return "", false
