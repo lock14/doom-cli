@@ -11,6 +11,7 @@ import (
 )
 
 func TestBackupFile(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "deploy_test_*")
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +36,7 @@ func TestBackupFile(t *testing.T) {
 }
 
 func TestDeployConfigs_And_Diff(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "deploy_full_*")
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +94,7 @@ func TestDeployConfigs_And_Diff(t *testing.T) {
 }
 
 func TestSyncConfigs(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// 1. Mock system config dirs

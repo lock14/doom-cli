@@ -63,7 +63,7 @@ jobs:
       - name: Install and run revive
         run: |
           go install github.com/mgechev/revive@latest
-          revive -config revive.toml -formatter friendly ./...
+          revive -config revive.toml -formatter friendly -set_exit_status ./...
 
   govulncheck:
     name: Vulnerability Scan
@@ -98,8 +98,19 @@ jobs:
         with:
           go-version: 'stable'
 
-      - name: Run tests (Linux / macOS with race detector)
-        if: runner.os != 'Windows'
+      - name: Run tests (Linux with race detector and coverage)
+        if: runner.os == 'Linux'
+        run: go test -v -race -shuffle=on -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage to Codecov
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v7
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+      - name: Run tests (macOS with race detector)
+        if: runner.os == 'macOS'
         run: go test -v -race -shuffle=on ./...
 
       - name: Run tests (Windows)
@@ -116,6 +127,7 @@ jobs:
       - name: Verify CLI commands
         shell: bash
         run: |
+          ./bin/doom --version
           ./bin/doom --help
           ./bin/doom presets list
           ./bin/doom wads list

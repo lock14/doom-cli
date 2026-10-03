@@ -8,6 +8,7 @@ import (
 )
 
 func TestResolveForLinux(t *testing.T) {
+	t.Parallel()
 	p := ResolveFor("linux", "")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), ".config/uzdoom") {
 		t.Errorf("expected .config/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
@@ -27,6 +28,7 @@ func TestResolveForLinux(t *testing.T) {
 }
 
 func TestResolveForDarwin(t *testing.T) {
+	t.Parallel()
 	p := ResolveFor("darwin", "")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Library/Application Support/uzdoom") {
 		t.Errorf("expected Library/Application Support/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
@@ -40,6 +42,7 @@ func TestResolveForDarwin(t *testing.T) {
 }
 
 func TestResolveForWindows(t *testing.T) {
+	t.Parallel()
 	p := ResolveFor("windows", "")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Games/Doom/bin") {
 		t.Errorf("expected Games/Doom/bin in UZDoomDir, got %s", p.UZDoomDir)
@@ -62,6 +65,7 @@ func TestResolveForWindows(t *testing.T) {
 }
 
 func TestCustomWadsDirOverride(t *testing.T) {
+	t.Parallel()
 	custom := "/my/custom/doom/wads"
 	p := ResolveFor("linux", custom)
 	if p.WadsDir != custom {
@@ -70,6 +74,7 @@ func TestCustomWadsDirOverride(t *testing.T) {
 }
 
 func TestPaths_Setters(t *testing.T) {
+	t.Parallel()
 	p := &Paths{}
 	p.SetBinDir("/opt/doom/bin")
 	if p.BinDir != "/opt/doom/bin" {

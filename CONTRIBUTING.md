@@ -217,6 +217,7 @@ We maintain a streamlined `Makefile` for developer verification and local builds
 | `make build` | `go build -o bin/doom ./cmd/doom` | Compiles the `bin/doom` static binary |
 | `make install` | `cp bin/doom $(PREFIX)/doom` | Builds and installs binary to `~/.local/bin/doom` |
 | `make test` | `go test -v -race -shuffle=on ./...` | Runs test suite under race detector with randomized order |
+| `make bench` | `go test -bench=. -benchmem ./...` | Runs performance benchmarks with allocation tracking |
 | `make lint` | `go vet && revive` | Performs static analysis via `go vet` and Revive |
 | `make format` | `gofmt -s -w .` | Simplifies and formats all Go source files |
 | `make tidy` | `go mod tidy && git diff` | Tidies and verifies `go.mod` and `go.sum` hygiene |

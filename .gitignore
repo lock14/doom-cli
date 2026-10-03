@@ -1,21 +1,54 @@
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
+# Binaries and build artifacts
+bin/
+dist/
+/doom
+/doom.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# OS & Editor files
-.DS_Store
-Thumbs.db
-*~
-*.swp
+# Test binaries and coverage artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+coverage/
+cov/
+c.out
+cov.out
+
+# Performance profiling artifacts
+*.pprof
+*.prof
+cpu.out
+mem.out
+bench.txt
+bench-old.txt
+bench-new.txt
 
 # Backup files
 *.bak
 *.bak.*
 
-# Build artifacts
-bin/
-/doom
-/doom.exe
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
+# Local environment & tools
+.env
+.env.local
+.mise.local.toml

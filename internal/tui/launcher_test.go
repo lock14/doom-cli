@@ -109,6 +109,11 @@ func TestRunNumberedMenu(t *testing.T) {
 }
 
 func TestModel_View_Layouts(t *testing.T) {
+	origProfile := lipgloss.ColorProfile()
+	// 3 corresponds to termenv.Ascii (uncolored profile).
+	lipgloss.SetColorProfile(3)
+	defer lipgloss.SetColorProfile(origProfile)
+
 	cat := mockCatalog()
 
 	tests := []struct {
@@ -255,6 +260,11 @@ func TestModel_View_QuittingAndSelected(t *testing.T) {
 }
 
 func TestModel_ReadmeViewer(t *testing.T) {
+	origProfile := lipgloss.ColorProfile()
+	// 3 corresponds to termenv.Ascii (uncolored profile).
+	lipgloss.SetColorProfile(3)
+	defer lipgloss.SetColorProfile(origProfile)
+
 	tmpDir := t.TempDir()
 	txtPath := filepath.Join(tmpDir, "av.txt")
 	txtContent := []byte(

@@ -127,6 +127,7 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 		"--once":       true,
 		"--nerd-fonts": true,
 		"-h":           true, "--help": true,
+		"--version": true, "-v": true,
 	}
 
 	var engineArgs []string

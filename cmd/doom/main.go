@@ -12,6 +12,10 @@ import (
 )
 
 var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+
 	flagEngineOverride string
 	flagWadsDir        string
 	flagBinDir         string
@@ -85,6 +89,7 @@ func newRootCmd() *cobra.Command {
 		Long: `doom is a modern, unified CLI and interactive terminal launcher for classic Doom.
 It manages source ports (UZDoom, DSDA-Doom), official Steam/GOG IWADs,
 Roland SC-55 SoundFonts, curated community megawads, and platform-native configurations.`,
+		Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If no subcommands or arguments are passed, run interactive launcher (doom play)
 			return runPlay(cmd, args)

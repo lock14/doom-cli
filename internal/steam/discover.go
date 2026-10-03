@@ -58,6 +58,22 @@ func DefaultTargetPatterns() []TargetPattern {
 
 var vdfPathRegex = regexp.MustCompile(`^\s*"path"\s*"([^"]+)"`)
 
+// ParseVDFPaths parses folder path values from a VDF reader without checking filesystem existence.
+func ParseVDFPaths(r io.Reader) []string {
+	var paths []string
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := vdfPathRegex.FindStringSubmatch(line)
+		if len(matches) > 1 {
+			p := strings.TrimSpace(matches[1])
+			p = strings.ReplaceAll(p, `\\`, `\`)
+			paths = append(paths, p)
+		}
+	}
+	return paths
+}
+
 // ParseLibraryFolders extracts secondary library folder paths from Steam's libraryfolders.vdf.
 func ParseLibraryFolders(vdfPath string) []string {
 	f, err := os.Open(vdfPath)
@@ -67,17 +83,9 @@ func ParseLibraryFolders(vdfPath string) []string {
 	defer f.Close()
 
 	var paths []string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		matches := vdfPathRegex.FindStringSubmatch(line)
-		if len(matches) > 1 {
-			p := strings.TrimSpace(matches[1])
-			// Handle Windows escaped backslashes in VDF
-			p = strings.ReplaceAll(p, `\\`, `\`)
-			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-				paths = append(paths, p)
-			}
+	for _, p := range ParseVDFPaths(f) {
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			paths = append(paths, p)
 		}
 	}
 	return paths

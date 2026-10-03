@@ -8,6 +8,7 @@ import (
 )
 
 func TestGetBuiltinTheme(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -132,6 +133,8 @@ func TestGetBuiltinTheme(t *testing.T) {
 }
 
 func TestListBuiltinThemes(t *testing.T) {
+	t.Parallel()
+
 	list := ListBuiltinThemes()
 	if len(list) != 10 {
 		t.Fatalf("expected 10 built-in themes, got %d", len(list))
@@ -148,6 +151,7 @@ func TestListBuiltinThemes(t *testing.T) {
 }
 
 func TestCompileStyles(t *testing.T) {
+	t.Parallel()
 	styles := CompileStyles(CyberpunkTheme)
 	rendered := styles.BrandBody.Render("TEST")
 	if rendered == "" {
@@ -156,6 +160,7 @@ func TestCompileStyles(t *testing.T) {
 }
 
 func TestLoadThemeFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	themeFile := filepath.Join(tmpDir, "custom.json")
 
@@ -184,6 +189,7 @@ func TestLoadThemeFile(t *testing.T) {
 }
 
 func TestResolveTheme(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	customFile := filepath.Join(tmpDir, "violet.json")
 	if err := os.WriteFile(customFile, []byte(`{"name":"violet"}`), 0o644); err != nil {
@@ -243,7 +249,9 @@ func TestResolveTheme(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			res := ResolveTheme(tt.flagTheme, tt.envTheme, tt.configTheme, tt.themesDir)
 			if res.Name != tt.expected {
 				t.Errorf("ResolveTheme() = %q, expected %q", res.Name, tt.expected)
@@ -253,6 +261,7 @@ func TestResolveTheme(t *testing.T) {
 }
 
 func TestRenderBrandPill_NerdFonts(t *testing.T) {
+	t.Parallel()
 	styles := CompileStyles(DefaultTheme)
 
 	// Solid badge without Nerd Fonts
@@ -269,6 +278,7 @@ func TestRenderBrandPill_NerdFonts(t *testing.T) {
 }
 
 func TestMonochromeThemeContrast(t *testing.T) {
+	t.Parallel()
 	styles := CompileStyles(MonochromeTheme)
 	brandPill := styles.RenderBrandPill(false)
 	if !strings.Contains(brandPill, "DOOM") {
