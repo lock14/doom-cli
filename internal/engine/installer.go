@@ -48,24 +48,32 @@ type GitHubAsset struct {
 
 // ResolveLatestGitHubURL queries GitHub Releases API for an asset matching regex pattern, falling back to fallbackURL.
 func (ins *Installer) ResolveLatestGitHubURL(repo, patternRegex, fallbackURL string) string {
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	var apiURL string
+	if strings.HasPrefix(repo, "http://") || strings.HasPrefix(repo, "https://") {
+		apiURL = repo
+	} else {
+		apiURL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	}
+
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err == nil {
 		req.Header.Set("User-Agent", "doom-cli/2.0")
 		resp, err := ins.Client.Do(req)
-		if err == nil && resp.StatusCode == http.StatusOK {
+		if err == nil {
 			defer resp.Body.Close()
-			var release GitHubRelease
-			if err := json.NewDecoder(resp.Body).Decode(&release); err == nil {
-				re, err := regexp.Compile("(?i)" + patternRegex)
-				if err == nil {
-					for _, asset := range release.Assets {
-						name := asset.Name
-						if re.MatchString(name) &&
-							!strings.HasSuffix(name, ".zsync") &&
-							!strings.HasSuffix(name, ".asc") &&
-							!strings.HasSuffix(name, ".sig") {
-							return asset.BrowserDownloadURL
+			if resp.StatusCode == http.StatusOK {
+				var release GitHubRelease
+				if err := json.NewDecoder(resp.Body).Decode(&release); err == nil {
+					re, err := regexp.Compile("(?i)" + patternRegex)
+					if err == nil {
+						for _, asset := range release.Assets {
+							name := asset.Name
+							if re.MatchString(name) &&
+								!strings.HasSuffix(name, ".zsync") &&
+								!strings.HasSuffix(name, ".asc") &&
+								!strings.HasSuffix(name, ".sig") {
+								return asset.BrowserDownloadURL
+							}
 						}
 					}
 				}

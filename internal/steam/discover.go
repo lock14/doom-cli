@@ -196,13 +196,19 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 	indexed := make(map[string][]string)
 	for _, root := range existingRoots {
 		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-			if err != nil || d == nil || d.IsDir() {
+			if err != nil || d == nil {
 				return nil
 			}
-			// Limit depth to avoid scanning irrelevant deep trees
+			// Limit depth to avoid scanning irrelevant deep directory trees
 			rel, relErr := filepath.Rel(root, path)
 			if relErr == nil && strings.Count(rel, string(filepath.Separator)) > 8 {
-				return filepath.SkipDir
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.IsDir() {
+				return nil
 			}
 
 			lowerName := strings.ToLower(d.Name())

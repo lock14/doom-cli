@@ -13,9 +13,9 @@
       "linux_data_dir": "__HOME__/.local/share/dsda-doom/dsda_doom_data",
       "windows_id": "D83A1056",
       "windows_name": "dsda-doom-0.29.4-win-x64",
-      "windows_path": "E:/dsda-doom-0.29.4-win-x64/dsda-doom.exe",
-      "windows_config_dir": "../dsda-doom-0.29.4-win-x64",
-      "windows_data_dir": "../dsda-doom-0.29.4-win-x64"
+      "windows_path": "__HOME__/Games/Doom/bin/dsda-doom.exe",
+      "windows_config_dir": "__HOME__/Games/Doom/bin",
+      "windows_data_dir": "__HOME__/Games/Doom/bin"
     },
     "uzdoom": {
       "name": "uzdoom",
@@ -25,9 +25,9 @@
       "linux_data_dir": "__HOME__/.local/share/games/uzdoom",
       "windows_id": "453D2AAB",
       "windows_name": "UZDoom",
-      "windows_path": "E:/UZDoom/uzdoom.exe",
-      "windows_config_dir": "../UZDoom",
-      "windows_data_dir": "../UZDoom"
+      "windows_path": "__HOME__/Games/Doom/bin/uzdoom.exe",
+      "windows_config_dir": "__HOME__/Games/Doom/bin",
+      "windows_data_dir": "__HOME__/Games/Doom/bin"
     }
   },
   "presets": [

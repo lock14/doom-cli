@@ -185,6 +185,11 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 			_ = os.WriteFile(repoAuto, []byte(text), 0644)
 			fmt.Fprintf(out, "✓ Synced %s -> %s\n", autoDest, repoAuto)
 		}
+		dataAuto := filepath.Join(repoDir, "internal", "templates", "data", "autoexec.cfg")
+		if _, err := os.Stat(filepath.Dir(dataAuto)); err == nil {
+			_ = os.WriteFile(dataAuto, []byte(text), 0644)
+			fmt.Fprintf(out, "✓ Synced %s -> %s\n", autoDest, dataAuto)
+		}
 	}
 
 	// 2. Sync DSDA-Doom
@@ -200,6 +205,11 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 		if _, err := os.Stat(filepath.Dir(repoDSDA)); err == nil {
 			_ = os.WriteFile(repoDSDA, []byte(text), 0644)
 			fmt.Fprintf(out, "✓ Synced %s -> %s\n", dsdaDest, repoDSDA)
+		}
+		dataDSDA := filepath.Join(repoDir, "internal", "templates", "data", "dsda-doom.cfg")
+		if _, err := os.Stat(filepath.Dir(dataDSDA)); err == nil {
+			_ = os.WriteFile(dataDSDA, []byte(text), 0644)
+			fmt.Fprintf(out, "✓ Synced %s -> %s\n", dsdaDest, dataDSDA)
 		}
 	}
 

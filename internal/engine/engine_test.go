@@ -3,6 +3,8 @@ package engine
 import (
 	"archive/zip"
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -343,5 +345,112 @@ func TestIsCompanionFile(t *testing.T) {
 				t.Errorf("isCompanionFile(%q) = %v, expected %v", tt.filename, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestInstaller_ResolveLatestGitHubURL(t *testing.T) {
+	releaseJSON := `{
+		"tag_name": "v1.0.0",
+		"assets": [
+			{
+				"name": "dsda-doom-0.29.4-linux-x86_64.appimage",
+				"browser_download_url": "https://example.com/dsda.appimage"
+			},
+			{
+				"name": "dsda-doom-0.29.4-linux-x86_64.appimage.sig",
+				"browser_download_url": "https://example.com/dsda.appimage.sig"
+			}
+		]
+	}`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/success":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(releaseJSON))
+		case "/rate-limited":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"message": "API rate limit exceeded"}`))
+		case "/not-found":
+			http.NotFound(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	ins := NewInstaller(t.TempDir(), nil)
+
+	// 1. Success matching regex
+	url := ins.ResolveLatestGitHubURL(
+		server.URL+"/success",
+		`.*linux-x86_64\.appimage`,
+		"https://fallback.com/default.bin",
+	)
+	if url != "https://example.com/dsda.appimage" {
+		t.Errorf("expected matching asset url, got %s", url)
+	}
+
+	// 2. Pattern does not match
+	url = ins.ResolveLatestGitHubURL(
+		server.URL+"/success",
+		`.*windows.*\.zip`,
+		"https://fallback.com/default.bin",
+	)
+	if url != "https://fallback.com/default.bin" {
+		t.Errorf("expected fallback url for unmatched pattern, got %s", url)
+	}
+
+	// 3. HTTP 403 (Rate limit)
+	url = ins.ResolveLatestGitHubURL(
+		server.URL+"/rate-limited",
+		`.*`,
+		"https://fallback.com/default.bin",
+	)
+	if url != "https://fallback.com/default.bin" {
+		t.Errorf("expected fallback url on 403, got %s", url)
+	}
+
+	// 4. HTTP 404
+	url = ins.ResolveLatestGitHubURL(
+		server.URL+"/not-found",
+		`.*`,
+		"https://fallback.com/default.bin",
+	)
+	if url != "https://fallback.com/default.bin" {
+		t.Errorf("expected fallback url on 404, got %s", url)
+	}
+}
+
+func TestInstaller_DownloadFile(t *testing.T) {
+	fileData := []byte("downloadable-binary-data")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/binary.bin" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(fileData)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	tmpDir := t.TempDir()
+	targetPath := filepath.Join(tmpDir, "sub", "test.bin")
+	ins := NewInstaller(tmpDir, nil)
+
+	// 1. Successful download
+	if err := ins.DownloadFile(server.URL+"/binary.bin", targetPath); err != nil {
+		t.Fatalf("DownloadFile failed: %v", err)
+	}
+	data, err := os.ReadFile(targetPath)
+	if err != nil || !bytes.Equal(data, fileData) {
+		t.Fatalf("downloaded data mismatch: got %q, want %q (err: %v)", string(data), string(fileData), err)
+	}
+
+	// 2. 404 Not Found error
+	err = ins.DownloadFile(server.URL+"/missing.bin", filepath.Join(tmpDir, "missing.bin"))
+	if err == nil {
+		t.Fatal("expected error downloading missing file, got nil")
 	}
 }

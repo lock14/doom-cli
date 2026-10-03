@@ -131,6 +131,18 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 
 	var engineArgs []string
 	pastSubcommand := false
+	if subcommand == "play" {
+		hasSub := false
+		for _, a := range rawArgs[1:] {
+			if a == "play" {
+				hasSub = true
+				break
+			}
+		}
+		if !hasSub {
+			pastSubcommand = true
+		}
+	}
 	presetSkipped := (subcommand != "launch") // Only skip preset argument on "launch"
 
 	for i := 1; i < len(rawArgs); i++ {
