@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseLibraryFolders(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "steam_vdf_*")
 	if err != nil {
 		t.Fatal(err)
@@ -53,6 +54,7 @@ func TestParseLibraryFolders(t *testing.T) {
 }
 
 func TestDiscoverAndExtract(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "steam_extract_*")
 	if err != nil {
 		t.Fatal(err)

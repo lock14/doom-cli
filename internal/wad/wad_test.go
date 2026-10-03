@@ -14,6 +14,7 @@ import (
 )
 
 func TestFilterExpectedFiles(t *testing.T) {
+	t.Parallel()
 	files := []string{"map.wad", "idkfa 2024.wad", "patch.deh"}
 	filtered := FilterExpectedFiles(files)
 	if len(filtered) != 2 {
@@ -43,6 +44,7 @@ func createTestZip(t *testing.T, files map[string]string) []byte {
 }
 
 func TestDownloader_ExtractFromZip(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "wad_test_*")
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +94,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 }
 
 func TestDownloader_DownloadPreset(t *testing.T) {
+	t.Parallel()
 	zipBytes := createTestZip(t, map[string]string{
 		"alienvendetta.wad": "av-content",
 		"av.deh":            "av-deh",
@@ -140,6 +143,7 @@ func TestDownloader_DownloadPreset(t *testing.T) {
 }
 
 func TestInstallSoundFont(t *testing.T) {
+	t.Parallel()
 	fakeSF := []byte("RIFF-SF2-MOCK-CONTENT")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -175,6 +179,7 @@ func TestInstallSoundFont(t *testing.T) {
 }
 
 func TestDownloader_ExtractFromZip_ZipSlipProtection(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	zipBytes := createTestZip(t, map[string]string{
 		"../escape.wad": "malicious-content",

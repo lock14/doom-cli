@@ -1,0 +1,45 @@
+run:
+  timeout: 5m
+  tests: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 50
+  exclude-rules:
+    - path: _bench_test\.go
+      linters:
+        - unused
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gocyclo
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - whitespace
+
+linters-settings:
+  gocyclo:
+    min-complexity: 55
+  lll:
+    line-length: 120
+  revive:
+    rules:
+      - name: exported
+      - name: package-comments
+      - name: blank-imports
+      - name: dot-imports
+      - name: var-naming
+      - name: line-length-limit
+        arguments: [120]
+  nolintlint:
+    require-explanation: true
+    require-specific: true

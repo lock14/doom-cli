@@ -1,7 +1,11 @@
 BIN ?= bin/doom
 PREFIX ?= $(HOME)/.local/bin
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
+DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS ?= -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: all build install test check lint format tidy clean help format-check tidy-check
+.PHONY: all build install test bench check lint format tidy clean help format-check tidy-check
 
 all: build
 
@@ -10,6 +14,7 @@ help:
 	@echo "  make build    - Compile bin/doom static binary"
 	@echo "  make install  - Install binary to $(PREFIX)/doom"
 	@echo "  make test     - Run full Go test suite with -race and -shuffle=on"
+	@echo "  make bench    - Run performance benchmarks with allocation tracking"
 	@echo "  make lint     - Run go vet and revive static analysis"
 	@echo "  make format   - Run gofmt -s to format all Go source files"
 	@echo "  make tidy     - Tidy and verify go.mod / go.sum"
@@ -23,7 +28,7 @@ help:
 
 build:
 	@mkdir -p bin
-	go build -o $(BIN) ./cmd/doom
+	go build -ldflags "$(LDFLAGS)" -o $(BIN) ./cmd/doom
 
 install: build
 	@mkdir -p $(PREFIX)
@@ -44,11 +49,14 @@ lint:
 	@go vet ./...
 	@if command -v revive >/dev/null 2>&1; then \
 		echo "Running revive..."; \
-		revive -config revive.toml -formatter friendly ./...; \
+		revive -config revive.toml -formatter friendly -set_exit_status ./...; \
 	fi
 
 test:
 	go test -v -race -shuffle=on ./...
+
+bench:
+	go test -run='^$$' -bench=. -benchmem ./...
 
 check: format-check tidy-check lint test
 	@echo "Auditing path invariants..."

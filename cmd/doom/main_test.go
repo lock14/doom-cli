@@ -11,6 +11,8 @@ import (
 )
 
 func TestExtractEngineArgs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name       string
 		subcommand string
@@ -105,6 +107,7 @@ func TestExtractEngineArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := extractEngineArgs(tt.subcommand, tt.rawArgs)
 			if len(result) == 0 && len(tt.expected) == 0 {
 				return
@@ -118,6 +121,8 @@ func TestExtractEngineArgs(t *testing.T) {
 }
 
 func TestWaitForEnter(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -138,6 +143,7 @@ func TestWaitForEnter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			reader := strings.NewReader(tt.input)
 			waitForEnter(reader)
 		})
@@ -201,6 +207,8 @@ func TestRunThemesSet(t *testing.T) {
 }
 
 func TestParseBool(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected bool
@@ -228,6 +236,7 @@ func TestParseBool(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
 			got, err := parseBool(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseBool(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
@@ -325,6 +334,8 @@ func TestRunConfigCommands(t *testing.T) {
 }
 
 func TestCanonicalConfigKey(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    string
@@ -348,6 +359,7 @@ func TestCanonicalConfigKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got, err := canonicalConfigKey(tt.input)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("canonicalConfigKey(%q) error = %v, wantErr = %v", tt.input, err, tt.wantErr)
@@ -556,5 +568,17 @@ func TestWadsCommands(t *testing.T) {
 				t.Fatalf("subcommand %q not found in wads command", tt.commandName)
 			}
 		})
+	}
+}
+
+func TestRootCmd_Version(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCmd()
+	if cmd.Version == "" {
+		t.Fatalf("expected rootCmd.Version to be non-empty")
+	}
+	if !strings.Contains(cmd.Version, "commit:") || !strings.Contains(cmd.Version, "built:") {
+		t.Errorf("expected rootCmd.Version to contain commit and built metadata, got %q", cmd.Version)
 	}
 }

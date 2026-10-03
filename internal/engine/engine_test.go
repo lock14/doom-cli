@@ -14,6 +14,7 @@ import (
 )
 
 func TestPrepareLaunch_DSDADoom(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "engine_test_*")
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +90,7 @@ func TestPrepareLaunch_DSDADoom(t *testing.T) {
 }
 
 func TestPrepareLaunch_UZDoom_OptionalAudio(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "uzdoom_test_*")
 	if err != nil {
 		t.Fatal(err)
@@ -141,6 +143,7 @@ func TestPrepareLaunch_UZDoom_OptionalAudio(t *testing.T) {
 }
 
 func TestPrepareLaunch_EngineOverride(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "override_test_*")
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +183,7 @@ func TestPrepareLaunch_EngineOverride(t *testing.T) {
 }
 
 func TestPrepareLaunch_CustomEngineAndArgs(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	binDir := filepath.Join(tmpDir, "bin")
 	customBinDir := filepath.Join(tmpDir, "custom_bin")
@@ -245,6 +249,7 @@ func TestPrepareLaunch_CustomEngineAndArgs(t *testing.T) {
 }
 
 func TestInstaller_ExtractZipBinary(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	binDir := filepath.Join(tmpDir, "bin")
 	_ = os.MkdirAll(binDir, 0755)
@@ -321,6 +326,7 @@ func (ioDiscard) Write(p []byte) (int, error) {
 }
 
 func TestIsCompanionFile(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		filename string
@@ -340,7 +346,9 @@ func TestIsCompanionFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := isCompanionFile(tt.filename); got != tt.expected {
 				t.Errorf("isCompanionFile(%q) = %v, expected %v", tt.filename, got, tt.expected)
 			}
@@ -349,6 +357,7 @@ func TestIsCompanionFile(t *testing.T) {
 }
 
 func TestInstaller_ResolveLatestGitHubURL(t *testing.T) {
+	t.Parallel()
 	releaseJSON := `{
 		"tag_name": "v1.0.0",
 		"assets": [
@@ -424,6 +433,7 @@ func TestInstaller_ResolveLatestGitHubURL(t *testing.T) {
 }
 
 func TestInstaller_DownloadFile(t *testing.T) {
+	t.Parallel()
 	fileData := []byte("downloadable-binary-data")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/binary.bin" {

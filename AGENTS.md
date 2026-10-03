@@ -138,6 +138,10 @@ Linux, macOS, and Windows:
 
 *   **Table-Driven Tests**: Table-driven tests are standard for unit testing. Each test case struct must include a
     descriptive `name` string field.
+*   **Parallel Execution**: Use `t.Parallel()` on unit tests and table-driven subtests that do not mutate the process
+    environment (`t.Setenv`) or package-level globals. Never combine `t.Parallel()` with `t.Setenv` or global CLI flags.
+*   **Performance Benchmarking**: Maintain `*_bench_test.go` benchmarks for performance-sensitive subsystems (e.g.
+    CP437 decoding, file resolution, Steam VDF parsing, and TUI fuzzy search/layout calculation).
 *   **Hardened Concurrency & Randomization**: All tests must execute cleanly under `-race` (race detector) and
     `-shuffle=on` (test order randomization).
 *   **Filesystem Isolation**: File resolution, deployment, and extraction tests must execute within isolated
@@ -154,8 +158,10 @@ Linux, macOS, and Windows:
     acquisition. Must **not** contain internal developer commands, agent instructions, or compiler details.
 *   **`CONTRIBUTING.md` (Contributor-Facing)**: Dedicated guide for human open-source developers. Details prerequisites,
     Makefile targets, Go code style, testing requirements, and PR guidelines.
-*   **`AGENTS.md` (Agent & Architectural Invariants)**: The canonical, authoritative reference for autonomous agents,
-    architecture invariants, path tokens, safety rules, and code quality checklists.
+*   **`AGENTS.md` (Agent & Architectural Invariants)**: The single canonical, authoritative reference at the repository
+    root for autonomous agents (including Claude Code, which natively reads `AGENTS.md`), architecture invariants, path
+    tokens, safety rules, and code quality checklists. Keep `AGENTS.md` as a single root file without splitting into
+    `.agents/` or creating `CLAUDE.md` symlinks.
 *   **Documentation Synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
     mechanics are modified, all relevant documentation (**Go doc comments**, **`README.md`**, **`CONTRIBUTING.md`**,
     and **`AGENTS.md`**) MUST be updated in the same pull request.
@@ -164,6 +170,9 @@ Linux, macOS, and Windows:
 
 *   **Accurate & Detailed Commits**: Use imperative commit messages describing the architectural change (e.g.
     `Adopt Go tooling, static analysis, and testing patterns from collections`).
+*   **PR Description Synchronization**: Whenever subsequent commits in a PR branch modify, fix, or expand upon the
+    original changeset (e.g. CI adjustments, bug fixes, refactoring), the PR description must be proactively updated
+    via `gh pr edit` to reflect the latest state of the PR.
 *   **Path Invariant Verification**: Verify `git diff` contains zero hardcoded personal user paths before committing.
 *   **PR Template Completion**: Ensure the PR template checklist is completely satisfied.
 
@@ -189,6 +198,7 @@ Before completing any changes, agents MUST run and verify the following commands
 
 1. `make format-check` (verify `gofmt -s -l .` reports zero unformatted files).
 2. `make tidy-check` (verify `go mod tidy && git diff --exit-code go.mod go.sum`).
-3. `make lint` (verify `go vet ./...` and `revive -config revive.toml` pass with zero warnings).
+3. `make lint` (verify `go vet ./...` and `revive -config revive.toml -set_exit_status` pass with zero warnings/errors).
 4. `make check` (runs full suite: formatting check, tidy check, linters, `go test -v -race -shuffle=on ./...`,
    preset parity invariants, and path invariant inspection verifying zero hardcoded personal user paths).
+5. `govulncheck ./...` (when installed, verify zero known vulnerabilities).

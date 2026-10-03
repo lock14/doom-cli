@@ -6,6 +6,7 @@ import (
 )
 
 func TestDetectResolution(t *testing.T) {
+	t.Parallel()
 	res := DetectResolution()
 	matched, err := regexp.MatchString(`^\d+x\d+$`, res)
 	if err != nil || !matched {
@@ -14,6 +15,7 @@ func TestDetectResolution(t *testing.T) {
 }
 
 func TestDetectRefreshRate(t *testing.T) {
+	t.Parallel()
 	rate := DetectRefreshRate()
 	if rate <= 0 || rate > 500 {
 		t.Errorf("DetectRefreshRate() returned unexpected rate: %d", rate)

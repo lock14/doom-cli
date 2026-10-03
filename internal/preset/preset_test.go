@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadCatalog(t *testing.T) {
+	t.Parallel()
 	cat, err := LoadCatalog("")
 	if err != nil {
 		t.Fatalf("LoadCatalog failed: %v", err)
@@ -18,6 +19,7 @@ func TestLoadCatalog(t *testing.T) {
 }
 
 func TestFind(t *testing.T) {
+	t.Parallel()
 	cat, err := LoadCatalog("")
 	if err != nil {
 		t.Fatalf("LoadCatalog failed: %v", err)
@@ -43,6 +45,7 @@ func TestFind(t *testing.T) {
 }
 
 func TestResolveFile(t *testing.T) {
+	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "wads_test_*")
 	if err != nil {
 		t.Fatalf("MkdirTemp failed: %v", err)
@@ -74,6 +77,7 @@ func TestResolveFile(t *testing.T) {
 }
 
 func TestResolveFile_Aliases(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		existingFiles []string
@@ -130,7 +134,9 @@ func TestResolveFile_Aliases(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			tmpDir := t.TempDir()
 			for _, f := range tt.existingFiles {
 				if err := os.WriteFile(filepath.Join(tmpDir, f), []byte("wad"), 0644); err != nil {
@@ -150,6 +156,7 @@ func TestResolveFile_Aliases(t *testing.T) {
 }
 
 func TestPresetParityAndInvariants(t *testing.T) {
+	t.Parallel()
 	rootDir := filepath.Join("..", "..")
 	presetsPath := filepath.Join(rootDir, "data", "presets.json")
 	if _, err := os.Stat(presetsPath); os.IsNotExist(err) {
@@ -187,6 +194,7 @@ func TestPresetParityAndInvariants(t *testing.T) {
 }
 
 func TestSyncReadme(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	// Setup data/presets.json
@@ -241,6 +249,7 @@ Some intro text
 }
 
 func TestResolveReadme(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 
 	txtPath := filepath.Join(tmpDir, "aaliens_v1_2.txt")
@@ -262,6 +271,7 @@ func TestResolveReadme(t *testing.T) {
 }
 
 func TestPresetMetadata(t *testing.T) {
+	t.Parallel()
 	cat, err := LoadCatalog("")
 	if err != nil {
 		t.Fatalf("LoadCatalog failed: %v", err)
@@ -278,6 +288,7 @@ func TestPresetMetadata(t *testing.T) {
 }
 
 func TestDecodeText_And_ReadReadme(t *testing.T) {
+	t.Parallel()
 	// 1. CRLF normalization
 	crlf := []byte("Line 1\r\nLine 2\r\n")
 	if got := DecodeText(crlf); got != "Line 1\nLine 2\n" {
@@ -333,6 +344,7 @@ func TestDecodeText_And_ReadReadme(t *testing.T) {
 }
 
 func TestEffectiveArgsStyle(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		cfg      EngineConfig
@@ -381,7 +393,9 @@ func TestEffectiveArgsStyle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if got := tt.cfg.EffectiveArgsStyle(); got != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
@@ -390,6 +404,7 @@ func TestEffectiveArgsStyle(t *testing.T) {
 }
 
 func TestCatalog_Clone(t *testing.T) {
+	t.Parallel()
 	cat, err := LoadCatalog("")
 	if err != nil {
 		t.Fatalf("LoadCatalog failed: %v", err)
@@ -411,6 +426,7 @@ func TestCatalog_Clone(t *testing.T) {
 }
 
 func TestCatalog_MergeAndLayer(t *testing.T) {
+	t.Parallel()
 	base, err := LoadCatalog("")
 	if err != nil {
 		t.Fatalf("LoadCatalog failed: %v", err)
@@ -484,6 +500,7 @@ func TestCatalog_MergeAndLayer(t *testing.T) {
 }
 
 func TestLoadLayeredCatalog(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	userPresetsFile := filepath.Join(tmpDir, "user_presets.json")
 

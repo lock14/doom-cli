@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadConfig_NonExistent(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	p := &Paths{
 		ConfigFile: filepath.Join(tmpDir, "config.json"),
@@ -23,6 +24,7 @@ func TestLoadConfig_NonExistent(t *testing.T) {
 }
 
 func TestSaveAndLoadConfig(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	p := &Paths{
 		ConfigFile: filepath.Join(tmpDir, "nested", "config.json"),
@@ -63,6 +65,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 }
 
 func TestAppConfig_ExtensibleHelpers(t *testing.T) {
+	t.Parallel()
 	cfg := &AppConfig{}
 
 	// 1. Engine helpers
@@ -126,6 +129,7 @@ func TestAppConfig_ExtensibleHelpers(t *testing.T) {
 }
 
 func TestAppConfig_SaveAndLoadExtensible(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	p := &Paths{
 		ConfigFile: filepath.Join(tmpDir, "config.json"),

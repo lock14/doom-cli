@@ -2,7 +2,9 @@
 
 [![Go Version](https://img.shields.io/github/go-mod/go-version/lock14/doom-cli)](https://go.dev/)
 [![CI](https://img.shields.io/github/actions/workflow/status/lock14/doom-cli/ci.yml?branch=main&label=CI)](https://github.com/lock14/doom-cli/actions/workflows/ci.yml)
+[![Benchmarks](https://img.shields.io/github/actions/workflow/status/lock14/doom-cli/benchmark.yml?branch=main&label=Benchmarks)](https://github.com/lock14/doom-cli/actions/workflows/benchmark.yml)
 [![Security](https://img.shields.io/github/actions/workflow/status/lock14/doom-cli/security.yml?branch=main&label=Security)](https://github.com/lock14/doom-cli/actions/workflows/security.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/lock14/doom-cli)](https://codecov.io/gh/lock14/doom-cli)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A unified, cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom source ports (**[DSDA-Doom](https://github.com/kraflab/dsda-doom)** and **[UZDoom](https://github.com/UZDoom/uzdoom)**) across Linux, macOS, and Windows.

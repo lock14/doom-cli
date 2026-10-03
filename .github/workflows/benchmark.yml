@@ -1,0 +1,138 @@
+name: Benchmark Regression Check
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  detect-packages:
+    name: Detect Changed Packages
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.set-matrix.outputs.packages }}
+      empty: ${{ steps.set-matrix.outputs.empty }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Full history is required to compare against base branch
+
+      - name: Determine changed packages
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="HEAD~1"
+          fi
+
+          echo "Base reference: $BASE"
+          GO_FILES=$(git diff --name-only $BASE...HEAD -- '*.go')
+
+          if [ -z "$GO_FILES" ]; then
+            echo "No Go files changed. Skipping benchmarks."
+            echo "packages=[]" >> $GITHUB_OUTPUT
+            echo "empty=true" >> $GITHUB_OUTPUT
+            echo "## 📊 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
+            echo "No Go files changed. Benchmarks skipped." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+
+          PKGS=()
+          for dir in $(echo "$GO_FILES" | xargs -n1 dirname | sort -u); do
+            # Skip root directory if no benchmark files exist in it
+            if [ "$dir" = "." ]; then
+              continue
+            fi
+            # Check if the directory exists in both base branch (to compare against) and current HEAD
+            if git rev-parse --verify "$BASE:$dir" >/dev/null 2>&1 && [ -d "$dir" ]; then
+              PKGS+=("./$dir")
+            else
+              echo "Skipping package $dir as it does not exist in both $BASE and current branch"
+            fi
+          done
+
+          if [ ${#PKGS[@]} -eq 0 ]; then
+            echo "No existing packages changed. Skipping benchmarks."
+            echo "packages=[]" >> $GITHUB_OUTPUT
+            echo "empty=true" >> $GITHUB_OUTPUT
+            echo "## 📊 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
+            echo "No existing package changes detected. Benchmarks skipped." >> $GITHUB_STEP_SUMMARY
+          else
+            JSON=$(printf "%s\n" "${PKGS[@]}" | jq -R . | jq -s -c .)
+            echo "Detected packages for benchmark matrix: $JSON"
+            echo "packages=$JSON" >> $GITHUB_OUTPUT
+            echo "empty=false" >> $GITHUB_OUTPUT
+            echo "## 📊 Benchmark Regression Check Plan" >> $GITHUB_STEP_SUMMARY
+            echo "**Base Ref:** \`$BASE\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Packages to benchmark in parallel:** \`${PKGS[*]}\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  benchmark:
+    name: Benchmark (${{ matrix.pkg }})
+    needs: detect-packages
+    if: ${{ needs.detect-packages.outputs.empty == 'false' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pkg: ${{ fromJson(needs.detect-packages.outputs.packages) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Full history is required to compare against base branch
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: 'stable'
+
+      - name: Install benchstat and benchdiff
+        run: |
+          go install golang.org/x/perf/cmd/benchstat@latest
+          go install filippo.io/mostly-harmless/benchdiff@latest
+
+      - name: Run benchdiff (Performance Regression Check)
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE="origin/${{ github.base_ref }}"
+          else
+            BASE="HEAD~1"
+          fi
+
+          echo "Running benchdiff against $BASE on: ${{ matrix.pkg }}"
+
+          # -count=6 allows benchstat to compute valid 95% confidence intervals
+          set -o pipefail
+          OUTPUT=$(benchdiff -base-ref $BASE -- -run '^$' -bench . -benchmem -count=6 -benchtime=500ms -timeout=15m ${{ matrix.pkg }})
+          EXIT_CODE=$?
+
+          echo "$OUTPUT"
+
+          # Write Markdown summary to GitHub Actions Step Summary UI
+          {
+            echo "## 📊 Benchmark Regression Check: \`${{ matrix.pkg }}\`"
+            echo ""
+            echo "**Base Ref:** \`$BASE\`"
+            echo "**Tested Package:** \`${{ matrix.pkg }}\`"
+            echo ""
+            echo "<details open><summary><b>Benchmark diff report</b></summary>"
+            echo ""
+            echo '```'
+            echo "$OUTPUT"
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> $GITHUB_STEP_SUMMARY
+
+          exit $EXIT_CODE
