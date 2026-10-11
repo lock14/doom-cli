@@ -69,19 +69,13 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	if strings.TrimSpace(binTarget) == "" {
 		binTarget = engine
 	}
-	engineBin, err := resolveEngineBinary(binTarget, opts.BinDir)
+	engineBin, err := ResolveBinary(binTarget, opts.BinDir)
 	if err != nil {
 		return nil, err
 	}
 
 	// Resolve IWAD
 	iwadPath, ok := preset.ResolveFile(opts.WadsDir, p.IWAD)
-	if !ok {
-		// Fallback check: doom.wad -> doom1.wad
-		if strings.EqualFold(p.IWAD, "doom.wad") {
-			iwadPath, ok = preset.ResolveFile(opts.WadsDir, "doom1.wad")
-		}
-	}
 	if !ok {
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
@@ -104,7 +98,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 
 		fpath, ok := preset.ResolveFile(opts.WadsDir, clean)
 		if !ok {
-			if strings.EqualFold(clean, "idkfa 2024.wad") {
+			if preset.IsOptionalFile(clean) {
 				fmt.Fprintf(
 					out,
 					"  ℹ Optional soundtrack '%s' not found in %s; launching with default MIDI.\n",
@@ -209,9 +203,11 @@ func Execute(plan *LaunchPlan, out, errOut io.Writer) error {
 	return cmd.Run()
 }
 
-func resolveEngineBinary(engine, binDir string) (string, error) {
+// ResolveBinary searches for an engine executable in an explicit path, binDir, or system PATH.
+func ResolveBinary(engine, binDir string) (string, error) {
 	// If engine is an explicit path (contains separator or is absolute)
-	if filepath.IsAbs(engine) || strings.ContainsRune(engine, filepath.Separator) || strings.ContainsRune(engine, '/') {
+	if filepath.IsAbs(engine) || strings.ContainsRune(engine, filepath.Separator) ||
+		strings.ContainsRune(engine, '/') || strings.ContainsRune(engine, '\\') {
 		if fi, err := os.Stat(engine); err == nil && !fi.IsDir() {
 			return engine, nil
 		}

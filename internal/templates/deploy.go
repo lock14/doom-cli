@@ -42,8 +42,32 @@ func BackupFile(dest string) (string, error) {
 	return backupPath, nil
 }
 
-// DeployConfigs installs autoexec.cfg and dsda-doom.cfg with backups.
-func DeployConfigs(paths *config.Paths) error {
+var (
+	reFluidPatchset = regexp.MustCompile(`fluid_patchset\s+".*"`)
+	reVidMaxFPS     = regexp.MustCompile(`vid_maxfps\s+\d+`)
+	reScreenRes     = regexp.MustCompile(`screen_resolution\s+"[0-9]+x[0-9]+"`)
+	reSndSoundfont  = regexp.MustCompile(`snd_soundfont\s+".*"`)
+)
+
+func renderAutoexecWithRate(paths *config.Paths, rate int) string {
+	content := string(embeddedAutoexec)
+	content = strings.ReplaceAll(content, "__REFRESH_RATE__", strconv.Itoa(rate))
+	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
+	return content
+}
+
+func renderDSDADoomWithRes(paths *config.Paths, res string) string {
+	content := string(embeddedDSDADoom)
+	content = strings.ReplaceAll(content, "__RESOLUTION__", res)
+	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
+	return content
+}
+
+// DeployConfigsTo installs autoexec.cfg and dsda-doom.cfg with backups, reporting output to out.
+func DeployConfigsTo(paths *config.Paths, out io.Writer) error {
+	if out == nil {
+		out = io.Discard
+	}
 	res := display.DetectResolution()
 	rate := display.DetectRefreshRate()
 
@@ -53,15 +77,13 @@ func DeployConfigs(paths *config.Paths) error {
 	}
 	autoexecDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
 	if bkp, _ := BackupFile(autoexecDest); bkp != "" {
-		fmt.Printf("Backing up existing autoexec.cfg -> %s\n", filepath.Base(bkp))
+		fmt.Fprintf(out, "Backing up existing autoexec.cfg -> %s\n", filepath.Base(bkp))
 	}
-	autoexecContent := string(embeddedAutoexec)
-	autoexecContent = strings.ReplaceAll(autoexecContent, "__REFRESH_RATE__", strconv.Itoa(rate))
-	autoexecContent = strings.ReplaceAll(autoexecContent, "__SOUNDFONT__", paths.SoundFontFile)
+	autoexecContent := renderAutoexecWithRate(paths, rate)
 	if err := os.WriteFile(autoexecDest, []byte(autoexecContent), 0644); err != nil {
 		return err
 	}
-	fmt.Printf("✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
+	fmt.Fprintf(out, "✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
 
 	// 2. Deploy DSDA-Doom dsda-doom.cfg
 	if err := os.MkdirAll(paths.DSDADir, 0755); err != nil {
@@ -69,35 +91,32 @@ func DeployConfigs(paths *config.Paths) error {
 	}
 	dsdaDest := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
 	if bkp, _ := BackupFile(dsdaDest); bkp != "" {
-		fmt.Printf("Backing up existing dsda-doom.cfg -> %s\n", filepath.Base(bkp))
+		fmt.Fprintf(out, "Backing up existing dsda-doom.cfg -> %s\n", filepath.Base(bkp))
 	}
-	dsdaContent := string(embeddedDSDADoom)
-	dsdaContent = strings.ReplaceAll(dsdaContent, "__RESOLUTION__", res)
-	dsdaContent = strings.ReplaceAll(dsdaContent, "__SOUNDFONT__", paths.SoundFontFile)
+	dsdaContent := renderDSDADoomWithRes(paths, res)
 	if err := os.WriteFile(dsdaDest, []byte(dsdaContent), 0644); err != nil {
 		return err
 	}
-	fmt.Printf("✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
+	fmt.Fprintf(out, "✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
 
 	return nil
+}
+
+// DeployConfigs installs autoexec.cfg and dsda-doom.cfg with backups.
+func DeployConfigs(paths *config.Paths) error {
+	return DeployConfigsTo(paths, os.Stdout)
 }
 
 // RenderAutoexec returns expected autoexec.cfg content with detected display and soundfont.
 func RenderAutoexec(paths *config.Paths) string {
 	rate := display.DetectRefreshRate()
-	content := string(embeddedAutoexec)
-	content = strings.ReplaceAll(content, "__REFRESH_RATE__", strconv.Itoa(rate))
-	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
-	return content
+	return renderAutoexecWithRate(paths, rate)
 }
 
 // RenderDSDADoom returns expected dsda-doom.cfg content with detected resolution and soundfont.
 func RenderDSDADoom(paths *config.Paths) string {
 	res := display.DetectResolution()
-	content := string(embeddedDSDADoom)
-	content = strings.ReplaceAll(content, "__RESOLUTION__", res)
-	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
-	return content
+	return renderDSDADoomWithRes(paths, res)
 }
 
 // DiffConfigs compares installed system configs against embedded templates and prints differences.
@@ -175,10 +194,8 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 	autoDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
 	if data, err := os.ReadFile(autoDest); err == nil {
 		text := string(data)
-		reSoundfont := regexp.MustCompile(`fluid_patchset\s+".*"`)
-		text = reSoundfont.ReplaceAllString(text, `fluid_patchset "__SOUNDFONT__"`)
-		reFPS := regexp.MustCompile(`vid_maxfps\s+\d+`)
-		text = reFPS.ReplaceAllString(text, `vid_maxfps __REFRESH_RATE__`)
+		text = reFluidPatchset.ReplaceAllString(text, `fluid_patchset "__SOUNDFONT__"`)
+		text = reVidMaxFPS.ReplaceAllString(text, `vid_maxfps __REFRESH_RATE__`)
 
 		repoAuto := filepath.Join(repoDir, "uzdoom", "autoexec.cfg")
 		if _, err := os.Stat(filepath.Dir(repoAuto)); err == nil {
@@ -196,10 +213,8 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 	dsdaDest := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
 	if data, err := os.ReadFile(dsdaDest); err == nil {
 		text := string(data)
-		reRes := regexp.MustCompile(`screen_resolution\s+"[0-9]+x[0-9]+"`)
-		text = reRes.ReplaceAllString(text, `screen_resolution               "__RESOLUTION__"`)
-		reSF := regexp.MustCompile(`snd_soundfont\s+".*"`)
-		text = reSF.ReplaceAllString(text, `snd_soundfont                   "__SOUNDFONT__"`)
+		text = reScreenRes.ReplaceAllString(text, `screen_resolution               "__RESOLUTION__"`)
+		text = reSndSoundfont.ReplaceAllString(text, `snd_soundfont                   "__SOUNDFONT__"`)
 
 		repoDSDA := filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg")
 		if _, err := os.Stat(filepath.Dir(repoDSDA)); err == nil {

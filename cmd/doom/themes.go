@@ -37,10 +37,9 @@ func newThemesCmd() *cobra.Command {
 }
 
 func runThemesList(cmd *cobra.Command, args []string) error {
-	paths := getPaths()
-	cfg, err := config.LoadConfig(paths)
+	paths, cfg, err := loadPathsAndConfig()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return err
 	}
 
 	activeTheme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
@@ -74,7 +73,10 @@ func runThemesList(cmd *cobra.Command, args []string) error {
 
 func runThemesSet(cmd *cobra.Command, args []string) error {
 	target := strings.TrimSpace(args[0])
-	paths := getPaths()
+	paths, cfg, err := loadPathsAndConfig()
+	if err != nil {
+		return err
+	}
 
 	if _, ok := tui.GetBuiltinTheme(target); !ok {
 		customFile := filepath.Join(paths.ThemesDir, target+".json")
@@ -83,11 +85,6 @@ func runThemesSet(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("unknown theme %q. Run 'doom themes list' to see available themes", target)
 			}
 		}
-	}
-
-	cfg, err := config.LoadConfig(paths)
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
 	}
 
 	cfg.Theme = target

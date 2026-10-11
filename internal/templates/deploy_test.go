@@ -165,3 +165,74 @@ func TestSyncConfigs(t *testing.T) {
 		t.Errorf("embedded dsda cfg does not match root template")
 	}
 }
+
+func TestTemplateParity(t *testing.T) {
+	t.Parallel()
+	rootDir := filepath.Join("..", "..")
+
+	pairs := []struct {
+		name         string
+		rootFile     string
+		embeddedData []byte
+	}{
+		{
+			name:         "dsda-doom.cfg",
+			rootFile:     filepath.Join(rootDir, "dsda-doom", "dsda-doom.cfg"),
+			embeddedData: embeddedDSDADoom,
+		},
+		{
+			name:         "autoexec.cfg",
+			rootFile:     filepath.Join(rootDir, "uzdoom", "autoexec.cfg"),
+			embeddedData: embeddedAutoexec,
+		},
+	}
+
+	for _, p := range pairs {
+		p := p
+		t.Run(p.name, func(t *testing.T) {
+			t.Parallel()
+			rootData, err := os.ReadFile(p.rootFile)
+			if os.IsNotExist(err) {
+				t.Skipf("%s not found from relative path", p.rootFile)
+			}
+			if err != nil {
+				t.Fatalf("reading %s: %v", p.rootFile, err)
+			}
+
+			if !bytes.Equal(rootData, p.embeddedData) {
+				t.Errorf("%s and embedded %s are out of sync; run 'doom config sync'", p.rootFile, p.name)
+			}
+		})
+	}
+}
+
+func TestDeployConfigsTo(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	paths := &config.Paths{
+		DataDir:       tmpDir,
+		BinDir:        filepath.Join(tmpDir, "bin"),
+		WadsDir:       filepath.Join(tmpDir, "wads"),
+		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
+		SoundFontFile: filepath.Join(tmpDir, "soundfonts", "GeneralUser-GS.sf2"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
+	}
+
+	var buf bytes.Buffer
+	if err := DeployConfigsTo(paths, &buf); err != nil {
+		t.Fatalf("DeployConfigsTo failed: %v", err)
+	}
+
+	outStr := buf.String()
+	if !strings.Contains(outStr, "Installed") {
+		t.Errorf("expected output to contain 'Installed', got: %s", outStr)
+	}
+
+	// Verify file was written
+	autoexecPath := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
+	if _, err := os.Stat(autoexecPath); err != nil {
+		t.Errorf("expected autoexec.cfg to exist: %v", err)
+	}
+}

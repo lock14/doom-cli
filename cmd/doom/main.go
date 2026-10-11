@@ -28,34 +28,12 @@ var (
 	flagNerdFonts      bool
 )
 
-func getCatalog() (*preset.Catalog, error) {
-	paths := getPaths()
+func loadPathsAndConfig() (*config.Paths, *config.AppConfig, error) {
+	paths := config.GetPaths()
 	cfg, err := config.LoadConfig(paths)
 	if err != nil {
-		return nil, fmt.Errorf("loading config: %w", err)
+		return nil, nil, fmt.Errorf("loading config: %w", err)
 	}
-
-	var customEngines map[string]preset.EngineConfig
-	var customPresets []preset.Preset
-	var launchOptions map[string]preset.WadLaunchOptions
-	if cfg != nil {
-		customEngines = cfg.Engines
-		customPresets = cfg.Presets
-		launchOptions = cfg.LaunchOptions
-	}
-
-	return preset.LoadLayeredCatalog(
-		flagPresetsFile,
-		paths.PresetsFile,
-		customEngines,
-		customPresets,
-		launchOptions,
-	)
-}
-
-func getPaths() *config.Paths {
-	paths := config.GetPaths()
-	cfg, _ := config.LoadConfig(paths)
 	if cfg != nil {
 		hasWadsEnv := os.Getenv("WADS_DIR") != "" || os.Getenv("DOOM_WADS_DIR") != ""
 		if cfg.WadsDir != "" && !hasWadsEnv {
@@ -78,6 +56,48 @@ func getPaths() *config.Paths {
 	}
 	if flagSoundFontsDir != "" {
 		paths.SetSoundFontsDir(flagSoundFontsDir)
+	}
+	return paths, cfg, nil
+}
+
+func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
+	paths, cfg, err := loadPathsAndConfig()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var customEngines map[string]preset.EngineConfig
+	var customPresets []preset.Preset
+	var launchOptions map[string]preset.WadLaunchOptions
+	if cfg != nil {
+		customEngines = cfg.Engines
+		customPresets = cfg.Presets
+		launchOptions = cfg.LaunchOptions
+	}
+
+	cat, err := preset.LoadLayeredCatalog(
+		flagPresetsFile,
+		paths.PresetsFile,
+		customEngines,
+		customPresets,
+		launchOptions,
+	)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return paths, cfg, cat, nil
+}
+
+func getCatalog() (*preset.Catalog, error) {
+	_, _, cat, err := loadAppState()
+	return cat, err
+}
+
+func getPaths() *config.Paths {
+	paths, _, err := loadPathsAndConfig()
+	if err != nil {
+		return config.GetPaths()
 	}
 	return paths
 }

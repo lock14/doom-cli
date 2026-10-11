@@ -22,8 +22,7 @@ func newWadsCmd() *cobra.Command {
 		Use:   "fetch [preset_name|all]",
 		Short: "Download community megawad files",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			paths := getPaths()
-			cat, err := getCatalog()
+			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}

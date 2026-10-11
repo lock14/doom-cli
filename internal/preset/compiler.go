@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var readmeTableRegex = regexp.MustCompile(`(## Preconfigured Presets\n\n[^\n]+\n\n)(\|[\s\S]+?)(\n\n---)`)
+
 // GenerateReadmeTable constructs the markdown table for README.md.
 func GenerateReadmeTable(cat *Catalog) string {
 	lines := []string{
@@ -25,11 +27,20 @@ func GenerateReadmeTable(cat *Catalog) string {
 	return strings.Join(lines, "\n")
 }
 
-// SyncReadme synchronizes data/presets.json into README.md.
+// SyncReadme synchronizes data/presets.json into README.md and updates embedded preset data if present.
 func SyncReadme(rootDir string) error {
-	cat, err := LoadCatalog(filepath.Join(rootDir, "data", "presets.json"))
+	srcPath := filepath.Join(rootDir, "data", "presets.json")
+	cat, err := LoadCatalog(srcPath)
 	if err != nil {
 		return err
+	}
+
+	// Keep embedded presets data in sync if repository tree exists
+	targetDir := filepath.Join(rootDir, "internal", "preset", "data")
+	if fi, err := os.Stat(targetDir); err == nil && fi.IsDir() {
+		if data, err := os.ReadFile(srcPath); err == nil {
+			_ = os.WriteFile(filepath.Join(targetDir, "presets.json"), data, 0o644)
+		}
 	}
 
 	readmeFile := filepath.Join(rootDir, "README.md")
@@ -39,8 +50,7 @@ func SyncReadme(rootDir string) error {
 	}
 
 	table := GenerateReadmeTable(cat)
-	pattern := regexp.MustCompile(`(## Preconfigured Presets\n\n[^\n]+\n\n)(\|[\s\S]+?)(\n\n---)`)
-	updated := pattern.ReplaceAllString(string(content), fmt.Sprintf("${1}%s${3}", table))
+	updated := readmeTableRegex.ReplaceAllString(string(content), fmt.Sprintf("${1}%s${3}", table))
 	return os.WriteFile(readmeFile, []byte(updated), 0o644)
 }
 

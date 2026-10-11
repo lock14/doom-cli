@@ -45,7 +45,7 @@ func newConfigCmd() *cobra.Command {
 		Short: "Deploy autoexec.cfg and dsda-doom.cfg with backups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			return templates.DeployConfigs(paths)
+			return templates.DeployConfigsTo(paths, cmd.OutOrStdout())
 		},
 	}
 	configDiffCmd := &cobra.Command{
@@ -73,10 +73,9 @@ func newConfigCmd() *cobra.Command {
 }
 
 func runConfigShow(cmd *cobra.Command, args []string) error {
-	paths := getPaths()
-	cfg, err := config.LoadConfig(paths)
+	paths, cfg, err := loadPathsAndConfig()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return err
 	}
 
 	theme := cfg.Theme
@@ -159,10 +158,9 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	paths := getPaths()
-	cfg, err := config.LoadConfig(paths)
+	paths, cfg, err := loadPathsAndConfig()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return err
 	}
 
 	switch canonKey {
@@ -199,11 +197,9 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	}
 
 	val := strings.TrimSpace(args[1])
-	paths := getPaths()
-
-	cfg, err := config.LoadConfig(paths)
+	paths, cfg, err := loadPathsAndConfig()
 	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
+		return err
 	}
 
 	switch canonKey {
