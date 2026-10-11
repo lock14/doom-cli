@@ -38,7 +38,7 @@ func NewDownloader(wadsDir string, force bool, out io.Writer) *Downloader {
 func FilterExpectedFiles(mappacks []string) []string {
 	var filtered []string
 	for _, m := range mappacks {
-		if strings.EqualFold(m, "idkfa 2024.wad") {
+		if preset.IsOptionalFile(m) {
 			continue
 		}
 		filtered = append(filtered, m)
@@ -172,11 +172,19 @@ func (d *Downloader) downloadAndExtract(url string, expectedFiles []string) erro
 	// If direct .wad / .pk3
 	if len(expectedFiles) == 1 {
 		dest := filepath.Join(d.WadsDir, expectedFiles[0])
-		data, err := os.ReadFile(tmpArchive)
+		in, err := os.Open(tmpArchive)
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(dest, data, 0644); err != nil {
+		defer in.Close()
+
+		out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		if _, err := io.Copy(out, in); err != nil {
 			return err
 		}
 		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", expectedFiles[0], dest)

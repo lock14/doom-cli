@@ -12,7 +12,8 @@ All contributions must respect our core foundational principles:
 
 *   **Declarative Presets & Single Source of Truth**: All preset definitions, source port engine assignments,
     IWAD mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs are defined declaratively in
-    [`data/presets.json`](data/presets.json). Use `doom presets build` to synchronize them with `README.md`.
+    [`data/presets.json`](data/presets.json). Use `doom presets build` to synchronize them with `README.md` and
+    `internal/preset/data/presets.json`.
 *   **Portability & Path Invariants**:
     *   **Never commit personal user paths, display resolutions, or refresh rates**: Do not commit paths like
         `/home/<user>/`, hardcoded display resolutions, or fixed monitor refresh rates into configurations, presets,
@@ -110,9 +111,9 @@ doom-cli/
 │   │   └── installer.go    # Downloads and extracts portable engine binaries (Zip Slip hardened)
 │   ├── preset/             # Catalog management, file resolution, text decoding, README synchronization
 │   │   ├── preset.go       # Catalog data models, catalog layering, and embedded presets loader
-│   │   ├── resolve.go      # Case-insensitive, whitespace-tolerant file resolution with aliases
+│   │   ├── resolve.go      # Cached DirIndex, case/whitespace-tolerant file & alias resolution
 │   │   ├── decode.go       # Robust text decoding with CP437/DOS box-drawing character detection
-│   │   └── compiler.go     # Synchronizes presets catalog table into README.md
+│   │   └── compiler.go     # Synchronizes presets catalog into README.md and embedded data
 │   ├── steam/              # Steam/GOG library discovery (libraryfolders.vdf) and game file extraction
 │   ├── templates/          # Embedded engine configuration templates and backup deployer
 │   ├── tui/                # Terminal user interface components powered by Bubble Tea and Lip Gloss

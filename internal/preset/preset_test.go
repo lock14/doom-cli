@@ -1,6 +1,7 @@
 package preset
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -566,5 +567,200 @@ func TestLoadLayeredCatalog(t *testing.T) {
 	sl := cat.Find("Sunlust")
 	if sl == nil || sl.AdditionalArgs != "-skill 4" {
 		t.Errorf("expected Sunlust AdditionalArgs to be '-skill 4', got %v", sl)
+	}
+}
+
+func TestPresetsParity(t *testing.T) {
+	t.Parallel()
+	rootFile := filepath.Join("..", "..", "data", "presets.json")
+	rootData, err := os.ReadFile(rootFile)
+	if os.IsNotExist(err) {
+		t.Skip("data/presets.json not found from relative path")
+	}
+	if err != nil {
+		t.Fatalf("reading %s: %v", rootFile, err)
+	}
+
+	embeddedFile := filepath.Join("data", "presets.json")
+	embeddedData, err := os.ReadFile(embeddedFile)
+	if err != nil {
+		t.Fatalf("reading %s: %v", embeddedFile, err)
+	}
+
+	if !bytes.Equal(rootData, embeddedData) {
+		t.Errorf("%s and %s are out of sync; run 'doom presets build'", rootFile, embeddedFile)
+	}
+}
+
+func TestIsOptionalFile(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		filename string
+		want     bool
+	}{
+		{filename: "idkfa 2024.wad", want: true},
+		{filename: "IDKFA 2024.WAD", want: true},
+		{filename: "idkfa 2024.Wad", want: true},
+		{filename: "doom.wad", want: false},
+		{filename: "doom2.wad", want: false},
+		{filename: "", want: false},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.filename, func(t *testing.T) {
+			t.Parallel()
+			if got := IsOptionalFile(tt.filename); got != tt.want {
+				t.Errorf("IsOptionalFile(%q) = %v, want %v", tt.filename, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKnownAliases(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{input: "gdturbo.wad", want: []string{"gd.wad"}},
+		{input: "GDTURBO.WAD", want: []string{"gd.wad"}},
+		{input: "gd.wad", want: []string{"gdturbo.wad"}},
+		{input: "doom.wad", want: []string{"doom1.wad"}},
+		{input: "other.wad", want: nil},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			got := KnownAliases(tt.input)
+			if len(got) != len(tt.want) {
+				t.Fatalf("KnownAliases(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("KnownAliases(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestDirIndex(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	// Create test files
+	files := []string{
+		"Eviternity II.wad",
+		"gd.wad",
+		"SIGIL_v1_21.wad",
+		"SIGIL_COMPAT.wad",
+	}
+	for _, f := range files {
+		if err := os.WriteFile(filepath.Join(tmpDir, f), []byte("dummy"), 0o644); err != nil {
+			t.Fatalf("WriteFile(%s) error = %v", f, err)
+		}
+	}
+
+	idx := NewDirIndex(tmpDir)
+
+	tests := []struct {
+		name      string
+		target    string
+		wantFound bool
+		wantBase  string
+	}{
+		{
+			name:      "exact match with same casing",
+			target:    "gd.wad",
+			wantFound: true,
+			wantBase:  "gd.wad",
+		},
+		{
+			name:      "exact match different casing",
+			target:    "GD.WAD",
+			wantFound: true,
+			wantBase:  "gd.wad",
+		},
+		{
+			name:      "alias match",
+			target:    "gdturbo.wad",
+			wantFound: true,
+			wantBase:  "gd.wad",
+		},
+		{
+			name:      "normalized spacing match",
+			target:    "eviternityii.wad",
+			wantFound: true,
+			wantBase:  "Eviternity II.wad",
+		},
+		{
+			name:      "missing file",
+			target:    "nonexistent.wad",
+			wantFound: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotPath, gotFound := idx.ResolveFile(tt.target)
+			if gotFound != tt.wantFound {
+				t.Fatalf("idx.ResolveFile(%q) found = %v, want %v", tt.target, gotFound, tt.wantFound)
+			}
+			if tt.wantFound && filepath.Base(gotPath) != tt.wantBase {
+				t.Errorf("idx.ResolveFile(%q) = %q, want base %q", tt.target, filepath.Base(gotPath), tt.wantBase)
+			}
+		})
+	}
+
+	// Test non-existent directory index
+	emptyIdx := NewDirIndex(filepath.Join(tmpDir, "does-not-exist"))
+	if _, found := emptyIdx.ResolveFile("anything.wad"); found {
+		t.Error("expected non-existent dir index to resolve nothing")
+	}
+}
+
+func TestMergePresets_FieldCopies(t *testing.T) {
+	t.Parallel()
+	cat := &Catalog{
+		Presets: []Preset{
+			{
+				Name:              "Test Preset",
+				Engine:            "dsda-doom",
+				IWAD:              "DOOM2.WAD",
+				Mappacks:          []string{"test.wad"},
+				DownloadURLs:      []string{"https://example.com/test.zip"},
+				LoadMapsAfterMods: true,
+			},
+		},
+	}
+
+	incoming := []Preset{
+		{
+			Name:        "Test Preset",
+			Engine:      "uzdoom",
+			Description: "Updated description",
+		},
+	}
+
+	cat.MergePresets(incoming)
+
+	p := cat.Find("Test Preset")
+	if p == nil {
+		t.Fatal("expected Test Preset to be found")
+	}
+	if p.Engine != "uzdoom" {
+		t.Errorf("expected engine uzdoom, got %s", p.Engine)
+	}
+	if p.Description != "Updated description" {
+		t.Errorf("expected updated description, got %s", p.Description)
+	}
+	if len(p.DownloadURLs) != 1 || p.DownloadURLs[0] != "https://example.com/test.zip" {
+		t.Errorf("expected DownloadURLs preserved, got %v", p.DownloadURLs)
+	}
+	if !p.LoadMapsAfterMods {
+		t.Error("expected LoadMapsAfterMods preserved")
 	}
 }

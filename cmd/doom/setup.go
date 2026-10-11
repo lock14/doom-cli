@@ -18,23 +18,23 @@ func newSetupCmd() *cobra.Command {
 		Use:   "setup",
 		Short: "Complete 1-command setup (engines, soundfont, configs, steam IWADs, and community megawads)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			paths := getPaths()
-			cat, err := getCatalog()
+			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
 
-			fmt.Println("============================================================")
-			fmt.Println("  ⚡ Initiating Doom Setup")
-			fmt.Println("============================================================")
-			fmt.Println()
+			out := cmd.OutOrStdout()
+			fmt.Fprintln(out, "============================================================")
+			fmt.Fprintln(out, "  ⚡ Initiating Doom Setup")
+			fmt.Fprintln(out, "============================================================")
+			fmt.Fprintln(out)
 
 			// 1. Configs
-			fmt.Println(">>> Step 1/5: Deploying platform configurations...")
-			if err := templates.DeployConfigs(paths); err != nil {
+			fmt.Fprintln(out, ">>> Step 1/5: Deploying platform configurations...")
+			if err := templates.DeployConfigsTo(paths, out); err != nil {
 				return fmt.Errorf("error deploying configs: %w", err)
 			}
-			fmt.Println()
+			fmt.Fprintln(out)
 
 			// 2. Engines
 			fmt.Println(">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")

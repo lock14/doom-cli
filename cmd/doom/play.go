@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/engine"
 	"github.com/lock14/doom-cli/internal/tui"
 )
@@ -28,15 +27,9 @@ func newPlayCmd() *cobra.Command {
 }
 
 func runPlay(cmd *cobra.Command, args []string) error {
-	cat, err := getCatalog()
+	paths, cfg, cat, err := loadAppState()
 	if err != nil {
 		return err
-	}
-
-	paths := getPaths()
-	cfg, err := config.LoadConfig(paths)
-	if err != nil {
-		return fmt.Errorf("loading config: %w", err)
 	}
 
 	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)

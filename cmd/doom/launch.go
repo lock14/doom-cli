@@ -17,7 +17,7 @@ func newLaunchCmd() *cobra.Command {
 		Args:               cobra.MinimumNArgs(1),
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cat, err := getCatalog()
+			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
@@ -29,8 +29,6 @@ func newLaunchCmd() *cobra.Command {
 			if p == nil {
 				return fmt.Errorf("preset %q not found. Run 'doom presets list' to see available presets", targetName)
 			}
-
-			paths := getPaths()
 			opts := engine.LaunchOptions{
 				EngineOverride: flagEngineOverride,
 				WadsDir:        paths.WadsDir,

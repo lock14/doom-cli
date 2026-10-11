@@ -172,6 +172,12 @@ func (c *Catalog) MergePresets(presets []Preset) {
 			if newP.AdditionalArgs != "" {
 				c.Presets[idx].AdditionalArgs = newP.AdditionalArgs
 			}
+			if len(newP.DownloadURLs) > 0 {
+				c.Presets[idx].DownloadURLs = append([]string(nil), newP.DownloadURLs...)
+			}
+			if newP.LoadMapsAfterMods {
+				c.Presets[idx].LoadMapsAfterMods = newP.LoadMapsAfterMods
+			}
 			c.Presets[idx].Custom = true
 		} else {
 			c.Presets = append(c.Presets, newP)

@@ -82,7 +82,7 @@ func (m model) renderPreviewLines() ([]string, bool) {
 	}
 
 	cur := m.filtered[m.cursor]
-	readmePath, hasReadme := preset.ResolveReadme(m.wadsDir, cur)
+	readmePath, hasReadme := m.resolveReadme(cur)
 
 	var previewLines []string
 	previewLines = append(previewLines,
@@ -140,7 +140,7 @@ func (m model) renderPreviewLines() ([]string, bool) {
 
 	// Check IWAD
 	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-	if _, ok := preset.ResolveFile(m.wadsDir, cur.IWAD); ok {
+	if _, ok := m.resolveFile(cur.IWAD); ok {
 		iwadStatus = m.styles.StatusReady.Render("[✓ Found]")
 	}
 	previewLines = append(previewLines,
@@ -151,9 +151,9 @@ func (m model) renderPreviewLines() ([]string, bool) {
 		previewLines = append(previewLines, m.styles.Label.Render("Files:"))
 		for _, mapfile := range cur.Mappacks {
 			fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-			if _, ok := preset.ResolveFile(m.wadsDir, mapfile); ok {
+			if _, ok := m.resolveFile(mapfile); ok {
 				fStatus = m.styles.StatusReady.Render("[✓ Found]")
-			} else if strings.EqualFold(mapfile, "idkfa 2024.wad") {
+			} else if preset.IsOptionalFile(mapfile) {
 				fStatus = m.styles.Help.Render("[Optional]")
 			}
 			previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))

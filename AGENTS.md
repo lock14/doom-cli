@@ -3,9 +3,11 @@
 *   **Declarative Presets & Single Source of Truth**:
     *   `data/presets.json` is the sole source of truth for all preset definitions, engine assignments, IWAD mappings,
         PWAD file lists, DeHackEd orderings, metadata, and download URLs.
-    *   **Synchronize Documentation**: Run `doom presets build` to synchronize `data/presets.json` into `README.md`.
-    *   **Parity Verification**: Run `make check` (or `go test -v ./internal/preset`) to verify that `README.md`
-        matches `data/presets.json` and complies with all path invariants.
+    *   **Synchronize Documentation & Embedded Data**: Run `doom presets build` to synchronize `data/presets.json`
+        into `README.md` and `internal/preset/data/presets.json`.
+    *   **Parity Verification**: Run `make check` (or `go test -v ./internal/preset ./internal/templates`) to verify
+        that `README.md` and embedded data match `data/presets.json` and root templates, and comply with all path
+        invariants.
 *   **Portability & Path Invariants**:
     *   **Never commit personal user paths, display resolutions, or refresh rates**: Never commit absolute personal
         paths like `/home/<username>/`, hardcoded local display resolutions, or fixed monitor refresh rates into
@@ -100,9 +102,10 @@ Linux, macOS, and Windows:
     *   `installer.go`: Source port asset downloading and portable binary installation (Zip Slip hardened).
 *   `internal/preset/`:
     *   `preset.go`: Declarative preset catalog, catalog layering, and embedded presets loader.
-    *   `resolve.go`: Case-insensitive, whitespace-tolerant file resolution with alias matching.
+    *   `resolve.go`: Cached `DirIndex` directory indexing, case-insensitive/whitespace-tolerant file resolution,
+        `IsOptionalFile`, and `KnownAliases` matching.
     *   `decode.go`: Document decoding with DOS Code Page 437 / CP437 box-drawing detection.
-    *   `compiler.go`: README table synchronizer (`doom presets build`).
+    *   `compiler.go`: README table and embedded preset data synchronizer (`doom presets build`).
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
 *   `internal/templates/`: Embedded engine configuration templates and timestamped backup deployer.
 *   `internal/tui/`: Interactive Bubble Tea fuzzy launcher:

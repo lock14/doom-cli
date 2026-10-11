@@ -19,23 +19,39 @@ import (
 var defaultStyles = CompileStyles(DefaultTheme)
 
 type model struct {
-	theme     Theme
-	styles    ThemeStyles
-	nerdFonts bool
-	catalog   *preset.Catalog
-	wadsDir   string
-	input     textinput.Model
-	filtered  []preset.Preset
-	cursor    int
-	selected  *preset.Preset
-	width     int
-	height    int
-	quitting  bool
+	theme         Theme
+	styles        ThemeStyles
+	nerdFonts     bool
+	catalog       *preset.Catalog
+	wadsDir       string
+	dirIndex      *preset.DirIndex
+	searchTargets []string
+	input         textinput.Model
+	filtered      []preset.Preset
+	cursor        int
+	selected      *preset.Preset
+	width         int
+	height        int
+	quitting      bool
 
 	// Readme viewer state
 	viewingReadme bool
 	readmeTitle   string
 	viewport      viewport.Model
+}
+
+func (m model) resolveFile(name string) (string, bool) {
+	if m.dirIndex != nil {
+		return m.dirIndex.ResolveFile(name)
+	}
+	return preset.ResolveFile(m.wadsDir, name)
+}
+
+func (m model) resolveReadme(p preset.Preset) (string, bool) {
+	if m.dirIndex != nil {
+		return m.dirIndex.ResolveReadme(p)
+	}
+	return preset.ResolveReadme(m.wadsDir, p)
 }
 
 func initialModel(
@@ -74,17 +90,26 @@ func initialModel(
 		}
 	}
 
+	var searchTargets []string
+	if catalog != nil {
+		for _, p := range catalog.Presets {
+			searchTargets = append(searchTargets, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+		}
+	}
+
 	return model{
-		theme:     theme,
-		styles:    styles,
-		nerdFonts: nerdFonts,
-		catalog:   catalog,
-		wadsDir:   wadsDir,
-		input:     ti,
-		filtered:  catalog.Presets,
-		cursor:    cursor,
-		width:     w,
-		height:    h,
+		theme:         theme,
+		styles:        styles,
+		nerdFonts:     nerdFonts,
+		catalog:       catalog,
+		wadsDir:       wadsDir,
+		dirIndex:      preset.NewDirIndex(wadsDir),
+		searchTargets: searchTargets,
+		input:         ti,
+		filtered:      catalog.Presets,
+		cursor:        cursor,
+		width:         w,
+		height:        h,
 	}
 }
 
@@ -147,7 +172,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "tab", "ctrl+r":
 			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
 				cur := m.filtered[m.cursor]
-				if txtPath, ok := preset.ResolveReadme(m.wadsDir, cur); ok {
+				if txtPath, ok := m.resolveReadme(cur); ok {
 					content, err := preset.ReadReadme(txtPath)
 					if err == nil {
 						m.viewingReadme = true
@@ -198,13 +223,15 @@ func (m *model) updateFiltered(query string) {
 		return
 	}
 
-	// Prepare search items
-	var names []string
-	for _, p := range m.catalog.Presets {
-		names = append(names, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+	targets := m.searchTargets
+	if len(targets) != len(m.catalog.Presets) {
+		targets = make([]string, 0, len(m.catalog.Presets))
+		for _, p := range m.catalog.Presets {
+			targets = append(targets, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+		}
 	}
 
-	matches := fuzzy.Find(query, names)
+	matches := fuzzy.Find(query, targets)
 	var result []preset.Preset
 	for _, match := range matches {
 		result = append(result, m.catalog.Presets[match.Index])

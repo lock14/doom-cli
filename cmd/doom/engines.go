@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -65,10 +63,9 @@ func newEnginesCmd() *cobra.Command {
 				Description: addDesc,
 			}
 
-			paths := getPaths()
-			cfg, err := config.LoadConfig(paths)
+			paths, cfg, err := loadPathsAndConfig()
 			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
+				return err
 			}
 			cfg.AddEngine(cfgMeta)
 			if err := config.SaveConfig(paths, cfg); err != nil {
@@ -99,10 +96,9 @@ func newEnginesCmd() *cobra.Command {
 				return fmt.Errorf("cannot remove built-in engine %q", name)
 			}
 
-			paths := getPaths()
-			cfg, err := config.LoadConfig(paths)
+			paths, cfg, err := loadPathsAndConfig()
 			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
+				return err
 			}
 			if !cfg.RemoveEngine(name) {
 				return fmt.Errorf("engine %q not found in user configuration", name)
@@ -144,31 +140,17 @@ func newEnginesCmd() *cobra.Command {
 }
 
 func checkEngineBinary(binary, binDir string) (string, bool) {
-	if binary == "" {
-		return "", false
-	}
-	if filepath.IsAbs(binary) || strings.Contains(binary, "/") || strings.Contains(binary, "\\") {
-		if fi, err := os.Stat(binary); err == nil && !fi.IsDir() {
-			return binary, true
-		}
-		return binary, false
-	}
-	cand := filepath.Join(binDir, binary)
-	if fi, err := os.Stat(cand); err == nil && !fi.IsDir() {
-		return cand, true
-	}
-	if p, err := exec.LookPath(binary); err == nil {
-		return p, true
+	if resolved, err := engine.ResolveBinary(binary, binDir); err == nil {
+		return resolved, true
 	}
 	return binary, false
 }
 
 func runEnginesList(cmd *cobra.Command, args []string) error {
-	cat, err := getCatalog()
+	paths, _, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
-	paths := getPaths()
 
 	fmt.Println("=== Available Doom Engines ===")
 	keys := make([]string, 0, len(cat.Engines))

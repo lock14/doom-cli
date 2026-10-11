@@ -12,11 +12,21 @@ import (
 	"strings"
 )
 
+var (
+	reResFormat   = regexp.MustCompile(`^\d+x\d+$`)
+	reDarwinRes   = regexp.MustCompile(`(?i)Resolution:\s*(\d+)\s*x\s*(\d+)`)
+	reXrandrRes   = regexp.MustCompile(`^\s*(\d+x\d+)\s+.*\*\+?`)
+	reWlrRes      = regexp.MustCompile(`(\d+x\d+)\s+px,\s+\d+(\.\d+)?\s+Hz\s+\(current\)`)
+	reDarwinRate  = regexp.MustCompile(`(?i)(refresh rate|hertz|@)\s*:?\s*(\d+)`)
+	reXrandrRate  = regexp.MustCompile(`(\d+(\.\d+)?)\*`)
+	reWlrRate     = regexp.MustCompile(`(\d+(\.\d+)?)\s+Hz\s+\(current\)`)
+	reKscreenRate = regexp.MustCompile(`@(\d+)`)
+)
+
 // DetectResolution attempts to discover the primary monitor's resolution (e.g. "1920x1080").
 func DetectResolution() string {
 	res := detectResolutionOS(runtime.GOOS)
-	matched, _ := regexp.MatchString(`^\d+x\d+$`, res)
-	if !matched {
+	if !reResFormat.MatchString(res) {
 		return "1920x1080"
 	}
 	return res
@@ -35,8 +45,7 @@ func detectResolutionOS(goos string) string {
 	switch goos {
 	case "darwin":
 		if out, err := exec.Command("system_profiler", "SPDisplaysDataType").Output(); err == nil {
-			re := regexp.MustCompile(`(?i)Resolution:\s*(\d+)\s*x\s*(\d+)`)
-			if m := re.FindStringSubmatch(string(out)); len(m) >= 3 {
+			if m := reDarwinRes.FindStringSubmatch(string(out)); len(m) >= 3 {
 				return m[1] + "x" + m[2]
 			}
 		}
@@ -49,7 +58,7 @@ func detectResolutionOS(goos string) string {
 		cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
 		if out, err := cmd.Output(); err == nil {
 			str := strings.TrimSpace(string(out))
-			if matched, _ := regexp.MatchString(`^\d+x\d+$`, str); matched {
+			if reResFormat.MatchString(str) {
 				return str
 			}
 		}
@@ -58,9 +67,8 @@ func detectResolutionOS(goos string) string {
 		// 1. Try xrandr
 		if out, err := exec.Command("xrandr").Output(); err == nil {
 			scanner := bufio.NewScanner(strings.NewReader(string(out)))
-			re := regexp.MustCompile(`^\s*(\d+x\d+)\s+.*\*\+?`)
 			for scanner.Scan() {
-				if m := re.FindStringSubmatch(scanner.Text()); len(m) >= 2 {
+				if m := reXrandrRes.FindStringSubmatch(scanner.Text()); len(m) >= 2 {
 					return m[1]
 				}
 			}
@@ -68,8 +76,7 @@ func detectResolutionOS(goos string) string {
 
 		// 2. Try wlr-randr (Wayland)
 		if out, err := exec.Command("wlr-randr").Output(); err == nil {
-			re := regexp.MustCompile(`(\d+x\d+)\s+px,\s+\d+(\.\d+)?\s+Hz\s+\(current\)`)
-			if m := re.FindStringSubmatch(string(out)); len(m) >= 2 {
+			if m := reWlrRes.FindStringSubmatch(string(out)); len(m) >= 2 {
 				return m[1]
 			}
 		}
@@ -81,7 +88,7 @@ func detectResolutionOS(goos string) string {
 				lines := strings.Split(string(data), "\n")
 				if len(lines) > 0 {
 					candidate := strings.TrimSpace(lines[0])
-					if matched, _ := regexp.MatchString(`^\d+x\d+$`, candidate); matched {
+					if reResFormat.MatchString(candidate) {
 						return candidate
 					}
 				}
@@ -96,8 +103,7 @@ func detectRefreshRateOS(goos string) int {
 	switch goos {
 	case "darwin":
 		if out, err := exec.Command("system_profiler", "SPDisplaysDataType").Output(); err == nil {
-			re := regexp.MustCompile(`(?i)(refresh rate|hertz|@)\s*:?\s*(\d+)`)
-			if m := re.FindStringSubmatch(string(out)); len(m) >= 3 {
+			if m := reDarwinRate.FindStringSubmatch(string(out)); len(m) >= 3 {
 				if val, err := strconv.Atoi(m[2]); err == nil && val > 0 {
 					return val
 				}
@@ -118,9 +124,8 @@ func detectRefreshRateOS(goos string) int {
 	default: // linux
 		if out, err := exec.Command("xrandr").Output(); err == nil {
 			scanner := bufio.NewScanner(strings.NewReader(string(out)))
-			re := regexp.MustCompile(`(\d+(\.\d+)?)\*`)
 			for scanner.Scan() {
-				if m := re.FindStringSubmatch(scanner.Text()); len(m) >= 2 {
+				if m := reXrandrRate.FindStringSubmatch(scanner.Text()); len(m) >= 2 {
 					if f, err := strconv.ParseFloat(m[1], 64); err == nil {
 						return int(f + 0.5)
 					}
@@ -129,8 +134,7 @@ func detectRefreshRateOS(goos string) int {
 		}
 
 		if out, err := exec.Command("wlr-randr").Output(); err == nil {
-			re := regexp.MustCompile(`(\d+(\.\d+)?)\s+Hz\s+\(current\)`)
-			if m := re.FindStringSubmatch(string(out)); len(m) >= 2 {
+			if m := reWlrRate.FindStringSubmatch(string(out)); len(m) >= 2 {
 				if f, err := strconv.ParseFloat(m[1], 64); err == nil {
 					return int(f + 0.5)
 				}
@@ -138,8 +142,7 @@ func detectRefreshRateOS(goos string) int {
 		}
 
 		if out, err := exec.Command("kscreen-doctor", "-o").Output(); err == nil {
-			re := regexp.MustCompile(`@(\d+)`)
-			if m := re.FindStringSubmatch(string(out)); len(m) >= 2 {
+			if m := reKscreenRate.FindStringSubmatch(string(out)); len(m) >= 2 {
 				if val, err := strconv.Atoi(m[1]); err == nil && val > 0 {
 					return val
 				}

@@ -91,20 +91,15 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 
 		// 3. Known aliases
 		if match == nil {
-			switch expLower {
-			case "gdturbo.wad":
+			for _, alias := range preset.KnownAliases(expLower) {
 				for _, zf := range zr.File {
-					if strings.EqualFold(filepath.Base(zf.Name), "gd.wad") {
+					if strings.EqualFold(filepath.Base(zf.Name), alias) {
 						match = zf
 						break
 					}
 				}
-			case "gd.wad":
-				for _, zf := range zr.File {
-					if strings.EqualFold(filepath.Base(zf.Name), "gdturbo.wad") {
-						match = zf
-						break
-					}
+				if match != nil {
+					break
 				}
 			}
 		}

@@ -45,13 +45,7 @@ func newPresetsCmd() *cobra.Command {
 				return fmt.Errorf("preset name cannot be empty")
 			}
 
-			paths := getPaths()
-			cfg, err := config.LoadConfig(paths)
-			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
-			}
-
-			cat, err := getCatalog()
+			paths, cfg, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
@@ -103,10 +97,9 @@ func newPresetsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths := getPaths()
-			cfg, err := config.LoadConfig(paths)
+			paths, cfg, err := loadPathsAndConfig()
 			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
+				return err
 			}
 
 			if cfgReset {
@@ -169,10 +162,9 @@ func newPresetsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths := getPaths()
-			cfg, err := config.LoadConfig(paths)
+			paths, cfg, err := loadPathsAndConfig()
 			if err != nil {
-				return fmt.Errorf("loading config: %w", err)
+				return err
 			}
 
 			if cfg.RemovePreset(name) {
@@ -236,12 +228,10 @@ func isCustomPreset(name string, cfg *config.AppConfig) bool {
 }
 
 func runPresetsList(cmd *cobra.Command, args []string) error {
-	cat, err := getCatalog()
+	_, cfg, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
-	paths := getPaths()
-	cfg, _ := config.LoadConfig(paths)
 
 	fmt.Println("=== Available Doom Presets ===")
 	for i, p := range cat.Presets {
@@ -260,18 +250,15 @@ func runPresetsList(cmd *cobra.Command, args []string) error {
 }
 
 func runPresetsShow(cmd *cobra.Command, args []string) error {
-	cat, err := getCatalog()
+	name := args[0]
+	paths, cfg, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
-	name := args[0]
 	p := cat.Find(name)
 	if p == nil {
 		return fmt.Errorf("preset %q not found", name)
 	}
-
-	paths := getPaths()
-	cfg, _ := config.LoadConfig(paths)
 
 	fmt.Printf("=== Preset: %s ===\n", p.Name)
 	if p.Custom {
@@ -321,7 +308,7 @@ func runPresetsShow(cmd *cobra.Command, args []string) error {
 			fStatus := "[✗ Missing]"
 			if fFound {
 				fStatus = fmt.Sprintf("[✓ Found: %s]", fpath)
-			} else if strings.EqualFold(m, "idkfa 2024.wad") {
+			} else if preset.IsOptionalFile(m) {
 				fStatus = "[Optional]"
 			}
 			fmt.Printf("    - %-20s %s\n", m, fStatus)
