@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "tnt-evilution",
+  "name": "TNT: Evilution",
+  "engine": "dsda-doom",
+  "iwad": "TNT.WAD",
+  "files": [
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Official IWAD",
+  "compatibility": "Vanilla",
+  "description": "Classic Final Doom IWAD with modern soundtrack",
+  "author": "TeamTNT",
+  "release_date": "1996",
+  "sort": 300
+}

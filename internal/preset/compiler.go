@@ -1,4 +1,3 @@
-// Package preset manages the declarative preset catalog and documentation synchronization.
 package preset
 
 import (
@@ -7,40 +6,41 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
 var readmeTableRegex = regexp.MustCompile(`(## Preconfigured Presets\n\n[^\n]+\n\n)(\|[\s\S]+?)(\n\n---)`)
 
-// GenerateReadmeTable constructs the markdown table for README.md.
+// GenerateReadmeTable constructs the markdown table for README.md using each
+// preset's resolved engine display name from the catalog.
 func GenerateReadmeTable(cat *Catalog) string {
 	lines := []string{
 		"| Megawad / Expansion | Engine | Compatibility / Details |",
 		"| :--- | :--- | :--- |",
 	}
+	if cat == nil {
+		return strings.Join(lines, "\n")
+	}
 	for _, p := range cat.Presets {
-		engDisplay := "DSDA-Doom"
-		if p.Engine == "uzdoom" {
-			engDisplay = "UZDoom"
+		if p.IsCustom() {
+			continue
 		}
+		engDisplay := cat.EngineDisplayName(p.Engine)
 		lines = append(lines, fmt.Sprintf("| **%s** | %s | %s |", p.Name, engDisplay, p.Description))
 	}
 	return strings.Join(lines, "\n")
 }
 
-// SyncReadme synchronizes data/presets.json into README.md and updates embedded preset data if present.
+// SyncReadme compiles on-disk catalog/*.json in rootDir into the README.md preset table.
 func SyncReadme(rootDir string) error {
-	srcPath := filepath.Join(rootDir, "data", "presets.json")
-	cat, err := LoadCatalog(srcPath)
-	if err != nil {
-		return err
+	if strings.TrimSpace(rootDir) == "" {
+		rootDir = "."
 	}
-
-	// Keep embedded presets data in sync if repository tree exists
-	targetDir := filepath.Join(rootDir, "internal", "preset", "data")
-	if fi, err := os.Stat(targetDir); err == nil && fi.IsDir() {
-		if data, err := os.ReadFile(srcPath); err == nil {
-			_ = os.WriteFile(filepath.Join(targetDir, "presets.json"), data, 0o644)
-		}
+	catalogDir := filepath.Join(rootDir, "catalog")
+	cat, err := LoadCatalogFromDir(catalogDir)
+	if err != nil {
+		return fmt.Errorf("loading curated catalog from %s: %w", catalogDir, err)
 	}
 
 	readmeFile := filepath.Join(rootDir, "README.md")
@@ -49,12 +49,26 @@ func SyncReadme(rootDir string) error {
 		return err
 	}
 
+	text := string(content)
+	loc := readmeTableRegex.FindStringSubmatchIndex(text)
+	if loc == nil {
+		return fmt.Errorf("could not locate '## Preconfigured Presets' table in %s", readmeFile)
+	}
+
 	table := GenerateReadmeTable(cat)
-	updated := readmeTableRegex.ReplaceAllString(string(content), fmt.Sprintf("${1}%s${3}", table))
-	return os.WriteFile(readmeFile, []byte(updated), 0o644)
+	updated := text[:loc[4]] + table + text[loc[5]:]
+	_, err = fsutil.WriteFileAtomic(readmeFile, []byte(updated), 0o644)
+	if err == nil {
+		// Remove any .bak file created for README.md in the git checkout
+		matches, _ := filepath.Glob(readmeFile + ".bak.*")
+		for _, m := range matches {
+			_ = os.Remove(m)
+		}
+	}
+	return err
 }
 
-// CompileOptionsFiles is retained for backward compatibility, delegating to SyncReadme.
+// CompileOptionsFiles delegates to SyncReadme for backward compatibility.
 func CompileOptionsFiles(rootDir string) error {
 	return SyncReadme(rootDir)
 }

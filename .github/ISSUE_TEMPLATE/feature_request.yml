@@ -13,11 +13,11 @@ body:
     attributes:
       label: Feature Category
       options:
-        - "New Preset (data/presets.json)"
+        - "New Preset or Engine (catalog/*.json)"
         - "CLI Feature (cmd/doom)"
         - "Engine Support or Config Profile"
         - "Game Asset Extraction / WAD Fetching"
-        - "DoomRunner Integration"
+        - "Interactive TUI Launcher"
         - "Other"
     validations:
       required: true

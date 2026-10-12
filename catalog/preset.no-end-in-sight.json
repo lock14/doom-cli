@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "no-end-in-sight",
+  "name": "No End In Sight",
+  "engine": "dsda-doom",
+  "iwad": "DOOM.WAD",
+  "files": [
+    {
+      "name": "NEIS.wad"
+    },
+    {
+      "name": "NEIS.deh"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla / Ultimate Doom",
+  "description": "Classic 4-episode expansion for Ultimate Doom",
+  "author": "Emil \"NaturalTvventy\" Brundage et al.",
+  "release_date": "2016",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/neis.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom/Ports/megawads/neis",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 190
+}

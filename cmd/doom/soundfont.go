@@ -17,7 +17,7 @@ func newSoundfontCmd() *cobra.Command {
 		Short: "Download and deploy Roland SC-55 compatible GeneralUser-GS SoundFont",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			_, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, cmd.OutOrStdout())
+			_, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, cmdOut(cmd))
 			return err
 		},
 	}

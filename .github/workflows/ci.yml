@@ -129,7 +129,9 @@ jobs:
         run: |
           ./bin/doom --version
           ./bin/doom --help
+          ./bin/doom engines list
           ./bin/doom presets list
+          ./bin/doom presets lint
           ./bin/doom wads list
           ./bin/doom setup --help
 

@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "nostalgia",
+  "name": "Nostalgia",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "Nostalgia.wad"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla",
+  "description": "Vanilla-compatible megawad",
+  "author": "myolden",
+  "release_date": "2022",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/nostalgia.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/m-o/nostalgia",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 180
+}

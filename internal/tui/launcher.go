@@ -61,6 +61,20 @@ func initialModel(
 	nerdFonts bool,
 	initialPreset ...string,
 ) model {
+	var roots []string
+	if wadsDir != "" {
+		roots = []string{wadsDir}
+	}
+	return initialModelWithRoots(catalog, roots, theme, nerdFonts, initialPreset...)
+}
+
+func initialModelWithRoots(
+	catalog *preset.Catalog,
+	wadRoots []string,
+	theme Theme,
+	nerdFonts bool,
+	initialPreset ...string,
+) model {
 	if theme.Name == "" {
 		theme = DefaultTheme
 	}
@@ -83,7 +97,7 @@ func initialModel(
 	cursor := 0
 	if len(initialPreset) > 0 && initialPreset[0] != "" && catalog != nil {
 		for i, p := range catalog.Presets {
-			if strings.EqualFold(p.Name, initialPreset[0]) {
+			if strings.EqualFold(p.Name, initialPreset[0]) || strings.EqualFold(p.ID, initialPreset[0]) {
 				cursor = i
 				break
 			}
@@ -97,13 +111,18 @@ func initialModel(
 		}
 	}
 
+	primaryWadsDir := ""
+	if len(wadRoots) > 0 {
+		primaryWadsDir = wadRoots[0]
+	}
+
 	return model{
 		theme:         theme,
 		styles:        styles,
 		nerdFonts:     nerdFonts,
 		catalog:       catalog,
-		wadsDir:       wadsDir,
-		dirIndex:      preset.NewDirIndex(wadsDir),
+		wadsDir:       primaryWadsDir,
+		dirIndex:      preset.NewDirIndex(wadRoots...),
 		searchTargets: searchTargets,
 		input:         ti,
 		filtered:      catalog.Presets,
@@ -261,8 +280,7 @@ func (m model) View() string {
 	return "\n" + header + panels + footer + "\n"
 }
 
-// RunInteractiveLauncher runs the interactive Bubble Tea UI launcher.
-// If initialPreset is provided, the launcher pre-selects that preset.
+// RunInteractiveLauncher runs the interactive Bubble Tea UI launcher against a single WADs directory.
 func RunInteractiveLauncher(
 	catalog *preset.Catalog,
 	wadsDir string,
@@ -270,12 +288,26 @@ func RunInteractiveLauncher(
 	nerdFonts bool,
 	initialPreset ...string,
 ) (*preset.Preset, error) {
-	// If not running in a terminal, fallback to numbered menu
+	var roots []string
+	if wadsDir != "" {
+		roots = []string{wadsDir}
+	}
+	return RunInteractiveLauncherWithRoots(catalog, roots, theme, nerdFonts, initialPreset...)
+}
+
+// RunInteractiveLauncherWithRoots runs the interactive Bubble Tea UI launcher across one or more WAD roots.
+func RunInteractiveLauncherWithRoots(
+	catalog *preset.Catalog,
+	wadRoots []string,
+	theme Theme,
+	nerdFonts bool,
+	initialPreset ...string,
+) (*preset.Preset, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
-	m := initialModel(catalog, wadsDir, theme, nerdFonts, initialPreset...)
+	m := initialModelWithRoots(catalog, wadRoots, theme, nerdFonts, initialPreset...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

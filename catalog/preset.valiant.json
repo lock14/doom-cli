@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "valiant",
+  "name": "Valiant",
+  "engine": "uzdoom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "Valiant.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "MBF",
+  "description": "MBF-compatible with custom weapons & dehacked",
+  "author": "Paul \"skillsaw\" DeBruyne",
+  "release_date": "2015",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/valiant.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 320
+}

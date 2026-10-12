@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "doom",
+  "name": "Doom",
+  "engine": "dsda-doom",
+  "iwad": "DOOM.WAD",
+  "files": [
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Official IWAD",
+  "compatibility": "Vanilla",
+  "description": "Classic IWAD with modern MIDI audio",
+  "author": "id Software",
+  "release_date": "1993",
+  "sort": 60
+}

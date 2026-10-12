@@ -12,14 +12,10 @@ import (
 
 func TestBackupFile(t *testing.T) {
 	t.Parallel()
-	tmpDir, err := os.MkdirTemp("", "deploy_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	targetFile := filepath.Join(tmpDir, "test.cfg")
-	_ = os.WriteFile(targetFile, []byte("original-content"), 0644)
+	_ = os.WriteFile(targetFile, []byte("original-content"), 0o644)
 
 	bkp, err := BackupFile(targetFile)
 	if err != nil {
@@ -37,11 +33,7 @@ func TestBackupFile(t *testing.T) {
 
 func TestDeployConfigs_And_Diff(t *testing.T) {
 	t.Parallel()
-	tmpDir, err := os.MkdirTemp("", "deploy_full_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	paths := &config.Paths{
 		DataDir:       tmpDir,
@@ -116,7 +108,6 @@ func TestSyncConfigs(t *testing.T) {
 	repoDir := filepath.Join(tmpDir, "repo")
 	_ = os.MkdirAll(filepath.Join(repoDir, "uzdoom"), 0o755)
 	_ = os.MkdirAll(filepath.Join(repoDir, "dsda-doom"), 0o755)
-	_ = os.MkdirAll(filepath.Join(repoDir, "internal", "templates", "data"), 0o755)
 
 	var out bytes.Buffer
 	if err := SyncConfigs(paths, repoDir, &out); err != nil {
@@ -135,15 +126,6 @@ func TestSyncConfigs(t *testing.T) {
 		t.Errorf("expected __REFRESH_RATE__ token in synced autoexec, got: %s", string(syncedAuto))
 	}
 
-	// Verify embedded template internal/templates/data/autoexec.cfg
-	embeddedAuto, err := os.ReadFile(filepath.Join(repoDir, "internal", "templates", "data", "autoexec.cfg"))
-	if err != nil {
-		t.Fatalf("failed reading embedded autoexec: %v", err)
-	}
-	if string(embeddedAuto) != string(syncedAuto) {
-		t.Errorf("embedded autoexec does not match root template")
-	}
-
 	// Verify root template dsda-doom/dsda-doom.cfg
 	syncedDSDA, err := os.ReadFile(filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg"))
 	if err != nil {
@@ -155,52 +137,47 @@ func TestSyncConfigs(t *testing.T) {
 	if !strings.Contains(string(syncedDSDA), `snd_soundfont                   "__SOUNDFONT__"`) {
 		t.Errorf("expected __SOUNDFONT__ token in synced dsda-doom, got: %s", string(syncedDSDA))
 	}
-
-	// Verify embedded template internal/templates/data/dsda-doom.cfg
-	embeddedDSDA, err := os.ReadFile(filepath.Join(repoDir, "internal", "templates", "data", "dsda-doom.cfg"))
-	if err != nil {
-		t.Fatalf("failed reading embedded dsda-doom cfg: %v", err)
-	}
-	if string(embeddedDSDA) != string(syncedDSDA) {
-		t.Errorf("embedded dsda cfg does not match root template")
-	}
 }
 
-func TestTemplateParity(t *testing.T) {
+func TestTemplateInvariants(t *testing.T) {
 	t.Parallel()
 	rootDir := filepath.Join("..", "..")
 
 	pairs := []struct {
-		name         string
-		rootFile     string
-		embeddedData []byte
+		name           string
+		rootFile       string
+		embeddedData   []byte
+		requiredTokens []string
 	}{
 		{
-			name:         "dsda-doom.cfg",
-			rootFile:     filepath.Join(rootDir, "dsda-doom", "dsda-doom.cfg"),
-			embeddedData: embeddedDSDADoom,
+			name:           "dsda-doom.cfg",
+			rootFile:       filepath.Join(rootDir, "dsda-doom", "dsda-doom.cfg"),
+			embeddedData:   embeddedDSDADoom,
+			requiredTokens: []string{"__RESOLUTION__", "__SOUNDFONT__"},
 		},
 		{
-			name:         "autoexec.cfg",
-			rootFile:     filepath.Join(rootDir, "uzdoom", "autoexec.cfg"),
-			embeddedData: embeddedAutoexec,
+			name:           "autoexec.cfg",
+			rootFile:       filepath.Join(rootDir, "uzdoom", "autoexec.cfg"),
+			embeddedData:   embeddedAutoexec,
+			requiredTokens: []string{"__REFRESH_RATE__", "__SOUNDFONT__"},
 		},
 	}
 
 	for _, p := range pairs {
-		p := p
 		t.Run(p.name, func(t *testing.T) {
 			t.Parallel()
 			rootData, err := os.ReadFile(p.rootFile)
-			if os.IsNotExist(err) {
-				t.Skipf("%s not found from relative path", p.rootFile)
-			}
 			if err != nil {
 				t.Fatalf("reading %s: %v", p.rootFile, err)
 			}
 
 			if !bytes.Equal(rootData, p.embeddedData) {
-				t.Errorf("%s and embedded %s are out of sync; run 'doom config sync'", p.rootFile, p.name)
+				t.Errorf("%s and embedded %s do not match", p.rootFile, p.name)
+			}
+			for _, tok := range p.requiredTokens {
+				if !strings.Contains(string(p.embeddedData), tok) {
+					t.Errorf("%s missing required token %s", p.name, tok)
+				}
 			}
 		})
 	}
@@ -230,7 +207,6 @@ func TestDeployConfigsTo(t *testing.T) {
 		t.Errorf("expected output to contain 'Installed', got: %s", outStr)
 	}
 
-	// Verify file was written
 	autoexecPath := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
 	if _, err := os.Stat(autoexecPath); err != nil {
 		t.Errorf("expected autoexec.cfg to exist: %v", err)

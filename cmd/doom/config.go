@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,17 +19,17 @@ func newConfigCmd() *cobra.Command {
 
 	configShowCmd := &cobra.Command{
 		Use:   "show",
-		Short: "Display current CLI settings (theme, nerd-fonts, config path)",
+		Short: "Display current CLI settings (theme, nerd-fonts, directories, catalog path)",
 		RunE:  runConfigShow,
 	}
 	configGetCmd := &cobra.Command{
 		Use:   "get [key]",
-		Short: "Get a CLI configuration setting (theme, nerd-fonts, wads-dir, bin-dir, soundfonts-dir)",
+		Short: "Get a CLI configuration setting (theme, nerd-fonts, wads-dir, wads-dirs, bin-dir, soundfonts-dir)",
 		RunE:  runConfigGet,
 	}
 	configSetCmd := &cobra.Command{
 		Use:   "set <key> <value>",
-		Short: "Set a CLI configuration setting (theme, nerd-fonts, wads-dir, bin-dir, soundfonts-dir)",
+		Short: "Set a CLI configuration setting (theme, nerd-fonts, wads-dir, wads-dirs, bin-dir, soundfonts-dir)",
 		Args:  cobra.ExactArgs(2),
 		RunE:  runConfigSet,
 	}
@@ -45,7 +44,7 @@ func newConfigCmd() *cobra.Command {
 		Short: "Deploy autoexec.cfg and dsda-doom.cfg with backups",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			return templates.DeployConfigsTo(paths, cmd.OutOrStdout())
+			return templates.DeployConfigsTo(paths, cmdOut(cmd))
 		},
 	}
 	configDiffCmd := &cobra.Command{
@@ -53,7 +52,7 @@ func newConfigCmd() *cobra.Command {
 		Short: "Compare installed system configs against repository templates",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			return templates.DiffConfigs(paths, os.Stdout)
+			return templates.DiffConfigs(paths, cmdOut(cmd))
 		},
 	}
 	configSyncCmd := &cobra.Command{
@@ -61,7 +60,7 @@ func newConfigCmd() *cobra.Command {
 		Short: "Sync modified in-game settings back into repository templates",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			return templates.SyncConfigs(paths, ".", os.Stdout)
+			return templates.SyncConfigs(paths, ".", cmdOut(cmd))
 		},
 	}
 
@@ -77,6 +76,7 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	out := cmdOut(cmd)
 
 	theme := cfg.Theme
 	if theme == "" {
@@ -88,62 +88,28 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 		nerdStatus = "enabled (Powerlevel10k rounded capsules)"
 	}
 
-	fmt.Println("=== Doom CLI Configuration ===")
-	fmt.Printf("  Config File:    %s\n", paths.ConfigFile)
-	fmt.Printf("  Theme:          %s\n", theme)
-	fmt.Printf("  Nerd Fonts:     %s\n", nerdStatus)
+	fmt.Fprintln(out, "=== Doom CLI Configuration ===")
+	fmt.Fprintf(out, "  Config File:    %s\n", paths.ConfigFile)
+	fmt.Fprintf(out, "  Catalog Dir:    %s\n", paths.CatalogDir)
+	fmt.Fprintf(out, "  Theme:          %s\n", theme)
+	fmt.Fprintf(out, "  Nerd Fonts:     %s\n", nerdStatus)
 	if cfg.WadsDir != "" {
-		fmt.Printf("  WADs Dir:       %s\n", cfg.WadsDir)
+		fmt.Fprintf(out, "  WADs Dir:       %s\n", cfg.WadsDir)
 	} else {
-		fmt.Printf("  WADs Dir:       %s (default)\n", paths.WadsDir)
+		fmt.Fprintf(out, "  WADs Dir:       %s (default)\n", paths.WadsDir)
+	}
+	if len(paths.WadsDirs) > 0 {
+		fmt.Fprintf(out, "  WADs Dirs:      %s\n", strings.Join(paths.WadsDirs, ", "))
 	}
 	if cfg.BinDir != "" {
-		fmt.Printf("  Bin Dir:        %s\n", cfg.BinDir)
+		fmt.Fprintf(out, "  Bin Dir:        %s\n", cfg.BinDir)
 	} else {
-		fmt.Printf("  Bin Dir:        %s (default)\n", paths.BinDir)
+		fmt.Fprintf(out, "  Bin Dir:        %s (default)\n", paths.BinDir)
 	}
 	if cfg.SoundFontsDir != "" {
-		fmt.Printf("  SoundFonts Dir: %s\n", cfg.SoundFontsDir)
+		fmt.Fprintf(out, "  SoundFonts Dir: %s\n", cfg.SoundFontsDir)
 	} else {
-		fmt.Printf("  SoundFonts Dir: %s (default)\n", paths.SoundFontsDir)
-	}
-
-	if len(cfg.Engines) > 0 {
-		fmt.Printf("\nCustom Engines (%d):\n", len(cfg.Engines))
-		for name, eng := range cfg.Engines {
-			binTarget := eng.Binary
-			if binTarget == "" {
-				binTarget = name
-			}
-			fmt.Printf("  • %-12s [%-5s] (binary: %s)\n", name, eng.EffectiveArgsStyle(), binTarget)
-		}
-	}
-
-	if len(cfg.Presets) > 0 {
-		fmt.Printf("\nCustom Presets (%d):\n", len(cfg.Presets))
-		for _, p := range cfg.Presets {
-			fmt.Printf("  • %-20s [%s] (IWAD: %s)\n", p.Name, p.Engine, p.IWAD)
-		}
-	}
-
-	if len(cfg.LaunchOptions) > 0 {
-		fmt.Printf("\nLaunch Options Overrides (%d):\n", len(cfg.LaunchOptions))
-		for name, opt := range cfg.LaunchOptions {
-			var details []string
-			if opt.Engine != "" {
-				details = append(details, "engine: "+opt.Engine)
-			}
-			if opt.IWAD != "" {
-				details = append(details, "iwad: "+opt.IWAD)
-			}
-			if opt.AdditionalArgs != "" {
-				details = append(details, "args: "+opt.AdditionalArgs)
-			}
-			if len(opt.ExtraFiles) > 0 {
-				details = append(details, fmt.Sprintf("extra files: %d", len(opt.ExtraFiles)))
-			}
-			fmt.Printf("  • %-20s (%s)\n", name, strings.Join(details, ", "))
-		}
+		fmt.Fprintf(out, "  SoundFonts Dir: %s (default)\n", paths.SoundFontsDir)
 	}
 	return nil
 }
@@ -162,29 +128,32 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	out := cmdOut(cmd)
 
 	switch canonKey {
 	case "theme":
-		fmt.Println(cfg.Theme)
+		fmt.Fprintln(out, cfg.Theme)
 	case "nerd-fonts":
-		fmt.Println(cfg.NerdFonts)
+		fmt.Fprintln(out, cfg.NerdFonts)
 	case "wads-dir":
 		if cfg.WadsDir != "" {
-			fmt.Println(cfg.WadsDir)
+			fmt.Fprintln(out, cfg.WadsDir)
 		} else {
-			fmt.Println(paths.WadsDir)
+			fmt.Fprintln(out, paths.WadsDir)
 		}
+	case "wads-dirs":
+		fmt.Fprintln(out, strings.Join(paths.WadsDirs, ","))
 	case "bin-dir":
 		if cfg.BinDir != "" {
-			fmt.Println(cfg.BinDir)
+			fmt.Fprintln(out, cfg.BinDir)
 		} else {
-			fmt.Println(paths.BinDir)
+			fmt.Fprintln(out, paths.BinDir)
 		}
 	case "soundfonts-dir":
 		if cfg.SoundFontsDir != "" {
-			fmt.Println(cfg.SoundFontsDir)
+			fmt.Fprintln(out, cfg.SoundFontsDir)
 		} else {
-			fmt.Println(paths.SoundFontsDir)
+			fmt.Fprintln(out, paths.SoundFontsDir)
 		}
 	}
 	return nil
@@ -201,6 +170,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	out := cmdOut(cmd)
 
 	switch canonKey {
 	case "theme":
@@ -222,28 +192,35 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		if cfg.NerdFonts {
 			status = "enabled"
 		}
-		fmt.Printf("✓ Set nerd_fonts to %t (%s) in %s\n", cfg.NerdFonts, status, paths.ConfigFile)
+		fmt.Fprintf(out, "✓ Set nerd_fonts to %t (%s) in %s\n", cfg.NerdFonts, status, paths.ConfigFile)
 		return nil
 	case "wads-dir":
 		cfg.WadsDir = val
 		if err := config.SaveConfig(paths, cfg); err != nil {
 			return fmt.Errorf("saving config: %w", err)
 		}
-		fmt.Printf("✓ Set wads_dir to %s in %s\n", val, paths.ConfigFile)
+		fmt.Fprintf(out, "✓ Set wads_dir to %s in %s\n", val, paths.ConfigFile)
+		return nil
+	case "wads-dirs":
+		cfg.WadsDirs = config.ParsePathList(val)
+		if err := config.SaveConfig(paths, cfg); err != nil {
+			return fmt.Errorf("saving config: %w", err)
+		}
+		fmt.Fprintf(out, "✓ Set wads_dirs to [%s] in %s\n", strings.Join(cfg.WadsDirs, ", "), paths.ConfigFile)
 		return nil
 	case "bin-dir":
 		cfg.BinDir = val
 		if err := config.SaveConfig(paths, cfg); err != nil {
 			return fmt.Errorf("saving config: %w", err)
 		}
-		fmt.Printf("✓ Set bin_dir to %s in %s\n", val, paths.ConfigFile)
+		fmt.Fprintf(out, "✓ Set bin_dir to %s in %s\n", val, paths.ConfigFile)
 		return nil
 	case "soundfonts-dir":
 		cfg.SoundFontsDir = val
 		if err := config.SaveConfig(paths, cfg); err != nil {
 			return fmt.Errorf("saving config: %w", err)
 		}
-		fmt.Printf("✓ Set soundfonts_dir to %s in %s\n", val, paths.ConfigFile)
+		fmt.Fprintf(out, "✓ Set soundfonts_dir to %s in %s\n", val, paths.ConfigFile)
 		return nil
 	}
 	return nil
@@ -269,13 +246,15 @@ func canonicalConfigKey(rawKey string) (string, error) {
 		return "nerd-fonts", nil
 	case "wads-dir", "wads_dir", "wadsdir":
 		return "wads-dir", nil
+	case "wads-dirs", "wads_dirs", "wadsdirs":
+		return "wads-dirs", nil
 	case "bin-dir", "bin_dir", "bindir":
 		return "bin-dir", nil
 	case "soundfonts-dir", "soundfonts_dir", "soundfont-dir", "soundfont_dir", "sf-dir", "sf_dir":
 		return "soundfonts-dir", nil
 	default:
 		return "", fmt.Errorf(
-			"unknown config key %q (valid keys: theme, nerd-fonts, wads-dir, bin-dir, soundfonts-dir)",
+			"unknown config key %q (valid keys: theme, nerd-fonts, wads-dir, wads-dirs, bin-dir, soundfonts-dir)",
 			rawKey,
 		)
 	}

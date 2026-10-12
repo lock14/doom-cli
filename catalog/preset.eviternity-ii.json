@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "eviternity-ii",
+  "name": "Eviternity II",
+  "engine": "uzdoom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "eviternityii.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "MBF21 / OTEX",
+  "description": "OTEX texture pack, advanced MBF21 & custom monsters",
+  "author": "Joshua \"Dragonfly\" O'Sullivan et al.",
+  "release_date": "2023",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip"
+    }
+  ],
+  "sort": 120
+}

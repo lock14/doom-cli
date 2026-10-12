@@ -3,6 +3,8 @@ package engine
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,32 +17,26 @@ import (
 
 func TestPrepareLaunch_DSDADoom(t *testing.T) {
 	t.Parallel()
-	tmpDir, err := os.MkdirTemp("", "engine_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	binDir := filepath.Join(tmpDir, "bin")
 	wadsDir := filepath.Join(tmpDir, "wads")
-	_ = os.MkdirAll(binDir, 0755)
-	_ = os.MkdirAll(wadsDir, 0755)
+	_ = os.MkdirAll(binDir, 0o755)
+	_ = os.MkdirAll(wadsDir, 0o755)
 
-	// Create fake engine binary
 	fakeBin := filepath.Join(binDir, "dsda-doom")
-	_ = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0755)
+	_ = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0o755)
 
-	// Create fake WADs & DEH
-	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0644)
-	_ = os.WriteFile(filepath.Join(wadsDir, "av.wad"), []byte("wad"), 0644)
-	_ = os.WriteFile(filepath.Join(wadsDir, "av.deh"), []byte("deh"), 0644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "av.wad"), []byte("wad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "av.deh"), []byte("deh"), 0o644)
 
 	p := preset.Preset{
-		Name:           "Alien Vendetta",
-		Engine:         "dsda-doom",
-		IWAD:           "doom2.wad",
-		Mappacks:       []string{"av.wad", "av.deh"},
-		AdditionalArgs: "-complevel 2",
+		Name:   "Alien Vendetta",
+		Engine: "dsda-doom",
+		IWAD:   "doom2.wad",
+		Files:  []preset.FileSpec{{Name: "av.wad"}, {Name: "av.deh"}},
+		Args:   []string{"-complevel", "2"},
 	}
 
 	opts := LaunchOptions{
@@ -62,8 +58,6 @@ func TestPrepareLaunch_DSDADoom(t *testing.T) {
 		t.Errorf("expected binary %s, got %s", fakeBin, plan.EngineBin)
 	}
 
-	// Verify args:
-	// -iwad <doom2.wad> -file <av.wad> -deh <av.deh> -complevel 2 -skill 4
 	joinedArgs := strings.Join(plan.Args, " ")
 	expectedParts := []string{
 		"-iwad " + filepath.Join(wadsDir, "DOOM2.WAD"),
@@ -79,7 +73,6 @@ func TestPrepareLaunch_DSDADoom(t *testing.T) {
 		}
 	}
 
-	// Test Execute with DryRun
 	var out bytes.Buffer
 	if err := Execute(plan, &out, &out); err != nil {
 		t.Fatalf("dry run Execute failed: %v", err)
@@ -89,31 +82,29 @@ func TestPrepareLaunch_DSDADoom(t *testing.T) {
 	}
 }
 
-func TestPrepareLaunch_UZDoom_OptionalAudio(t *testing.T) {
+func TestPrepareLaunch_UZDoom_OptionalAudioAndLoadMapsAfterMods(t *testing.T) {
 	t.Parallel()
-	tmpDir, err := os.MkdirTemp("", "uzdoom_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	binDir := filepath.Join(tmpDir, "bin")
 	wadsDir := filepath.Join(tmpDir, "wads")
-	_ = os.MkdirAll(binDir, 0755)
-	_ = os.MkdirAll(wadsDir, 0755)
+	_ = os.MkdirAll(binDir, 0o755)
+	_ = os.MkdirAll(wadsDir, 0o755)
 
 	fakeBin := filepath.Join(binDir, "uzdoom")
-	_ = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0755)
+	_ = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0o755)
 
-	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0644)
-	_ = os.WriteFile(filepath.Join(wadsDir, "eviternity.wad"), []byte("wad"), 0644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "eviternity.wad"), []byte("wad"), 0o644)
 
-	// Note: "idkfa 2024.wad" is intentionally NOT created to test graceful degradation
 	p := preset.Preset{
-		Name:     "Eviternity",
-		Engine:   "uzdoom",
-		IWAD:     "doom2.wad",
-		Mappacks: []string{"idkfa 2024.wad", "eviternity.wad"},
+		Name:   "Eviternity",
+		Engine: "uzdoom",
+		IWAD:   "doom2.wad",
+		Files: []preset.FileSpec{
+			{Name: "idkfa 2024.wad", Optional: true},
+			{Name: "eviternity.wad"},
+		},
 	}
 
 	var out bytes.Buffer
@@ -128,92 +119,70 @@ func TestPrepareLaunch_UZDoom_OptionalAudio(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PrepareLaunch failed: %v", err)
 	}
+	if strings.Contains(strings.Join(plan.Args, " "), "idkfa 2024.wad") {
+		t.Errorf("did not expect missing idkfa 2024.wad in args: %v", plan.Args)
+	}
 
 	if !strings.Contains(out.String(), "Optional soundtrack 'idkfa 2024.wad' not found") {
 		t.Errorf("expected optional soundtrack warning, got: %s", out.String())
 	}
 
-	joinedArgs := strings.Join(plan.Args, " ")
-	if strings.Contains(joinedArgs, "idkfa 2024.wad") {
-		t.Errorf("did not expect missing idkfa 2024.wad in args: %s", joinedArgs)
+	// Now create idkfa 2024.wad and verify LoadMapsAfterMods reorders optional mods before required maps
+	_ = os.WriteFile(filepath.Join(wadsDir, "idkfa 2024.wad"), []byte("music"), 0o644)
+	pReorder := preset.Preset{
+		Name:              "Sigil II",
+		Engine:            "uzdoom",
+		IWAD:              "DOOM2.WAD",
+		LoadMapsAfterMods: true,
+		Files: []preset.FileSpec{
+			{Name: "eviternity.wad", Optional: false},
+			{Name: "idkfa 2024.wad", Optional: true},
+		},
 	}
-	if !strings.Contains(joinedArgs, filepath.Join(wadsDir, "eviternity.wad")) {
-		t.Errorf("expected eviternity.wad in args: %s", joinedArgs)
+	planReorder, err := PrepareLaunch(pReorder, opts)
+	if err != nil {
+		t.Fatalf("PrepareLaunch reorder failed: %v", err)
+	}
+	if len(planReorder.OrderedFiles) != 2 ||
+		filepath.Base(planReorder.OrderedFiles[0]) != "idkfa 2024.wad" ||
+		filepath.Base(planReorder.OrderedFiles[1]) != "eviternity.wad" {
+		t.Fatalf("expected optional mod before map when LoadMapsAfterMods=true, got: %v", planReorder.OrderedFiles)
 	}
 }
 
-func TestPrepareLaunch_EngineOverride(t *testing.T) {
-	t.Parallel()
-	tmpDir, err := os.MkdirTemp("", "override_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	binDir := filepath.Join(tmpDir, "bin")
-	wadsDir := filepath.Join(tmpDir, "wads")
-	_ = os.MkdirAll(binDir, 0755)
-	_ = os.MkdirAll(wadsDir, 0755)
-
-	fakeBin := filepath.Join(binDir, "dsda-doom")
-	_ = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0755)
-	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM.WAD"), []byte("iwad"), 0644)
-
-	p := preset.Preset{
-		Name:   "Doom 1",
-		Engine: "uzdoom",
-		IWAD:   "doom.wad",
-	}
-
-	opts := LaunchOptions{
-		EngineOverride: "dsda-doom",
-		BinDir:         binDir,
-		WadsDir:        wadsDir,
-		DryRun:         true,
-	}
-
-	plan, err := PrepareLaunch(p, opts)
-	if err != nil {
-		t.Fatalf("PrepareLaunch failed: %v", err)
-	}
-
-	if plan.Engine != "dsda-doom" {
-		t.Errorf("expected overridden engine dsda-doom, got %s", plan.Engine)
-	}
-}
-
-func TestPrepareLaunch_CustomEngineAndArgs(t *testing.T) {
+func TestPrepareLaunch_CustomEnginePrefixArgsAndBex(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	binDir := filepath.Join(tmpDir, "bin")
 	customBinDir := filepath.Join(tmpDir, "custom_bin")
 	wadsDir := filepath.Join(tmpDir, "wads")
-	_ = os.MkdirAll(binDir, 0755)
-	_ = os.MkdirAll(customBinDir, 0755)
-	_ = os.MkdirAll(wadsDir, 0755)
+	_ = os.MkdirAll(binDir, 0o755)
+	_ = os.MkdirAll(customBinDir, 0o755)
+	_ = os.MkdirAll(wadsDir, 0o755)
 
 	customBinPath := filepath.Join(customBinDir, "woof")
-	_ = os.WriteFile(customBinPath, []byte("#!/bin/sh\n"), 0755)
+	_ = os.WriteFile(customBinPath, []byte("#!/bin/sh\n"), 0o755)
 
-	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0644)
-	_ = os.WriteFile(filepath.Join(wadsDir, "sunlust.wad"), []byte("wad"), 0644)
-	_ = os.WriteFile(filepath.Join(wadsDir, "sunlust.deh"), []byte("deh"), 0644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "sunlust.wad"), []byte("wad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "sunlust.bex"), []byte("bex"), 0o644)
 
 	customEngines := map[string]preset.EngineConfig{
 		"woof": {
-			Name:        "woof",
+			ID:          "woof",
 			Binary:      customBinPath,
 			ArgsStyle:   "boom",
+			PrefixArgs:  []string{"-config", "/tmp/woof.cfg"},
 			DefaultArgs: []string{"-geometry", "1920x1080"},
 		},
 	}
 
 	p := preset.Preset{
-		Name:           "Sunlust",
-		Engine:         "woof",
-		IWAD:           "DOOM2.WAD",
-		Mappacks:       []string{"sunlust.wad", "sunlust.deh"},
-		AdditionalArgs: "-skill 4",
+		Name:   "Sunlust",
+		Engine: "woof",
+		IWAD:   "DOOM2.WAD",
+		Files:  []preset.FileSpec{{Name: "sunlust.wad"}, {Name: "sunlust.bex"}},
+		Args:   []string{"-skill", "4"},
 	}
 
 	opts := LaunchOptions{
@@ -235,8 +204,9 @@ func TestPrepareLaunch_CustomEngineAndArgs(t *testing.T) {
 
 	joined := strings.Join(plan.Args, " ")
 	expectedTokens := []string{
+		"-config /tmp/woof.cfg -iwad",
 		"-file " + filepath.Join(wadsDir, "sunlust.wad"),
-		"-deh " + filepath.Join(wadsDir, "sunlust.deh"),
+		"-deh " + filepath.Join(wadsDir, "sunlust.bex"),
 		"-geometry 1920x1080",
 		"-skill 4",
 		"-warp 15",
@@ -252,7 +222,7 @@ func TestInstaller_ExtractZipBinary(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	binDir := filepath.Join(tmpDir, "bin")
-	_ = os.MkdirAll(binDir, 0755)
+	_ = os.MkdirAll(binDir, 0o755)
 
 	zipPath := filepath.Join(tmpDir, "test.zip")
 	zf, err := os.Create(zipPath)
@@ -283,184 +253,121 @@ func TestInstaller_ExtractZipBinary(t *testing.T) {
 	_ = zf.Close()
 
 	dest := filepath.Join(binDir, "uzdoom.exe")
-	ins := NewInstaller(binDir, ioDiscard{})
+	ins := NewInstaller(binDir, nil)
 	if err := ins.extractZipBinary(zipPath, "uzdoom.exe", dest); err != nil {
 		t.Fatalf("extractZipBinary failed: %v", err)
 	}
 
-	// 1. Verify binary is uzdoom.exe and NOT uzdoom.sf2
 	binData, err := os.ReadFile(dest)
+	if err != nil || string(binData) != "executable binary" {
+		t.Fatalf("expected binary content 'executable binary', got %q (%v)", string(binData), err)
+	}
+
+	// Verify missing binary returns an error rather than falling back to zr.File[0]
+	if err := ins.extractZipBinary(zipPath, "nonexistent-engine", filepath.Join(binDir, "nonexistent")); err == nil {
+		t.Fatal("expected error when target binary is not in zip")
+	}
+}
+
+func TestSelectAsset_MacUniAndPatterns(t *testing.T) {
+	t.Parallel()
+	cat, err := preset.LoadCuratedCatalog()
 	if err != nil {
-		t.Fatalf("failed to read dest binary: %v", err)
+		t.Fatalf("LoadCuratedCatalog: %v", err)
 	}
-	if string(binData) != "executable binary" {
-		t.Errorf("expected binary content 'executable binary', got %q", string(binData))
-	}
-
-	// 2. Verify companion files
-	pk3Data, err := os.ReadFile(filepath.Join(binDir, "uzdoom.pk3"))
-	if err != nil || string(pk3Data) != "pk3 archive" {
-		t.Errorf("companion uzdoom.pk3 missing or invalid")
+	dsda, ok := cat.FindEngine("dsda-doom")
+	if !ok || dsda.Install == nil {
+		t.Fatal("dsda-doom install recipe missing")
 	}
 
-	dllData, err := os.ReadFile(filepath.Join(binDir, "libcurl-x64.dll"))
-	if err != nil || string(dllData) != "dll binary" {
-		t.Errorf("companion libcurl-x64.dll missing or invalid")
+	liveAssets := []GitHubAsset{
+		{
+			Name:               "dsda-doom-0.30.1-linux-x86_64.appimage",
+			BrowserDownloadURL: "https://example.com/linux.appimage",
+			Digest:             "sha256:b06adf3f0c7d4e82dc1870baf97e67e4dc4e663e37f69070ddc02fa3e97608b0",
+		},
+		{
+			Name:               "dsda-doom-0.30.1-mac-uni.zip",
+			BrowserDownloadURL: "https://example.com/mac-uni.zip",
+			Digest:             "sha256:9dced51464da3c5d915b4970b49128a798d0b59bfd3010a9a87edd8ebac01503",
+		},
 	}
 
-	woplData, err := os.ReadFile(filepath.Join(binDir, "fm_banks", "GENMIDI.GS.wopl"))
-	if err != nil || string(woplData) != "opl data" {
-		t.Errorf("companion fm_banks/GENMIDI.GS.wopl missing or invalid")
-	}
-
-	sf2Data, err := os.ReadFile(filepath.Join(binDir, "soundfonts", "uzdoom.sf2"))
-	if err != nil || string(sf2Data) != "soundfont data" {
-		t.Errorf("companion soundfonts/uzdoom.sf2 missing or invalid")
+	for _, plat := range []string{"darwin/arm64", "darwin/amd64"} {
+		recipe := dsda.Install.Platforms[plat]
+		url, digest, matched := SelectAsset(recipe, liveAssets)
+		if !matched || url != "https://example.com/mac-uni.zip" {
+			t.Fatalf("SelectAsset(%s) matched=%v url=%q, want mac-uni.zip", plat, matched, url)
+		}
+		if digest != "9dced51464da3c5d915b4970b49128a798d0b59bfd3010a9a87edd8ebac01503" {
+			t.Fatalf("SelectAsset(%s) digest=%q", plat, digest)
+		}
 	}
 }
 
-type ioDiscard struct{}
-
-func (ioDiscard) Write(p []byte) (int, error) {
-	return len(p), nil
-}
-
-func TestIsCompanionFile(t *testing.T) {
+func TestInstallCatalog_AggregatesErrorsAndVerifiesDigest(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		name     string
-		filename string
-		expected bool
-	}{
-		{name: "wad file", filename: "doom2.wad", expected: true},
-		{name: "pk3 archive", filename: "brightmaps.pk3", expected: true},
-		{name: "windows dll", filename: "libcurl.dll", expected: true},
-		{name: "linux so", filename: "libfluidsynth.so", expected: true},
-		{name: "mac dylib", filename: "libz.dylib", expected: true},
-		{name: "soundfont sf2", filename: "uzdoom.sf2", expected: true},
-		{name: "wopl bank", filename: "GENMIDI.GS.wopl", expected: true},
-		{name: "wopn bank", filename: "bank.wopn", expected: true},
-		{name: "exe file", filename: "uzdoom.exe", expected: false},
-		{name: "txt file", filename: "readme.txt", expected: false},
-		{name: "cfg file", filename: "autoexec.cfg", expected: false},
-	}
+	payload := []byte("#!/bin/sh\necho ok\n")
+	sum := sha256.Sum256(payload)
+	sumHex := hex.EncodeToString(sum[:])
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := isCompanionFile(tt.filename); got != tt.expected {
-				t.Errorf("isCompanionFile(%q) = %v, expected %v", tt.filename, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestInstaller_ResolveLatestGitHubURL(t *testing.T) {
-	t.Parallel()
-	releaseJSON := `{
-		"tag_name": "v1.0.0",
-		"assets": [
-			{
-				"name": "dsda-doom-0.29.4-linux-x86_64.appimage",
-				"browser_download_url": "https://example.com/dsda.appimage"
-			},
-			{
-				"name": "dsda-doom-0.29.4-linux-x86_64.appimage.sig",
-				"browser_download_url": "https://example.com/dsda.appimage.sig"
-			}
-		]
-	}`
-
+	var serverURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/success":
+		case "/repos/org/good/releases/latest":
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(releaseJSON))
-		case "/rate-limited":
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte(`{"message": "API rate limit exceeded"}`))
-		case "/not-found":
-			http.NotFound(w, r)
+			_, _ = w.Write([]byte(`{"tag_name":"v1","assets":[{"name":"good-linux.appimage","browser_download_url":"` +
+				serverURL + `/dl/good.appimage","digest":"sha256:` + sumHex + `"}]}`))
+		case "/repos/org/bad/releases/latest":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/dl/good.appimage":
+			_, _ = w.Write(payload)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
+	serverURL = server.URL
 
-	ins := NewInstaller(t.TempDir(), nil)
+	binDir := t.TempDir()
+	var out bytes.Buffer
+	ins := NewInstaller(binDir, &out)
+	ins.APIBase = server.URL
+	ins.GOOS = "linux"
+	ins.GOARCH = "amd64"
 
-	// 1. Success matching regex
-	url := ins.ResolveLatestGitHubURL(
-		server.URL+"/success",
-		`.*linux-x86_64\.appimage`,
-		"https://fallback.com/default.bin",
-	)
-	if url != "https://example.com/dsda.appimage" {
-		t.Errorf("expected matching asset url, got %s", url)
+	cat := &preset.Catalog{
+		Engines: map[string]preset.EngineConfig{
+			"a-bad": {
+				ID:     "a-bad",
+				Binary: "a-bad",
+				Install: &preset.InstallRecipe{
+					Repo: "org/bad",
+					Platforms: map[string]preset.PlatformRecipe{
+						"linux/amd64": {Assets: []string{`^bad\.appimage$`}},
+					},
+				},
+			},
+			"b-good": {
+				ID:     "b-good",
+				Binary: "b-good",
+				Install: &preset.InstallRecipe{
+					Repo: "org/good",
+					Platforms: map[string]preset.PlatformRecipe{
+						"linux/amd64": {Assets: []string{`^good-linux\.appimage$`}},
+					},
+				},
+			},
+		},
 	}
 
-	// 2. Pattern does not match
-	url = ins.ResolveLatestGitHubURL(
-		server.URL+"/success",
-		`.*windows.*\.zip`,
-		"https://fallback.com/default.bin",
-	)
-	if url != "https://fallback.com/default.bin" {
-		t.Errorf("expected fallback url for unmatched pattern, got %s", url)
+	err := ins.InstallCatalog(cat)
+	if err == nil || !strings.Contains(err.Error(), "a-bad") {
+		t.Fatalf("expected error from a-bad, got: %v", err)
 	}
 
-	// 3. HTTP 403 (Rate limit)
-	url = ins.ResolveLatestGitHubURL(
-		server.URL+"/rate-limited",
-		`.*`,
-		"https://fallback.com/default.bin",
-	)
-	if url != "https://fallback.com/default.bin" {
-		t.Errorf("expected fallback url on 403, got %s", url)
-	}
-
-	// 4. HTTP 404
-	url = ins.ResolveLatestGitHubURL(
-		server.URL+"/not-found",
-		`.*`,
-		"https://fallback.com/default.bin",
-	)
-	if url != "https://fallback.com/default.bin" {
-		t.Errorf("expected fallback url on 404, got %s", url)
-	}
-}
-
-func TestInstaller_DownloadFile(t *testing.T) {
-	t.Parallel()
-	fileData := []byte("downloadable-binary-data")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/binary.bin" {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(fileData)
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	tmpDir := t.TempDir()
-	targetPath := filepath.Join(tmpDir, "sub", "test.bin")
-	ins := NewInstaller(tmpDir, nil)
-
-	// 1. Successful download
-	if err := ins.DownloadFile(server.URL+"/binary.bin", targetPath); err != nil {
-		t.Fatalf("DownloadFile failed: %v", err)
-	}
-	data, err := os.ReadFile(targetPath)
-	if err != nil || !bytes.Equal(data, fileData) {
-		t.Fatalf("downloaded data mismatch: got %q, want %q (err: %v)", string(data), string(fileData), err)
-	}
-
-	// 2. 404 Not Found error
-	err = ins.DownloadFile(server.URL+"/missing.bin", filepath.Join(tmpDir, "missing.bin"))
-	if err == nil {
-		t.Fatal("expected error downloading missing file, got nil")
+	// Verify b-good was STILL installed even though a-bad failed first (Defect #15 fix)
+	if _, statErr := os.Stat(filepath.Join(binDir, "b-good")); statErr != nil {
+		t.Fatalf("expected b-good to be installed despite a-bad failure: %v", statErr)
 	}
 }

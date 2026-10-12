@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "back-to-saturn-x-episode-2",
+  "name": "Back to Saturn X: Episode 2",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "btsx_e2.deh"
+    },
+    {
+      "name": "btsx_e2a.wad"
+    },
+    {
+      "name": "btsx_e2b.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla / Boom",
+  "description": "Vanilla/Boom compatible with custom soundtrack & palettes",
+  "author": "Esselfortium et al.",
+  "release_date": "2014",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e2.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 40
+}

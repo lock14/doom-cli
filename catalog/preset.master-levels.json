@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "master-levels",
+  "name": "Master Levels",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "MASTERLEVELS.WAD"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Official Expansion",
+  "compatibility": "Vanilla",
+  "description": "Full 20-level classic collection",
+  "author": "Various (Commissioned by id Software)",
+  "release_date": "1995",
+  "sort": 170
+}

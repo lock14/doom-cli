@@ -41,12 +41,13 @@ func runThemesList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	out := cmdOut(cmd)
 
 	activeTheme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
 	nerdFonts := flagNerdFonts || cfg.NerdFonts
 
-	fmt.Println("=== Available Doom Themes ===")
-	fmt.Println()
+	fmt.Fprintln(out, "=== Available Doom Themes ===")
+	fmt.Fprintln(out)
 
 	themes := tui.ListBuiltinThemes()
 	for _, t := range themes {
@@ -62,12 +63,12 @@ func runThemesList(cmd *cobra.Command, args []string) error {
 			styles.CursorBar.Render("▎ ") +
 			styles.CursorText.Render("Select")
 
-		fmt.Printf("%s%-11s [%-9s] %-42s %s\n", marker, t.Name, t.Type, t.Description, sample)
+		fmt.Fprintf(out, "%s%-11s [%-9s] %-42s %s\n", marker, t.Name, t.Type, t.Description, sample)
 	}
 
-	fmt.Println()
-	fmt.Printf("Active theme: %s\n", activeTheme.Name)
-	fmt.Printf("Run 'doom themes set <name>' to save a default theme to %s\n", paths.ConfigFile)
+	fmt.Fprintln(out)
+	fmt.Fprintf(out, "Active theme: %s\n", activeTheme.Name)
+	fmt.Fprintf(out, "Run 'doom themes set <name>' to save a default theme to %s\n", paths.ConfigFile)
 	return nil
 }
 
@@ -92,6 +93,6 @@ func runThemesSet(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Printf("✓ Active theme set to %q in %s\n", target, paths.ConfigFile)
+	fmt.Fprintf(cmdOut(cmd), "✓ Active theme set to %q in %s\n", target, paths.ConfigFile)
 	return nil
 }

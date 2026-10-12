@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "deathless",
+  "name": "Deathless",
+  "engine": "dsda-doom",
+  "iwad": "DOOM.WAD",
+  "files": [
+    {
+      "name": "deathless.wad"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla",
+  "description": "Modern Ultimate Doom episode replacement",
+  "author": "James \"Jimmy\" Paddock",
+  "release_date": "2018",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/deathless.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom/Ports/megawads/deathless",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 50
+}

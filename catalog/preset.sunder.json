@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "sunder",
+  "name": "Sunder",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "SUNDER_V2512.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "MBF21 / Boom",
+  "description": "Monumental architectural slaughter megawad",
+  "author": "Insane_Gazebo",
+  "release_date": "2009",
+  "sort": 260
+}

@@ -139,7 +139,7 @@ The `doom` CLI provides modular commands for granular management:
 | `doom play --once` | Launches the TUI, runs selected preset, and exits without returning to launcher |
 | `doom play --theme <name>` | Temporarily runs the TUI with a specific color theme |
 | `doom play --nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the session |
-| `doom launch <preset> [flags]` | Directly launches a preset by name or prefix with optional engine flags |
+| `doom launch <preset> [flags]` | Directly launches a preset by ID, name, or prefix with optional engine flags |
 | `doom launch <preset> --dry-run` | Prints synthesized launch command without starting the game |
 | `doom setup` | Automated turnkey installation of engines, configs, soundfonts, and game files |
 
@@ -148,21 +148,21 @@ The `doom` CLI provides modular commands for granular management:
 | Command | Description |
 | :--- | :--- |
 | `doom engines` / `doom engines list` | Lists all configured engines (built-in and custom) with binary status |
-| `doom engines add <name> [flags]` | Registers a custom source port engine with binary path and argument style |
-| `doom engines remove <name>` | Removes a custom engine from your user configuration |
-| `doom engines install` | Downloads and installs portable binaries for `uzdoom` and `dsda-doom` |
+| `doom engines add <name> [flags]` | Registers a custom source port engine in `catalog.d/engine.<id>.json` |
+| `doom engines remove <name>` | Removes a custom engine from your user catalog |
+| `doom engines install [engine|all]` | Downloads and installs portable binaries for `uzdoom` and `dsda-doom` |
 
 ### Preset & Custom WAD Management
 
 | Command | Description |
 | :--- | :--- |
 | `doom presets` / `doom presets list` | Lists all presets (built-in and custom) with engine badges and descriptions |
-| `doom presets show <name>` | Displays resolved engine, IWAD, PWADs, and file availability for a preset |
-| `doom presets add <name> [flags]` | Registers a custom WAD or mapset preset into your personal library |
-| `doom presets config <name> [flags]` | Sets per-WAD launch options (preferred engine, launch flags, custom IWAD) |
-| `doom presets config <name> --reset` | Clears custom launch options, reverting back to curated defaults |
-| `doom presets remove <name>` | Removes a custom preset from your personal library |
-| `doom presets build` | Synchronizes `data/presets.json` into `README.md` (developer tool) |
+| `doom presets show <name>` | Displays resolved engine, IWAD, PWADs, sources, links, and file status |
+| `doom presets add <name> [flags]` | Registers a custom WAD or mapset preset in `catalog.d/preset.<id>.json` |
+| `doom presets config <name> [flags]` | Sets per-WAD overrides in `catalog.d/override.preset.<id>.json` |
+| `doom presets config <name> --reset` | Clears custom launch overrides, reverting back to curated defaults |
+| `doom presets remove <name>` | Removes a custom preset or clears overrides for a built-in preset |
+| `doom presets lint` | Validates curated and user catalog entities and schema invariants |
 
 ### WADs & Expansion Management
 
@@ -353,6 +353,9 @@ Set default directories permanently in `config.json` without needing CLI flags o
 # Set custom WADs directory permanently
 doom config set wads-dir "E:\DOOM\WADS"
 
+# Configure additional read-only WAD search roots
+doom config set wads-dirs "E:\DOOM\MEGAWADS,E:\DOOM\MODS"
+
 # Set custom engine binaries directory permanently
 doom config set bin-dir "E:\DOOM\bin"
 
@@ -367,7 +370,7 @@ doom config show
 
 ## Extensibility
 
-`doom-cli` is fully extensible while keeping curated defaults as the baseline foundation:
+`doom-cli` uses a two-layer entity catalog: immutable curated defaults embedded from `catalog/*.json` and per-entity user drop-in files in `<config_dir>/catalog.d/*.json`.
 
 ### Add Custom Engines
 
@@ -375,10 +378,10 @@ Register any source port installed on your system (e.g., Woof!, Crispy Doom, GZD
 
 ```bash
 # Add Woof! source port (Boom argument style with -file and -deh)
-doom engines add woof --bin woof --args-style boom --desc "Woof! MBF21 port"
+doom engines add "Woof!" --id woof --binary woof --style boom --description "Woof! MBF21 port"
 
 # Add GZDoom pointing to an explicit binary path
-doom engines add gzdoom --bin /usr/bin/gzdoom --args-style zdoom --desc "GZDoom OpenGL/Vulkan"
+doom engines add "GZDoom" --id gzdoom --binary /usr/bin/gzdoom --style zdoom --description "GZDoom OpenGL/Vulkan"
 
 # List all available engines and verify binary availability
 doom engines list
@@ -386,11 +389,11 @@ doom engines list
 
 ### Add Custom WADs & Presets
 
-Add custom mapsets or community mods to your library. They automatically integrate into `doom play` fuzzy search and direct execution (`doom launch`):
+Add custom mapsets or community mods to your personal catalog (`catalog.d/preset.<id>.json`). They automatically integrate into `doom play` fuzzy search and direct execution (`doom launch`):
 
 ```bash
 # Add a custom mapset with required IWAD and PWADs
-doom presets add "KDiZD" --engine uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --desc "Knee-Deep in ZDoom"
+doom presets add "KDiZD" --engine uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --description "Knee-Deep in ZDoom"
 
 # Inspect preset details and missing file status
 doom presets show "KDiZD"
@@ -401,7 +404,7 @@ doom launch "KDiZD"
 
 ### Configure Per-WAD Launch Options
 
-Customize launch preferences for any WAD without modifying repository defaults:
+Customize launch preferences for any WAD (`catalog.d/override.preset.<id>.json`) without modifying repository defaults:
 
 ```bash
 # Always launch Sunlust in Woof! with ultra-violence skill
@@ -416,45 +419,75 @@ doom presets config "Sunlust" --reset
 
 ---
 
-## Configuration Schema (`config.json`)
+## Configuration & User Catalog Schema
 
-User configurations are persisted in `~/.config/doom-cli/config.json` (Linux), `~/Library/Application Support/doom-cli/config.json` (macOS), or `%LOCALAPPDATA%\doom-cli\config.json` (Windows):
+### CLI Settings (`config.json`)
+
+User settings are persisted in `~/.config/doom-cli/config.json` (Linux), `~/Library/Application Support/doom-cli/config.json` (macOS), or `%LOCALAPPDATA%\doom-cli\config.json` (Windows):
 
 ```json
 {
   "theme": "blood",
   "nerd_fonts": false,
   "wads_dir": "E:\\DOOM\\WADS",
-  "bin_dir": "E:\\DOOM\\bin",
-  "soundfonts_dir": "E:\\DOOM\\soundfonts",
-  "engines": {
-    "woof": {
-      "name": "woof",
-      "binary": "woof",
-      "family": "boom",
-      "args_style": "boom",
-      "description": "Woof! MBF21 port"
-    }
-  },
-  "presets": [
-    {
-      "name": "KDiZD",
-      "engine": "uzdoom",
-      "iwad": "DOOM.WAD",
-      "mappacks": [
-        "kdizd_12.pk3"
-      ],
-      "description": "Knee-Deep in ZDoom"
-    }
+  "wads_dirs": [
+    "E:\\DOOM\\MEGAWADS"
   ],
-  "launch_options": {
-    "Sunlust": {
-      "engine": "woof",
-      "additional_args": "-skill 4"
-    }
-  }
+  "bin_dir": "E:\\DOOM\\bin",
+  "soundfonts_dir": "E:\\DOOM\\soundfonts"
 }
 ```
+
+### User Entity Catalog (`catalog.d/*.json`)
+
+Custom engines, presets, and overrides are stored one entity per file inside `<config_dir>/catalog.d/`:
+
+- **`catalog.d/engine.woof.json`**:
+  ```json
+  {
+    "schema_version": 1,
+    "kind": "engine",
+    "id": "woof",
+    "display_name": "Woof!",
+    "description": "Woof! MBF21 port",
+    "args_style": "boom",
+    "binary": "woof"
+  }
+  ```
+- **`catalog.d/preset.kdizd.json`**:
+  ```json
+  {
+    "schema_version": 1,
+    "kind": "preset",
+    "id": "kdizd",
+    "name": "KDiZD",
+    "engine": "uzdoom",
+    "iwad": "DOOM.WAD",
+    "files": [
+      { "name": "kdizd_12.pk3" }
+    ],
+    "category": "Custom",
+    "description": "Knee-Deep in ZDoom"
+  }
+  ```
+- **`catalog.d/override.preset.sunlust.json`**:
+  ```json
+  {
+    "schema_version": 1,
+    "kind": "override",
+    "target": {
+      "kind": "preset",
+      "id": "sunlust"
+    },
+    "set": {
+      "engine": "woof"
+    },
+    "append_args": [
+      "-skill",
+      "4"
+    ]
+  }
+  ```
 
 ---
 
@@ -465,10 +498,10 @@ The `doom` CLI respects the following environment variables:
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `DOOM_THEME` | Color theme for the interactive launcher | `default` (or value in `config.json`) |
-| `DOOM_WADS_DIR` / `WADS_DIR` | Directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
+| `DOOM_WADS_DIR` / `WADS_DIR` | Primary directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
+| `DOOM_WADS_DIRS` / `WADS_DIRS` | Additional read-only WAD search directories (comma or path-list separated) | `wads_dirs` in `config.json` |
 | `DOOM_BIN_DIR` / `BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |
 | `DOOM_SF_DIR` / `SF_DIR` | Directory containing SoundFonts (`GeneralUser-GS.sf2`) | Platform standard soundfonts directory |
-| `DOOM_PRESETS_FILE` | Custom path to external presets JSON file | Embedded `data/presets.json` |
 
 ---
 
@@ -483,6 +516,7 @@ The `doom` CLI automatically respects standard, platform-idiomatic paths:
 | **UZDoom Config** | `~/.config/uzdoom/autoexec.cfg` | `~/Library/Application Support/uzdoom/autoexec.cfg` | `%USERPROFILE%\Games\Doom\bin\autoexec.cfg` |
 | **DSDA-Doom Config** | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` |
 | **CLI Config & Themes** | `~/.config/doom-cli/` | `~/Library/Application Support/doom-cli/` | `%LOCALAPPDATA%\doom-cli\` |
+| **User Catalog** | `~/.config/doom-cli/catalog.d/` | `~/Library/Application Support/doom-cli/catalog.d/` | `%LOCALAPPDATA%\doom-cli\catalog.d\` |
 | **SoundFonts** | `~/.local/share/soundfonts/` | `~/Library/Application Support/soundfonts/` | `%USERPROFILE%\Games\Doom\soundfonts\` |
 
 ---
@@ -503,7 +537,7 @@ The `doom` CLI automatically respects standard, platform-idiomatic paths:
 
 ## Preconfigured Presets
 
-All presets are declaratively managed in [`data/presets.json`](data/presets.json) and mapped to their optimal engine:
+All presets are declaratively managed in [`catalog/`](catalog/) and mapped to their optimal engine:
 
 | Megawad / Expansion | Engine | Compatibility / Details |
 | :--- | :--- | :--- |

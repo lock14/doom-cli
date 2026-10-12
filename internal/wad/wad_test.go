@@ -3,11 +3,14 @@ package wad
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/lock14/doom-cli/internal/preset"
@@ -15,7 +18,11 @@ import (
 
 func TestFilterExpectedFiles(t *testing.T) {
 	t.Parallel()
-	files := []string{"map.wad", "idkfa 2024.wad", "patch.deh"}
+	files := []preset.FileSpec{
+		{Name: "map.wad"},
+		{Name: "idkfa 2024.wad", Optional: true},
+		{Name: "patch.deh"},
+	}
 	filtered := FilterExpectedFiles(files)
 	if len(filtered) != 2 {
 		t.Fatalf("expected 2 files, got %d", len(filtered))
@@ -26,6 +33,7 @@ func TestFilterExpectedFiles(t *testing.T) {
 }
 
 func createTestZip(t *testing.T, files map[string]string) []byte {
+	t.Helper()
 	buf := new(bytes.Buffer)
 	zw := zip.NewWriter(buf)
 	for name, content := range files {
@@ -45,33 +53,26 @@ func createTestZip(t *testing.T, files map[string]string) []byte {
 
 func TestDownloader_ExtractFromZip(t *testing.T) {
 	t.Parallel()
-	tmpDir, err := os.MkdirTemp("", "wad_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	zipBytes := createTestZip(t, map[string]string{
 		"Eviternity II.wad": "content-eviternity",
 		"sub/gd.wad":        "content-gdturbo",
-		"patch_file.deh":    "content-deh",
+		"patch_file.bex":    "content-bex",
 	})
 
 	zipPath := filepath.Join(tmpDir, "test.zip")
-	if err := os.WriteFile(zipPath, zipBytes, 0644); err != nil {
+	if err := os.WriteFile(zipPath, zipBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	wadsDir := filepath.Join(tmpDir, "wads")
 	dl := NewDownloader(wadsDir, false, nil)
 
-	// 1. Normalized match: "eviternityii.wad" should match "Eviternity II.wad"
-	// 2. Alias match: "gdturbo.wad" should match "gd.wad"
-	// 3. Fallback match: "patch.deh" should match single .deh file "patch_file.deh"
-	err = dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{
+	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{
 		"eviternityii.wad",
-		"gdturbo.wad",
-		"patch.deh",
+		"sub/gdturbo.wad",
+		"patch.bex",
 	})
 	if err != nil {
 		t.Fatalf("unexpected extract error: %v", err)
@@ -82,64 +83,146 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 		t.Errorf("eviternityii.wad content mismatch: %s (err: %v)", string(c1), err)
 	}
 
-	c2, err := os.ReadFile(filepath.Join(wadsDir, "gdturbo.wad"))
+	c2, err := os.ReadFile(filepath.Join(wadsDir, "sub", "gdturbo.wad"))
 	if err != nil || string(c2) != "content-gdturbo" {
-		t.Errorf("gdturbo.wad content mismatch: %s (err: %v)", string(c2), err)
+		t.Errorf("sub/gdturbo.wad content mismatch: %s (err: %v)", string(c2), err)
 	}
 
-	c3, err := os.ReadFile(filepath.Join(wadsDir, "patch.deh"))
-	if err != nil || string(c3) != "content-deh" {
-		t.Errorf("patch.deh content mismatch: %s (err: %v)", string(c3), err)
+	c3, err := os.ReadFile(filepath.Join(wadsDir, "patch.bex"))
+	if err != nil || string(c3) != "content-bex" {
+		t.Errorf("patch.bex content mismatch: %s (err: %v)", string(c3), err)
 	}
 }
 
-func TestDownloader_DownloadPreset(t *testing.T) {
+func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 	t.Parallel()
 	zipBytes := createTestZip(t, map[string]string{
 		"alienvendetta.wad": "av-content",
 		"av.deh":            "av-deh",
 	})
+	zipSum := sha256.Sum256(zipBytes)
+	zipHex := hex.EncodeToString(zipSum[:])
+
+	pk3Bytes := createTestZip(t, map[string]string{
+		"maps/map01.wad": "pk3-map-content",
+	})
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/alienv.zip" {
+		switch r.URL.Path {
+		case "/alienv.zip":
 			w.Header().Set("Content-Type", "application/zip")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(zipBytes)
-			return
+		case "/mod.pk3":
+			w.Header().Set("Content-Type", "application/octet-stream")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(pk3Bytes)
+		case "/direct.wad":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("PWAD-DIRECT"))
+		case "/archive.7z":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("7z-content"))
+		default:
+			http.NotFound(w, r)
 		}
-		http.NotFound(w, r)
 	}))
-	defer server.Close()
+	t.Cleanup(server.Close)
 
-	tmpDir, err := os.MkdirTemp("", "wad_dl_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	t.Run("zip download with valid sha256", func(t *testing.T) {
+		t.Parallel()
+		wadsDir := filepath.Join(t.TempDir(), "wads")
+		dl := NewDownloader(wadsDir, false, nil)
+		p := preset.Preset{
+			Name:   "Alien Vendetta",
+			Engine: "dsda-doom",
+			IWAD:   "doom2.wad",
+			Files:  []preset.FileSpec{{Name: "alienvendetta.wad"}, {Name: "av.deh"}},
+			Sources: []preset.Source{
+				{URL: fmt.Sprintf("%s/alienv.zip", server.URL), SHA256: zipHex},
+			},
+		}
+		if err := dl.DownloadPreset(p); err != nil {
+			t.Fatalf("DownloadPreset failed: %v", err)
+		}
+		if !dl.IsPresetInstalled(p) {
+			t.Errorf("preset should be reported as installed")
+		}
+	})
 
-	wadsDir := filepath.Join(tmpDir, "wads")
-	dl := NewDownloader(wadsDir, false, nil)
+	t.Run("sha256 mismatch rejected", func(t *testing.T) {
+		t.Parallel()
+		wadsDir := filepath.Join(t.TempDir(), "wads")
+		dl := NewDownloader(wadsDir, false, nil)
+		p := preset.Preset{
+			Name:   "Bad Digest",
+			Engine: "dsda-doom",
+			IWAD:   "doom2.wad",
+			Files:  []preset.FileSpec{{Name: "alienvendetta.wad"}},
+			Sources: []preset.Source{
+				{URL: fmt.Sprintf("%s/alienv.zip", server.URL), SHA256: strings.Repeat("0", 64)},
+			},
+		}
+		if err := dl.DownloadPreset(p); err == nil || !strings.Contains(err.Error(), "sha256 mismatch") {
+			t.Fatalf("expected sha256 mismatch error, got: %v", err)
+		}
+	})
 
-	p := preset.Preset{
-		Name:         "Alien Vendetta",
-		Engine:       "dsda-doom",
-		IWAD:         "doom2.wad",
-		Mappacks:     []string{"alienvendetta.wad", "av.deh"},
-		DownloadURLs: []string{fmt.Sprintf("%s/alienv.zip", server.URL)},
-	}
+	t.Run("direct pk3 download saved as pk3 without unzipping", func(t *testing.T) {
+		t.Parallel()
+		wadsDir := filepath.Join(t.TempDir(), "wads")
+		dl := NewDownloader(wadsDir, false, nil)
+		p := preset.Preset{
+			Name:    "Direct PK3",
+			Engine:  "uzdoom",
+			IWAD:    "doom2.wad",
+			Files:   []preset.FileSpec{{Name: "mod.pk3"}},
+			Sources: []preset.Source{{URL: fmt.Sprintf("%s/mod.pk3", server.URL)}},
+		}
+		if err := dl.DownloadPreset(p); err != nil {
+			t.Fatalf("direct .pk3 DownloadPreset failed: %v", err)
+		}
+		got, err := os.ReadFile(filepath.Join(wadsDir, "mod.pk3"))
+		if err != nil || !bytes.Equal(got, pk3Bytes) {
+			t.Fatalf("saved .pk3 mismatch (err=%v)", err)
+		}
+	})
 
-	if err := dl.DownloadPreset(p); err != nil {
-		t.Fatalf("DownloadPreset failed: %v", err)
-	}
+	t.Run("7z extension rejected before saving as wad", func(t *testing.T) {
+		t.Parallel()
+		wadsDir := filepath.Join(t.TempDir(), "wads")
+		dl := NewDownloader(wadsDir, false, nil)
+		p := preset.Preset{
+			Name:    "Unsupported 7z",
+			Engine:  "dsda-doom",
+			IWAD:    "doom2.wad",
+			Files:   []preset.FileSpec{{Name: "pack.wad"}},
+			Sources: []preset.Source{{URL: fmt.Sprintf("%s/archive.7z", server.URL)}},
+		}
+		if err := dl.DownloadPreset(p); err == nil || !strings.Contains(err.Error(), "unsupported archive format") {
+			t.Fatalf("expected unsupported archive format error, got: %v", err)
+		}
+	})
 
-	if !dl.IsPresetInstalled(p) {
-		t.Errorf("preset should be reported as installed")
-	}
-
-	// Verify idempotence
-	if err := dl.DownloadPreset(p); err != nil {
-		t.Fatalf("second DownloadPreset run failed: %v", err)
-	}
+	t.Run("direct save path traversal rejected", func(t *testing.T) {
+		t.Parallel()
+		baseDir := t.TempDir()
+		wadsDir := filepath.Join(baseDir, "wads")
+		dl := NewDownloader(wadsDir, false, nil)
+		p := preset.Preset{
+			Name:    "Traversal",
+			Engine:  "dsda-doom",
+			IWAD:    "doom2.wad",
+			Files:   []preset.FileSpec{{Name: "../evil.wad"}},
+			Sources: []preset.Source{{URL: fmt.Sprintf("%s/direct.wad", server.URL)}},
+		}
+		if err := dl.DownloadPreset(p); err == nil {
+			t.Fatal("expected path traversal in Files[0].Name to be rejected")
+		}
+		if _, err := os.Stat(filepath.Join(baseDir, "evil.wad")); !os.IsNotExist(err) {
+			t.Fatalf("security violation: ../evil.wad was written outside wadsDir")
+		}
+	})
 }
 
 func TestInstallSoundFont(t *testing.T) {
@@ -152,11 +235,7 @@ func TestInstallSoundFont(t *testing.T) {
 	}))
 	defer server.Close()
 
-	tmpDir, err := os.MkdirTemp("", "sf_test_*")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	installed, err := InstallSoundFontURL(server.URL, tmpDir, false, nil)
 	if err != nil {
@@ -168,7 +247,6 @@ func TestInstallSoundFont(t *testing.T) {
 		t.Fatalf("installed soundfont content mismatch: %s (err: %v)", string(data), err)
 	}
 
-	// Test idempotence when not forced
 	installed2, err := InstallSoundFontURL(server.URL, tmpDir, false, nil)
 	if err != nil {
 		t.Fatalf("second install failed: %v", err)
@@ -188,20 +266,18 @@ func TestDownloader_ExtractFromZip_ZipSlipProtection(t *testing.T) {
 	})
 
 	zipPath := filepath.Join(tmpDir, "traversal.zip")
-	if err := os.WriteFile(zipPath, zipBytes, 0644); err != nil {
+	if err := os.WriteFile(zipPath, zipBytes, 0o644); err != nil {
 		t.Fatal(err)
 	}
 
 	wadsDir := filepath.Join(tmpDir, "wads")
 	dl := NewDownloader(wadsDir, false, nil)
 
-	// Attempt to extract entry that tries to escape directory
 	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{"normal.wad"})
 	if err != nil {
 		t.Fatalf("unexpected error extracting normal file: %v", err)
 	}
 
-	// Verify that escaped file was not created outside wadsDir
 	escapedPath := filepath.Join(tmpDir, "escape.wad")
 	if _, err := os.Stat(escapedPath); !os.IsNotExist(err) {
 		t.Errorf("security violation: escaped file was extracted to %s", escapedPath)

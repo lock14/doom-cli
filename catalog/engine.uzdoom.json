@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "kind": "engine",
+  "id": "uzdoom",
+  "display_name": "UZDoom",
+  "description": "UZDoom (Software-Plus / Advanced)",
+  "family": "ZDoom",
+  "args_style": "zdoom",
+  "binary": "uzdoom",
+  "aliases": [
+    "zdoom"
+  ],
+  "badge": "UZDoom",
+  "install": {
+    "repo": "UZDoom/UZDoom",
+    "platforms": {
+      "linux/amd64": {
+        "assets": [
+          "^Linux-UZDoom-.*\\.AppImage$"
+        ],
+        "pinned": {
+          "version": "5.0.3",
+          "url": "https://github.com/UZDoom/UZDoom/releases/download/5.0.3/Linux-UZDoom-Release-x86_64.AppImage",
+          "sha256": "9c5166febc09cbf80c24612a78829037c953f38c4d986e36f8475ddd507e0228"
+        }
+      },
+      "darwin/arm64": {
+        "assets": [
+          "^MacOS-UZDoom-.*ARM64\\.dmg$"
+        ],
+        "pinned": {
+          "version": "5.0.3",
+          "url": "https://github.com/UZDoom/UZDoom/releases/download/5.0.3/MacOS-UZDoom-Release-ARM64.dmg",
+          "sha256": "789465d31dd970c3bff7b929c7f74d090f730d8934a3a0f7aef92befd5582666"
+        }
+      },
+      "darwin/amd64": {
+        "unsupported": true
+      },
+      "windows/amd64": {
+        "assets": [
+          "^Windows-UZDoom-.*\\.zip$"
+        ],
+        "pinned": {
+          "version": "5.0.3",
+          "url": "https://github.com/UZDoom/UZDoom/releases/download/5.0.3/Windows-UZDoom-Release-x86_64.zip",
+          "sha256": "3a41131845415bc4bb5474f8de301a77736bd858e2ab489926325a2675e8263f"
+        }
+      }
+    }
+  }
+}

@@ -2,117 +2,44 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
-	"strings"
+	"sort"
 
-	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
-// AppConfig represents persistent user configuration for doom-cli.
+// AppConfig represents persistent user settings for doom-cli.
+// User-defined engines, presets, and overrides live in <ConfigDir>/catalog.d/*.json.
 type AppConfig struct {
-	Theme         string                             `json:"theme,omitempty"`
-	NerdFonts     bool                               `json:"nerd_fonts,omitempty"`
-	WadsDir       string                             `json:"wads_dir,omitempty"`
-	BinDir        string                             `json:"bin_dir,omitempty"`
-	SoundFontsDir string                             `json:"soundfonts_dir,omitempty"`
-	Engines       map[string]preset.EngineConfig     `json:"engines,omitempty"`
-	Presets       []preset.Preset                    `json:"presets,omitempty"`
-	LaunchOptions map[string]preset.WadLaunchOptions `json:"launch_options,omitempty"`
+	Theme         string   `json:"theme,omitempty"`
+	NerdFonts     bool     `json:"nerd_fonts,omitempty"`
+	WadsDir       string   `json:"wads_dir,omitempty"`
+	WadsDirs      []string `json:"wads_dirs,omitempty"`
+	BinDir        string   `json:"bin_dir,omitempty"`
+	SoundFontsDir string   `json:"soundfonts_dir,omitempty"`
+
+	// LegacyEntityKeys lists any legacy v1 entity keys ("engines", "presets",
+	// "launch_options") encountered in config.json so callers can emit a warning.
+	LegacyEntityKeys []string `json:"-"`
+
+	extra map[string]json.RawMessage
 }
 
-// AddEngine registers or updates a custom engine in user configuration.
-func (c *AppConfig) AddEngine(cfg preset.EngineConfig) {
-	if c.Engines == nil {
-		c.Engines = make(map[string]preset.EngineConfig)
-	}
-	name := strings.TrimSpace(cfg.Name)
-	if name == "" {
-		return
-	}
-	cfg.Name = name
-	c.Engines[name] = cfg
+var knownConfigKeys = map[string]bool{
+	"theme":          true,
+	"nerd_fonts":     true,
+	"wads_dir":       true,
+	"wads_dirs":      true,
+	"bin_dir":        true,
+	"soundfonts_dir": true,
 }
 
-// RemoveEngine deletes a custom engine from user configuration by name.
-func (c *AppConfig) RemoveEngine(name string) bool {
-	if c.Engines == nil {
-		return false
-	}
-	for k := range c.Engines {
-		if strings.EqualFold(k, name) {
-			delete(c.Engines, k)
-			return true
-		}
-	}
-	return false
-}
-
-// AddPreset registers or updates a custom preset in user configuration.
-func (c *AppConfig) AddPreset(p preset.Preset) {
-	clean := strings.TrimSpace(p.Name)
-	if clean == "" {
-		return
-	}
-	p.Name = clean
-	p.Custom = true
-
-	for i := range c.Presets {
-		if strings.EqualFold(c.Presets[i].Name, clean) {
-			c.Presets[i] = p
-			return
-		}
-	}
-	c.Presets = append(c.Presets, p)
-}
-
-// RemovePreset deletes a custom preset from user configuration by name.
-func (c *AppConfig) RemovePreset(name string) bool {
-	for i := range c.Presets {
-		if strings.EqualFold(c.Presets[i].Name, name) {
-			c.Presets = append(c.Presets[:i], c.Presets[i+1:]...)
-			return true
-		}
-	}
-	return false
-}
-
-// SetLaunchOptions configures launch options overrides for a specific preset/wad.
-func (c *AppConfig) SetLaunchOptions(presetName string, opts preset.WadLaunchOptions) {
-	if c.LaunchOptions == nil {
-		c.LaunchOptions = make(map[string]preset.WadLaunchOptions)
-	}
-	clean := strings.TrimSpace(presetName)
-	if clean == "" {
-		return
-	}
-
-	// Remove existing key if casing differs
-	for k := range c.LaunchOptions {
-		if strings.EqualFold(k, clean) {
-			delete(c.LaunchOptions, k)
-			break
-		}
-	}
-	c.LaunchOptions[clean] = opts
-}
-
-// RemoveLaunchOptions removes launch options overrides for a specific preset/wad.
-func (c *AppConfig) RemoveLaunchOptions(presetName string) bool {
-	if c.LaunchOptions == nil {
-		return false
-	}
-	for k := range c.LaunchOptions {
-		if strings.EqualFold(k, presetName) {
-			delete(c.LaunchOptions, k)
-			return true
-		}
-	}
-	return false
-}
+var legacyEntityKeyNames = []string{"engines", "presets", "launch_options"}
 
 // LoadConfig reads the user configuration file if present, returning defaults if not found.
+// Unknown top-level JSON keys are preserved in memory so SaveConfig does not strip them.
 func LoadConfig(paths *Paths) (*AppConfig, error) {
 	cfg := &AppConfig{}
 	if paths == nil || paths.ConfigFile == "" {
@@ -127,27 +54,88 @@ func LoadConfig(paths *Paths) (*AppConfig, error) {
 		return nil, err
 	}
 
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
 	if err := json.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMap); err != nil {
+		return nil, err
+	}
+	for k, v := range rawMap {
+		if !knownConfigKeys[k] {
+			if cfg.extra == nil {
+				cfg.extra = make(map[string]json.RawMessage)
+			}
+			cfg.extra[k] = v
+		}
+	}
+	for _, k := range legacyEntityKeyNames {
+		if _, exists := cfg.extra[k]; exists {
+			cfg.LegacyEntityKeys = append(cfg.LegacyEntityKeys, k)
+		}
+	}
+
 	return cfg, nil
 }
 
-// SaveConfig writes the user configuration file, creating parent directories as necessary.
+// SaveConfig writes the user configuration file atomically, creating a timestamped
+// backup when overwriting an existing file and preserving any unknown top-level keys.
 func SaveConfig(paths *Paths, cfg *AppConfig) error {
 	if paths == nil || paths.ConfigFile == "" {
 		return nil
 	}
+	if cfg == nil {
+		cfg = &AppConfig{}
+	}
 
-	if err := os.MkdirAll(filepath.Dir(paths.ConfigFile), 0o755); err != nil {
+	merged := make(map[string]any, len(cfg.extra)+len(knownConfigKeys))
+	for k, v := range cfg.extra {
+		if !knownConfigKeys[k] {
+			merged[k] = v
+		}
+	}
+	if cfg.Theme != "" {
+		merged["theme"] = cfg.Theme
+	}
+	if cfg.NerdFonts {
+		merged["nerd_fonts"] = cfg.NerdFonts
+	}
+	if cfg.WadsDir != "" {
+		merged["wads_dir"] = cfg.WadsDir
+	}
+	if len(cfg.WadsDirs) > 0 {
+		merged["wads_dirs"] = cfg.WadsDirs
+	}
+	if cfg.BinDir != "" {
+		merged["bin_dir"] = cfg.BinDir
+	}
+	if cfg.SoundFontsDir != "" {
+		merged["soundfonts_dir"] = cfg.SoundFontsDir
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(merged); err != nil {
 		return err
 	}
 
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	data = append(data, '\n')
+	_, err := fsutil.WriteFileAtomic(paths.ConfigFile, buf.Bytes(), 0o644)
+	return err
+}
 
-	return os.WriteFile(paths.ConfigFile, data, 0o644)
+// ExtraKeys returns the sorted list of unknown top-level keys preserved in AppConfig.
+func (c *AppConfig) ExtraKeys() []string {
+	if c == nil || len(c.extra) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(c.extra))
+	for k := range c.extra {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

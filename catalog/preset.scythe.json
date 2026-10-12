@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "scythe",
+  "name": "Scythe",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "SCYTHE.WAD"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla",
+  "description": "Iconic fast-paced speedrunning megawad",
+  "author": "Erik Alm",
+  "release_date": "2003",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/megawads/scythe",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 230
+}

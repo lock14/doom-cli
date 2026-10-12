@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "legacy-of-rust",
+  "name": "Legacy of Rust",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "id24res.wad"
+    },
+    {
+      "name": "id1-res.wad"
+    },
+    {
+      "name": "id1-weap.wad"
+    },
+    {
+      "name": "id1.wad"
+    },
+    {
+      "name": "extras.wad"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Official Expansion",
+  "compatibility": "ID24",
+  "description": "Official ID24 standard episode + weapons & monsters",
+  "author": "id Software & Nightdive Studios",
+  "release_date": "2024",
+  "sort": 160
+}

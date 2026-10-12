@@ -13,6 +13,17 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
+func userCatalogWriteDir(paths *config.Paths) (string, error) {
+	if flagPresetsFile == "" {
+		return paths.CatalogDir, nil
+	}
+	info, err := os.Stat(flagPresetsFile)
+	if err == nil && !info.IsDir() {
+		return "", fmt.Errorf("--presets-file %q is a single file; pass a directory to write entities", flagPresetsFile)
+	}
+	return flagPresetsFile, nil
+}
+
 // newEnginesCmd creates the source port engine management command.
 func newEnginesCmd() *cobra.Command {
 	enginesCmd := &cobra.Command{
@@ -29,7 +40,7 @@ func newEnginesCmd() *cobra.Command {
 		RunE:  runEnginesList,
 	}
 
-	var addBin, addStyle, addArgs, addDesc string
+	var addID, addBinary, addStyle, addFamily, addArgs, addBadge, addDisplayName, addDescription string
 	enginesAddCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Register or update a custom source port engine",
@@ -40,14 +51,17 @@ func newEnginesCmd() *cobra.Command {
 				return fmt.Errorf("engine name cannot be empty")
 			}
 
-			binTarget := addBin
-			if binTarget == "" {
-				binTarget = name
+			paths, _, err := loadPathsAndConfig()
+			if err != nil {
+				return err
 			}
-
-			style := strings.ToLower(strings.TrimSpace(addStyle))
-			if style != "" && style != "boom" && style != "zdoom" {
-				return fmt.Errorf("invalid args-style %q (must be 'boom' or 'zdoom')", style)
+			writeDir, err := userCatalogWriteDir(paths)
+			if err != nil {
+				return err
+			}
+			curated, err := preset.LoadCuratedCatalog()
+			if err != nil {
+				return err
 			}
 
 			var defaultArgs []string
@@ -55,58 +69,88 @@ func newEnginesCmd() *cobra.Command {
 				defaultArgs = strings.Fields(addArgs)
 			}
 
-			cfgMeta := preset.EngineConfig{
-				Name:        name,
-				Binary:      binTarget,
-				ArgsStyle:   style,
-				DefaultArgs: defaultArgs,
-				Description: addDesc,
+			displayName := addDisplayName
+			if displayName == "" {
+				displayName = name
+			}
+			id := addID
+			if id == "" {
+				id = preset.Slug(name)
 			}
 
-			paths, cfg, err := loadPathsAndConfig()
+			eng := preset.EngineConfig{
+				ID:          id,
+				DisplayName: displayName,
+				Description: addDescription,
+				Family:      addFamily,
+				ArgsStyle:   strings.ToLower(strings.TrimSpace(addStyle)),
+				Binary:      addBinary,
+				DefaultArgs: defaultArgs,
+				Badge:       addBadge,
+			}
+
+			outPath, err := preset.AddEngine(writeDir, curated, eng)
 			if err != nil {
 				return err
 			}
-			cfg.AddEngine(cfgMeta)
-			if err := config.SaveConfig(paths, cfg); err != nil {
-				return fmt.Errorf("saving config: %w", err)
-			}
 
-			fmt.Printf(
+			fmt.Fprintf(
+				cmdOut(cmd),
 				"✓ Registered engine %q (%s) in %s\n",
-				name,
-				cfgMeta.EffectiveArgsStyle(),
-				paths.ConfigFile,
+				eng.ID,
+				eng.EffectiveArgsStyle(),
+				outPath,
 			)
 			return nil
 		},
 	}
-	enginesAddCmd.Flags().StringVar(&addBin, "bin", "", "Executable name or absolute path (defaults to name)")
+	enginesAddCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for the engine (defaults to slugified name)")
+	enginesAddCmd.Flags().StringVar(&addBinary, "binary", "", "Executable name or absolute path (defaults to id)")
+	enginesAddCmd.Flags().StringVar(&addBinary, "bin", "", "Executable name or absolute path (defaults to id)")
+	_ = enginesAddCmd.Flags().MarkHidden("bin")
+	enginesAddCmd.Flags().StringVar(&addStyle, "style", "", "Argument format: boom (-file/-deh) or zdoom (-file)")
 	enginesAddCmd.Flags().StringVar(&addStyle, "args-style", "", "Argument format: boom (-file/-deh) or zdoom (-file)")
+	_ = enginesAddCmd.Flags().MarkHidden("args-style")
+	enginesAddCmd.Flags().StringVar(&addFamily, "family", "", "Engine family (e.g. boom, mbf21, zdoom)")
 	enginesAddCmd.Flags().StringVar(&addArgs, "args", "", "Default flags always passed to this engine")
-	enginesAddCmd.Flags().StringVar(&addDesc, "desc", "", "Description of the engine")
+	enginesAddCmd.Flags().StringVar(&addBadge, "badge", "", "Short badge label for the launcher")
+	enginesAddCmd.Flags().StringVar(&addDisplayName, "display-name", "", "Display name for the engine")
+	enginesAddCmd.Flags().StringVar(&addDescription, "description", "", "Description of the engine")
+	enginesAddCmd.Flags().StringVar(&addDescription, "desc", "", "Description of the engine")
+	_ = enginesAddCmd.Flags().MarkHidden("desc")
 
 	enginesRemoveCmd := &cobra.Command{
 		Use:   "remove <name>",
-		Short: "Remove a custom engine from user configuration",
+		Short: "Remove a custom engine from user catalog",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			if strings.EqualFold(name, "uzdoom") || strings.EqualFold(name, "dsda-doom") {
-				return fmt.Errorf("cannot remove built-in engine %q", name)
-			}
-
-			paths, cfg, err := loadPathsAndConfig()
+			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
-			if !cfg.RemoveEngine(name) {
-				return fmt.Errorf("engine %q not found in user configuration", name)
+			writeDir, err := userCatalogWriteDir(paths)
+			if err != nil {
+				return err
 			}
-			if err := config.SaveConfig(paths, cfg); err != nil {
-				return fmt.Errorf("saving config: %w", err)
+			curated, err := preset.LoadCuratedCatalog()
+			if err != nil {
+				return err
 			}
-			fmt.Printf("✓ Removed engine %q from %s\n", name, paths.ConfigFile)
+
+			removedPath, referencedBy, err := preset.RemoveEngine(writeDir, curated, cat, name)
+			if err != nil {
+				return err
+			}
+			if len(referencedBy) > 0 {
+				fmt.Fprintf(
+					cmdErr(cmd),
+					"warning: removed engine %q is still referenced by presets: %s\n",
+					name,
+					strings.Join(referencedBy, ", "),
+				)
+			}
+			fmt.Fprintf(cmdOut(cmd), "✓ Removed engine %q from %s\n", name, removedPath)
 			return nil
 		},
 	}
@@ -115,23 +159,25 @@ func newEnginesCmd() *cobra.Command {
 		Use:   "install [uzdoom|dsda-doom|all]",
 		Short: "Download and deploy portable engine binaries",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			paths := getPaths()
-			ins := engine.NewInstaller(paths.BinDir, os.Stdout)
+			paths, _, cat, err := loadAppState()
+			if err != nil {
+				return err
+			}
+			ins := engine.NewInstaller(paths.BinDir, cmdOut(cmd))
 			target := "all"
 			if len(args) > 0 {
-				target = strings.ToLower(args[0])
+				target = strings.TrimSpace(args[0])
 			}
 
-			switch target {
-			case "uzdoom":
-				return ins.InstallUZDoom()
-			case "dsda", "dsda-doom", "dsdadoom":
-				return ins.InstallDSDA()
-			case "all":
-				return ins.InstallAll()
-			default:
+			if strings.EqualFold(target, "all") {
+				return ins.InstallCatalog(cat)
+			}
+
+			eng, ok := cat.FindEngine(target)
+			if !ok {
 				return fmt.Errorf("unknown engine target: %s (choose uzdoom, dsda-doom, or all)", target)
 			}
+			return ins.InstallEngine(eng)
 		},
 	}
 
@@ -151,8 +197,9 @@ func runEnginesList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	out := cmdOut(cmd)
 
-	fmt.Println("=== Available Doom Engines ===")
+	fmt.Fprintln(out, "=== Available Doom Engines ===")
 	keys := make([]string, 0, len(cat.Engines))
 	for k := range cat.Engines {
 		keys = append(keys, k)
@@ -161,10 +208,7 @@ func runEnginesList(cmd *cobra.Command, args []string) error {
 
 	for _, k := range keys {
 		eng := cat.Engines[k]
-		binTarget := eng.Binary
-		if binTarget == "" {
-			binTarget = eng.Name
-		}
+		binTarget := eng.EffectiveBinary()
 		resolvedPath, found := checkEngineBinary(binTarget, paths.BinDir)
 		status := "[✗ Missing]"
 		if found {
@@ -173,9 +217,9 @@ func runEnginesList(cmd *cobra.Command, args []string) error {
 		style := eng.EffectiveArgsStyle()
 		desc := eng.Description
 		if desc == "" {
-			desc = eng.Name
+			desc = eng.EffectiveDisplayName()
 		}
-		fmt.Printf("  • %-12s [%-5s] %-32s %s\n", eng.Name, style, desc, status)
+		fmt.Fprintf(out, "  • %-12s [%-5s] %-32s %s\n", eng.ID, style, desc, status)
 	}
 	return nil
 }

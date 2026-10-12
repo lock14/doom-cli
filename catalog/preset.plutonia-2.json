@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "plutonia-2",
+  "name": "Plutonia 2",
+  "engine": "dsda-doom",
+  "iwad": "PLUTONIA.WAD",
+  "files": [
+    {
+      "name": "PL2.WAD"
+    },
+    {
+      "name": "PL2.DEH"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla",
+  "description": "Community sequel to The Plutonia Experiment",
+  "author": "Plutonia 2 Team",
+  "release_date": "2008",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/pl2.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/megawads/pl2",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 290
+}

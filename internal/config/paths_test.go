@@ -25,6 +25,9 @@ func TestResolveForLinux(t *testing.T) {
 	if !strings.Contains(filepath.ToSlash(p.ConfigFile), "config.json") {
 		t.Errorf("expected config.json in ConfigFile, got %s", p.ConfigFile)
 	}
+	if !strings.Contains(filepath.ToSlash(p.CatalogDir), "catalog.d") {
+		t.Errorf("expected catalog.d in CatalogDir, got %s", p.CatalogDir)
+	}
 }
 
 func TestResolveForDarwin(t *testing.T) {
@@ -73,9 +76,12 @@ func TestCustomWadsDirOverride(t *testing.T) {
 	}
 }
 
-func TestPaths_Setters(t *testing.T) {
+func TestPaths_SettersAndWadRoots(t *testing.T) {
 	t.Parallel()
-	p := &Paths{}
+	p := &Paths{
+		WadsDir:  "/wads/primary",
+		WadsDirs: []string{"/wads/secondary", "/wads/primary", "  ", "/wads/tertiary"},
+	}
 	p.SetBinDir("/opt/doom/bin")
 	if p.BinDir != "/opt/doom/bin" {
 		t.Errorf("expected BinDir /opt/doom/bin, got %s", p.BinDir)
@@ -93,5 +99,18 @@ func TestPaths_Setters(t *testing.T) {
 	expectedSF := filepath.Join("/opt/doom/soundfonts", "GeneralUser-GS.sf2")
 	if p.SoundFontFile != expectedSF {
 		t.Errorf("expected SoundFontFile %s, got %s", expectedSF, p.SoundFontFile)
+	}
+
+	roots := p.WadRoots()
+	if len(roots) != 3 || roots[0] != "/wads/primary" || roots[1] != "/wads/secondary" || roots[2] != "/wads/tertiary" {
+		t.Fatalf("unexpected WadRoots: %v", roots)
+	}
+}
+
+func TestParsePathList(t *testing.T) {
+	t.Parallel()
+	got := ParsePathList(" /a/one , /b/two, /a/one ,, ")
+	if len(got) != 2 || got[0] != "/a/one" || got[1] != "/b/two" {
+		t.Fatalf("ParsePathList got %v", got)
 	}
 }

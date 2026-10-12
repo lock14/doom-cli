@@ -1,10 +1,10 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
-
-	"github.com/lock14/doom-cli/internal/preset"
 )
 
 func TestLoadConfig_NonExistent(t *testing.T) {
@@ -34,6 +34,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		Theme:         "cyberpunk",
 		NerdFonts:     true,
 		WadsDir:       "/custom/wads",
+		WadsDirs:      []string{"/extra/wads1", "/extra/wads2"},
 		BinDir:        "/custom/bin",
 		SoundFontsDir: "/custom/soundfonts",
 	}
@@ -56,6 +57,9 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	if loaded.WadsDir != "/custom/wads" {
 		t.Errorf("expected loaded WadsDir '/custom/wads', got %q", loaded.WadsDir)
 	}
+	if len(loaded.WadsDirs) != 2 || loaded.WadsDirs[0] != "/extra/wads1" {
+		t.Errorf("unexpected WadsDirs: %v", loaded.WadsDirs)
+	}
 	if loaded.BinDir != "/custom/bin" {
 		t.Errorf("expected loaded BinDir '/custom/bin', got %q", loaded.BinDir)
 	}
@@ -64,112 +68,50 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 }
 
-func TestAppConfig_ExtensibleHelpers(t *testing.T) {
-	t.Parallel()
-	cfg := &AppConfig{}
-
-	// 1. Engine helpers
-	cfg.AddEngine(preset.EngineConfig{
-		Name:        "woof",
-		Binary:      "/usr/bin/woof",
-		ArgsStyle:   "boom",
-		Description: "Woof port",
-	})
-	if len(cfg.Engines) != 1 || cfg.Engines["woof"].Binary != "/usr/bin/woof" {
-		t.Errorf("expected woof engine to be added, got %+v", cfg.Engines)
-	}
-	if !cfg.RemoveEngine("WOOF") {
-		t.Error("expected RemoveEngine case-insensitive to succeed")
-	}
-	if len(cfg.Engines) != 0 {
-		t.Errorf("expected empty engines after removal, got %d", len(cfg.Engines))
-	}
-
-	// 2. Preset helpers
-	cfg.AddPreset(preset.Preset{
-		Name:     "KDiZD",
-		Engine:   "uzdoom",
-		IWAD:     "DOOM.WAD",
-		Mappacks: []string{"kdizd.pk3"},
-	})
-	if len(cfg.Presets) != 1 || cfg.Presets[0].Name != "KDiZD" || !cfg.Presets[0].Custom {
-		t.Errorf("expected KDiZD preset to be added as custom, got %+v", cfg.Presets)
-	}
-	// Update existing preset
-	cfg.AddPreset(preset.Preset{
-		Name:     "kdizd",
-		Engine:   "gzdoom",
-		IWAD:     "DOOM.WAD",
-		Mappacks: []string{"kdizd.pk3"},
-	})
-	if len(cfg.Presets) != 1 || cfg.Presets[0].Engine != "gzdoom" {
-		t.Errorf("expected KDiZD to be updated in place, got %+v", cfg.Presets)
-	}
-	if !cfg.RemovePreset("kdizd") {
-		t.Error("expected RemovePreset case-insensitive to succeed")
-	}
-	if len(cfg.Presets) != 0 {
-		t.Errorf("expected empty presets after removal, got %d", len(cfg.Presets))
-	}
-
-	// 3. Launch options helpers
-	cfg.SetLaunchOptions("Sunlust", preset.WadLaunchOptions{
-		Engine:         "woof",
-		AdditionalArgs: "-skill 4",
-	})
-	if len(cfg.LaunchOptions) != 1 || cfg.LaunchOptions["Sunlust"].Engine != "woof" {
-		t.Errorf("expected Sunlust launch options to be set, got %+v", cfg.LaunchOptions)
-	}
-	if !cfg.RemoveLaunchOptions("sunlust") {
-		t.Error("expected RemoveLaunchOptions case-insensitive to succeed")
-	}
-	if len(cfg.LaunchOptions) != 0 {
-		t.Errorf("expected empty launch options after removal, got %d", len(cfg.LaunchOptions))
-	}
-}
-
-func TestAppConfig_SaveAndLoadExtensible(t *testing.T) {
+func TestConfigPreservesUnknownKeysAndCreatesBackup(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
-	p := &Paths{
-		ConfigFile: filepath.Join(tmpDir, "config.json"),
+	configPath := filepath.Join(tmpDir, "config.json")
+	p := &Paths{ConfigFile: configPath}
+
+	initial := "\xef\xbb\xbf{\n  \"theme\": \"blood\",\n" +
+		"  \"x_custom_future\": {\"keep\": \"me\"},\n  \"engines\": {}\n}\n"
+	if err := os.WriteFile(configPath, []byte(initial), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 
-	cfg := &AppConfig{
-		Theme:     "sigil",
-		NerdFonts: false,
-	}
-	cfg.AddEngine(preset.EngineConfig{
-		Name:      "crispy-doom",
-		Binary:    "crispy-doom",
-		ArgsStyle: "boom",
-	})
-	cfg.AddPreset(preset.Preset{
-		Name:     "MyCustomWad",
-		Engine:   "crispy-doom",
-		IWAD:     "DOOM2.WAD",
-		Mappacks: []string{"mywad.wad"},
-	})
-	cfg.SetLaunchOptions("Alien Vendetta", preset.WadLaunchOptions{
-		AdditionalArgs: "-skill 4 -warp 01",
-	})
-
-	if err := SaveConfig(p, cfg); err != nil {
-		t.Fatalf("failed to save config: %v", err)
-	}
-
-	loaded, err := LoadConfig(p)
+	cfg, err := LoadConfig(p)
 	if err != nil {
-		t.Fatalf("failed to load config: %v", err)
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if len(cfg.LegacyEntityKeys) != 1 || cfg.LegacyEntityKeys[0] != "engines" {
+		t.Fatalf("expected LegacyEntityKeys=[engines], got %v", cfg.LegacyEntityKeys)
 	}
 
-	if len(loaded.Engines) != 1 || loaded.Engines["crispy-doom"].Name != "crispy-doom" {
-		t.Errorf("failed to persist engines: %+v", loaded.Engines)
+	cfg.NerdFonts = true
+	if err := SaveConfig(p, cfg); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
 	}
-	if len(loaded.Presets) != 1 || loaded.Presets[0].Name != "MyCustomWad" {
-		t.Errorf("failed to persist presets: %+v", loaded.Presets)
+
+	rawAfter, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
 	}
-	if len(loaded.LaunchOptions) != 1 || loaded.LaunchOptions["Alien Vendetta"].AdditionalArgs != "-skill 4 -warp 01" {
-		t.Errorf("failed to persist launch options: %+v", loaded.LaunchOptions)
+	if !strings.Contains(string(rawAfter), `"x_custom_future"`) || !strings.Contains(string(rawAfter), `"keep": "me"`) {
+		t.Fatalf("unknown key lost after SaveConfig:\n%s", string(rawAfter))
+	}
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	foundBackup := false
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "config.json.bak.") {
+			foundBackup = true
+		}
+	}
+	if !foundBackup {
+		t.Fatal("expected SaveConfig to create a .bak.<timestamp> backup when overwriting")
 	}
 }
