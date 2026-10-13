@@ -154,6 +154,7 @@ func TestWaitForEnter(t *testing.T) {
 func TestRunThemesList(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 
 	if err := runThemesList(nil, nil); err != nil {
 		t.Fatalf("runThemesList() returned unexpected error: %v", err)
@@ -163,6 +164,7 @@ func TestRunThemesList(t *testing.T) {
 func TestRunThemesSet(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 
 	// Test setting valid builtin theme
 	if err := runThemesSet(nil, []string{"blood"}); err != nil {
@@ -253,6 +255,7 @@ func TestParseBool(t *testing.T) {
 func TestRunConfigCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 	paths := getPaths()
 
 	// 1. Show with empty config
@@ -352,6 +355,7 @@ func TestRunConfigCommands(t *testing.T) {
 func TestGetPathsMalformedConfigPreservesFlags(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 
 	p0 := config.GetPaths()
 	if err := os.MkdirAll(p0.ConfigDir, 0o755); err != nil {
@@ -444,6 +448,7 @@ func TestNewRootCmd(t *testing.T) {
 func TestEnginesCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 	t.Setenv("BIN_DIR", tempDir)
 	t.Setenv("WADS_DIR", tempDir)
 	t.Setenv("PATH", tempDir)
@@ -495,6 +500,7 @@ func TestEnginesCommands(t *testing.T) {
 func TestPresetsCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 	t.Setenv("BIN_DIR", tempDir)
 	t.Setenv("WADS_DIR", tempDir)
 

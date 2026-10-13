@@ -168,13 +168,6 @@ func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	subDirRel := strings.Join(parts[:len(parts)-1], "/")
 
 	for _, rc := range idx.roots {
-		exactPath, joinErr := fsutil.SafeJoin(rc.dir, cleanRel)
-		if joinErr != nil {
-			continue
-		}
-		if info, statErr := os.Stat(exactPath); statErr == nil && !info.IsDir() {
-			return exactPath, true
-		}
 		parentDir := rc.dir
 		if subDirRel != "" {
 			var parentErr error
