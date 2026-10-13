@@ -151,6 +151,7 @@ The `doom` CLI provides modular commands for granular management:
 | `doom engines add <name> [flags]` | Registers a custom source port engine in `catalog.d/engine.<id>.json` |
 | `doom engines remove <name>` | Removes a custom engine from your user catalog |
 | `doom engines install [engine|all]` | Downloads and installs portable binaries for `uzdoom` and `dsda-doom` |
+| `doom engines install --force` | Re-downloads and overwrites existing engine binaries |
 
 ### Preset & Custom WAD Management
 

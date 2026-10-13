@@ -93,12 +93,23 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 		if len(expected) == 0 {
 			return nil
 		}
-		fmt.Fprintf(
-			d.Out,
-			"Note: '%s' is an official commercial release; "+
-				"files must be provided by user or Steam/GOG extractor.\n",
-			p.Name,
-		)
+		if p.Category == "Community Megawad" || p.Category == "Community Episode" {
+			fmt.Fprintf(
+				d.Out,
+				"Note: '%s' is a community release without automated mirrors; "+
+					"place files (%s) in %s or discover via Steam add-ons.\n",
+				p.Name,
+				strings.Join(expected, ", "),
+				d.WadsDir,
+			)
+		} else {
+			fmt.Fprintf(
+				d.Out,
+				"Note: '%s' is an official commercial release; "+
+					"files must be provided by user or Steam/GOG extractor.\n",
+				p.Name,
+			)
+		}
 		return nil
 	}
 

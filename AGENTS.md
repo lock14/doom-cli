@@ -70,7 +70,8 @@
     *   **Filename Normalization & Alias Tolerance**: Case-insensitive and whitespace/dash/underscore-normalized
         matching across configured WAD roots (`wads_dir` and `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), and
         1-level child directories (for non-IWAD files) ensures maps and patches resolve reliably. Rerelease add-on
-        aliases (`gdturbo.wad` -> `gd.wad`, `doomzero.wad`/`DOOMZERO.DEH`) must be discovered by `doom wads extract`.
+        aliases (`gdturbo.wad` -> `gd.wad`, `sigil2.wad` -> `SIGIL_II_V1_0.WAD`, `sunder.wad` -> `SUNDER_V2512.wad`,
+        `doomzero.wad`/`DOOMZERO.DEH`) must be discovered by `doom wads extract`.
     *   **Visual Aesthetic & Frame Pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
         (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`,
         and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0`
@@ -213,6 +214,9 @@ Linux, macOS, and Windows:
 *   **Symmetric Two-Layer Entity Catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.
+*   **Engine Installer Idempotency & Proton Discovery**: `doom setup` and `doom engines install` must check for existing
+    executable binaries in `BinDir` and skip redundant asset downloads unless `--force` is specified. Steam discovery
+    must traverse up to depth 15 to discover game files inside Steam Proton prefixes (`compatdata/<id>/pfx/...`).
 
 # Pre-Completion Verification Checklist
 

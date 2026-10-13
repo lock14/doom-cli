@@ -30,6 +30,7 @@ type Installer struct {
 	APIBase string
 	GOOS    string
 	GOARCH  string
+	Force   bool
 }
 
 // NewInstaller creates a new engine installer targeting binDir.
@@ -239,11 +240,25 @@ func (ins *Installer) InstallEngine(eng preset.EngineConfig) error {
 		return nil
 	}
 
-	fmt.Fprintf(ins.Out, "Installing %s...\n", eng.EffectiveDisplayName())
 	targetName := filepath.Base(eng.EffectiveBinary())
 	if ins.goos() == "windows" && !strings.HasSuffix(strings.ToLower(targetName), ".exe") {
 		targetName += ".exe"
 	}
+	dest := filepath.Join(ins.BinDir, targetName)
+
+	if !ins.Force {
+		if fi, err := os.Stat(dest); err == nil && fi.Size() > 0 {
+			fmt.Fprintf(
+				ins.Out,
+				"✓ %s already installed: %s\n  (Use --force to re-download)\n\n",
+				eng.EffectiveDisplayName(),
+				dest,
+			)
+			return nil
+		}
+	}
+
+	fmt.Fprintf(ins.Out, "Installing %s...\n", eng.EffectiveDisplayName())
 
 	url, sha256Hex, err := ins.resolveRecipeAsset(eng.Install.Repo, recipe)
 	if err != nil {

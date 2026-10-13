@@ -264,6 +264,12 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	// Place an IWAD inside a subdirectory only — IWADs must NOT resolve from subdirectories
 	_ = os.WriteFile(filepath.Join(root1, "av", "DOOM2.WAD"), []byte("IWAD"), 0o644)
 
+	// Create alias files
+	sigil2Wad := filepath.Join(root0, "sigil2.wad")
+	_ = os.WriteFile(sigil2Wad, []byte("PWAD"), 0o644)
+	sunderWad := filepath.Join(root1, "sunder.wad")
+	_ = os.WriteFile(sunderWad, []byte("PWAD"), 0o644)
+
 	idx := NewDirIndex(root0, root1)
 
 	tests := []struct {
@@ -278,6 +284,8 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 		{name: "traversal rejected", query: "../evil.wad", wantOK: false},
 		{name: "1-level subdir non-IWAD in root1", query: "av.wad", wantOK: true, wantPath: avSub},
 		{name: "IWAD in subdir ignored", query: "DOOM2.WAD", wantOK: false},
+		{name: "alias sigil2 to SIGIL_II_V1_0", query: "SIGIL_II_V1_0.WAD", wantOK: true, wantPath: sigil2Wad},
+		{name: "alias sunder to SUNDER_V2512", query: "SUNDER_V2512.wad", wantOK: true, wantPath: sunderWad},
 	}
 
 	for _, tc := range tests {

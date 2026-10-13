@@ -71,6 +71,7 @@ func TestDiscoverAndExtract(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(doomDir, "doom2.wad"), []byte("doom2-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "gd.wad"), []byte("gdturbo-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "DOOMZERO.DEH"), []byte("doomzero-deh-data"), 0644)
+	_ = os.WriteFile(filepath.Join(doomDir, "sigil2.wad"), []byte("sigil2-data"), 0644)
 
 	destWads := filepath.Join(tmpDir, "target_wads")
 	var out bytes.Buffer
@@ -79,14 +80,15 @@ func TestDiscoverAndExtract(t *testing.T) {
 		t.Fatalf("DiscoverAndExtract failed: %v", err)
 	}
 
-	if count != 3 {
-		t.Fatalf("expected 3 files extracted, got %d\nOutput: %s", count, out.String())
+	if count != 4 {
+		t.Fatalf("expected 4 files extracted, got %d\nOutput: %s", count, out.String())
 	}
 
 	// Verify target names:
 	// doom2.wad -> DOOM2.WAD
 	// gd.wad -> gdturbo.wad
 	// DOOMZERO.DEH -> DOOMZERO.DEH
+	// sigil2.wad -> SIGIL_II_V1_0.WAD
 	if _, err := os.Stat(filepath.Join(destWads, "DOOM2.WAD")); err != nil {
 		t.Errorf("DOOM2.WAD was not created: %v", err)
 	}
@@ -95,6 +97,9 @@ func TestDiscoverAndExtract(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(destWads, "DOOMZERO.DEH")); err != nil {
 		t.Errorf("DOOMZERO.DEH was not created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(destWads, "SIGIL_II_V1_0.WAD")); err != nil {
+		t.Errorf("SIGIL_II_V1_0.WAD was not created from sigil2.wad: %v", err)
 	}
 
 	// Run again without force: count should be 0

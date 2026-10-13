@@ -42,6 +42,7 @@ func DefaultTargetPatterns() []TargetPattern {
 		{"extras.wad", "extras.wad"},
 		{"sigil.wad", "SIGIL_V1_23.wad"},
 		{"SIGIL_V1_23.wad", "SIGIL_V1_23.wad"},
+		{"sigil2.wad", "SIGIL_II_V1_0.WAD"},
 		{"sigil_ii.wad", "SIGIL_II_V1_0.WAD"},
 		{"SIGIL_II_V1_0.WAD", "SIGIL_II_V1_0.WAD"},
 		{"DoomZero.wad", "DoomZero.wad"},
@@ -209,9 +210,10 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 			if err != nil || d == nil {
 				return nil
 			}
-			// Limit depth to avoid scanning irrelevant deep directory trees
+			// Limit depth to avoid scanning irrelevant deep directory trees, while
+			// allowing Proton prefixes (compatdata/<id>/pfx/.../Saved Games/...)
 			rel, relErr := filepath.Rel(root, path)
-			if relErr == nil && strings.Count(rel, string(filepath.Separator)) > 8 {
+			if relErr == nil && strings.Count(rel, string(filepath.Separator)) > 15 {
 				if d.IsDir() {
 					return filepath.SkipDir
 				}
