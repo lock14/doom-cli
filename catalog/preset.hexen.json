@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "hexen",
+  "name": "Hexen",
+  "engine": "uzdoom",
+  "iwad": "HEXEN.WAD",
+  "files": [],
+  "category": "Official IWAD",
+  "compatibility": "Raven Software",
+  "description": "Raven Software hub-based fantasy shooter",
+  "author": "Raven Software",
+  "release_date": "1995",
+  "sort": 150
+}

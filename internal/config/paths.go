@@ -1,10 +1,11 @@
-// Package config provides platform-idiomatic path resolution for doom-cli.
+// Package config provides platform-idiomatic path resolution and user settings for doom-cli.
 package config
 
 import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Paths holds the resolved platform-idiomatic paths for Doom source ports and tools.
@@ -12,12 +13,13 @@ type Paths struct {
 	UZDoomDir     string
 	DSDADir       string
 	WadsDir       string
+	WadsDirs      []string
 	SoundFontsDir string
 	BinDir        string
 	DataDir       string
 	ConfigDir     string
 	ConfigFile    string
-	PresetsFile   string
+	CatalogDir    string
 	ThemesDir     string
 	SoundFontFile string
 }
@@ -82,15 +84,10 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.WadsDir = filepath.Join(xdgData, "games", "uzdoom")
 	}
 
-	p.ConfigFile = filepath.Join(p.ConfigDir, "config.json")
-	p.PresetsFile = filepath.Join(p.ConfigDir, "presets.json")
-	p.ThemesDir = filepath.Join(p.ConfigDir, "themes")
+	p.SetConfigDir(p.ConfigDir)
 
 	if envConfig := os.Getenv("DOOM_CONFIG_DIR"); envConfig != "" {
-		p.ConfigDir = envConfig
-		p.ConfigFile = filepath.Join(p.ConfigDir, "config.json")
-		p.PresetsFile = filepath.Join(p.ConfigDir, "presets.json")
-		p.ThemesDir = filepath.Join(p.ConfigDir, "themes")
+		p.SetConfigDir(envConfig)
 	}
 
 	if envWads := os.Getenv("DOOM_WADS_DIR"); envWads != "" {
@@ -98,21 +95,16 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 	} else if envWads := os.Getenv("WADS_DIR"); envWads != "" {
 		p.WadsDir = envWads
 	}
+	if envWadsDirs := os.Getenv("DOOM_WADS_DIRS"); envWadsDirs != "" {
+		p.WadsDirs = ParsePathList(envWadsDirs)
+	}
 	if customWadsDir != "" {
 		p.WadsDir = customWadsDir
 	}
 	if envBin := os.Getenv("DOOM_BIN_DIR"); envBin != "" {
-		p.BinDir = envBin
-		if targetOS == "windows" {
-			p.UZDoomDir = envBin
-			p.DSDADir = envBin
-		}
+		p.SetBinDirForOS(targetOS, envBin)
 	} else if envBin := os.Getenv("BIN_DIR"); envBin != "" {
-		p.BinDir = envBin
-		if targetOS == "windows" {
-			p.UZDoomDir = envBin
-			p.DSDADir = envBin
-		}
+		p.SetBinDirForOS(targetOS, envBin)
 	}
 	if envSF := os.Getenv("DOOM_SF_DIR"); envSF != "" {
 		p.SetSoundFontsDir(envSF)
@@ -125,10 +117,23 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 	return p
 }
 
+// SetConfigDir updates ConfigDir and synchronizes ConfigFile, CatalogDir, and ThemesDir.
+func (p *Paths) SetConfigDir(dir string) {
+	p.ConfigDir = dir
+	p.ConfigFile = filepath.Join(dir, "config.json")
+	p.CatalogDir = filepath.Join(dir, "catalog.d")
+	p.ThemesDir = filepath.Join(dir, "themes")
+}
+
 // SetBinDir updates BinDir and, on Windows, synchronizes UZDoomDir and DSDADir.
 func (p *Paths) SetBinDir(dir string) {
+	p.SetBinDirForOS(runtime.GOOS, dir)
+}
+
+// SetBinDirForOS updates BinDir and, when targetOS is windows, synchronizes UZDoomDir and DSDADir.
+func (p *Paths) SetBinDirForOS(targetOS, dir string) {
 	p.BinDir = dir
-	if runtime.GOOS == "windows" {
+	if targetOS == "windows" {
 		p.UZDoomDir = dir
 		p.DSDADir = dir
 	}
@@ -138,4 +143,56 @@ func (p *Paths) SetBinDir(dir string) {
 func (p *Paths) SetSoundFontsDir(dir string) {
 	p.SoundFontsDir = dir
 	p.SoundFontFile = filepath.Join(dir, "GeneralUser-GS.sf2")
+}
+
+// WadRoots returns the ordered, deduplicated list of WAD root directories,
+// starting with WadsDir (root 0) followed by any configured WadsDirs.
+func (p *Paths) WadRoots() []string {
+	if p == nil {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var roots []string
+	add := func(dir string) {
+		trimmed := strings.TrimSpace(dir)
+		if trimmed == "" {
+			return
+		}
+		key := filepath.Clean(trimmed)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		roots = append(roots, trimmed)
+	}
+	add(p.WadsDir)
+	for _, dir := range p.WadsDirs {
+		add(dir)
+	}
+	return roots
+}
+
+// ParsePathList splits a comma- or OS-path-list-separated string of directories
+// into a trimmed, deduplicated slice of non-empty directory paths.
+func ParsePathList(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	seen := make(map[string]bool)
+	var out []string
+	for _, chunk := range strings.Split(raw, ",") {
+		for _, part := range filepath.SplitList(chunk) {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			key := filepath.Clean(trimmed)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

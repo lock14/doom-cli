@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "doom-zero",
+  "name": "Doom Zero",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "DOOMZERO.DEH"
+    },
+    {
+      "name": "DoomZero.wad"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla / DEH",
+  "description": "Anniversary megawad + DEH modifications",
+  "author": "Christopher Golden",
+  "release_date": "2019",
+  "sort": 80
+}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
@@ -33,120 +32,176 @@ func newPresetsCmd() *cobra.Command {
 		RunE:  runPresetsShow,
 	}
 
-	var addEngine, addIWAD, addCategory, addDesc, addAuthor, addRelease, addArgs string
-	var addFiles []string
+	var (
+		addID, addEngine, addIWAD, addCategory  string
+		addDesc, addAuthor, addRelease, addArgs string
+		addSourceURL, addSourceSHA256           string
+		addFiles, addOptionalFiles              []string
+	)
 	presetsAddCmd := &cobra.Command{
 		Use:   "add <name>",
-		Short: "Add a custom WAD or preset to your personal library",
+		Short: "Add a custom WAD or preset to your personal catalog",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			if name == "" {
 				return fmt.Errorf("preset name cannot be empty")
 			}
+			if addSourceSHA256 != "" && addSourceURL == "" {
+				return fmt.Errorf("--source-sha256 requires --source-url")
+			}
 
-			paths, cfg, cat, err := loadAppState()
+			paths, _, cat, err := loadAppState()
+			if err != nil {
+				return err
+			}
+			writeDir, err := userCatalogWriteDir(paths)
+			if err != nil {
+				return err
+			}
+			curated, err := preset.LoadCuratedCatalog()
 			if err != nil {
 				return err
 			}
 
-			if !isCustomPreset(name, cfg) && cat.Find(name) != nil {
-				return fmt.Errorf(
-					"preset %q is a built-in preset; use 'doom presets config %q' to adjust launch options",
-					name, name,
-				)
+			var files []preset.FileSpec
+			for _, f := range addFiles {
+				if trimmed := strings.TrimSpace(f); trimmed != "" {
+					files = append(files, preset.FileSpec{Name: trimmed})
+				}
+			}
+			for _, f := range addOptionalFiles {
+				if trimmed := strings.TrimSpace(f); trimmed != "" {
+					files = append(files, preset.FileSpec{Name: trimmed, Optional: true})
+				}
+			}
+
+			var extraArgs []string
+			if strings.TrimSpace(addArgs) != "" {
+				extraArgs = strings.Fields(addArgs)
+			}
+
+			var sources []preset.Source
+			if strings.TrimSpace(addSourceURL) != "" {
+				sources = append(sources, preset.Source{
+					URL:    strings.TrimSpace(addSourceURL),
+					SHA256: strings.TrimSpace(addSourceSHA256),
+				})
 			}
 
 			p := preset.Preset{
-				Name:           name,
-				Engine:         addEngine,
-				IWAD:           addIWAD,
-				Mappacks:       addFiles,
-				Category:       addCategory,
-				Description:    addDesc,
-				Author:         addAuthor,
-				ReleaseDate:    addRelease,
-				AdditionalArgs: addArgs,
-				Custom:         true,
+				ID:          addID,
+				Name:        name,
+				Engine:      addEngine,
+				IWAD:        addIWAD,
+				Files:       files,
+				Args:        extraArgs,
+				Category:    addCategory,
+				Description: addDesc,
+				Author:      addAuthor,
+				ReleaseDate: addRelease,
+				Sources:     sources,
 			}
 
-			cfg.AddPreset(p)
-			if err := config.SaveConfig(paths, cfg); err != nil {
-				return fmt.Errorf("saving config: %w", err)
+			outPath, err := preset.AddPreset(writeDir, curated, cat, p)
+			if err != nil {
+				return err
 			}
 
-			fmt.Printf("✓ Successfully added custom preset %q to %s\n", name, paths.ConfigFile)
+			fmt.Fprintf(cmdOut(cmd), "✓ Successfully added custom preset %q to %s\n", p.Name, outPath)
 			return nil
 		},
 	}
+	presetsAddCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for this preset (defaults to slugified name)")
 	presetsAddCmd.Flags().StringVar(&addEngine, "engine", "uzdoom", "Default engine for this preset")
 	presetsAddCmd.Flags().StringVar(&addIWAD, "iwad", "DOOM2.WAD", "Base IWAD required by this preset")
-	presetsAddCmd.Flags().StringSliceVar(&addFiles, "files", nil, "Comma-separated list of PWAD and DEH files")
+	presetsAddCmd.Flags().StringSliceVar(&addFiles, "files", nil, "Comma-separated list of required PWAD/DEH files")
+	presetsAddCmd.Flags().StringSliceVar(
+		&addOptionalFiles, "optional-files", nil, "Comma-separated list of optional PWAD files",
+	)
 	presetsAddCmd.Flags().StringVar(&addCategory, "category", "Custom", "Category or collection name")
+	presetsAddCmd.Flags().StringVar(&addDesc, "description", "", "Short description of the mapset")
 	presetsAddCmd.Flags().StringVar(&addDesc, "desc", "", "Short description of the mapset")
+	_ = presetsAddCmd.Flags().MarkHidden("desc")
 	presetsAddCmd.Flags().StringVar(&addAuthor, "author", "", "Map author / team")
 	presetsAddCmd.Flags().StringVar(&addRelease, "release", "", "Release year / date")
 	presetsAddCmd.Flags().StringVar(&addArgs, "args", "", "Default extra launch arguments")
+	presetsAddCmd.Flags().StringVar(&addSourceURL, "source-url", "", "HTTPS download URL for the WAD archive")
+	presetsAddCmd.Flags().StringVar(&addSourceURL, "download-url", "", "HTTPS download URL for the WAD archive")
+	_ = presetsAddCmd.Flags().MarkHidden("download-url")
+	presetsAddCmd.Flags().StringVar(
+		&addSourceSHA256, "source-sha256", "", "Expected SHA-256 hex digest for --source-url",
+	)
 
 	var cfgEngine, cfgIWAD, cfgArgs string
 	var cfgFiles []string
 	var cfgReset bool
 	presetsConfigCmd := &cobra.Command{
 		Use:   "config <preset_name>",
-		Short: "Configure per-WAD launch options (engine, extra args, files)",
+		Short: "Configure per-preset overrides (engine, iwad, extra args, extra files)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, cfg, err := loadPathsAndConfig()
+			paths, _, cat, err := loadAppState()
+			if err != nil {
+				return err
+			}
+			writeDir, err := userCatalogWriteDir(paths)
 			if err != nil {
 				return err
 			}
 
+			out := cmdOut(cmd)
 			if cfgReset {
-				if cfg.RemoveLaunchOptions(name) {
-					if err := config.SaveConfig(paths, cfg); err != nil {
-						return fmt.Errorf("saving config: %w", err)
-					}
-					fmt.Printf("✓ Reset custom launch options for %q in %s\n", name, paths.ConfigFile)
+				target, removed, err := preset.ResetPresetOverride(writeDir, cat, name)
+				if err != nil {
+					return err
+				}
+				if removed {
+					fmt.Fprintf(out, "✓ Reset custom launch options for %q\n", target.Name)
 					return nil
 				}
-				fmt.Printf("ℹ No custom launch options configured for %q\n", name)
+				fmt.Fprintf(out, "ℹ No custom launch options configured for %q\n", target.Name)
 				return nil
 			}
 
-			var opts preset.WadLaunchOptions
-			if existing, ok := cfg.LaunchOptions[name]; ok {
-				opts = existing
-			}
-
+			var req preset.OverridePatchRequest
 			changed := false
-			if cfgEngine != "" {
-				opts.Engine = cfgEngine
+			if cmd.Flags().Changed("engine") || cfgEngine != "" {
+				v := cfgEngine
+				req.Engine = &v
 				changed = true
 			}
-			if cfgIWAD != "" {
-				opts.IWAD = cfgIWAD
+			if cmd.Flags().Changed("iwad") || cfgIWAD != "" {
+				v := cfgIWAD
+				req.IWAD = &v
 				changed = true
 			}
-			if cfgArgs != "" {
-				opts.AdditionalArgs = cfgArgs
+			if cmd.Flags().Changed("args") || cfgArgs != "" {
+				v := strings.Fields(cfgArgs)
+				req.AppendArgs = &v
 				changed = true
 			}
-			if len(cfgFiles) > 0 {
-				opts.ExtraFiles = cfgFiles
+			if cmd.Flags().Changed("files") || len(cfgFiles) > 0 {
+				var specs []preset.FileSpec
+				for _, f := range cfgFiles {
+					if trimmed := strings.TrimSpace(f); trimmed != "" {
+						specs = append(specs, preset.FileSpec{Name: trimmed})
+					}
+				}
+				req.AppendFiles = &specs
 				changed = true
 			}
-
 			if !changed {
 				return fmt.Errorf("no option flags provided (use --engine, --args, --iwad, --files, or --reset)")
 			}
 
-			cfg.SetLaunchOptions(name, opts)
-			if err := config.SaveConfig(paths, cfg); err != nil {
-				return fmt.Errorf("saving config: %w", err)
+			outPath, target, err := preset.ConfigPreset(writeDir, cat, name, req)
+			if err != nil {
+				return err
 			}
 
-			fmt.Printf("✓ Configured launch options for %q in %s\n", name, paths.ConfigFile)
+			fmt.Fprintf(out, "✓ Configured launch options for %q in %s\n", target.Name, outPath)
 			return nil
 		},
 	}
@@ -162,39 +217,41 @@ func newPresetsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, cfg, err := loadPathsAndConfig()
+			paths, _, cat, err := loadAppState()
+			if err != nil {
+				return err
+			}
+			writeDir, err := userCatalogWriteDir(paths)
+			if err != nil {
+				return err
+			}
+			curated, err := preset.LoadCuratedCatalog()
 			if err != nil {
 				return err
 			}
 
-			if cfg.RemovePreset(name) {
-				cfg.RemoveLaunchOptions(name)
-				if err := config.SaveConfig(paths, cfg); err != nil {
-					return fmt.Errorf("saving config: %w", err)
-				}
-				fmt.Printf("✓ Removed custom preset %q from %s\n", name, paths.ConfigFile)
+			removed, err := preset.RemovePreset(writeDir, curated, cat, name)
+			if err != nil {
+				return err
+			}
+			out := cmdOut(cmd)
+			if removed.IsCustom() {
+				fmt.Fprintf(out, "✓ Removed custom preset %q (%s)\n", removed.Name, removed.ID)
 				return nil
 			}
-
-			if cfg.RemoveLaunchOptions(name) {
-				if err := config.SaveConfig(paths, cfg); err != nil {
-					return fmt.Errorf("saving config: %w", err)
-				}
-				fmt.Printf(
-					"✓ Cleared launch option overrides for built-in preset %q in %s\n",
-					name,
-					paths.ConfigFile,
-				)
-				return nil
-			}
-
-			return fmt.Errorf("preset %q not found in custom presets or overrides", name)
+			fmt.Fprintf(
+				out,
+				"✓ Cleared launch option overrides for built-in preset %q (%s)\n",
+				removed.Name,
+				removed.ID,
+			)
+			return nil
 		},
 	}
 
 	presetsBuildCmd := &cobra.Command{
-		Use:   "build",
-		Short: "Synchronize data/presets.json into README.md",
+		Use:   "build [root]",
+		Short: "Synchronize catalog/*.json into README.md",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := "."
 			if len(args) > 0 {
@@ -203,55 +260,71 @@ func newPresetsCmd() *cobra.Command {
 			if err := preset.SyncReadme(root); err != nil {
 				return err
 			}
-			fmt.Println("✓ Successfully synchronized README.md with data/presets.json")
+			fmt.Fprintln(cmdOut(cmd), "✓ Successfully synchronized README.md with catalog/*.json")
+			return nil
+		},
+	}
+
+	presetsLintCmd := &cobra.Command{
+		Use:   "lint [root]",
+		Short: "Validate curated and user catalog entities, schema invariants, and README parity",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root := "."
+			if len(args) > 0 {
+				root = args[0]
+			}
+			paths := getPaths()
+			userDir := paths.CatalogDir
+			if flagPresetsFile != "" {
+				userDir = flagPresetsFile
+			}
+			diags, err := preset.LintCatalog(root, userDir)
+			if err != nil {
+				return err
+			}
+			out := cmdOut(cmd)
+			for _, d := range diags {
+				fmt.Fprintf(out, "[%s] %s\n", strings.ToUpper(d.Severity), d.String())
+			}
+			if preset.HasErrors(diags) {
+				return fmt.Errorf("catalog lint failed with errors")
+			}
+			fmt.Fprintln(out, "✓ Catalog lint passed")
 			return nil
 		},
 	}
 
 	presetsCmd.AddCommand(
 		presetsListCmd, presetsShowCmd, presetsAddCmd,
-		presetsConfigCmd, presetsRemoveCmd, presetsBuildCmd,
+		presetsConfigCmd, presetsRemoveCmd, presetsBuildCmd, presetsLintCmd,
 	)
 	return presetsCmd
 }
 
-func isCustomPreset(name string, cfg *config.AppConfig) bool {
-	if cfg == nil {
-		return false
-	}
-	for _, p := range cfg.Presets {
-		if strings.EqualFold(p.Name, name) {
-			return true
-		}
-	}
-	return false
-}
-
 func runPresetsList(cmd *cobra.Command, args []string) error {
-	_, cfg, cat, err := loadAppState()
+	_, _, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
+	out := cmdOut(cmd)
 
-	fmt.Println("=== Available Doom Presets ===")
+	fmt.Fprintln(out, "=== Available Doom Presets ===")
 	for i, p := range cat.Presets {
-		tag := formatEngineBadge(p.Engine)
+		tag := formatEngineBadge(cat, p.Engine)
 		statusFlag := ""
-		if p.Custom {
+		if p.IsCustom() {
 			statusFlag = " [Custom]"
-		} else if cfg != nil && cfg.LaunchOptions != nil {
-			if _, ok := cfg.LaunchOptions[p.Name]; ok {
-				statusFlag = " [Overridden]"
-			}
+		} else if p.Overridden {
+			statusFlag = " [Overridden]"
 		}
-		fmt.Printf("%2d. %-30s %s%s - %s\n", i+1, p.Name, tag, statusFlag, p.Description)
+		fmt.Fprintf(out, "%2d. %-30s %s%s - %s\n", i+1, p.Name, tag, statusFlag, p.Description)
 	}
 	return nil
 }
 
 func runPresetsShow(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	paths, cfg, cat, err := loadAppState()
+	paths, _, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
@@ -259,25 +332,26 @@ func runPresetsShow(cmd *cobra.Command, args []string) error {
 	if p == nil {
 		return fmt.Errorf("preset %q not found", name)
 	}
+	out := cmdOut(cmd)
 
-	fmt.Printf("=== Preset: %s ===\n", p.Name)
-	if p.Custom {
-		fmt.Printf("  Type:          Custom WAD\n")
+	fmt.Fprintf(out, "=== Preset: %s ===\n", p.Name)
+	if p.IsCustom() {
+		fmt.Fprintf(out, "  Type:          Custom WAD\n")
 	}
 	if p.Author != "" {
-		fmt.Printf("  Author:        %s\n", p.Author)
+		fmt.Fprintf(out, "  Author:        %s\n", p.Author)
 	}
 	if p.ReleaseDate != "" {
-		fmt.Printf("  Released:      %s\n", p.ReleaseDate)
+		fmt.Fprintf(out, "  Released:      %s\n", p.ReleaseDate)
 	}
 	if p.Category != "" {
-		fmt.Printf("  Category:      %s\n", p.Category)
+		fmt.Fprintf(out, "  Category:      %s\n", p.Category)
 	}
 	if p.Compatibility != "" {
-		fmt.Printf("  Compatibility: %s\n", p.Compatibility)
+		fmt.Fprintf(out, "  Compatibility: %s\n", p.Compatibility)
 	}
 	if p.Description != "" {
-		fmt.Printf("  Description:   %s\n", p.Description)
+		fmt.Fprintf(out, "  Description:   %s\n", p.Description)
 	}
 
 	engStr := p.Engine
@@ -287,49 +361,73 @@ func runPresetsShow(cmd *cobra.Command, args []string) error {
 		}
 	}
 	engineOverridden := ""
-	if cfg != nil && cfg.LaunchOptions != nil {
-		if opt, ok := cfg.LaunchOptions[p.Name]; ok && opt.Engine != "" {
-			engineOverridden = " [Overridden in user config]"
-		}
+	if p.EngineOverridden {
+		engineOverridden = " [Overridden in user config]"
 	}
-	fmt.Printf("  Engine:        %s%s\n", engStr, engineOverridden)
+	fmt.Fprintf(out, "  Engine:        %s%s\n", engStr, engineOverridden)
 
-	iwadPath, iwadFound := preset.ResolveFile(paths.WadsDir, p.IWAD)
+	idx := preset.NewDirIndex(paths.WadRoots()...)
+	iwadPath, iwadFound := idx.ResolveFile(p.IWAD)
 	iwadStatus := "[✗ Missing]"
 	if iwadFound {
 		iwadStatus = fmt.Sprintf("[✓ Found: %s]", iwadPath)
 	}
-	fmt.Printf("  Base IWAD:     %s %s\n", p.IWAD, iwadStatus)
+	fmt.Fprintf(out, "  Base IWAD:     %s %s\n", p.IWAD, iwadStatus)
 
-	if len(p.Mappacks) > 0 {
-		fmt.Println("  Files:")
-		for _, m := range p.Mappacks {
-			fpath, fFound := preset.ResolveFile(paths.WadsDir, m)
+	if len(p.Files) > 0 {
+		fmt.Fprintln(out, "  Files:")
+		for _, f := range p.Files {
+			fpath, fFound := idx.ResolveFile(f.Name)
 			fStatus := "[✗ Missing]"
 			if fFound {
 				fStatus = fmt.Sprintf("[✓ Found: %s]", fpath)
-			} else if preset.IsOptionalFile(m) {
+			} else if f.Optional {
 				fStatus = "[Optional]"
 			}
-			fmt.Printf("    - %-20s %s\n", m, fStatus)
+			fmt.Fprintf(out, "    - %-20s %s\n", f.Name, fStatus)
 		}
 	}
 
-	if p.AdditionalArgs != "" {
-		fmt.Printf("  Launch Args:   %s\n", p.AdditionalArgs)
+	if len(p.Args) > 0 {
+		fmt.Fprintf(out, "  Launch Args:   %s\n", strings.Join(p.Args, " "))
+	}
+
+	if len(p.Sources) > 0 {
+		fmt.Fprintln(out, "  Sources:")
+		for _, s := range p.Sources {
+			if s.SHA256 != "" {
+				fmt.Fprintf(out, "    - %s (sha256: %s)\n", s.URL, s.SHA256)
+			} else {
+				fmt.Fprintf(out, "    - %s\n", s.URL)
+			}
+		}
+	}
+
+	if len(p.Links) > 0 {
+		fmt.Fprintln(out, "  Links:")
+		for _, l := range p.Links {
+			if l.Rel != "" {
+				fmt.Fprintf(out, "    - [%s] %s\n", l.Rel, l.URL)
+			} else {
+				fmt.Fprintf(out, "    - %s\n", l.URL)
+			}
+		}
 	}
 
 	return nil
 }
 
-func formatEngineBadge(engine string) string {
-	switch strings.ToLower(engine) {
+func formatEngineBadge(cat *preset.Catalog, engineID string) string {
+	if cat != nil {
+		return fmt.Sprintf("[%-8s]", cat.EngineBadge(engineID))
+	}
+	switch strings.ToLower(engineID) {
 	case "dsda-doom", "dsda":
 		return "[DSDA    ]"
 	case "uzdoom", "zdoom":
 		return "[UZDoom  ]"
 	default:
-		tag := strings.ToUpper(engine)
+		tag := strings.ToUpper(engineID)
 		runes := []rune(tag)
 		if len(runes) > 6 {
 			tag = string(runes[:6])

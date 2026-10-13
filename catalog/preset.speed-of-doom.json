@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "speed-of-doom",
+  "name": "Speed of Doom",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "SODFINAL.WAD"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Boom",
+  "description": "33-level intense challenge megawad",
+  "author": "Joshy & Darkwave0000",
+  "release_date": "2010",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sodfinal.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sodfinal",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 250
+}

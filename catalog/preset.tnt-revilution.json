@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "tnt-revilution",
+  "name": "TNT: Revilution",
+  "engine": "dsda-doom",
+  "iwad": "TNT.WAD",
+  "files": [
+    {
+      "name": "TNTR.wad"
+    },
+    {
+      "name": "TNTR.deh"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Vanilla",
+  "description": "Community sequel to TNT: Evilution",
+  "author": "TeamTNT & Various",
+  "release_date": "2017",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/tntr.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/megawads/tntr",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 310
+}

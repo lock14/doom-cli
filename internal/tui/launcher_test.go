@@ -17,26 +17,29 @@ func mockCatalog() *preset.Catalog {
 	return &preset.Catalog{
 		Presets: []preset.Preset{
 			{
+				ID:          "alien-vendetta",
 				Name:        "Alien Vendetta",
 				Engine:      "dsda-doom",
 				IWAD:        "doom2.wad",
-				Mappacks:    []string{"av.wad"},
+				Files:       []preset.FileSpec{{Name: "av.wad"}},
 				Author:      "Anders Johnsen, Brad Spencer, et al.",
 				ReleaseDate: "2002",
 			},
 			{
+				ID:          "eviternity-ii",
 				Name:        "Eviternity II",
 				Engine:      "uzdoom",
 				IWAD:        "doom2.wad",
-				Mappacks:    []string{"eviternityii.wad"},
+				Files:       []preset.FileSpec{{Name: "eviternityii.wad"}},
 				Author:      "Joshua \"Dragonfly\" O'Sullivan et al.",
 				ReleaseDate: "2023",
 			},
 			{
+				ID:          "sunder",
 				Name:        "Sunder",
 				Engine:      "dsda-doom",
 				IWAD:        "doom2.wad",
-				Mappacks:    []string{"sunder.wad"},
+				Files:       []preset.FileSpec{{Name: "sunder.wad"}},
 				Author:      "Insane_Gazebo",
 				ReleaseDate: "2009",
 			},
@@ -579,18 +582,21 @@ func TestModel_CustomPresetAndEngine(t *testing.T) {
 	cat := &preset.Catalog{
 		Engines: map[string]preset.EngineConfig{
 			"woof": {
-				Name:        "woof",
+				ID:          "woof",
+				DisplayName: "Woof!",
+				Badge:       "WOOF",
 				Description: "Woof! MBF21 Engine",
 			},
 		},
 		Presets: []preset.Preset{
 			{
-				Name:           "CustomMap",
-				Engine:         "woof",
-				IWAD:           "DOOM2.WAD",
-				Mappacks:       []string{"custom.wad"},
-				AdditionalArgs: "-skill 4",
-				Custom:         true,
+				ID:     "custom-map",
+				Name:   "CustomMap",
+				Engine: "woof",
+				IWAD:   "DOOM2.WAD",
+				Files:  []preset.FileSpec{{Name: "custom.wad"}},
+				Args:   []string{"-skill", "4"},
+				Layer:  preset.LayerUser,
 			},
 		},
 	}
@@ -609,5 +615,71 @@ func TestModel_CustomPresetAndEngine(t *testing.T) {
 	}
 	if !strings.Contains(view, "-skill 4") {
 		t.Errorf("expected launch args in preview:\n%s", view)
+	}
+
+	var menuOut bytes.Buffer
+	_, _ = RunNumberedMenu(cat, strings.NewReader("q\n"), &menuOut)
+	if !strings.Contains(menuOut.String(), "[Woof!]") {
+		t.Errorf("expected numbered menu to use custom engine DisplayName [Woof!], got:\n%s", menuOut.String())
+	}
+}
+
+func TestTruncateANSI(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		input    string
+		maxWidth int
+		want     string
+		wantCols int
+	}{
+		{
+			name:     "fits unchanged",
+			input:    "Alien Vendetta",
+			maxWidth: 20,
+			want:     "Alien Vendetta",
+			wantCols: 14,
+		},
+		{
+			name:     "plain truncation",
+			input:    "Alien Vendetta",
+			maxWidth: 6,
+			want:     "Alien…",
+			wantCols: 6,
+		},
+		{
+			name:     "ansi styled truncation preserves sgr and resets",
+			input:    "\x1b[38;2;255;0;0mAlien Vendetta\x1b[0m",
+			maxWidth: 6,
+			want:     "\x1b[38;2;255;0;0mAlien\x1b[0m…",
+			wantCols: 6,
+		},
+		{
+			name:     "width 1",
+			input:    "\x1b[31mHello\x1b[0m",
+			maxWidth: 1,
+			want:     "…",
+			wantCols: 1,
+		},
+		{
+			name:     "width 0",
+			input:    "Hello",
+			maxWidth: 0,
+			want:     "",
+			wantCols: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := truncateANSI(tc.input, tc.maxWidth)
+			if got != tc.want {
+				t.Errorf("truncateANSI(%q, %d) = %q, want %q", tc.input, tc.maxWidth, got, tc.want)
+			}
+			if cols := lipgloss.Width(got); cols != tc.wantCols {
+				t.Errorf("lipgloss.Width(truncateANSI) = %d, want %d", cols, tc.wantCols)
+			}
+		})
 	}
 }

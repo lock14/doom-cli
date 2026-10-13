@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
 // DefaultSoundFontURL is the primary mirror URL for the GeneralUser GS SoundFont.
@@ -50,32 +52,10 @@ func InstallSoundFontURL(url, destDir string, force bool, out io.Writer) (string
 		return "", fmt.Errorf("soundfont download failed with HTTP status %d", resp.StatusCode)
 	}
 
-	tmpFile, err := os.CreateTemp(destDir, "soundfont.*.tmp")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	tmpName := tmpFile.Name()
-	defer func() {
-		_ = os.Remove(tmpName)
-	}()
-
-	written, err := io.Copy(tmpFile, resp.Body)
-	_ = tmpFile.Close()
+	written, _, err := fsutil.WriteReaderAtomic(targetPath, resp.Body, 0o644)
 	if err != nil {
 		return "", fmt.Errorf("failed writing soundfont: %w", err)
 	}
-
-	if err := os.Rename(tmpName, targetPath); err != nil {
-		// Fallback to copy if cross-device link error
-		data, readErr := os.ReadFile(tmpName)
-		if readErr != nil {
-			return "", fmt.Errorf("failed to move soundfont into place: %w", err)
-		}
-		if writeErr := os.WriteFile(targetPath, data, 0644); writeErr != nil {
-			return "", fmt.Errorf("failed writing soundfont: %w", writeErr)
-		}
-	}
-	_ = os.Chmod(targetPath, 0644)
 
 	fmt.Fprintf(out, "✓ Successfully installed GeneralUser-GS.sf2 (%d bytes) to:\n  %s\n", written, targetPath)
 	return targetPath, nil

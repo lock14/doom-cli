@@ -2,7 +2,10 @@ package engine
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,80 +14,169 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/lock14/doom-cli/internal/fsutil"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
-// Installer manages downloading and deploying Doom engines and launchers.
+// Installer manages downloading and deploying Doom source ports from declarative recipes.
 type Installer struct {
-	BinDir string
-	Client *http.Client
-	Out    io.Writer
+	BinDir  string
+	Client  *http.Client
+	Out     io.Writer
+	APIBase string
+	GOOS    string
+	GOARCH  string
 }
 
-// NewInstaller creates a new engine installer.
+// NewInstaller creates a new engine installer targeting binDir.
 func NewInstaller(binDir string, out io.Writer) *Installer {
 	if out == nil {
 		out = io.Discard
 	}
 	return &Installer{
-		BinDir: binDir,
-		Client: &http.Client{Timeout: 5 * time.Minute},
-		Out:    out,
+		BinDir:  binDir,
+		Client:  &http.Client{Timeout: 5 * time.Minute},
+		Out:     out,
+		APIBase: "https://api.github.com",
+		GOOS:    runtime.GOOS,
+		GOARCH:  runtime.GOARCH,
 	}
 }
 
-// GitHubRelease represents a release object from GitHub API.
+func (ins *Installer) goos() string {
+	if ins.GOOS != "" {
+		return ins.GOOS
+	}
+	return runtime.GOOS
+}
+
+func (ins *Installer) goarch() string {
+	if ins.GOARCH != "" {
+		return ins.GOARCH
+	}
+	return runtime.GOARCH
+}
+
+// PlatformKey formats an OS/arch pair as "<goos>/<goarch>".
+func PlatformKey(goos, goarch string) string {
+	return fmt.Sprintf("%s/%s", goos, goarch)
+}
+
+func (ins *Installer) platformKey() string {
+	return PlatformKey(ins.goos(), ins.goarch())
+}
+
+// GitHubRelease represents a release object from the GitHub Releases API.
 type GitHubRelease struct {
 	TagName string        `json:"tag_name"`
 	Assets  []GitHubAsset `json:"assets"`
 }
 
-// GitHubAsset represents a downloadable release asset.
+// GitHubAsset represents a downloadable release asset from the GitHub Releases API.
 type GitHubAsset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
+	Digest             string `json:"digest,omitempty"`
 }
 
-// ResolveLatestGitHubURL queries GitHub Releases API for an asset matching regex pattern, falling back to fallbackURL.
+// SelectAsset evaluates recipe.Assets regex patterns in priority order against assets,
+// returning the first matching download URL and optional SHA-256 hex digest.
+func SelectAsset(recipe preset.PlatformRecipe, assets []GitHubAsset) (string, string, bool) {
+	for _, pattern := range recipe.Assets {
+		re, err := regexp.Compile("(?i)" + pattern)
+		if err != nil {
+			continue
+		}
+		for _, asset := range assets {
+			name := asset.Name
+			if re.MatchString(name) &&
+				!strings.HasSuffix(name, ".zsync") &&
+				!strings.HasSuffix(name, ".asc") &&
+				!strings.HasSuffix(name, ".sig") {
+				digest := strings.TrimSpace(asset.Digest)
+				digest = strings.TrimPrefix(strings.ToLower(digest), "sha256:")
+				return asset.BrowserDownloadURL, digest, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// ResolveLatestGitHubURL queries the GitHub Releases API for an asset matching patternRegex,
+// falling back to fallbackURL if the API request fails or no asset matches.
 func (ins *Installer) ResolveLatestGitHubURL(repo, patternRegex, fallbackURL string) string {
+	recipe := preset.PlatformRecipe{
+		Assets: []string{patternRegex},
+	}
+	if fallbackURL != "" {
+		recipe.Pinned = &preset.PinnedRelease{URL: fallbackURL}
+	}
+	url, _, err := ins.resolveRecipeAsset(repo, recipe)
+	if err != nil {
+		return fallbackURL
+	}
+	return url
+}
+
+func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformRecipe) (string, string, error) {
 	var apiURL string
 	if strings.HasPrefix(repo, "http://") || strings.HasPrefix(repo, "https://") {
 		apiURL = repo
-	} else {
-		apiURL = fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
+	} else if repo != "" {
+		base := strings.TrimRight(ins.APIBase, "/")
+		if base == "" {
+			base = "https://api.github.com"
+		}
+		apiURL = fmt.Sprintf("%s/repos/%s/releases/latest", base, repo)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-	if err == nil {
-		req.Header.Set("User-Agent", "doom-cli/2.0")
-		resp, err := ins.Client.Do(req)
+	if apiURL != "" && len(recipe.Assets) > 0 {
+		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
-				var release GitHubRelease
-				if err := json.NewDecoder(resp.Body).Decode(&release); err == nil {
-					re, err := regexp.Compile("(?i)" + patternRegex)
-					if err == nil {
-						for _, asset := range release.Assets {
-							name := asset.Name
-							if re.MatchString(name) &&
-								!strings.HasSuffix(name, ".zsync") &&
-								!strings.HasSuffix(name, ".asc") &&
-								!strings.HasSuffix(name, ".sig") {
-								return asset.BrowserDownloadURL
-							}
+			req.Header.Set("User-Agent", "doom-cli/2.0")
+			resp, doErr := ins.Client.Do(req)
+			if doErr == nil {
+				defer resp.Body.Close()
+				if resp.StatusCode == http.StatusOK {
+					var release GitHubRelease
+					if decErr := json.NewDecoder(resp.Body).Decode(&release); decErr == nil {
+						if url, digest, ok := SelectAsset(recipe, release.Assets); ok {
+							return url, digest, nil
 						}
 					}
 				}
 			}
 		}
 	}
-	return fallbackURL
+
+	if recipe.Pinned != nil && strings.TrimSpace(recipe.Pinned.URL) != "" {
+		ver := recipe.Pinned.Version
+		if ver == "" {
+			ver = recipe.Pinned.URL
+		}
+		fmt.Fprintf(
+			ins.Out,
+			"  Warning: live release lookup unavailable for %s; using pinned release %s\n",
+			repo,
+			ver,
+		)
+		return recipe.Pinned.URL, strings.TrimSpace(recipe.Pinned.SHA256), nil
+	}
+
+	return "", "", fmt.Errorf("no matching release asset found for %s", repo)
 }
 
-// DownloadFile downloads a file from URL to local targetPath.
+// DownloadFile downloads a file from url to targetPath and verifies expectedSHA256 when non-empty.
 func (ins *Installer) DownloadFile(url, targetPath string) error {
+	return ins.DownloadFileVerified(url, targetPath, "")
+}
+
+// DownloadFileVerified downloads a file from url to targetPath and checks expectedSHA256 when provided.
+func (ins *Installer) DownloadFileVerified(url, targetPath, expectedSHA256 string) error {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -101,88 +193,129 @@ func (ins *Installer) DownloadFile(url, targetPath string) error {
 		return fmt.Errorf("HTTP status %d", resp.StatusCode)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return err
 	}
 
-	out, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	out, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, resp.Body)
-	return err
-}
-
-// InstallUZDoom downloads and installs UZDoom for current platform.
-func (ins *Installer) InstallUZDoom() error {
-	fmt.Fprintf(ins.Out, "Installing UZDoom...\n")
-	var pattern, fallback, targetName string
-
-	switch runtime.GOOS {
-	case "darwin":
-		targetName = "uzdoom"
-		if runtime.GOARCH == "arm64" {
-			pattern = `.*(macos|mac|darwin).*uzdoom.*arm64.*(\.dmg|\.zip)`
-			fallback = "https://github.com/UZDoom/UZDoom/releases/download/5.0.0/MacOS-UZDoom-Release-ARM64.dmg"
-		} else {
-			pattern = `.*(macos|mac|darwin).*uzdoom.*(x86_64|x64|intel).*(\.dmg|\.zip)`
-			fallback = "https://github.com/UZDoom/UZDoom/releases/download/5.0.0/MacOS-UZDoom-Release-ARM64.dmg"
-		}
-	case "windows":
-		targetName = "uzdoom.exe"
-		pattern = `Windows.*UZDoom.*\.zip`
-		fallback = "https://github.com/UZDoom/UZDoom/releases/download/5.0.0/Windows-UZDoom-Release-x86_64.zip"
-	default:
-		targetName = "uzdoom"
-		pattern = `Linux.*UZDoom.*\.AppImage`
-		fallback = "https://github.com/UZDoom/UZDoom/releases/download/5.0.0/Linux-UZDoom-Release-x86_64.AppImage"
+	hasher := sha256.New()
+	_, copyErr := io.Copy(io.MultiWriter(out, hasher), resp.Body)
+	closeErr := out.Close()
+	if copyErr != nil {
+		_ = os.Remove(targetPath)
+		return copyErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(targetPath)
+		return closeErr
 	}
 
-	url := ins.ResolveLatestGitHubURL("UZDoom/UZDoom", pattern, fallback)
-	return ins.deployAsset(targetName, url)
+	if cleanSum := strings.TrimSpace(expectedSHA256); cleanSum != "" {
+		actualSum := hex.EncodeToString(hasher.Sum(nil))
+		if !strings.EqualFold(actualSum, cleanSum) {
+			_ = os.Remove(targetPath)
+			return fmt.Errorf("sha256 mismatch for %s: got %s, want %s", url, actualSum, cleanSum)
+		}
+	}
+	return nil
 }
 
-// InstallDSDA downloads and installs DSDA-Doom for current platform.
-func (ins *Installer) InstallDSDA() error {
-	fmt.Fprintf(ins.Out, "Installing DSDA-Doom...\n")
-	var pattern, fallback, targetName string
-	const fallbackBase = "https://github.com/kraflab/dsda-doom/releases/download/v0.29.4/"
-
-	switch runtime.GOOS {
-	case "darwin":
-		targetName = "dsda-doom"
-		if runtime.GOARCH == "arm64" {
-			pattern = `dsda-doom-.*-mac-arm64\.zip`
-			fallback = fallbackBase + "dsda-doom-0.29.4-mac-arm64.zip"
-		} else {
-			pattern = `dsda-doom-.*-mac-x86_64\.zip`
-			fallback = fallbackBase + "dsda-doom-0.29.4-mac-x86_64.zip"
-		}
-	case "windows":
-		targetName = "dsda-doom.exe"
-		pattern = `dsda-doom-.*-win-x64\.zip`
-		fallback = fallbackBase + "dsda-doom-0.29.4-win-x64.zip"
-	default:
-		targetName = "dsda-doom"
-		pattern = `dsda-doom-.*-linux-x86_64\.appimage`
-		fallback = fallbackBase + "dsda-doom-0.29.4-linux-x86_64.appimage"
+// InstallEngine downloads and installs a single engine using its declarative InstallRecipe.
+func (ins *Installer) InstallEngine(eng preset.EngineConfig) error {
+	if eng.Install == nil {
+		return fmt.Errorf("engine %q does not define an install recipe", eng.ID)
+	}
+	platKey := ins.platformKey()
+	recipe, ok := eng.Install.Platforms[platKey]
+	if !ok {
+		return fmt.Errorf("engine %q has no install recipe for platform %s", eng.ID, platKey)
+	}
+	if recipe.Unsupported {
+		fmt.Fprintf(ins.Out, "Skipping %s: unsupported on %s\n", eng.EffectiveDisplayName(), platKey)
+		return nil
 	}
 
-	url := ins.ResolveLatestGitHubURL("kraflab/dsda-doom", pattern, fallback)
-	return ins.deployAsset(targetName, url)
-}
+	fmt.Fprintf(ins.Out, "Installing %s...\n", eng.EffectiveDisplayName())
+	targetName := filepath.Base(eng.EffectiveBinary())
+	if ins.goos() == "windows" && !strings.HasSuffix(strings.ToLower(targetName), ".exe") {
+		targetName += ".exe"
+	}
 
-// InstallAll installs UZDoom and DSDA-Doom source ports.
-func (ins *Installer) InstallAll() error {
-	if err := ins.InstallUZDoom(); err != nil {
+	url, sha256Hex, err := ins.resolveRecipeAsset(eng.Install.Repo, recipe)
+	if err != nil {
 		return err
 	}
-	return ins.InstallDSDA()
+	return ins.deployAsset(targetName, url, sha256Hex)
 }
 
-func (ins *Installer) deployAsset(targetName, url string) error {
+// InstallCatalog attempts to install all engines in cat that define an InstallRecipe,
+// collecting and returning any errors after trying every installable engine.
+func (ins *Installer) InstallCatalog(cat *preset.Catalog) error {
+	if cat == nil {
+		var err error
+		cat, err = preset.LoadCuratedCatalog()
+		if err != nil {
+			return err
+		}
+	}
+
+	ids := make([]string, 0, len(cat.Engines))
+	for id, eng := range cat.Engines {
+		if eng.Install != nil {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+
+	var errs []error
+	for _, id := range ids {
+		if err := ins.InstallEngine(cat.Engines[id]); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", id, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// InstallUZDoom downloads and installs UZDoom using its curated catalog recipe.
+func (ins *Installer) InstallUZDoom() error {
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		return err
+	}
+	eng, ok := cat.FindEngine("uzdoom")
+	if !ok {
+		return fmt.Errorf("curated engine uzdoom not found")
+	}
+	return ins.InstallEngine(eng)
+}
+
+// InstallDSDA downloads and installs DSDA-Doom using its curated catalog recipe.
+func (ins *Installer) InstallDSDA() error {
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		return err
+	}
+	eng, ok := cat.FindEngine("dsda-doom")
+	if !ok {
+		return fmt.Errorf("curated engine dsda-doom not found")
+	}
+	return ins.InstallEngine(eng)
+}
+
+// InstallAll installs all curated source ports, attempting each engine even if one fails.
+func (ins *Installer) InstallAll() error {
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		return err
+	}
+	return ins.InstallCatalog(cat)
+}
+
+func (ins *Installer) deployAsset(targetName, url, expectedSHA256 string) error {
 	if url == "" {
 		return fmt.Errorf("no download URL found for %s", targetName)
 	}
@@ -197,22 +330,21 @@ func (ins *Installer) deployAsset(targetName, url string) error {
 	defer os.RemoveAll(tmpDir)
 
 	tmpFile := filepath.Join(tmpDir, "downloaded.bin")
-	if err := ins.DownloadFile(url, tmpFile); err != nil {
+	if err := ins.DownloadFileVerified(url, tmpFile, expectedSHA256); err != nil {
 		return fmt.Errorf("download error: %w", err)
 	}
 
 	lowerURL := strings.ToLower(url)
 	if strings.HasSuffix(lowerURL, ".zip") {
 		return ins.extractZipBinary(tmpFile, targetName, dest)
-	} else if strings.HasSuffix(lowerURL, ".dmg") && runtime.GOOS == "darwin" {
+	} else if strings.HasSuffix(lowerURL, ".dmg") && ins.goos() == "darwin" {
 		return ins.extractDMGBinary(tmpFile, targetName, dest)
 	}
 
-	// Raw binary or AppImage
 	if err := copyBinaryFile(tmpFile, dest); err != nil {
 		return err
 	}
-	_ = os.Chmod(dest, 0755)
+	_ = os.Chmod(dest, 0o755)
 	fmt.Fprintf(ins.Out, "✓ Installed %s to %s\n\n", targetName, dest)
 	return nil
 }
@@ -227,7 +359,7 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	var binMatch *zip.File
 	cleanTarget := strings.TrimSuffix(strings.ToLower(targetName), ".exe")
 
-	// 1. Exact match on targetName (e.g. "uzdoom.exe" or "dsda-doom.exe")
+	// 1. Exact match on targetName (e.g. "uzdoom.exe" or "dsda-doom")
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() {
 			continue
@@ -246,7 +378,7 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 				continue
 			}
 			base := strings.ToLower(filepath.Base(zf.Name))
-			if runtime.GOOS == "windows" && !strings.HasSuffix(base, ".exe") {
+			if ins.goos() == "windows" && !strings.HasSuffix(base, ".exe") {
 				continue
 			}
 			baseClean := strings.TrimSuffix(base, ".exe")
@@ -255,10 +387,6 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 				break
 			}
 		}
-	}
-
-	if binMatch == nil && len(zr.File) > 0 {
-		binMatch = zr.File[0]
 	}
 
 	if binMatch == nil {
@@ -275,16 +403,16 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	if err := extractZipEntry(binMatch, cleanBinDir, cleanDest); err != nil {
 		return err
 	}
-	_ = os.Chmod(dest, 0755)
+	_ = os.Chmod(dest, 0o755)
 
-	// Also extract companion files (.wad, .pk3, dlls, soundfonts, etc.) in the same directory or subdirectories
+	// Also extract companion files (.wad, .pk3, dlls, soundfonts, etc.)
 	binParent := filepath.Dir(binMatch.Name)
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() || zf == binMatch {
 			continue
 		}
-		relPath, err := filepath.Rel(binParent, zf.Name)
-		if err != nil || strings.HasPrefix(relPath, "..") {
+		relPath, relErr := filepath.Rel(binParent, zf.Name)
+		if relErr != nil || strings.HasPrefix(relPath, "..") {
 			continue
 		}
 		base := filepath.Base(filepath.Clean(zf.Name))
@@ -327,7 +455,6 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 	}
 	defer os.RemoveAll(mountPoint)
 
-	// Attach DMG
 	attachCmd := exec.Command("hdiutil", "attach", dmgPath, "-mountpoint", mountPoint, "-nobrowse", "-quiet")
 	if err := attachCmd.Run(); err != nil {
 		return fmt.Errorf("failed to attach DMG: %w", err)
@@ -336,7 +463,6 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 		_ = exec.Command("hdiutil", "detach", mountPoint, "-quiet").Run()
 	}()
 
-	// Find .app bundle
 	entries, err := os.ReadDir(mountPoint)
 	if err != nil {
 		return err
@@ -359,7 +485,7 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 		return fmt.Errorf("resolving user home directory: %w", err)
 	}
 	appsDir := filepath.Join(home, "Applications")
-	_ = os.MkdirAll(appsDir, 0755)
+	_ = os.MkdirAll(appsDir, 0o755)
 	appDest := filepath.Join(appsDir, filepath.Base(appEntry))
 
 	_ = os.RemoveAll(appDest)
@@ -367,7 +493,6 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 		return fmt.Errorf("failed to copy .app to %s: %w", appsDir, err)
 	}
 
-	// Locate binary inside Contents/MacOS
 	macOSDir := filepath.Join(appDest, "Contents", "MacOS")
 	macEntries, err := os.ReadDir(macOSDir)
 	if err != nil || len(macEntries) == 0 {
@@ -375,10 +500,8 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 	}
 
 	appBin := filepath.Join(macOSDir, macEntries[0].Name())
-
-	// Create launcher wrapper script in dest
 	wrapper := fmt.Sprintf("#!/bin/sh\nexec %q \"$@\"\n", appBin)
-	if err := os.WriteFile(dest, []byte(wrapper), 0755); err != nil {
+	if _, err := fsutil.WriteFileAtomic(dest, []byte(wrapper), 0o755); err != nil {
 		return err
 	}
 
@@ -394,43 +517,25 @@ func extractZipEntry(zf *zip.File, destDir, destPath string) error {
 		return fmt.Errorf("illegal file path in archive: %s", zf.Name)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(cleanDest), 0755); err != nil {
-		return err
-	}
-
 	rc, err := zf.Open()
 	if err != nil {
 		return err
 	}
 	defer rc.Close()
 
-	out, err := os.OpenFile(cleanDest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	data, err := io.ReadAll(rc)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-
-	_, err = io.Copy(out, rc)
+	_, err = fsutil.WriteFileAtomic(cleanDest, data, 0o644)
 	return err
 }
 
 func copyBinaryFile(src, dst string) error {
-	in, err := os.Open(src)
+	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
-
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
+	_, err = fsutil.WriteFileAtomic(dst, data, 0o755)
 	return err
 }

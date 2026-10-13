@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -32,7 +31,7 @@ func newWadsCmd() *cobra.Command {
 				target = args[0]
 			}
 
-			dl := wad.NewDownloader(paths.WadsDir, flagForce, os.Stdout)
+			dl := wad.NewDownloaderWithRoots(paths.WadRoots(), flagForce, cmdOut(cmd))
 			if strings.EqualFold(target, "all") {
 				return dl.DownloadAll(cat)
 			}
@@ -54,11 +53,12 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Println("=== Available Downloadable Community Megawads ===")
+			out := cmdOut(cmd)
+			fmt.Fprintln(out, "=== Available Downloadable Community Megawads ===")
 			for _, p := range cat.Presets {
-				if len(p.DownloadURLs) > 0 {
-					files := wad.FilterExpectedFiles(p.Mappacks)
-					fmt.Printf("  - %-30s [%s]\n", p.Name, strings.Join(files, ", "))
+				if len(p.Sources) > 0 {
+					files := wad.FilterExpectedFiles(p.Files)
+					fmt.Fprintf(out, "  - %-30s [%s]\n", p.Name, strings.Join(files, ", "))
 				}
 			}
 			return nil
@@ -71,7 +71,7 @@ func newWadsCmd() *cobra.Command {
 		Short:   "Auto-discover and copy official IWADs and expansions from Steam/GOG",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			_, err := steam.DiscoverAndExtract(nil, paths.WadsDir, flagForce, os.Stdout)
+			_, err := steam.DiscoverAndExtract(nil, paths.WadsDir, flagForce, cmdOut(cmd))
 			return err
 		},
 	}

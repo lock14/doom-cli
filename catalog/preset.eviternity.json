@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "eviternity",
+  "name": "Eviternity",
+  "engine": "uzdoom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "Eviternity.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "MBF / OTEX",
+  "description": "OTEX texture pack & custom monsters",
+  "author": "Joshua \"Dragonfly\" O'Sullivan et al.",
+  "release_date": "2019",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternity.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 110
+}

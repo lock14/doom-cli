@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "sunlust",
+  "name": "Sunlust",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "sunlust.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Boom",
+  "description": "32-level visual and gameplay masterpiece",
+  "author": "Ribbiks & Dannebubinga",
+  "release_date": "2015",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunlust.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunlust",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 270
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -19,21 +20,39 @@ func formatKeyHelp(items []keyHelp) string {
 	return defaultStyles.FormatKeyHelp(items)
 }
 
-func formatEngineTag(engine string, styles ThemeStyles) string {
-	switch strings.ToLower(engine) {
-	case "dsda-doom", "dsda":
+func resolveBadgeText(catalog *preset.Catalog, engine string) string {
+	if catalog != nil {
+		if eng, ok := catalog.FindEngine(engine); ok {
+			return eng.BadgeText()
+		}
+	}
+	if curated, err := preset.LoadCuratedCatalog(); err == nil {
+		if eng, ok := curated.FindEngine(engine); ok {
+			return eng.BadgeText()
+		}
+	}
+	return (preset.EngineConfig{ID: engine}).BadgeText()
+}
+
+func formatEngineTagWithCatalog(catalog *preset.Catalog, engine string, styles ThemeStyles) string {
+	badge := resolveBadgeText(catalog, engine)
+	switch {
+	case strings.EqualFold(badge, "DSDA"):
 		return styles.TagDSDA.Render("[DSDA]") + "  "
-	case "uzdoom", "zdoom":
+	case strings.EqualFold(badge, "UZDoom"):
 		return styles.TagUZDoom.Render("[UZDoom]")
 	default:
-		tagText := strings.ToUpper(engine)
-		runes := []rune(tagText)
+		runes := []rune(badge)
 		if len(runes) > 6 {
-			tagText = string(runes[:6])
+			badge = string(runes[:6])
 		}
-		formatted := fmt.Sprintf("[%-6s]", tagText)
+		formatted := fmt.Sprintf("[%-6s]", badge)
 		return styles.TagUZDoom.Render(formatted)
 	}
+}
+
+func formatEngineTag(engine string, styles ThemeStyles) string {
+	return formatEngineTagWithCatalog(nil, engine, styles)
 }
 
 func (m model) renderListLines(geom layoutGeometry) []string {
@@ -57,7 +76,7 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 	var listLines []string
 	for i := startIdx; i < endIdx; i++ {
 		p := m.filtered[i]
-		tag := formatEngineTag(p.Engine, m.styles)
+		tag := formatEngineTagWithCatalog(m.catalog, p.Engine, m.styles)
 
 		name := p.Name
 		runes := []rune(name)
@@ -76,6 +95,26 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 	return listLines
 }
 
+func resolveEngineDescription(catalog *preset.Catalog, engineKey string) string {
+	if catalog != nil {
+		if eng, ok := catalog.FindEngine(engineKey); ok {
+			if eng.Description != "" {
+				return eng.Description
+			}
+			return eng.EffectiveDisplayName()
+		}
+	}
+	if curated, err := preset.LoadCuratedCatalog(); err == nil {
+		if eng, ok := curated.FindEngine(engineKey); ok {
+			if eng.Description != "" {
+				return eng.Description
+			}
+			return eng.EffectiveDisplayName()
+		}
+	}
+	return engineKey
+}
+
 func (m model) renderPreviewLines() ([]string, bool) {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
 		return []string{m.styles.Help.Render("No preset details available.")}, false
@@ -88,9 +127,13 @@ func (m model) renderPreviewLines() ([]string, bool) {
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s", m.styles.Label.Render("Preset:        "), m.styles.ValueBold.Render(cur.Name)),
 	)
-	if cur.Custom {
+	if cur.IsCustom() {
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Type:          "), m.styles.TagUZDoom.Render("[Custom WAD]")),
+		)
+	} else if cur.Overridden {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Type:          "), m.styles.TagUZDoom.Render("[Overridden]")),
 		)
 	}
 	if cur.Author != "" {
@@ -103,23 +146,13 @@ func (m model) renderPreviewLines() ([]string, bool) {
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Released:      "), cur.ReleaseDate),
 		)
 	}
-	engStr := cur.Engine
-	if m.catalog != nil && m.catalog.Engines != nil {
-		if engCfg, ok := m.catalog.Engines[cur.Engine]; ok && engCfg.Description != "" {
-			engStr = engCfg.Description
-		}
-	}
-	if engStr == "uzdoom" {
-		engStr = "UZDoom (Software-Plus / Advanced)"
-	} else if engStr == "dsda-doom" {
-		engStr = "DSDA-Doom (MBF21 / Speedrun)"
-	}
+	engStr := resolveEngineDescription(m.catalog, cur.Engine)
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s", m.styles.Label.Render("Engine:        "), engStr),
 	)
-	if cur.AdditionalArgs != "" {
+	if len(cur.Args) > 0 {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), cur.AdditionalArgs),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(cur.Args, " ")),
 		)
 	}
 	if cur.Category != "" {
@@ -147,16 +180,16 @@ func (m model) renderPreviewLines() ([]string, bool) {
 		fmt.Sprintf("%s%s %s", m.styles.Label.Render("IWAD:          "), cur.IWAD, iwadStatus),
 	)
 
-	if len(cur.Mappacks) > 0 || hasReadme {
+	if len(cur.Files) > 0 || hasReadme {
 		previewLines = append(previewLines, m.styles.Label.Render("Files:"))
-		for _, mapfile := range cur.Mappacks {
+		for _, f := range cur.Files {
 			fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-			if _, ok := m.resolveFile(mapfile); ok {
+			if _, ok := m.resolveFile(f.Name); ok {
 				fStatus = m.styles.StatusReady.Render("[✓ Found]")
-			} else if preset.IsOptionalFile(mapfile) {
+			} else if f.Optional {
 				fStatus = m.styles.Help.Render("[Optional]")
 			}
-			previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", mapfile, fStatus))
+			previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", f.Name, fStatus))
 		}
 		if hasReadme {
 			previewLines = append(previewLines,
@@ -303,30 +336,74 @@ func (m model) renderReadmeFooter() string {
 func (m model) renderFooter(hasReadme bool) string {
 	items := []keyHelp{
 		{"↑/↓", "Navigate"},
-		{"Enter", "Launch"},
 	}
 	if hasReadme {
-		items = append(items, keyHelp{"Tab", "Readme"})
+		items = append(items, keyHelp{"Tab", "View README"})
 	}
-	items = append(items, keyHelp{"Esc", "Quit"})
+	items = append(items,
+		keyHelp{"Enter", "Launch"},
+		keyHelp{"Esc/Ctrl+C", "Quit"},
+	)
 	return m.styles.FormatKeyHelp(items)
 }
 
-func formatBoxContent(lines []string, innerWidth, targetHeight int) string {
-	if innerWidth < 1 {
-		innerWidth = 1
+func formatBoxContent(lines []string, width, height int) string {
+	var out []string
+	for i := 0; i < height; i++ {
+		if i < len(lines) {
+			out = append(out, truncateANSI(lines[i], width))
+		} else {
+			out = append(out, "")
+		}
 	}
-	if targetHeight < 1 {
-		targetHeight = 1
+	return strings.Join(out, "\n")
+}
+
+func truncateANSI(s string, maxWidth int) string {
+	if maxWidth <= 0 {
+		return ""
 	}
-	wrapStyle := lipgloss.NewStyle().Width(innerWidth)
-	wrapped := wrapStyle.Render(strings.Join(lines, "\n"))
-	contentLines := strings.Split(wrapped, "\n")
-	if len(contentLines) > targetHeight {
-		contentLines = contentLines[:targetHeight]
+	if lipgloss.Width(s) <= maxWidth {
+		return s
 	}
-	for len(contentLines) < targetHeight {
-		contentLines = append(contentLines, "")
+	if maxWidth == 1 {
+		return "…"
 	}
-	return strings.Join(contentLines, "\n")
+
+	target := maxWidth - 1
+	var b strings.Builder
+	b.Grow(len(s))
+	visWidth := 0
+	hasANSI := false
+
+	for i := 0; i < len(s); {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			hasANSI = true
+			j := i + 2
+			for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
+				j++
+			}
+			if j < len(s) {
+				j++
+			}
+			b.WriteString(s[i:j])
+			i = j
+			continue
+		}
+
+		r, size := utf8.DecodeRuneInString(s[i:])
+		rw := lipgloss.Width(string(r))
+		if visWidth+rw > target {
+			break
+		}
+		b.WriteRune(r)
+		visWidth += rw
+		i += size
+	}
+
+	if hasANSI {
+		b.WriteString("\x1b[0m")
+	}
+	b.WriteString("…")
+	return b.String()
 }

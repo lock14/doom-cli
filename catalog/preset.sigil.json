@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "sigil",
+  "name": "Sigil",
+  "engine": "dsda-doom",
+  "iwad": "DOOM.WAD",
+  "files": [
+    {
+      "name": "SIGIL_V1_23.wad"
+    }
+  ],
+  "category": "Community Episode",
+  "compatibility": "Vanilla",
+  "description": "John Romero's unofficial 5th episode for Ultimate Doom",
+  "author": "John Romero",
+  "release_date": "2019",
+  "sort": 210
+}

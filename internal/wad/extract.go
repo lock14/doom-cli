@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lock14/doom-cli/internal/fsutil"
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
@@ -26,7 +27,7 @@ func isZip(path string) bool {
 	return bytes.Equal(buf[:], []byte{'P', 'K', 0x03, 0x04})
 }
 
-func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []string) error {
+func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []string) error {
 	zr, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed opening zip: %w", err)
@@ -53,7 +54,7 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 		baseLower := strings.ToLower(filepath.Base(cleanName))
 		if strings.HasSuffix(baseLower, ".wad") {
 			wadFiles = append(wadFiles, zf)
-		} else if strings.HasSuffix(baseLower, ".deh") {
+		} else if strings.HasSuffix(baseLower, ".deh") || strings.HasSuffix(baseLower, ".bex") {
 			dehFiles = append(dehFiles, zf)
 		} else if strings.HasSuffix(baseLower, ".txt") {
 			txtFiles = append(txtFiles, zf)
@@ -61,9 +62,16 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 	}
 
 	for _, exp := range expectedFiles {
+		destPath, joinErr := fsutil.SafeJoin(cleanWadsDir, exp)
+		if joinErr != nil {
+			return fmt.Errorf("illegal file destination for %q: %w", exp, joinErr)
+		}
+
+		expBase := filepath.Base(destPath)
+		expLower := strings.ToLower(expBase)
+		expNorm := preset.NormalizeFilename(expBase)
+
 		var match *zip.File
-		expLower := strings.ToLower(exp)
-		expNorm := preset.NormalizeFilename(exp)
 
 		// 1. Exact case-insensitive match on base filename
 		for _, zf := range zr.File {
@@ -108,20 +116,14 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 		if match == nil {
 			if strings.HasSuffix(expLower, ".wad") && len(wadFiles) == 1 {
 				match = wadFiles[0]
-			} else if strings.HasSuffix(expLower, ".deh") && len(dehFiles) == 1 {
+			} else if (strings.HasSuffix(expLower, ".deh") || strings.HasSuffix(expLower, ".bex")) &&
+				len(dehFiles) == 1 {
 				match = dehFiles[0]
 			}
 		}
 
 		if match == nil {
 			return fmt.Errorf("could not find matching file in archive for %s", exp)
-		}
-
-		cleanExp := filepath.Base(filepath.Clean(exp))
-		destPath := filepath.Clean(filepath.Join(cleanWadsDir, cleanExp))
-		prefix := cleanWadsDir + string(filepath.Separator)
-		if !strings.HasPrefix(destPath, prefix) {
-			return fmt.Errorf("illegal file destination %q for entry %s", destPath, match.Name)
 		}
 
 		if err := extractZipFile(match, cleanWadsDir, destPath); err != nil {
@@ -140,9 +142,8 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 		if cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "..") {
 			continue
 		}
-		destPath := filepath.Clean(filepath.Join(cleanWadsDir, cleanName))
-		prefix := cleanWadsDir + string(filepath.Separator)
-		if !strings.HasPrefix(destPath, prefix) {
+		destPath, joinErr := fsutil.SafeJoin(cleanWadsDir, cleanName)
+		if joinErr != nil {
 			continue
 		}
 
@@ -156,14 +157,13 @@ func (d *Downloader) extractFromZip(zipPath string, size int64, expectedFiles []
 }
 
 func extractZipFile(zf *zip.File, targetDir, destPath string) error {
-	cleanTarget := filepath.Clean(targetDir)
+	cleanTargetDir := filepath.Clean(targetDir)
 	cleanDest := filepath.Clean(destPath)
-	prefix := cleanTarget + string(filepath.Separator)
-	if !strings.HasPrefix(cleanDest, prefix) {
+	if !strings.HasPrefix(cleanDest, cleanTargetDir+string(filepath.Separator)) {
 		return fmt.Errorf("illegal file path in archive: %s", zf.Name)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(cleanDest), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cleanDest), 0o755); err != nil {
 		return err
 	}
 
@@ -173,12 +173,10 @@ func extractZipFile(zf *zip.File, targetDir, destPath string) error {
 	}
 	defer rc.Close()
 
-	out, err := os.OpenFile(cleanDest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	data, err := io.ReadAll(rc)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-
-	_, err = io.Copy(out, rc)
+	_, err = fsutil.WriteFileAtomic(cleanDest, data, 0o644)
 	return err
 }

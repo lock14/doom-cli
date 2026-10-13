@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "going-down-turbo",
+  "name": "Going Down Turbo",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "gdturbo.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Boom",
+  "description": "Fast-paced, compact map pack",
+  "author": "mouldy",
+  "release_date": "2024",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gd.zip"
+    }
+  ],
+  "sort": 130
+}

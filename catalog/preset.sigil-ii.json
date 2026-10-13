@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "sigil-ii",
+  "name": "Sigil II",
+  "engine": "dsda-doom",
+  "iwad": "DOOM.WAD",
+  "files": [
+    {
+      "name": "SIGIL_II_V1_0.WAD"
+    }
+  ],
+  "category": "Community Episode",
+  "compatibility": "Vanilla",
+  "description": "John Romero's unofficial 6th episode for Ultimate Doom",
+  "author": "John Romero",
+  "release_date": "2023",
+  "load_maps_after_mods": true,
+  "sort": 220
+}

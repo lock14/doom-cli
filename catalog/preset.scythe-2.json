@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "scythe-2",
+  "name": "Scythe 2",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "scythe2.wad"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Boom / DEH",
+  "description": "Erik Alm's legendary sequel with custom monsters",
+  "author": "Erik Alm",
+  "release_date": "2005",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/scythe2.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/scythe2",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 240
+}

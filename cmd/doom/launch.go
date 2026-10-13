@@ -13,7 +13,7 @@ import (
 func newLaunchCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "launch <preset_name> [engine_args...]",
-		Short:              "Directly launch a preset by name or prefix",
+		Short:              "Directly launch a preset by ID, name, or prefix",
 		Args:               cobra.MinimumNArgs(1),
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -29,14 +29,18 @@ func newLaunchCmd() *cobra.Command {
 			if p == nil {
 				return fmt.Errorf("preset %q not found. Run 'doom presets list' to see available presets", targetName)
 			}
+			out := cmdOut(cmd)
+			errOut := cmdErr(cmd)
 			opts := engine.LaunchOptions{
 				EngineOverride: flagEngineOverride,
 				WadsDir:        paths.WadsDir,
+				WadRoots:       paths.WadRoots(),
 				BinDir:         paths.BinDir,
 				DryRun:         flagDryRun,
 				ExtraArgs:      extraArgs,
-				Out:            os.Stdout,
+				Out:            out,
 				Engines:        cat.Engines,
+				Catalog:        cat,
 			}
 
 			plan, err := engine.PrepareLaunch(*p, opts)
@@ -44,7 +48,7 @@ func newLaunchCmd() *cobra.Command {
 				return err
 			}
 
-			return engine.Execute(plan, os.Stdout, os.Stderr)
+			return engine.Execute(plan, out, errOut)
 		},
 	}
 }

@@ -17,11 +17,23 @@ import (
 type LaunchOptions struct {
 	EngineOverride string
 	WadsDir        string
+	WadRoots       []string
 	BinDir         string
 	DryRun         bool
 	ExtraArgs      []string
 	Out            io.Writer
 	Engines        map[string]preset.EngineConfig
+	Catalog        *preset.Catalog
+}
+
+func (opts LaunchOptions) wadRoots() []string {
+	if len(opts.WadRoots) > 0 {
+		return opts.WadRoots
+	}
+	if opts.WadsDir != "" {
+		return []string{opts.WadsDir}
+	}
+	return nil
 }
 
 // LaunchPlan contains the resolved engine binary and constructed arguments ready for execution.
@@ -35,6 +47,55 @@ type LaunchPlan struct {
 	DryRun       bool
 }
 
+func resolveEngineConfig(name string, opts LaunchOptions) (preset.EngineConfig, error) {
+	clean := strings.TrimSpace(name)
+	if clean == "" {
+		clean = "dsda-doom"
+	}
+
+	if opts.Catalog != nil {
+		if eng, ok := opts.Catalog.FindEngine(clean); ok {
+			return eng, nil
+		}
+		return preset.EngineConfig{}, fmt.Errorf("unknown engine %q", clean)
+	}
+
+	if len(opts.Engines) > 0 {
+		for k, eng := range opts.Engines {
+			if strings.EqualFold(k, clean) || strings.EqualFold(eng.ID, clean) {
+				if eng.ID == "" {
+					eng.ID = k
+				}
+				return eng, nil
+			}
+			for _, alias := range eng.Aliases {
+				if strings.EqualFold(alias, clean) {
+					if eng.ID == "" {
+						eng.ID = k
+					}
+					return eng, nil
+				}
+			}
+		}
+	}
+
+	if curated, err := preset.LoadCuratedCatalog(); err == nil {
+		if eng, ok := curated.FindEngine(clean); ok {
+			return eng, nil
+		}
+	}
+
+	if len(opts.Engines) > 0 {
+		return preset.EngineConfig{}, fmt.Errorf("unknown engine %q", clean)
+	}
+
+	return preset.EngineConfig{
+		ID:        clean,
+		Binary:    clean,
+		ArgsStyle: preset.GuessArgsStyle(clean, ""),
+	}, nil
+}
+
 // PrepareLaunch resolves engine binaries, files, and arguments to create a LaunchPlan.
 func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	out := opts.Out
@@ -42,68 +103,64 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 		out = io.Discard
 	}
 
-	engine := p.Engine
-	if opts.EngineOverride != "" {
-		override := strings.TrimSpace(opts.EngineOverride)
-		if _, exists := opts.Engines[override]; !exists {
-			switch strings.ToLower(override) {
-			case "dsda", "dsda-doom", "dsdadoom":
-				override = "dsda-doom"
-			case "uzdoom", "zdoom":
-				override = "uzdoom"
-			}
-		}
-		engine = override
+	targetEngine := p.Engine
+	if strings.TrimSpace(opts.EngineOverride) != "" {
+		targetEngine = strings.TrimSpace(opts.EngineOverride)
 	}
 
-	// Resolve engine configuration
-	var engCfg preset.EngineConfig
-	if cfg, ok := opts.Engines[engine]; ok {
-		engCfg = cfg
-	} else {
-		engCfg = preset.EngineConfig{Name: engine}
+	engCfg, err := resolveEngineConfig(targetEngine, opts)
+	if err != nil {
+		return nil, err
+	}
+	engineID := engCfg.ID
+	if engineID == "" {
+		engineID = targetEngine
 	}
 
-	// Resolve engine binary
-	binTarget := engCfg.Binary
-	if strings.TrimSpace(binTarget) == "" {
-		binTarget = engine
-	}
+	binTarget := engCfg.EffectiveBinary()
 	engineBin, err := ResolveBinary(binTarget, opts.BinDir)
 	if err != nil {
 		return nil, err
 	}
 
-	// Resolve IWAD
-	iwadPath, ok := preset.ResolveFile(opts.WadsDir, p.IWAD)
+	roots := opts.wadRoots()
+	primaryDir := opts.WadsDir
+	if primaryDir == "" && len(roots) > 0 {
+		primaryDir = roots[0]
+	}
+	idx := preset.NewDirIndex(roots...)
+
+	iwadPath, ok := idx.ResolveFile(p.IWAD)
 	if !ok {
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
 				"Run 'doom wads extract-steam' if you own the game on Steam/GOG",
 			p.IWAD,
-			opts.WadsDir,
+			primaryDir,
 		)
 	}
 
-	// Resolve Mappack and DeHackEd files
-	var orderedFiles []string
-	var wads []string
-	var dehs []string
+	type resolvedEntry struct {
+		path     string
+		optional bool
+		isDeh    bool
+	}
+	var resolved []resolvedEntry
 
-	for _, m := range p.Mappacks {
-		clean := strings.TrimSpace(m)
+	for _, f := range p.Files {
+		clean := strings.TrimSpace(f.Name)
 		if clean == "" {
 			continue
 		}
 
-		fpath, ok := preset.ResolveFile(opts.WadsDir, clean)
-		if !ok {
-			if preset.IsOptionalFile(clean) {
+		fpath, found := idx.ResolveFile(clean)
+		if !found {
+			if f.Optional {
 				fmt.Fprintf(
 					out,
 					"  ℹ Optional soundtrack '%s' not found in %s; launching with default MIDI.\n",
 					clean,
-					opts.WadsDir,
+					primaryDir,
 				)
 				continue
 			}
@@ -111,21 +168,49 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 				"required mappack file '%s' not found in %s.\n"+
 					"Run 'doom wads fetch %q' to download it",
 				clean,
-				opts.WadsDir,
+				primaryDir,
 				p.Name,
 			)
 		}
 
-		orderedFiles = append(orderedFiles, fpath)
-		if strings.HasSuffix(strings.ToLower(fpath), ".deh") {
-			dehs = append(dehs, fpath)
+		lower := strings.ToLower(fpath)
+		isDeh := strings.HasSuffix(lower, ".deh") || strings.HasSuffix(lower, ".bex")
+		resolved = append(resolved, resolvedEntry{
+			path:     fpath,
+			optional: f.Optional,
+			isDeh:    isDeh,
+		})
+	}
+
+	if p.LoadMapsAfterMods && len(resolved) > 1 {
+		var mods []resolvedEntry
+		var maps []resolvedEntry
+		for _, r := range resolved {
+			if r.optional {
+				mods = append(mods, r)
+			} else {
+				maps = append(maps, r)
+			}
+		}
+		resolved = append(mods, maps...)
+	}
+
+	var orderedFiles []string
+	var wads []string
+	var dehs []string
+	for _, r := range resolved {
+		orderedFiles = append(orderedFiles, r.path)
+		if r.isDeh {
+			dehs = append(dehs, r.path)
 		} else {
-			wads = append(wads, fpath)
+			wads = append(wads, r.path)
 		}
 	}
 
-	// Build argument list
 	var args []string
+	if len(engCfg.PrefixArgs) > 0 {
+		args = append(args, engCfg.PrefixArgs...)
+	}
 	args = append(args, "-iwad", iwadPath)
 
 	if engCfg.EffectiveArgsStyle() == "boom" {
@@ -138,32 +223,25 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 			args = append(args, dehs...)
 		}
 	} else {
-		// ZDoom style accepts all files under -file while maintaining declared order
 		if len(orderedFiles) > 0 {
 			args = append(args, "-file")
 			args = append(args, orderedFiles...)
 		}
 	}
 
-	// Engine default args
 	if len(engCfg.DefaultArgs) > 0 {
 		args = append(args, engCfg.DefaultArgs...)
 	}
-
-	// Preset additional args
-	if strings.TrimSpace(p.AdditionalArgs) != "" {
-		tokens := strings.Fields(p.AdditionalArgs)
-		args = append(args, tokens...)
+	if len(p.Args) > 0 {
+		args = append(args, p.Args...)
 	}
-
-	// User-provided extra args
 	if len(opts.ExtraArgs) > 0 {
 		args = append(args, opts.ExtraArgs...)
 	}
 
 	return &LaunchPlan{
 		Preset:       p,
-		Engine:       engine,
+		Engine:       engineID,
 		EngineBin:    engineBin,
 		IWADPath:     iwadPath,
 		OrderedFiles: orderedFiles,
@@ -205,7 +283,6 @@ func Execute(plan *LaunchPlan, out, errOut io.Writer) error {
 
 // ResolveBinary searches for an engine executable in an explicit path, binDir, or system PATH.
 func ResolveBinary(engine, binDir string) (string, error) {
-	// If engine is an explicit path (contains separator or is absolute)
 	if filepath.IsAbs(engine) || strings.ContainsRune(engine, filepath.Separator) ||
 		strings.ContainsRune(engine, '/') || strings.ContainsRune(engine, '\\') {
 		if fi, err := os.Stat(engine); err == nil && !fi.IsDir() {
@@ -232,7 +309,6 @@ func ResolveBinary(engine, binDir string) (string, error) {
 		}
 	}
 
-	// Check system PATH
 	if p, err := exec.LookPath(engine); err == nil {
 		return p, nil
 	}

@@ -2,44 +2,38 @@
 package templates
 
 import (
-	_ "embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/lock14/doom-cli"
 	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/display"
+	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
-//go:embed data/autoexec.cfg
-var embeddedAutoexec []byte
+var (
+	embeddedAutoexec = mustReadEmbedded("uzdoom/autoexec.cfg")
+	embeddedDSDADoom = mustReadEmbedded("dsda-doom/dsda-doom.cfg")
+)
 
-//go:embed data/dsda-doom.cfg
-var embeddedDSDADoom []byte
-
-// BackupFile copies dest to dest.bak.YYYYMMDDHHMMSS if it exists.
-func BackupFile(dest string) (string, error) {
-	if _, err := os.Stat(dest); os.IsNotExist(err) {
-		return "", nil
-	}
-
-	timestamp := time.Now().Format("20060102150405")
-	backupPath := fmt.Sprintf("%s.bak.%s", dest, timestamp)
-
-	data, err := os.ReadFile(dest)
+func mustReadEmbedded(name string) []byte {
+	data, err := fs.ReadFile(doomcli.FS, name)
 	if err != nil {
-		return "", err
+		panic(fmt.Sprintf("templates: reading embedded %s: %v", name, err))
 	}
+	return data
+}
 
-	if err := os.WriteFile(backupPath, data, 0644); err != nil {
-		return "", err
-	}
-	return backupPath, nil
+// BackupFile copies dest to dest.bak.YYYYMMDDHHMMSS if it exists, never
+// overwriting an existing backup file.
+func BackupFile(dest string) (string, error) {
+	return fsutil.BackupFile(dest)
 }
 
 var (
@@ -68,34 +62,35 @@ func DeployConfigsTo(paths *config.Paths, out io.Writer) error {
 	if out == nil {
 		out = io.Discard
 	}
-	res := display.DetectResolution()
-	rate := display.DetectRefreshRate()
+	res, rate := display.DetectDisplay()
 
 	// 1. Deploy UZDoom autoexec.cfg
-	if err := os.MkdirAll(paths.UZDoomDir, 0755); err != nil {
+	if err := os.MkdirAll(paths.UZDoomDir, 0o755); err != nil {
 		return err
 	}
 	autoexecDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
-	if bkp, _ := BackupFile(autoexecDest); bkp != "" {
-		fmt.Fprintf(out, "Backing up existing autoexec.cfg -> %s\n", filepath.Base(bkp))
-	}
 	autoexecContent := renderAutoexecWithRate(paths, rate)
-	if err := os.WriteFile(autoexecDest, []byte(autoexecContent), 0644); err != nil {
+	bkp, err := fsutil.WriteFileAtomic(autoexecDest, []byte(autoexecContent), 0o644)
+	if err != nil {
 		return err
+	}
+	if bkp != "" {
+		fmt.Fprintf(out, "Backing up existing autoexec.cfg -> %s\n", filepath.Base(bkp))
 	}
 	fmt.Fprintf(out, "✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
 
 	// 2. Deploy DSDA-Doom dsda-doom.cfg
-	if err := os.MkdirAll(paths.DSDADir, 0755); err != nil {
+	if err := os.MkdirAll(paths.DSDADir, 0o755); err != nil {
 		return err
 	}
 	dsdaDest := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
-	if bkp, _ := BackupFile(dsdaDest); bkp != "" {
-		fmt.Fprintf(out, "Backing up existing dsda-doom.cfg -> %s\n", filepath.Base(bkp))
-	}
 	dsdaContent := renderDSDADoomWithRes(paths, res)
-	if err := os.WriteFile(dsdaDest, []byte(dsdaContent), 0644); err != nil {
+	bkp, err = fsutil.WriteFileAtomic(dsdaDest, []byte(dsdaContent), 0o644)
+	if err != nil {
 		return err
+	}
+	if bkp != "" {
+		fmt.Fprintf(out, "Backing up existing dsda-doom.cfg -> %s\n", filepath.Base(bkp))
 	}
 	fmt.Fprintf(out, "✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
 
@@ -199,13 +194,8 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 
 		repoAuto := filepath.Join(repoDir, "uzdoom", "autoexec.cfg")
 		if _, err := os.Stat(filepath.Dir(repoAuto)); err == nil {
-			_ = os.WriteFile(repoAuto, []byte(text), 0644)
+			_ = os.WriteFile(repoAuto, []byte(text), 0o644)
 			fmt.Fprintf(out, "✓ Synced %s -> %s\n", autoDest, repoAuto)
-		}
-		dataAuto := filepath.Join(repoDir, "internal", "templates", "data", "autoexec.cfg")
-		if _, err := os.Stat(filepath.Dir(dataAuto)); err == nil {
-			_ = os.WriteFile(dataAuto, []byte(text), 0644)
-			fmt.Fprintf(out, "✓ Synced %s -> %s\n", autoDest, dataAuto)
 		}
 	}
 
@@ -218,13 +208,8 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 
 		repoDSDA := filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg")
 		if _, err := os.Stat(filepath.Dir(repoDSDA)); err == nil {
-			_ = os.WriteFile(repoDSDA, []byte(text), 0644)
+			_ = os.WriteFile(repoDSDA, []byte(text), 0o644)
 			fmt.Fprintf(out, "✓ Synced %s -> %s\n", dsdaDest, repoDSDA)
-		}
-		dataDSDA := filepath.Join(repoDir, "internal", "templates", "data", "dsda-doom.cfg")
-		if _, err := os.Stat(filepath.Dir(dataDSDA)); err == nil {
-			_ = os.WriteFile(dataDSDA, []byte(text), 0644)
-			fmt.Fprintf(out, "✓ Synced %s -> %s\n", dsdaDest, dataDSDA)
 		}
 	}
 

@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
 // TargetPattern maps a candidate source filename to its canonical destination name in WADs directory.
@@ -267,22 +269,6 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 }
 
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
+	_, err := fsutil.CopyFileAtomic(src, dst, 0o644)
 	return err
 }

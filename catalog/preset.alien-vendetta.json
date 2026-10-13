@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "alien-vendetta",
+  "name": "Alien Vendetta",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "AV.WAD"
+    },
+    {
+      "name": "AV.DEH"
+    }
+  ],
+  "category": "Community Megawad",
+  "compatibility": "Boom",
+  "description": "Classic Boom megawad + DEH patch",
+  "author": "Anders Johnsen, Brad Spencer, et al.",
+  "release_date": "2002",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/av.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/megawads/av",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 10
+}

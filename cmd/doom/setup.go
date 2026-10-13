@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -23,7 +22,7 @@ func newSetupCmd() *cobra.Command {
 				return err
 			}
 
-			out := cmd.OutOrStdout()
+			out := cmdOut(cmd)
 			fmt.Fprintln(out, "============================================================")
 			fmt.Fprintln(out, "  ⚡ Initiating Doom Setup")
 			fmt.Fprintln(out, "============================================================")
@@ -37,40 +36,40 @@ func newSetupCmd() *cobra.Command {
 			fmt.Fprintln(out)
 
 			// 2. Engines
-			fmt.Println(">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
-			installer := engine.NewInstaller(paths.BinDir, os.Stdout)
-			if err := installer.InstallAll(); err != nil {
-				fmt.Printf("Warning: engine installer encountered: %v\n", err)
+			fmt.Fprintln(out, ">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
+			installer := engine.NewInstaller(paths.BinDir, out)
+			if err := installer.InstallCatalog(cat); err != nil {
+				fmt.Fprintf(out, "Warning: engine installer encountered: %v\n", err)
 			}
-			fmt.Println()
+			fmt.Fprintln(out)
 
 			// 3. SoundFont
-			fmt.Println(">>> Step 3/5: Installing Roland SC-55 SoundFont...")
-			if _, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, os.Stdout); err != nil {
-				fmt.Printf("Warning: soundfont installer encountered: %v\n", err)
+			fmt.Fprintln(out, ">>> Step 3/5: Installing Roland SC-55 SoundFont...")
+			if _, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, out); err != nil {
+				fmt.Fprintf(out, "Warning: soundfont installer encountered: %v\n", err)
 			}
-			fmt.Println()
+			fmt.Fprintln(out)
 
 			// 4. Steam IWADs
-			fmt.Println(">>> Step 4/5: Auto-discovering official Steam/GOG game files...")
-			if _, err := steam.DiscoverAndExtract(nil, paths.WadsDir, flagForce, os.Stdout); err != nil {
-				fmt.Printf("Warning: steam discoverer encountered: %v\n", err)
+			fmt.Fprintln(out, ">>> Step 4/5: Auto-discovering official Steam/GOG game files...")
+			if _, err := steam.DiscoverAndExtract(nil, paths.WadsDir, flagForce, out); err != nil {
+				fmt.Fprintf(out, "Warning: steam discoverer encountered: %v\n", err)
 			}
-			fmt.Println()
+			fmt.Fprintln(out)
 
 			// 5. Community megawads
-			fmt.Println(">>> Step 5/5: Downloading community megawads...")
-			dl := wad.NewDownloader(paths.WadsDir, flagForce, os.Stdout)
+			fmt.Fprintln(out, ">>> Step 5/5: Downloading community megawads...")
+			dl := wad.NewDownloaderWithRoots(paths.WadRoots(), flagForce, out)
 			if err := dl.DownloadAll(cat); err != nil {
-				fmt.Printf("Warning: some megawads failed to download: %v\n", err)
+				fmt.Fprintf(out, "Warning: some megawads failed to download: %v\n", err)
 			}
-			fmt.Println()
+			fmt.Fprintln(out)
 
-			fmt.Println("============================================================")
-			fmt.Println("  ✓ Doom setup complete!")
-			fmt.Println("  Engines, configs, soundfonts, and megawads are ready.")
-			fmt.Println("  Run 'doom play' or 'doom' to start playing!")
-			fmt.Println("============================================================")
+			fmt.Fprintln(out, "============================================================")
+			fmt.Fprintln(out, "  ✓ Doom setup complete!")
+			fmt.Fprintln(out, "  Engines, configs, soundfonts, and megawads are ready.")
+			fmt.Fprintln(out, "  Run 'doom play' or 'doom' to start playing!")
+			fmt.Fprintln(out, "============================================================")
 			return nil
 		},
 	}

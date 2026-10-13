@@ -22,7 +22,7 @@ body:
         - "CLI: doom config (install/diff/sync)"
         - "Source Port Config: DSDA-Doom"
         - "Source Port Config: UZDoom"
-        - "Launcher: DoomRunner Preset"
+        - "Catalog: Presets & Overrides (catalog/ & catalog.d/)"
         - "Other"
     validations:
       required: true

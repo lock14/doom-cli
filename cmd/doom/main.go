@@ -3,7 +3,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +30,32 @@ var (
 	flagNerdFonts      bool
 )
 
+func cmdOut(cmd *cobra.Command) io.Writer {
+	if cmd == nil {
+		return os.Stdout
+	}
+	return cmd.OutOrStdout()
+}
+
+func cmdErr(cmd *cobra.Command) io.Writer {
+	if cmd == nil {
+		return os.Stderr
+	}
+	return cmd.ErrOrStderr()
+}
+
+func applyFlagOverrides(paths *config.Paths) {
+	if flagWadsDir != "" {
+		paths.WadsDir = flagWadsDir
+	}
+	if flagBinDir != "" {
+		paths.SetBinDir(flagBinDir)
+	}
+	if flagSoundFontsDir != "" {
+		paths.SetSoundFontsDir(flagSoundFontsDir)
+	}
+}
+
 func loadPathsAndConfig() (*config.Paths, *config.AppConfig, error) {
 	paths := config.GetPaths()
 	cfg, err := config.LoadConfig(paths)
@@ -35,9 +63,23 @@ func loadPathsAndConfig() (*config.Paths, *config.AppConfig, error) {
 		return nil, nil, fmt.Errorf("loading config: %w", err)
 	}
 	if cfg != nil {
+		if len(cfg.LegacyEntityKeys) > 0 {
+			fmt.Fprintf(
+				os.Stderr,
+				"warning: legacy keys (%s) in %s are ignored; "+
+					"user engines, presets, and overrides now live in %s\n",
+				strings.Join(cfg.LegacyEntityKeys, ", "),
+				paths.ConfigFile,
+				paths.CatalogDir,
+			)
+		}
 		hasWadsEnv := os.Getenv("WADS_DIR") != "" || os.Getenv("DOOM_WADS_DIR") != ""
 		if cfg.WadsDir != "" && !hasWadsEnv {
 			paths.WadsDir = cfg.WadsDir
+		}
+		hasWadsDirsEnv := os.Getenv("WADS_DIRS") != "" || os.Getenv("DOOM_WADS_DIRS") != ""
+		if len(cfg.WadsDirs) > 0 && !hasWadsDirsEnv {
+			paths.WadsDirs = append([]string(nil), cfg.WadsDirs...)
 		}
 		hasBinEnv := os.Getenv("BIN_DIR") != "" || os.Getenv("DOOM_BIN_DIR") != ""
 		if cfg.BinDir != "" && !hasBinEnv {
@@ -48,15 +90,7 @@ func loadPathsAndConfig() (*config.Paths, *config.AppConfig, error) {
 			paths.SetSoundFontsDir(cfg.SoundFontsDir)
 		}
 	}
-	if flagWadsDir != "" {
-		paths.WadsDir = flagWadsDir
-	}
-	if flagBinDir != "" {
-		paths.SetBinDir(flagBinDir)
-	}
-	if flagSoundFontsDir != "" {
-		paths.SetSoundFontsDir(flagSoundFontsDir)
-	}
+	applyFlagOverrides(paths)
 	return paths, cfg, nil
 }
 
@@ -66,24 +100,20 @@ func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 		return nil, nil, nil, err
 	}
 
-	var customEngines map[string]preset.EngineConfig
-	var customPresets []preset.Preset
-	var launchOptions map[string]preset.WadLaunchOptions
-	if cfg != nil {
-		customEngines = cfg.Engines
-		customPresets = cfg.Presets
-		launchOptions = cfg.LaunchOptions
+	userCatalogPath := paths.CatalogDir
+	explicitPath := false
+	if flagPresetsFile != "" {
+		userCatalogPath = flagPresetsFile
+		explicitPath = true
 	}
 
-	cat, err := preset.LoadLayeredCatalog(
-		flagPresetsFile,
-		paths.PresetsFile,
-		customEngines,
-		customPresets,
-		launchOptions,
-	)
+	cat, err := preset.LoadLayeredCatalog(userCatalogPath, explicitPath)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+
+	for _, d := range cat.Diagnostics {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", d.String())
 	}
 
 	return paths, cfg, cat, nil
@@ -97,7 +127,10 @@ func getCatalog() (*preset.Catalog, error) {
 func getPaths() *config.Paths {
 	paths, _, err := loadPathsAndConfig()
 	if err != nil {
-		return config.GetPaths()
+		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
+		fallback := config.GetPaths()
+		applyFlagOverrides(fallback)
+		return fallback
 	}
 	return paths
 }
@@ -125,7 +158,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 		&flagSoundFontsDir, "soundfonts-dir", "", "Custom path to SoundFonts directory",
 	)
 	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Print launch command without executing")
-	rootCmd.PersistentFlags().StringVar(&flagPresetsFile, "presets-file", "", "Custom presets.json file path")
+	rootCmd.PersistentFlags().StringVar(
+		&flagPresetsFile, "presets-file", "", "Custom user catalog directory or entity JSON file",
+	)
 	rootCmd.PersistentFlags().StringVar(
 		&flagTheme, "theme", "",
 		"Color theme for launcher (classic, blood, toxic, inferno, frost, plasma, heretic, amber, sigil, monochrome)",

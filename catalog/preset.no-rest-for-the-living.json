@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "no-rest-for-the-living",
+  "name": "No Rest for the Living",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "NERVE.WAD"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
+    }
+  ],
+  "category": "Official Expansion",
+  "compatibility": "Vanilla",
+  "description": "Official 9-level expansion for Doom II",
+  "author": "Nerve Software",
+  "release_date": "2010",
+  "sort": 200
+}
