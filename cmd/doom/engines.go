@@ -164,6 +164,7 @@ func newEnginesCmd() *cobra.Command {
 				return err
 			}
 			ins := engine.NewInstaller(paths.BinDir, cmdOut(cmd))
+			ins.Force = flagForce
 			target := "all"
 			if len(args) > 0 {
 				target = strings.TrimSpace(args[0])
@@ -180,6 +181,7 @@ func newEnginesCmd() *cobra.Command {
 			return ins.InstallEngine(eng)
 		},
 	}
+	enginesInstallCmd.Flags().BoolVar(&flagForce, "force", false, "Force re-download and overwrite existing files")
 
 	enginesCmd.AddCommand(enginesListCmd, enginesAddCmd, enginesRemoveCmd, enginesInstallCmd)
 	return enginesCmd

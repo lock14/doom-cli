@@ -38,6 +38,16 @@ func KnownAliases(name string) []string {
 		return []string{"gdturbo.wad"}
 	case "doom.wad":
 		return []string{"doom1.wad"}
+	case "sigil_ii_v1_0.wad":
+		return []string{"sigil2.wad", "sigil_ii.wad"}
+	case "sigil2.wad":
+		return []string{"sigil_ii_v1_0.wad"}
+	case "sigil_ii.wad":
+		return []string{"sigil_ii_v1_0.wad"}
+	case "sunder_v2512.wad":
+		return []string{"sunder.wad"}
+	case "sunder.wad":
+		return []string{"sunder_v2512.wad"}
 	default:
 		return nil
 	}

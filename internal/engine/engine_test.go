@@ -371,3 +371,37 @@ func TestInstallCatalog_AggregatesErrorsAndVerifiesDigest(t *testing.T) {
 		t.Fatalf("expected b-good to be installed despite a-bad failure: %v", statErr)
 	}
 }
+
+func TestInstallEngine_AlreadyInstalledSkipsUnlessForce(t *testing.T) {
+	t.Parallel()
+	binDir := t.TempDir()
+	existingBin := filepath.Join(binDir, "my-engine")
+	if err := os.WriteFile(existingBin, []byte("installed"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	ins := NewInstaller(binDir, &out)
+	ins.GOOS = "linux"
+	ins.GOARCH = "amd64"
+	ins.Force = false
+
+	eng := preset.EngineConfig{
+		ID:          "my-engine",
+		DisplayName: "My Engine",
+		Binary:      "my-engine",
+		Install: &preset.InstallRecipe{
+			Repo: "org/dummy",
+			Platforms: map[string]preset.PlatformRecipe{
+				"linux/amd64": {Assets: []string{`^dummy\.appimage$`}},
+			},
+		},
+	}
+
+	if err := ins.InstallEngine(eng); err != nil {
+		t.Fatalf("InstallEngine failed on already installed binary: %v", err)
+	}
+	if !strings.Contains(out.String(), "already installed") {
+		t.Fatalf("expected already installed message, got: %s", out.String())
+	}
+}

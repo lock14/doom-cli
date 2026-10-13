@@ -38,6 +38,7 @@ func newSetupCmd() *cobra.Command {
 			// 2. Engines
 			fmt.Fprintln(out, ">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
 			installer := engine.NewInstaller(paths.BinDir, out)
+			installer.Force = flagForce
 			if err := installer.InstallCatalog(cat); err != nil {
 				fmt.Fprintf(out, "Warning: engine installer encountered: %v\n", err)
 			}
