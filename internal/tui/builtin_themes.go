@@ -38,10 +38,10 @@ var ClassicTheme = Theme{
 // DefaultTheme is retained as an alias to ClassicTheme for backward compatibility.
 var DefaultTheme = ClassicTheme
 
-// BloodTheme is a gothic Crimson & Bone aesthetic inspired by Nightdive.
+// BloodTheme is a gothic Crimson and Bone aesthetic inspired by Nightdive.
 var BloodTheme = Theme{
 	Name:           "blood",
-	Description:    "Gothic Crimson & Bone Nightdive aesthetic",
+	Description:    "Gothic Crimson and Bone Nightdive aesthetic",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#9B111E"),
 	BrandText:      lipgloss.Color("#FFFFFF"),
@@ -69,7 +69,7 @@ var BloodTheme = Theme{
 // ToxicTheme is a radioactive Nukage Green and Hazard Amber theme inspired by Phobos techbases.
 var ToxicTheme = Theme{
 	Name:           "toxic",
-	Description:    "Radioactive Nukage Green & Hazard Amber",
+	Description:    "Radioactive Nukage Green and Hazard Amber",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#FFB703"),
 	BrandText:      lipgloss.Color("#0D1B2A"),
@@ -97,7 +97,7 @@ var ToxicTheme = Theme{
 // InfernoTheme is a volcanic molten magma and charred basalt theme inspired by Episode 3 and Plutonia.
 var InfernoTheme = Theme{
 	Name:           "inferno",
-	Description:    "Volcanic Molten Magma & Charred Basalt",
+	Description:    "Volcanic Molten Magma and Charred Basalt",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#FF5400"),
 	BrandText:      lipgloss.Color("#120805"),
@@ -125,7 +125,7 @@ var InfernoTheme = Theme{
 // FrostTheme is a soothing glacial ice and midnight navy theme inspired by Cocytus and Nordic palettes.
 var FrostTheme = Theme{
 	Name:           "frost",
-	Description:    "Glacial Cyan & Midnight Polar Navy",
+	Description:    "Glacial Cyan and Midnight Polar Navy",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#56CFE1"),
 	BrandText:      lipgloss.Color("#0A1128"),
@@ -153,7 +153,7 @@ var FrostTheme = Theme{
 // PlasmaTheme (aliased as CyberpunkTheme) is an electric cyan and neon magenta theme inspired by Plasma Rifle coils.
 var PlasmaTheme = Theme{
 	Name:           "plasma",
-	Description:    "Plasma Rifle Coils & Electric Neon",
+	Description:    "Plasma Rifle Coils and Electric Neon",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#FF2A6D"),
 	BrandText:      lipgloss.Color("#FFFFFF"),
@@ -184,7 +184,7 @@ var CyberpunkTheme = PlasmaTheme
 // HereticTheme is a dark fantasy amethyst and emerald theme inspired by Raven Software titles.
 var HereticTheme = Theme{
 	Name:           "heretic",
-	Description:    "Raven Dark Fantasy Amethyst & Emerald",
+	Description:    "Raven Dark Fantasy Amethyst and Emerald",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#FF79C6"),
 	BrandText:      lipgloss.Color("#282A36"),
@@ -243,7 +243,7 @@ var MatrixTheme = AmberTheme
 // SigilTheme is an occult velvet maroon and pentagram red theme inspired by Romero's Sigil episodes.
 var SigilTheme = Theme{
 	Name:           "sigil",
-	Description:    "Romero Occult Velvet Maroon & Pentagram Red",
+	Description:    "Romero Occult Velvet Maroon and Pentagram Red",
 	Type:           "TrueColor",
 	BrandCap:       lipgloss.Color("#D90429"),
 	BrandText:      lipgloss.Color("#ECE2D0"),
@@ -268,10 +268,10 @@ var SigilTheme = Theme{
 	Muted:          lipgloss.Color("#7A5260"),
 }
 
-// MonochromeTheme is a minimalist high-contrast Black & White ANSI theme.
+// MonochromeTheme is a minimalist high-contrast Black and White ANSI theme.
 var MonochromeTheme = Theme{
 	Name:           "monochrome",
-	Description:    "Minimalist high-contrast Black & White",
+	Description:    "Minimalist high-contrast Black and White",
 	Type:           "ANSI",
 	BrandCap:       lipgloss.Color("7"),
 	BrandText:      lipgloss.Color("0"),

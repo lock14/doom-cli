@@ -374,7 +374,7 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	var binMatch *zip.File
 	cleanTarget := strings.TrimSuffix(strings.ToLower(targetName), ".exe")
 
-	// 1. Exact match on targetName (e.g. "uzdoom.exe" or "dsda-doom")
+	// 1. Exact match on targetName (such as "uzdoom.exe" or "dsda-doom")
 	for _, zf := range zr.File {
 		if zf.FileInfo().IsDir() {
 			continue

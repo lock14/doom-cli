@@ -35,7 +35,7 @@ func newConfigCmd() *cobra.Command {
 	}
 	configToggleCmd := &cobra.Command{
 		Use:   "toggle <key>",
-		Short: "Toggle a boolean CLI configuration setting (e.g. nerd-fonts)",
+		Short: "Toggle a boolean CLI configuration setting (such as nerd-fonts)",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runConfigToggle,
 	}

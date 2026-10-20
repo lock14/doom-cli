@@ -10,13 +10,15 @@ import (
 	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
-var readmeTableRegex = regexp.MustCompile(`(## Preconfigured Presets\n\n[^\n]+\n\n)(\|[\s\S]+?)(\n\n---)`)
+var readmeTableRegex = regexp.MustCompile(
+	`(?i)(## Preconfigured presets\n\n[^\n]+\n\n)(\|[\s\S]+?)(\n\n(?:---|## ))`,
+)
 
 // GenerateReadmeTable constructs the markdown table for README.md using each
 // preset's resolved engine display name from the catalog.
 func GenerateReadmeTable(cat *Catalog) string {
 	lines := []string{
-		"| Megawad / Expansion | Engine | Compatibility / Details |",
+		"| Megawad or expansion | Engine | Compatibility and details |",
 		"| :--- | :--- | :--- |",
 	}
 	if cat == nil {
@@ -27,7 +29,7 @@ func GenerateReadmeTable(cat *Catalog) string {
 			continue
 		}
 		engDisplay := cat.EngineDisplayName(p.Engine)
-		lines = append(lines, fmt.Sprintf("| **%s** | %s | %s |", p.Name, engDisplay, p.Description))
+		lines = append(lines, fmt.Sprintf("| %s | %s | %s |", p.Name, engDisplay, p.Description))
 	}
 	return strings.Join(lines, "\n")
 }
@@ -52,7 +54,7 @@ func SyncReadme(rootDir string) error {
 	text := string(content)
 	loc := readmeTableRegex.FindStringSubmatchIndex(text)
 	if loc == nil {
-		return fmt.Errorf("could not locate '## Preconfigured Presets' table in %s", readmeFile)
+		return fmt.Errorf("could not locate '## Preconfigured presets' table in %s", readmeFile)
 	}
 
 	table := GenerateReadmeTable(cat)

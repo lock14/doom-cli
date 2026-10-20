@@ -108,10 +108,14 @@ func newEnginesCmd() *cobra.Command {
 	enginesAddCmd.Flags().StringVar(&addBinary, "binary", "", "Executable name or absolute path (defaults to id)")
 	enginesAddCmd.Flags().StringVar(&addBinary, "bin", "", "Executable name or absolute path (defaults to id)")
 	_ = enginesAddCmd.Flags().MarkHidden("bin")
-	enginesAddCmd.Flags().StringVar(&addStyle, "style", "", "Argument format: boom (-file/-deh) or zdoom (-file)")
-	enginesAddCmd.Flags().StringVar(&addStyle, "args-style", "", "Argument format: boom (-file/-deh) or zdoom (-file)")
+	enginesAddCmd.Flags().StringVar(
+		&addStyle, "style", "", "Argument format: boom (-file and -deh) or zdoom (-file)",
+	)
+	enginesAddCmd.Flags().StringVar(
+		&addStyle, "args-style", "", "Argument format: boom (-file and -deh) or zdoom (-file)",
+	)
 	_ = enginesAddCmd.Flags().MarkHidden("args-style")
-	enginesAddCmd.Flags().StringVar(&addFamily, "family", "", "Engine family (e.g. boom, mbf21, zdoom)")
+	enginesAddCmd.Flags().StringVar(&addFamily, "family", "", "Engine family (such as boom, mbf21, zdoom)")
 	enginesAddCmd.Flags().StringVar(&addArgs, "args", "", "Default flags always passed to this engine")
 	enginesAddCmd.Flags().StringVar(&addBadge, "badge", "", "Short badge label for the launcher")
 	enginesAddCmd.Flags().StringVar(&addDisplayName, "display-name", "", "Display name for the engine")

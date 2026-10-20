@@ -134,7 +134,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	if !ok {
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
-				"Run 'doom wads extract-steam' if you own the game on Steam/GOG",
+				"Run 'doom wads extract-steam' if you own the game on Steam or GOG",
 			p.IWAD,
 			primaryDir,
 		)

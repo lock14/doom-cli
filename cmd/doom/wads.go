@@ -68,7 +68,7 @@ func newWadsCmd() *cobra.Command {
 	wadsExtractCmd := &cobra.Command{
 		Use:     "extract-steam",
 		Aliases: []string{"extract"},
-		Short:   "Auto-discover and copy official IWADs and expansions from Steam/GOG",
+		Short:   "Auto-discover and copy official IWADs and expansions from Steam and GOG",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths, _, cat, err := loadAppState()
 			if err != nil {

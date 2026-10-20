@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -288,5 +289,60 @@ func TestMonochromeThemeContrast(t *testing.T) {
 	// Verify BrandBg and StatsBg are distinct for contrast
 	if MonochromeTheme.BrandBg == MonochromeTheme.StatsBg {
 		t.Errorf("expected BrandBg and StatsBg to differ in MonochromeTheme for visual contrast")
+	}
+}
+
+func TestReadmeCustomThemeJSONBlock(t *testing.T) {
+	t.Parallel()
+	readmePath := filepath.Join("..", "..", "README.md")
+	raw, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("reading README.md: %v", err)
+	}
+
+	lines := strings.Split(string(raw), "\n")
+	inCustomThemesSection := false
+	inJSONFence := false
+	var jsonBuf strings.Builder
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "### ") {
+			inCustomThemesSection = strings.EqualFold(trimmed, "### Custom JSON themes")
+			continue
+		}
+		if !inCustomThemesSection {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") {
+			if !inJSONFence {
+				if strings.EqualFold(strings.TrimSpace(strings.TrimPrefix(trimmed, "```")), "json") {
+					inJSONFence = true
+					jsonBuf.Reset()
+				}
+			} else {
+				break
+			}
+			continue
+		}
+		if inJSONFence {
+			jsonBuf.WriteString(line)
+			jsonBuf.WriteByte('\n')
+		}
+	}
+
+	block := strings.TrimSpace(jsonBuf.String())
+	if block == "" {
+		t.Fatal("could not find JSON code block under '### Custom JSON themes' in README.md")
+	}
+
+	dec := json.NewDecoder(strings.NewReader(block))
+	dec.DisallowUnknownFields()
+	var parsed CustomThemeFile
+	if err := dec.Decode(&parsed); err != nil {
+		t.Fatalf("README.md custom theme JSON failed strict CustomThemeFile decoding: %v\n%s", err, block)
+	}
+	if parsed.Name == "" || parsed.BrandCap == "" || parsed.StatusReady == "" {
+		t.Errorf("expected populated CustomThemeFile fields in README.md example, got %+v", parsed)
 	}
 }

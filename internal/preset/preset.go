@@ -402,7 +402,7 @@ func (c *Catalog) EngineBadge(engineKey string) string {
 	return (EngineConfig{ID: engineKey}).BadgeText()
 }
 
-// Find searches for a preset by exact ID, exact case-insensitive name, or name/ID prefix.
+// Find searches for a preset by exact ID, exact case-insensitive name, or name or ID prefix.
 func (c *Catalog) Find(target string) *Preset {
 	if c == nil {
 		return nil
