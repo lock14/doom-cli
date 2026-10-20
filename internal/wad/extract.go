@@ -49,7 +49,7 @@ func (d *Downloader) extractFromZip(
 		if zf.FileInfo().IsDir() {
 			continue
 		}
-		// CodeQL / Zip Slip defense: skip entries containing path traversal
+		// CodeQL and Zip Slip defense: skip entries containing path traversal
 		cleanName := filepath.Clean(zf.Name)
 		if strings.HasPrefix(cleanName, "..") ||
 			strings.Contains(cleanName, "/../") ||

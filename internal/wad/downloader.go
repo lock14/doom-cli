@@ -106,7 +106,7 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 			fmt.Fprintf(
 				d.Out,
 				"Note: '%s' is an official commercial release; "+
-					"files must be provided by user or Steam/GOG extractor.\n",
+					"files must be provided by user or Steam or GOG extractor.\n",
 				p.Name,
 			)
 		}

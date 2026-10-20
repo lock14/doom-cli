@@ -3,7 +3,7 @@
   "kind": "engine",
   "id": "dsda-doom",
   "display_name": "DSDA-Doom",
-  "description": "DSDA-Doom (MBF21 / Speedrun)",
+  "description": "DSDA-Doom (MBF21 and speedrunning)",
   "family": "PrBoom",
   "args_style": "boom",
   "binary": "dsda-doom",

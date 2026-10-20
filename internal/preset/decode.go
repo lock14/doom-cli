@@ -8,8 +8,8 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
-// DecodeText converts raw text bytes (e.g. from idgames .txt / README files) into valid UTF-8,
-// normalizing line endings and automatically detecting DOS Code Page 437 (ASCII/ANSI art),
+// DecodeText converts raw text bytes (such as idgames .txt and README files) into valid UTF-8,
+// normalizing line endings and automatically detecting DOS Code Page 437 (ASCII and ANSI art),
 // Windows-1252, or standard UTF-8.
 func DecodeText(raw []byte) string {
 	if len(raw) == 0 {
@@ -71,7 +71,7 @@ func DecodeText(raw []byte) string {
 	return string(normalized)
 }
 
-// ReadReadme reads and decodes an accompanying documentation file, converting CP437/Windows-1252 to UTF-8
+// ReadReadme reads and decodes an accompanying documentation file, converting CP437 or Windows-1252 to UTF-8
 // and normalizing carriage returns.
 func ReadReadme(path string) (string, error) {
 	raw, err := os.ReadFile(path)

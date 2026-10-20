@@ -284,7 +284,7 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 		return "", false
 	}
 
-	// Relative sub-path (e.g. "sub/foo.wad" or "sub\foo.wad")
+	// Relative sub-path (such as "sub/foo.wad" or "sub\foo.wad")
 	if strings.ContainsAny(targetName, `/\`) {
 		return idx.resolveRelativeSubpath(targetName)
 	}

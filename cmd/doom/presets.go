@@ -115,7 +115,9 @@ func newPresetsCmd() *cobra.Command {
 	presetsAddCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for this preset (defaults to slugified name)")
 	presetsAddCmd.Flags().StringVar(&addEngine, "engine", "uzdoom", "Default engine for this preset")
 	presetsAddCmd.Flags().StringVar(&addIWAD, "iwad", "DOOM2.WAD", "Base IWAD required by this preset")
-	presetsAddCmd.Flags().StringSliceVar(&addFiles, "files", nil, "Comma-separated list of required PWAD/DEH files")
+	presetsAddCmd.Flags().StringSliceVar(
+		&addFiles, "files", nil, "Comma-separated list of required PWAD and DeHackEd files",
+	)
 	presetsAddCmd.Flags().StringSliceVar(
 		&addOptionalFiles, "optional-files", nil, "Comma-separated list of optional PWAD files",
 	)
@@ -123,8 +125,8 @@ func newPresetsCmd() *cobra.Command {
 	presetsAddCmd.Flags().StringVar(&addDesc, "description", "", "Short description of the mapset")
 	presetsAddCmd.Flags().StringVar(&addDesc, "desc", "", "Short description of the mapset")
 	_ = presetsAddCmd.Flags().MarkHidden("desc")
-	presetsAddCmd.Flags().StringVar(&addAuthor, "author", "", "Map author / team")
-	presetsAddCmd.Flags().StringVar(&addRelease, "release", "", "Release year / date")
+	presetsAddCmd.Flags().StringVar(&addAuthor, "author", "", "Map author or team")
+	presetsAddCmd.Flags().StringVar(&addRelease, "release", "", "Release year or date")
 	presetsAddCmd.Flags().StringVar(&addArgs, "args", "", "Default extra launch arguments")
 	presetsAddCmd.Flags().StringVar(&addSourceURL, "source-url", "", "HTTPS download URL for the WAD archive")
 	presetsAddCmd.Flags().StringVar(&addSourceURL, "download-url", "", "HTTPS download URL for the WAD archive")
@@ -207,7 +209,7 @@ func newPresetsCmd() *cobra.Command {
 	}
 	presetsConfigCmd.Flags().StringVar(&cfgEngine, "engine", "", "Preferred engine override for this preset")
 	presetsConfigCmd.Flags().StringVar(&cfgIWAD, "iwad", "", "Custom IWAD override")
-	presetsConfigCmd.Flags().StringVar(&cfgArgs, "args", "", "Additional launch arguments (e.g. -skill 4 -warp 01)")
+	presetsConfigCmd.Flags().StringVar(&cfgArgs, "args", "", "Additional launch arguments (such as -skill 4 -warp 01)")
 	presetsConfigCmd.Flags().StringSliceVar(&cfgFiles, "files", nil, "Extra PWAD files to load with this preset")
 	presetsConfigCmd.Flags().BoolVar(&cfgReset, "reset", false, "Clear all custom launch options for this preset")
 

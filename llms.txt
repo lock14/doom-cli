@@ -6,10 +6,10 @@
 ## Overview
 
 `github.com/lock14/doom-cli` provides a static, zero-dependency Go CLI (`doom`) that automates Doom source port
-management, engine configuration deployment with display auto-detection, Steam/GOG game file discovery,
+management, engine configuration deployment with display auto-detection, Steam and GOG game file discovery,
 multi-mirror community megawad downloading, and interactive terminal launching across Linux, macOS, and Windows.
 
-## Quick Start
+## Quick start
 
 ```bash
 # Automated full setup (engines, configs, soundfonts, Steam IWADs, community WADs)
@@ -23,7 +23,7 @@ doom launch "Eviternity II"
 doom launch "Ancient Aliens" -e dsda-doom -skill 4
 ```
 
-## CLI Command Tree
+## CLI command tree
 
 - `doom setup`: Full automated turnkey setup in a single step.
 - `doom play`: Interactive TUI preset launcher powered by Bubble Tea.
@@ -46,7 +46,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom config show`: Displays active CLI user settings (`config.json`) and catalog path.
 - `doom config get <key>`: Retrieves a specific configuration value (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`).
 - `doom config set <key> <val>`: Sets a configuration value.
-- `doom config toggle <key>`: Toggles a boolean configuration setting (e.g. `nerd-fonts`).
+- `doom config toggle <key>`: Toggles a boolean configuration setting (such as `nerd-fonts`).
 - `doom config install`: Deploys engine configuration files with native display auto-detection and backups.
 - `doom config diff`: Shows differences between repository templates and live installed configs.
 - `doom config sync`: Pulls in-game tweaks back from the host system into repository templates.
@@ -54,7 +54,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom themes set <name>`: Sets persistent launcher color theme.
 - `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
 
-## Architecture & Modular Packages
+## Architecture and modular packages
 
 - `embed.go`: Single root `embed.FS` embedding `catalog/*.json`, `dsda-doom/dsda-doom.cfg`, and `uzdoom/autoexec.cfg`.
 - `catalog/`: Per-entity curated JSON files (`engine.<id>.json`, `preset.<id>.json`).
@@ -63,7 +63,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
   - `play.go`: `doom play` interactive Bubble Tea launcher.
   - `launch.go`: `doom launch` direct execution.
   - `setup.go`: `doom setup` automated turnkey workflow.
-  - `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract-steam` / `extract`).
+  - `wads.go`: `doom wads` subcommands (`list`, `fetch`, and `extract-steam` with `extract` alias).
   - `engines.go`: `doom engines` subcommands (`list`, `add`, `remove`, `install`).
   - `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build`, `lint`).
   - `soundfont.go`: `doom soundfont install`.
@@ -79,14 +79,14 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
 - `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, and SoundFont installer (`downloader.go`, `extract.go`, `soundfont.go`).
 
-## Key Design Invariants
+## Key design invariants
 
-- **Single Source of Truth**: Curated engines and presets are defined one-entity-per-file in `catalog/*.json`, with user entities and overrides layered from `<ConfigDir>/catalog.d/*.json`.
-- **Catalog-Driven WAD Aliases & Steam Synthesis**: Alternate filename stems (`files[].aliases`) are declared once in `catalog/preset.<id>.json` and `<ConfigDir>/catalog.d/*.json`; `preset.KnownAliases`, `DirIndex`, and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog alongside normalized filename matching (`preset.NormalizeFilename`).
+- **Single source of truth**: Curated engines and presets are defined one-entity-per-file in `catalog/*.json`, with user entities and overrides layered from `<ConfigDir>/catalog.d/*.json`.
+- **Catalog-driven WAD aliases and Steam synthesis**: Alternate filename stems (`files[].aliases`) are declared once in `catalog/preset.<id>.json` and `<ConfigDir>/catalog.d/*.json`; `preset.KnownAliases`, `DirIndex`, and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog alongside normalized filename matching (`preset.NormalizeFilename`).
 - **Portability**: Configuration templates use `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholders.
-- **Destructive Safety**: Atomic writes and non-clobbering timestamped backups (`.bak.<timestamp>`) are created before modifying existing user files.
-- **Archive Security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and SHA-256 verification.
-- **Strict Line Length (120 Columns)**: Code enforced at 120 columns via `revive.toml` and `.editorconfig`.
+- **Destructive safety**: Atomic writes and non-clobbering timestamped backups (`.bak.<timestamp>`) are created before modifying existing user files.
+- **Archive security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and SHA-256 verification.
+- **Strict line length (120 columns)**: Code enforced at 120 columns via `revive.toml` and `.editorconfig`.
 
 ## References
 

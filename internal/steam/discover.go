@@ -162,7 +162,7 @@ func GetSearchRoots() []string {
 			roots = append(roots, drive+`:\Steam`, drive+`:\GOG Games`, drive+`:\Games`)
 		}
 
-	default: // Linux / BSD
+	default: // Linux and BSD
 		if home != "" {
 			roots = append(roots,
 				filepath.Join(home, ".local", "share", "Steam"),
@@ -248,7 +248,7 @@ func DiscoverAndExtractForCatalog(
 	}
 	fmt.Fprintln(out)
 
-	// Build indexed maps: lowercase and normalized filenames -> slice of paths
+	// Build indexed maps from lowercase and normalized filenames to slices of paths
 	indexed := make(map[string][]string)
 	indexedNorm := make(map[string][]string)
 	for _, root := range existingRoots {
