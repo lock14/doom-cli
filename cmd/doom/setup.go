@@ -53,7 +53,7 @@ func newSetupCmd() *cobra.Command {
 
 			// 4. Steam IWADs
 			fmt.Fprintln(out, ">>> Step 4/5: Auto-discovering official Steam/GOG game files...")
-			if _, err := steam.DiscoverAndExtract(nil, paths.WadsDir, flagForce, out); err != nil {
+			if _, err := steam.DiscoverAndExtractForCatalog(cat, nil, paths.WadsDir, flagForce, out); err != nil {
 				fmt.Fprintf(out, "Warning: steam discoverer encountered: %v\n", err)
 			}
 			fmt.Fprintln(out)

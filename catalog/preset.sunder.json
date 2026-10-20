@@ -7,7 +7,10 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "SUNDER_V2512.wad"
+      "name": "SUNDER_V2512.wad",
+      "aliases": [
+        "sunder.wad"
+      ]
     }
   ],
   "category": "Community Megawad",

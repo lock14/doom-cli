@@ -366,7 +366,7 @@ func runPresetsShow(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(out, "  Engine:        %s%s\n", engStr, engineOverridden)
 
-	idx := preset.NewDirIndex(paths.WadRoots()...)
+	idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat).WithPresets(*p)
 	iwadPath, iwadFound := idx.ResolveFile(p.IWAD)
 	iwadStatus := "[✗ Missing]"
 	if iwadFound {

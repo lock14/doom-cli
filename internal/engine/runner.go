@@ -128,7 +128,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	if primaryDir == "" && len(roots) > 0 {
 		primaryDir = roots[0]
 	}
-	idx := preset.NewDirIndex(roots...)
+	idx := preset.NewDirIndex(roots...).WithCatalog(opts.Catalog).WithPresets(p)
 
 	iwadPath, ok := idx.ResolveFile(p.IWAD)
 	if !ok {

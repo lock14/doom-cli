@@ -280,7 +280,7 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 		ov.AppendArgs = append([]string(nil), (*req.AppendArgs)...)
 	}
 	if req.AppendFiles != nil {
-		ov.AppendFiles = append([]FileSpec(nil), (*req.AppendFiles)...)
+		ov.AppendFiles = cloneFileSpecs(*req.AppendFiles)
 	}
 
 	data, err := MarshalEntity(ov)

@@ -265,10 +265,14 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(root1, "av", "DOOM2.WAD"), []byte("IWAD"), 0o644)
 
 	// Create alias files
+	sigilWad := filepath.Join(root0, "sigil.wad")
+	_ = os.WriteFile(sigilWad, []byte("PWAD"), 0o644)
 	sigil2Wad := filepath.Join(root0, "sigil2.wad")
 	_ = os.WriteFile(sigil2Wad, []byte("PWAD"), 0o644)
 	sunderWad := filepath.Join(root1, "sunder.wad")
 	_ = os.WriteFile(sunderWad, []byte("PWAD"), 0o644)
+	aaliensWad := filepath.Join(root1, "aaliens.wad")
+	_ = os.WriteFile(aaliensWad, []byte("PWAD"), 0o644)
 
 	idx := NewDirIndex(root0, root1)
 
@@ -284,8 +288,10 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 		{name: "traversal rejected", query: "../evil.wad", wantOK: false},
 		{name: "1-level subdir non-IWAD in root1", query: "av.wad", wantOK: true, wantPath: avSub},
 		{name: "IWAD in subdir ignored", query: "DOOM2.WAD", wantOK: false},
+		{name: "alias sigil to SIGIL_V1_23", query: "SIGIL_V1_23.wad", wantOK: true, wantPath: sigilWad},
 		{name: "alias sigil2 to SIGIL_II_V1_0", query: "SIGIL_II_V1_0.WAD", wantOK: true, wantPath: sigil2Wad},
 		{name: "alias sunder to SUNDER_V2512", query: "SUNDER_V2512.wad", wantOK: true, wantPath: sunderWad},
+		{name: "alias aaliens to aaliens_v1_2", query: "aaliens_v1_2.wad", wantOK: true, wantPath: aaliensWad},
 	}
 
 	for _, tc := range tests {
@@ -302,11 +308,120 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	}
 }
 
+func TestLintCatalog_FileAliasesValidation(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+
+	// Redundant alias, path-separator alias, cross-IWAD alias (HERETIC.WAD on DOOM2 preset),
+	// and canonical target collision (SCYTHE.WAD)
+	badPreset := `{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "custom-alias-test",
+  "name": "Custom Alias Test",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "my_map.wad",
+      "aliases": ["MY-MAP.WAD", "sub/other.wad", "HERETIC.WAD", "SCYTHE.WAD"]
+    }
+  ]
+}`
+	targetFile := filepath.Join(userDir, "preset.custom-alias-test.json")
+	if err := os.WriteFile(targetFile, []byte(badPreset), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override with invalid alias
+	badOverride := `{
+  "schema_version": 1,
+  "kind": "override",
+  "target": { "kind": "preset", "id": "scythe" },
+  "append_files": [
+    {
+      "name": "extra_mod.wad",
+      "aliases": ["EXTRA-MOD.WAD"]
+    }
+  ]
+}`
+	ovFile := filepath.Join(userDir, "override.preset.scythe.json")
+	if err := os.WriteFile(ovFile, []byte(badOverride), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := LintCatalog("", userDir)
+	if err != nil {
+		t.Fatalf("LintCatalog error: %v", err)
+	}
+	if !HasErrors(diags) {
+		t.Fatal("expected lint errors for invalid file aliases, got none")
+	}
+
+	var joined strings.Builder
+	for _, d := range diags {
+		joined.WriteString(d.Message + "\n")
+	}
+	out := joined.String()
+	for _, wantSub := range []string{
+		"redundant with normalized filename",
+		"must not contain path separators",
+		"must not match iwad \"HERETIC.WAD\"",
+		"conflicts with canonical target \"SCYTHE.WAD\"",
+		"file extra_mod.wad alias \"EXTRA-MOD.WAD\" is redundant",
+	} {
+		if !strings.Contains(out, wantSub) {
+			t.Errorf("expected lint diagnostics to contain %q, got:\n%s", wantSub, out)
+		}
+	}
+}
+
+func TestDirIndex_WithCatalogCustomAliases(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	aliasFile := filepath.Join(wadsDir, "custom_short.wad")
+	if err := os.WriteFile(aliasFile, []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasTxt := filepath.Join(wadsDir, "custom_short.txt")
+	if err := os.WriteFile(aliasTxt, []byte("readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	customPreset := Preset{
+		ID:     "custom-pack",
+		Name:   "Custom Pack",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files: []FileSpec{
+			{
+				Name:    "custom_pack_v2.wad",
+				Aliases: []string{"custom_short.wad"},
+			},
+		},
+	}
+	cat := &Catalog{Presets: []Preset{customPreset}}
+	idx := NewDirIndex(wadsDir).WithCatalog(cat)
+
+	got, ok := idx.ResolveFile("custom_pack_v2.wad")
+	if !ok || got != aliasFile {
+		t.Fatalf("ResolveFile(\"custom_pack_v2.wad\") = (%q, %v), want (%q, true)", got, ok, aliasFile)
+	}
+
+	gotTxt, okTxt := idx.ResolveReadme(customPreset)
+	if !okTxt || gotTxt != aliasTxt {
+		t.Fatalf("ResolveReadme(customPreset) = (%q, %v), want (%q, true)", gotTxt, okTxt, aliasTxt)
+	}
+}
+
 func TestResolveReadmeRegression2(t *testing.T) {
 	t.Parallel()
 	wadsDir := t.TempDir()
 
-	for _, txt := range []string{"doom.txt", "doom2.txt", "plutonia.txt", "tnt.txt", "heretic.txt", "hexen.txt"} {
+	for _, txt := range []string{
+		"doom.txt", "doom2.txt", "plutonia.txt", "tnt.txt", "heretic.txt", "hexen.txt",
+		"aaliens.txt", "gd.txt", "sigil.txt", "sigil2.txt", "sunder.txt",
+	} {
 		if err := os.WriteFile(filepath.Join(wadsDir, txt), []byte("readme"), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -316,7 +431,7 @@ func TestResolveReadmeRegression2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCuratedCatalog: %v", err)
 	}
-	idx := NewDirIndex(wadsDir)
+	idx := NewDirIndex(wadsDir).WithCatalog(cat)
 
 	basePresets := []struct {
 		name    string
@@ -328,6 +443,11 @@ func TestResolveReadmeRegression2(t *testing.T) {
 		{name: "TNT: Evilution", wantTxt: "tnt.txt"},
 		{name: "Heretic", wantTxt: "heretic.txt"},
 		{name: "Hexen", wantTxt: "hexen.txt"},
+		{name: "Ancient Aliens", wantTxt: "aaliens.txt"},
+		{name: "Going Down Turbo", wantTxt: "gd.txt"},
+		{name: "Sigil", wantTxt: "sigil.txt"},
+		{name: "Sigil II", wantTxt: "sigil2.txt"},
+		{name: "Sunder", wantTxt: "sunder.txt"},
 	}
 
 	for _, tc := range basePresets {

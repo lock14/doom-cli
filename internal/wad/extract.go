@@ -27,7 +27,12 @@ func isZip(path string) bool {
 	return bytes.Equal(buf[:], []byte{'P', 'K', 0x03, 0x04})
 }
 
-func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []string) error {
+func (d *Downloader) extractFromZip(
+	zipPath string,
+	_ int64,
+	expectedFiles []string,
+	presets ...preset.Preset,
+) error {
 	zr, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed opening zip: %w", err)
@@ -35,6 +40,7 @@ func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []str
 	defer zr.Close()
 
 	cleanWadsDir := filepath.Clean(d.WadsDir)
+	aliasCat := &preset.Catalog{Presets: presets}
 
 	var wadFiles []*zip.File
 	var dehFiles []*zip.File
@@ -97,11 +103,16 @@ func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []str
 			}
 		}
 
-		// 3. Known aliases
+		// 3. Known aliases (curated and preset-defined)
 		if match == nil {
-			for _, alias := range preset.KnownAliases(expLower) {
+			for _, alias := range aliasCat.FileAliases(expBase) {
+				aliasNorm := preset.NormalizeFilename(alias)
 				for _, zf := range zr.File {
-					if strings.EqualFold(filepath.Base(zf.Name), alias) {
+					if zf.FileInfo().IsDir() {
+						continue
+					}
+					zfBase := filepath.Base(zf.Name)
+					if strings.EqualFold(zfBase, alias) || preset.NormalizeFilename(zfBase) == aliasNorm {
 						match = zf
 						break
 					}
