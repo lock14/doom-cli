@@ -7,7 +7,10 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "aaliens_v1_2.wad"
+      "name": "aaliens_v1_2.wad",
+      "aliases": [
+        "aaliens.wad"
+      ]
     }
   ],
   "category": "Community Megawad",

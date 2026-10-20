@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/lock14/doom-cli/internal/fsutil"
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 // TargetPattern maps a candidate source filename to its canonical destination name in WADs directory.
@@ -20,43 +21,75 @@ type TargetPattern struct {
 	DestName      string
 }
 
-// DefaultTargetPatterns returns all official commercial Doom files and re-release add-ons to extract.
+// DefaultTargetPatterns returns all official commercial Doom files, expansions, and catalog WADs
+// (including declared filename aliases) to extract from Steam and GOG installations.
 func DefaultTargetPatterns() []TargetPattern {
-	return []TargetPattern{
-		{"DOOM.WAD", "DOOM.WAD"},
-		{"DOOM1.WAD", "DOOM.WAD"},
-		{"DOOM2.WAD", "DOOM2.WAD"},
-		{"PLUTONIA.WAD", "PLUTONIA.WAD"},
-		{"TNT.WAD", "TNT.WAD"},
-		{"HERETIC.WAD", "HERETIC.WAD"},
-		{"HEXEN.WAD", "HEXEN.WAD"},
-		{"HEXDD.WAD", "HEXDD.WAD"},
-		{"NERVE.WAD", "NERVE.WAD"},
-		{"MASTERLEVELS.WAD", "MASTERLEVELS.WAD"},
-		{"idkfa 2024.wad", "idkfa 2024.wad"},
-		{"idkfa_2024.wad", "idkfa 2024.wad"},
-		{"id24res.wad", "id24res.wad"},
-		{"id1-res.wad", "id1-res.wad"},
-		{"id1-weap.wad", "id1-weap.wad"},
-		{"id1.wad", "id1.wad"},
-		{"extras.wad", "extras.wad"},
-		{"sigil.wad", "SIGIL_V1_23.wad"},
-		{"SIGIL_V1_23.wad", "SIGIL_V1_23.wad"},
-		{"sigil2.wad", "SIGIL_II_V1_0.WAD"},
-		{"sigil_ii.wad", "SIGIL_II_V1_0.WAD"},
-		{"SIGIL_II_V1_0.WAD", "SIGIL_II_V1_0.WAD"},
-		{"DoomZero.wad", "DoomZero.wad"},
-		{"doomzero.wad", "DoomZero.wad"},
-		{"DOOMZERO.DEH", "DOOMZERO.DEH"},
-		{"doomzero.deh", "DOOMZERO.DEH"},
-		{"gdturbo.wad", "gdturbo.wad"},
-		{"gd.wad", "gdturbo.wad"},
-		{"SCYTHE.WAD", "SCYTHE.WAD"},
-		{"scythe.wad", "SCYTHE.WAD"},
-		{"scythe2.wad", "scythe2.wad"},
-		{"SUNDER_V2512.wad", "SUNDER_V2512.wad"},
-		{"sunder.wad", "SUNDER_V2512.wad"},
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		return nil
 	}
+	return TargetPatternsForCatalog(cat)
+}
+
+// TargetPatternsForCatalog synthesizes extraction target patterns from the given preset catalog,
+// mapping both canonical filenames and their declared aliases to each preset's canonical filename.
+func TargetPatternsForCatalog(cat *preset.Catalog) []TargetPattern {
+	if cat == nil {
+		return nil
+	}
+
+	var patterns []TargetPattern
+	seen := make(map[string]bool)
+
+	addPattern := func(sourcePattern, destName string) {
+		src := strings.TrimSpace(sourcePattern)
+		dst := strings.TrimSpace(destName)
+		if src == "" || dst == "" {
+			return
+		}
+		key := preset.NormalizeFilename(src) + "->" + strings.ToLower(dst)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		patterns = append(patterns, TargetPattern{
+			SourcePattern: src,
+			DestName:      dst,
+		})
+	}
+
+	// 1. Base IWADs referenced across the catalog (plus official Hexen expansion HEXDD.WAD)
+	seenIWADs := make(map[string]bool)
+	for _, p := range cat.Presets {
+		iwad := filepath.Base(strings.TrimSpace(p.IWAD))
+		if iwad == "" || seenIWADs[strings.ToLower(iwad)] {
+			continue
+		}
+		seenIWADs[strings.ToLower(iwad)] = true
+		addPattern(iwad, iwad)
+		for _, alias := range cat.FileAliases(iwad) {
+			addPattern(alias, iwad)
+		}
+		if strings.EqualFold(iwad, "HEXEN.WAD") {
+			addPattern("HEXDD.WAD", "HEXDD.WAD")
+		}
+	}
+
+	// 2. PWADs, DeHackEd patches, and optional soundtracks declared across catalog presets
+	for _, p := range cat.Presets {
+		for _, f := range p.Files {
+			dest := filepath.Base(strings.TrimSpace(f.Name))
+			if dest == "" {
+				continue
+			}
+			addPattern(dest, dest)
+			for _, alias := range f.Aliases {
+				addPattern(alias, dest)
+			}
+		}
+	}
+
+	return patterns
 }
 
 var vdfPathRegex = regexp.MustCompile(`^\s*"path"\s*"([^"]+)"`)
@@ -171,6 +204,18 @@ func GetSearchRoots() []string {
 
 // DiscoverAndExtract searches for official game files across search roots and copies them into wadsDir.
 func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io.Writer) (int, error) {
+	return DiscoverAndExtractForCatalog(nil, searchRoots, wadsDir, force, out)
+}
+
+// DiscoverAndExtractForCatalog searches for official game files and catalog WADs across search roots
+// using target patterns synthesized from cat (or the curated catalog when cat is nil).
+func DiscoverAndExtractForCatalog(
+	cat *preset.Catalog,
+	searchRoots []string,
+	wadsDir string,
+	force bool,
+	out io.Writer,
+) (int, error) {
 	if out == nil {
 		out = io.Discard
 	}
@@ -203,8 +248,9 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 	}
 	fmt.Fprintln(out)
 
-	// Build indexed map: lowercase filename -> slice of paths
+	// Build indexed maps: lowercase and normalized filenames -> slice of paths
 	indexed := make(map[string][]string)
+	indexedNorm := make(map[string][]string)
 	for _, root := range existingRoots {
 		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil || d == nil {
@@ -228,17 +274,27 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 				strings.HasSuffix(lowerName, ".pk3") ||
 				strings.HasSuffix(lowerName, ".deh") {
 				indexed[lowerName] = append(indexed[lowerName], path)
+				normName := preset.NormalizeFilename(d.Name())
+				indexedNorm[normName] = append(indexedNorm[normName], path)
 			}
 			return nil
 		})
 	}
 
-	patterns := DefaultTargetPatterns()
+	var patterns []TargetPattern
+	if cat != nil {
+		patterns = TargetPatternsForCatalog(cat)
+	} else {
+		patterns = DefaultTargetPatterns()
+	}
 	foundCount := 0
 	installedTargets := make(map[string]bool)
 
 	for _, tp := range patterns {
-		destFile := filepath.Join(wadsDir, tp.DestName)
+		destFile, joinErr := fsutil.SafeJoin(wadsDir, tp.DestName)
+		if joinErr != nil {
+			continue
+		}
 		if installedTargets[strings.ToLower(tp.DestName)] {
 			continue
 		}
@@ -250,6 +306,9 @@ func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io
 		}
 
 		candidates := indexed[strings.ToLower(tp.SourcePattern)]
+		if len(candidates) == 0 {
+			candidates = indexedNorm[preset.NormalizeFilename(tp.SourcePattern)]
+		}
 		if len(candidates) > 0 {
 			src := candidates[0]
 			if err := copyFile(src, destFile); err == nil {

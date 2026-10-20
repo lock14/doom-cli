@@ -36,8 +36,11 @@ All contributions must respect our core foundational principles:
     *   **UZDoom**: Use for mapsets requiring ZDoom/GZDoom scripting, high-res texture packs like OTEX
         (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
     *   **No Duplicate IWADs**: Never include the base game IWAD in `files`. The IWAD must only be specified in `iwad`.
-    *   **Filename Normalization & Alias Tolerance**: Maintain case-insensitive and dash/underscore/space-tolerant
-        file resolution so maps and DeHackEd patches resolve reliably regardless of user file naming.
+    *   **Filename Normalization & Declarative Aliases**: Maintain case-insensitive and dash/underscore/space-tolerant
+        file resolution (`preset.NormalizeFilename`) across WAD roots, archive extraction, and Steam/GOG discovery.
+        When an upstream archive or rerelease uses a distinct filename stem, declare `"aliases"` on the `FileSpec` in
+        `catalog/preset.<id>.json` so both `preset.KnownAliases` and `steam.DefaultTargetPatterns()` derive from a
+        single source of truth.
     *   **Two-Layer Catalog**: Curated defaults in `catalog/*.json` are immutable; user engines, presets, and overrides
         layer cleanly as individual drop-in files in `<ConfigDir>/catalog.d/*.json`, while `<ConfigDir>/config.json`
         stores CLI settings only.

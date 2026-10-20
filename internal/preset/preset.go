@@ -177,9 +177,10 @@ func GuessArgsStyle(idOrName, family string) string {
 
 // FileSpec describes a single WAD, PK3, or DeHackEd file in a preset's load order.
 type FileSpec struct {
-	Name     string `json:"name"`
-	Optional bool   `json:"optional,omitempty"`
-	SHA256   string `json:"sha256,omitempty"`
+	Name     string   `json:"name"`
+	Aliases  []string `json:"aliases,omitempty"`
+	Optional bool     `json:"optional,omitempty"`
+	SHA256   string   `json:"sha256,omitempty"`
 }
 
 // Source describes a downloadable archive or file mirror for a preset.
@@ -316,6 +317,19 @@ type Catalog struct {
 	Diagnostics []Diagnostic
 }
 
+func cloneFileSpecs(files []FileSpec) []FileSpec {
+	if len(files) == 0 {
+		return nil
+	}
+	out := make([]FileSpec, len(files))
+	for i, f := range files {
+		fc := f
+		fc.Aliases = append([]string(nil), f.Aliases...)
+		out[i] = fc
+	}
+	return out
+}
+
 // Clone returns a deep copy of the Catalog.
 func (c *Catalog) Clone() *Catalog {
 	if c == nil {
@@ -335,7 +349,7 @@ func (c *Catalog) Clone() *Catalog {
 	}
 	for i, p := range c.Presets {
 		pc := p
-		pc.Files = append([]FileSpec(nil), p.Files...)
+		pc.Files = cloneFileSpecs(p.Files)
 		pc.Args = append([]string(nil), p.Args...)
 		pc.Sources = append([]Source(nil), p.Sources...)
 		pc.Links = append([]Link(nil), p.Links...)
@@ -942,7 +956,7 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 			p.IWAD = *s.IWAD
 		}
 		if s.Files != nil {
-			p.Files = append([]FileSpec(nil), (*s.Files)...)
+			p.Files = cloneFileSpecs(*s.Files)
 		}
 		if s.Args != nil {
 			p.Args = append([]string(nil), (*s.Args)...)
@@ -973,10 +987,10 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 		}
 	}
 	if len(ov.AppendFiles) > 0 {
-		p.Files = append(p.Files, ov.AppendFiles...)
+		p.Files = append(cloneFileSpecs(p.Files), cloneFileSpecs(ov.AppendFiles)...)
 	}
 	if len(ov.AppendArgs) > 0 {
-		p.Args = append(p.Args, ov.AppendArgs...)
+		p.Args = append(append([]string(nil), p.Args...), ov.AppendArgs...)
 	}
 	p.Overridden = true
 }

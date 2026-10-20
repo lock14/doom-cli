@@ -77,7 +77,7 @@ func (d *Downloader) IsPresetInstalled(p preset.Preset) bool {
 	if len(expected) == 0 {
 		return true
 	}
-	idx := preset.NewDirIndex(d.roots()...)
+	idx := preset.NewDirIndex(d.roots()...).WithPresets(p)
 	for _, exp := range expected {
 		if _, ok := idx.ResolveFile(exp); !ok {
 			return false
@@ -157,7 +157,7 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 		}
 
 		fmt.Fprintf(d.Out, "    Trying: %s\n", cleanURL)
-		err := d.downloadAndExtract(src, expected)
+		err := d.downloadAndExtract(src, expected, p)
 		if err == nil {
 			fmt.Fprintln(d.Out)
 			return nil
@@ -180,7 +180,7 @@ func urlExtension(rawURL string) string {
 	return filepath.Ext(lower)
 }
 
-func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []string) error {
+func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []string, p preset.Preset) error {
 	req, err := http.NewRequest(http.MethodGet, src.URL, nil)
 	if err != nil {
 		return err
@@ -244,7 +244,7 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 	}
 
 	if isZip(tmpArchive) {
-		return d.extractFromZip(tmpArchive, size, expectedFiles)
+		return d.extractFromZip(tmpArchive, size, expectedFiles, p)
 	}
 
 	return fmt.Errorf("downloaded payload from %s is not a valid zip archive", src.URL)

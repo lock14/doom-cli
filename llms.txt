@@ -73,8 +73,8 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `internal/display/`: Native display resolution and refresh rate auto-detection.
 - `internal/engine/`: Declarative source port binary installation and argument synthesis (`runner.go`, `installer.go`).
 - `internal/fsutil/`: Atomic file writes with timestamped backups and path-containment helpers (`fsutil.go`).
-- `internal/preset/`: Two-layer entity catalog, store operations, schema linting, multi-root file resolution, CP437 decoding, and README sync (`preset.go`, `store.go`, `lint.go`, `resolve.go`, `decode.go`, `compiler.go`).
-- `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
+- `internal/preset/`: Two-layer entity catalog, store operations, schema linting, multi-root file and alias resolution, CP437 decoding, and README sync (`preset.go`, `store.go`, `lint.go`, `resolve.go`, `decode.go`, `compiler.go`).
+- `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and catalog-driven game file extraction.
 - `internal/templates/`: Embedded configuration templates and backup deployment engine.
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
 - `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, and SoundFont installer (`downloader.go`, `extract.go`, `soundfont.go`).
@@ -82,6 +82,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 ## Key Design Invariants
 
 - **Single Source of Truth**: Curated engines and presets are defined one-entity-per-file in `catalog/*.json`, with user entities and overrides layered from `<ConfigDir>/catalog.d/*.json`.
+- **Catalog-Driven WAD Aliases & Steam Synthesis**: Alternate filename stems (`files[].aliases`) are declared once in `catalog/preset.<id>.json` and `<ConfigDir>/catalog.d/*.json`; `preset.KnownAliases`, `DirIndex`, and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog alongside normalized filename matching (`preset.NormalizeFilename`).
 - **Portability**: Configuration templates use `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholders.
 - **Destructive Safety**: Atomic writes and non-clobbering timestamped backups (`.bak.<timestamp>`) are created before modifying existing user files.
 - **Archive Security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and SHA-256 verification.

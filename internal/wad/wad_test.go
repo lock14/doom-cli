@@ -58,6 +58,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	zipBytes := createTestZip(t, map[string]string{
 		"Eviternity II.wad": "content-eviternity",
 		"sub/gd.wad":        "content-gdturbo",
+		"custom_short.wad":  "content-custom",
 		"patch_file.bex":    "content-bex",
 	})
 
@@ -69,11 +70,18 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	wadsDir := filepath.Join(tmpDir, "wads")
 	dl := NewDownloader(wadsDir, false, nil)
 
+	customPreset := preset.Preset{
+		Files: []preset.FileSpec{
+			{Name: "custom_v2.wad", Aliases: []string{"custom_short.wad"}},
+		},
+	}
+
 	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{
 		"eviternityii.wad",
 		"sub/gdturbo.wad",
+		"custom_v2.wad",
 		"patch.bex",
-	})
+	}, customPreset)
 	if err != nil {
 		t.Fatalf("unexpected extract error: %v", err)
 	}
@@ -86,6 +94,11 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	c2, err := os.ReadFile(filepath.Join(wadsDir, "sub", "gdturbo.wad"))
 	if err != nil || string(c2) != "content-gdturbo" {
 		t.Errorf("sub/gdturbo.wad content mismatch: %s (err: %v)", string(c2), err)
+	}
+
+	cCustom, err := os.ReadFile(filepath.Join(wadsDir, "custom_v2.wad"))
+	if err != nil || string(cCustom) != "content-custom" {
+		t.Errorf("custom_v2.wad content mismatch: %s (err: %v)", string(cCustom), err)
 	}
 
 	c3, err := os.ReadFile(filepath.Join(wadsDir, "patch.bex"))

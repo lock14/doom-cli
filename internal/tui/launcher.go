@@ -44,14 +44,14 @@ func (m model) resolveFile(name string) (string, bool) {
 	if m.dirIndex != nil {
 		return m.dirIndex.ResolveFile(name)
 	}
-	return preset.ResolveFile(m.wadsDir, name)
+	return preset.NewDirIndex(m.wadsDir).WithCatalog(m.catalog).ResolveFile(name)
 }
 
 func (m model) resolveReadme(p preset.Preset) (string, bool) {
 	if m.dirIndex != nil {
 		return m.dirIndex.ResolveReadme(p)
 	}
-	return preset.ResolveReadme(m.wadsDir, p)
+	return preset.NewDirIndex(m.wadsDir).WithCatalog(m.catalog).WithPresets(p).ResolveReadme(p)
 }
 
 func initialModel(
@@ -122,7 +122,7 @@ func initialModelWithRoots(
 		nerdFonts:     nerdFonts,
 		catalog:       catalog,
 		wadsDir:       primaryWadsDir,
-		dirIndex:      preset.NewDirIndex(wadRoots...),
+		dirIndex:      preset.NewDirIndex(wadRoots...).WithCatalog(catalog),
 		searchTargets: searchTargets,
 		input:         ti,
 		filtered:      catalog.Presets,

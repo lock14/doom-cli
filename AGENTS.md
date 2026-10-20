@@ -67,11 +67,15 @@
     *   **Optional Asset Degradation**: Optional files (`"optional": true`, such as `idkfa 2024.wad`) must not prevent
         presets from running when absent. Missing required files must cleanly abort execution with a descriptive error
         before engine invocation.
-    *   **Filename Normalization & Alias Tolerance**: Case-insensitive and whitespace/dash/underscore-normalized
-        matching across configured WAD roots (`wads_dir` and `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), and
-        1-level child directories (for non-IWAD files) ensures maps and patches resolve reliably. Rerelease add-on
-        aliases (`gdturbo.wad` -> `gd.wad`, `sigil2.wad` -> `SIGIL_II_V1_0.WAD`, `sunder.wad` -> `SUNDER_V2512.wad`,
-        `doomzero.wad`/`DOOMZERO.DEH`) must be discovered by `doom wads extract`.
+    *   **Filename Normalization & Declarative Catalog Aliases**: Case-insensitive and whitespace/dash/underscore-normalized
+        matching (`preset.NormalizeFilename`) across configured WAD roots (`wads_dir` and `wads_dirs`), safe relative
+        sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and Steam/GOG extraction ensures
+        maps and patches resolve without redundant case or punctuation entries. When upstream archives or rerelease
+        add-ons use a genuinely distinct filename stem (e.g. `gd.wad` for `gdturbo.wad`, `sigil.wad` for
+        `SIGIL_V1_23.wad`, `sigil2.wad`/`sigil_ii.wad` for `SIGIL_II_V1_0.WAD`, `sunder.wad` for `SUNDER_V2512.wad`,
+        `aaliens.wad` for `aaliens_v1_2.wad`), declare `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`.
+        Both `preset.KnownAliases` and `steam.DefaultTargetPatterns()` derive their mappings automatically from the
+        catalog rather than maintaining separate hardcoded filename tables.
     *   **Visual Aesthetic & Frame Pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
         (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`,
         and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0`
@@ -217,6 +221,11 @@ Linux, macOS, and Windows:
 *   **Engine Installer Idempotency & Proton Discovery**: `doom setup` and `doom engines install` must check for existing
     executable binaries in `BinDir` and skip redundant asset downloads unless `--force` is specified. Steam discovery
     must traverse up to depth 15 to discover game files inside Steam Proton prefixes (`compatdata/<id>/pfx/...`).
+*   **Catalog-Driven WAD Aliases & Steam Target Synthesis**: Never duplicate WAD filenames or alias tables across
+    `internal/preset/resolve.go` and `internal/steam/discover.go`, and never add aliases that only differ by case,
+    spaces, dashes, or underscores (which `preset.NormalizeFilename` matches automatically and `LintCatalog` rejects).
+    Declare true alternate filename stems once in `files[].aliases` inside `catalog/preset.<id>.json`;
+    `preset.KnownAliases` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog.
 
 # Pre-Completion Verification Checklist
 

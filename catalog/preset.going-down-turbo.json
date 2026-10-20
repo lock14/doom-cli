@@ -7,7 +7,10 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "gdturbo.wad"
+      "name": "gdturbo.wad",
+      "aliases": [
+        "gd.wad"
+      ]
     }
   ],
   "category": "Community Megawad",

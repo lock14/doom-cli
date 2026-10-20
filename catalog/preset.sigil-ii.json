@@ -7,7 +7,11 @@
   "iwad": "DOOM.WAD",
   "files": [
     {
-      "name": "SIGIL_II_V1_0.WAD"
+      "name": "SIGIL_II_V1_0.WAD",
+      "aliases": [
+        "sigil2.wad",
+        "sigil_ii.wad"
+      ]
     }
   ],
   "category": "Community Episode",
