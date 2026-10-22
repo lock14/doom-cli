@@ -191,7 +191,7 @@ func TestRunThemesSet(t *testing.T) {
 		t.Fatalf("MkdirAll(themes) error = %v", err)
 	}
 	customThemeFile := filepath.Join(customThemeDir, "custom.json")
-	customContent := `{"name": "custom", "type": "dark", "description": "Custom theme"}`
+	customContent := `{"name": "custom", "description": "Custom theme"}`
 	if err := os.WriteFile(customThemeFile, []byte(customContent), 0o600); err != nil {
 		t.Fatalf("WriteFile(custom.json) error = %v", err)
 	}

@@ -128,13 +128,13 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	if primaryDir == "" && len(roots) > 0 {
 		primaryDir = roots[0]
 	}
-	idx := preset.NewDirIndex(roots...)
+	idx := preset.NewDirIndex(roots...).WithCatalog(opts.Catalog).WithPresets(p)
 
 	iwadPath, ok := idx.ResolveFile(p.IWAD)
 	if !ok {
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
-				"Run 'doom wads extract-steam' if you own the game on Steam/GOG",
+				"Run 'doom wads extract-steam' if you own the game on Steam or GOG",
 			p.IWAD,
 			primaryDir,
 		)

@@ -96,6 +96,10 @@ type CustomThemeFile struct {
 
 // CompileStyles constructs pre-compiled lipgloss.Style instances from a Theme.
 func CompileStyles(t Theme) ThemeStyles {
+	statusMissing := lipgloss.NewStyle().Foreground(t.StatusMissing).Bold(true)
+	if strings.EqualFold(t.Name, "monochrome") {
+		statusMissing = statusMissing.Reverse(true)
+	}
 	return ThemeStyles{
 		BrandCap:     lipgloss.NewStyle().Foreground(t.BrandCap),
 		BrandBody:    lipgloss.NewStyle().Background(t.BrandBg).Foreground(t.BrandText).Bold(true),
@@ -115,7 +119,7 @@ func CompileStyles(t Theme) ThemeStyles {
 		BorderFgActive:   lipgloss.NewStyle().Foreground(t.BorderActive),
 		BorderFgInactive: lipgloss.NewStyle().Foreground(t.BorderInactive),
 		TitleActive:      lipgloss.NewStyle().Foreground(t.TitleActive).Bold(true),
-		TitleInactive:    lipgloss.NewStyle().Foreground(t.TitleInactive).Bold(true),
+		TitleInactive:    lipgloss.NewStyle().Foreground(t.TitleInactive),
 		Label:            lipgloss.NewStyle().Foreground(t.Label).Bold(true),
 		ValueBold:        lipgloss.NewStyle().Bold(true),
 		KeyHelpKey:       lipgloss.NewStyle().Foreground(t.Keycap).Bold(true),
@@ -124,7 +128,7 @@ func CompileStyles(t Theme) ThemeStyles {
 		TagDSDA:          lipgloss.NewStyle().Foreground(t.TagDSDA),
 		TagUZDoom:        lipgloss.NewStyle().Foreground(t.TagUZDoom),
 		StatusReady:      lipgloss.NewStyle().Foreground(t.StatusReady).Bold(true),
-		StatusMissing:    lipgloss.NewStyle().Foreground(t.StatusMissing).Bold(true),
+		StatusMissing:    statusMissing,
 		Placeholder:      lipgloss.NewStyle().Foreground(t.Muted),
 		Help:             lipgloss.NewStyle().Foreground(t.Muted),
 	}

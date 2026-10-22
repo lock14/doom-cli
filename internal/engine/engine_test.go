@@ -405,3 +405,40 @@ func TestInstallEngine_AlreadyInstalledSkipsUnlessForce(t *testing.T) {
 		t.Fatalf("expected already installed message, got: %s", out.String())
 	}
 }
+
+func TestPrepareLaunch_CustomFileSpecAliases(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	binDir := filepath.Join(tmpDir, "bin")
+	wadsDir := filepath.Join(tmpDir, "wads")
+	_ = os.MkdirAll(binDir, 0o755)
+	_ = os.MkdirAll(wadsDir, 0o755)
+
+	fakeBin := filepath.Join(binDir, "dsda-doom")
+	_ = os.WriteFile(fakeBin, []byte("#!/bin/sh\n"), 0o755)
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	aliasWad := filepath.Join(wadsDir, "custom_short.wad")
+	_ = os.WriteFile(aliasWad, []byte("pwad"), 0o644)
+
+	p := preset.Preset{
+		ID:     "custom-alias-pack",
+		Name:   "Custom Alias Pack",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files: []preset.FileSpec{
+			{Name: "custom_canonical_v2.wad", Aliases: []string{"custom_short.wad"}},
+		},
+	}
+
+	plan, err := PrepareLaunch(p, LaunchOptions{
+		BinDir:  binDir,
+		WadsDir: wadsDir,
+		DryRun:  true,
+	})
+	if err != nil {
+		t.Fatalf("PrepareLaunch failed to resolve custom FileSpec.Aliases: %v", err)
+	}
+	if len(plan.OrderedFiles) != 1 || plan.OrderedFiles[0] != aliasWad {
+		t.Fatalf("OrderedFiles = %v, want [%s]", plan.OrderedFiles, aliasWad)
+	}
+}

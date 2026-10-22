@@ -3,7 +3,7 @@
   "kind": "engine",
   "id": "uzdoom",
   "display_name": "UZDoom",
-  "description": "UZDoom (Software-Plus / Advanced)",
+  "description": "UZDoom (Software-Plus and advanced scripting)",
   "family": "ZDoom",
   "args_style": "zdoom",
   "binary": "uzdoom",

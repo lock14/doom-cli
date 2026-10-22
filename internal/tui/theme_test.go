@@ -1,8 +1,12 @@
 package tui
 
 import (
+	"encoding/json"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -288,5 +292,147 @@ func TestMonochromeThemeContrast(t *testing.T) {
 	// Verify BrandBg and StatsBg are distinct for contrast
 	if MonochromeTheme.BrandBg == MonochromeTheme.StatsBg {
 		t.Errorf("expected BrandBg and StatsBg to differ in MonochromeTheme for visual contrast")
+	}
+
+	// Verify StatusMissing uses base-16 code 7 and reverse video for high prominence
+	if fmt.Sprint(MonochromeTheme.StatusMissing) != "7" {
+		t.Errorf("expected MonochromeTheme.StatusMissing to be '7', got %v", MonochromeTheme.StatusMissing)
+	}
+	if !styles.StatusMissing.GetReverse() {
+		t.Errorf("expected MonochromeTheme styles.StatusMissing.GetReverse() == true")
+	}
+	if !styles.TitleActive.GetBold() {
+		t.Errorf("expected styles.TitleActive.GetBold() == true")
+	}
+	if styles.TitleInactive.GetBold() {
+		t.Errorf("expected styles.TitleInactive.GetBold() == false")
+	}
+}
+
+func relativeLuminance(hex string) float64 {
+	h := strings.TrimPrefix(hex, "#")
+	r, _ := strconv.ParseUint(h[0:2], 16, 8)
+	g, _ := strconv.ParseUint(h[2:4], 16, 8)
+	b, _ := strconv.ParseUint(h[4:6], 16, 8)
+	chanLum := func(v uint64) float64 {
+		c := float64(v) / 255.0
+		if c <= 0.03928 {
+			return c / 12.92
+		}
+		return math.Pow((c+0.055)/1.055, 2.4)
+	}
+	return 0.2126*chanLum(r) + 0.7152*chanLum(g) + 0.0722*chanLum(b)
+}
+
+func wcagContrastRatio(c1, c2 string) float64 {
+	l1 := relativeLuminance(c1)
+	l2 := relativeLuminance(c2)
+	if l1 < l2 {
+		l1, l2 = l2, l1
+	}
+	return (l1 + 0.05) / (l2 + 0.05)
+}
+
+func TestBuiltinThemesWCAGContrast(t *testing.T) {
+	t.Parallel()
+	const refCanvas = "#0D1117"
+	for _, th := range ListBuiltinThemes() {
+		th := th
+		if th.Type != "TrueColor" {
+			continue
+		}
+		t.Run(th.Name, func(t *testing.T) {
+			t.Parallel()
+			normalTokens := map[string]string{
+				"TitleInactive": fmt.Sprint(th.TitleInactive),
+				"Label":         fmt.Sprint(th.Label),
+				"KeyDesc":       fmt.Sprint(th.KeyDesc),
+				"TagDSDA":       fmt.Sprint(th.TagDSDA),
+				"TagUZDoom":     fmt.Sprint(th.TagUZDoom),
+				"StatusReady":   fmt.Sprint(th.StatusReady),
+				"Muted":         fmt.Sprint(th.Muted),
+			}
+			for field, hex := range normalTokens {
+				if r := wcagContrastRatio(hex, refCanvas); r < 4.5 {
+					t.Errorf("%s.%s (%s vs %s) contrast = %.2f:1, want >= 4.5:1", th.Name, field, hex, refCanvas, r)
+				}
+			}
+			boldTokens := map[string]string{
+				"Prompt":        fmt.Sprint(th.Prompt),
+				"CursorBar":     fmt.Sprint(th.CursorBar),
+				"CursorText":    fmt.Sprint(th.CursorText),
+				"TitleActive":   fmt.Sprint(th.TitleActive),
+				"Keycap":        fmt.Sprint(th.Keycap),
+				"StatusMissing": fmt.Sprint(th.StatusMissing),
+			}
+			for field, hex := range boldTokens {
+				if r := wcagContrastRatio(hex, refCanvas); r < 3.0 {
+					t.Errorf("%s.%s (%s vs %s) contrast = %.2f:1, want >= 3.0:1", th.Name, field, hex, refCanvas, r)
+				}
+			}
+			if r := wcagContrastRatio(fmt.Sprint(th.BrandText), fmt.Sprint(th.BrandBg)); r < 3.0 {
+				t.Errorf("%s.BrandText (%v vs %v) contrast = %.2f:1, want >= 3.0:1",
+					th.Name, th.BrandText, th.BrandBg, r)
+			}
+			if r := wcagContrastRatio(fmt.Sprint(th.StatsText), fmt.Sprint(th.StatsBg)); r < 3.0 {
+				t.Errorf("%s.StatsText (%v vs %v) contrast = %.2f:1, want >= 3.0:1",
+					th.Name, th.StatsText, th.StatsBg, r)
+			}
+		})
+	}
+}
+
+func TestReadmeCustomThemeJSONBlock(t *testing.T) {
+	t.Parallel()
+	readmePath := filepath.Join("..", "..", "README.md")
+	raw, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("reading README.md: %v", err)
+	}
+
+	lines := strings.Split(string(raw), "\n")
+	inCustomThemesSection := false
+	inJSONFence := false
+	var jsonBuf strings.Builder
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "### ") {
+			inCustomThemesSection = strings.EqualFold(trimmed, "### Custom JSON themes")
+			continue
+		}
+		if !inCustomThemesSection {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "```") {
+			if !inJSONFence {
+				if strings.EqualFold(strings.TrimSpace(strings.TrimPrefix(trimmed, "```")), "json") {
+					inJSONFence = true
+					jsonBuf.Reset()
+				}
+			} else {
+				break
+			}
+			continue
+		}
+		if inJSONFence {
+			jsonBuf.WriteString(line)
+			jsonBuf.WriteByte('\n')
+		}
+	}
+
+	block := strings.TrimSpace(jsonBuf.String())
+	if block == "" {
+		t.Fatal("could not find JSON code block under '### Custom JSON themes' in README.md")
+	}
+
+	dec := json.NewDecoder(strings.NewReader(block))
+	dec.DisallowUnknownFields()
+	var parsed CustomThemeFile
+	if err := dec.Decode(&parsed); err != nil {
+		t.Fatalf("README.md custom theme JSON failed strict CustomThemeFile decoding: %v\n%s", err, block)
+	}
+	if parsed.Name == "" || parsed.BrandCap == "" || parsed.StatusReady == "" {
+		t.Errorf("expected populated CustomThemeFile fields in README.md example, got %+v", parsed)
 	}
 }

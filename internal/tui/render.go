@@ -42,11 +42,7 @@ func formatEngineTagWithCatalog(catalog *preset.Catalog, engine string, styles T
 	case strings.EqualFold(badge, "UZDoom"):
 		return styles.TagUZDoom.Render("[UZDoom]")
 	default:
-		runes := []rune(badge)
-		if len(runes) > 6 {
-			badge = string(runes[:6])
-		}
-		formatted := fmt.Sprintf("[%-6s]", badge)
+		formatted := "[" + padOrTruncateName(badge, 6) + "]"
 		return styles.TagUZDoom.Render(formatted)
 	}
 }
@@ -55,35 +51,59 @@ func formatEngineTag(engine string, styles ThemeStyles) string {
 	return formatEngineTagWithCatalog(nil, engine, styles)
 }
 
+func padOrTruncateName(name string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(name) > width {
+		name = truncateANSI(name, width)
+	}
+	pad := width - lipgloss.Width(name)
+	if pad > 0 {
+		return name + strings.Repeat(" ", pad)
+	}
+	return name
+}
+
 func (m model) renderListLines(geom layoutGeometry) []string {
 	if len(m.filtered) == 0 {
 		return []string{"  No presets matching search."}
 	}
 
-	startIdx := 0
-	if m.cursor >= geom.maxVisible {
-		startIdx = m.cursor - geom.maxVisible + 1
+	maxVisible := geom.maxVisible
+	if maxVisible < 1 {
+		maxVisible = 1
 	}
-	endIdx := startIdx + geom.maxVisible
+	startIdx := 0
+	if m.cursor >= maxVisible {
+		startIdx = m.cursor - maxVisible + 1
+	}
+	endIdx := startIdx + maxVisible
 	if endIdx > len(m.filtered) {
 		endIdx = len(m.filtered)
-		startIdx = endIdx - geom.maxVisible
+		startIdx = endIdx - maxVisible
 		if startIdx < 0 {
 			startIdx = 0
 		}
+	}
+
+	contentWidth := geom.leftWidth - 2
+	if !geom.sideBySide {
+		contentWidth = geom.boxWidth - 2
+	}
+	nameWidth := contentWidth - 12
+	if nameWidth > 48 {
+		nameWidth = 48
+	}
+	if nameWidth < 12 {
+		nameWidth = 12
 	}
 
 	var listLines []string
 	for i := startIdx; i < endIdx; i++ {
 		p := m.filtered[i]
 		tag := formatEngineTagWithCatalog(m.catalog, p.Engine, m.styles)
-
-		name := p.Name
-		runes := []rune(name)
-		if len(runes) > 30 {
-			name = string(runes[:29]) + "…"
-		}
-		paddedName := fmt.Sprintf("%-30s", name)
+		paddedName := padOrTruncateName(p.Name, nameWidth)
 
 		if i == m.cursor {
 			selected := m.styles.CursorBar.Render("▎ ") + m.styles.CursorText.Render(paddedName) + " " + tag
@@ -115,13 +135,127 @@ func resolveEngineDescription(catalog *preset.Catalog, engineKey string) string 
 	return engineKey
 }
 
-func (m model) renderPreviewLines() ([]string, bool) {
+type previewFileEntry struct {
+	name   string
+	status string
+}
+
+func (m model) buildFileEntries(cur preset.Preset, readmePath string, hasReadme bool) []previewFileEntry {
+	var entries []previewFileEntry
+	for _, f := range cur.Files {
+		fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
+		if _, ok := m.resolveFile(f.Name); ok {
+			fStatus = m.styles.StatusReady.Render("[✓ Found]")
+		} else if f.Optional {
+			fStatus = m.styles.Help.Render("[Optional]")
+		}
+		entries = append(entries, previewFileEntry{name: f.Name, status: fStatus})
+	}
+	if hasReadme {
+		entries = append(entries, previewFileEntry{
+			name:   filepath.Base(readmePath),
+			status: m.styles.TagUZDoom.Render("[✓ Readme]"),
+		})
+	}
+	return entries
+}
+
+func formatSingleFileLine(entry previewFileEntry, detailsWidth int) string {
+	maxNameW := detailsWidth - 16
+	if maxNameW < 8 {
+		maxNameW = 8
+	}
+	name := entry.name
+	if lipgloss.Width(name) > maxNameW {
+		name = truncateANSI(name, maxNameW)
+	}
+	padW := 22
+	if padW > maxNameW {
+		padW = maxNameW
+	}
+	if pad := padW - lipgloss.Width(name); pad > 0 {
+		name += strings.Repeat(" ", pad)
+	}
+	return fmt.Sprintf("  - %s %s", name, entry.status)
+}
+
+func formatCompactFileCol(entry previewFileEntry, colNameW int, padStatus bool) string {
+	name := padOrTruncateName(entry.name, colNameW)
+	status := entry.status
+	if padStatus {
+		if pad := 11 - lipgloss.Width(status); pad > 0 {
+			status += strings.Repeat(" ", pad)
+		}
+	}
+	return name + " " + status
+}
+
+func (m model) packTwoColumnFiles(
+	fileEntries []previewFileEntry,
+	colNameW int,
+	availLines int,
+	hasReadme bool,
+) []string {
+	var rows []string
+	for i := 0; i < len(fileEntries); i += 2 {
+		prefix := "               "
+		if i == 0 {
+			prefix = m.styles.Label.Render("Files:         ")
+		}
+		first := formatCompactFileCol(fileEntries[i], colNameW, i+1 < len(fileEntries))
+		if i+1 < len(fileEntries) {
+			second := formatCompactFileCol(fileEntries[i+1], colNameW, false)
+			rows = append(rows, prefix+first+"  "+second)
+		} else {
+			rows = append(rows, prefix+first)
+		}
+	}
+
+	if availLines >= 1 && len(rows) > availLines {
+		rows = rows[:availLines]
+		lastRowIdx := availLines - 1
+		shownBeforeLast := lastRowIdx * 2
+		remaining := len(fileEntries) - shownBeforeLast
+		prefix := "               "
+		if lastRowIdx == 0 {
+			prefix = m.styles.Label.Render("Files:         ")
+		}
+		if hasReadme && len(fileEntries) > 0 {
+			hidden := remaining - 1
+			moreText := padOrTruncateName(fmt.Sprintf("(+%d more files)", hidden), colNameW+12)
+			first := m.styles.Help.Render(moreText)
+			second := formatCompactFileCol(fileEntries[len(fileEntries)-1], colNameW, false)
+			rows[lastRowIdx] = prefix + first + "  " + second
+		} else {
+			first := formatCompactFileCol(fileEntries[shownBeforeLast], colNameW, true)
+			hidden := remaining - 1
+			second := m.styles.Help.Render(fmt.Sprintf("(+%d more files)", hidden))
+			rows[lastRowIdx] = prefix + first + "  " + second
+		}
+	}
+
+	return rows
+}
+
+func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
 		return []string{m.styles.Help.Render("No preset details available.")}, false
 	}
 
 	cur := m.filtered[m.cursor]
 	readmePath, hasReadme := m.resolveReadme(cur)
+	engStr := resolveEngineDescription(m.catalog, cur.Engine)
+
+	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")
+	if _, ok := m.resolveFile(cur.IWAD); ok {
+		iwadStatus = m.styles.StatusReady.Render("[✓ Found]")
+	}
+	fileEntries := m.buildFileEntries(cur, readmePath, hasReadme)
+
+	detailsWidth := geom.rightWidth - 2
+	if !geom.sideBySide {
+		detailsWidth = geom.boxWidth - 2
+	}
 
 	var previewLines []string
 	previewLines = append(previewLines,
@@ -146,7 +280,6 @@ func (m model) renderPreviewLines() ([]string, bool) {
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Released:      "), cur.ReleaseDate),
 		)
 	}
-	engStr := resolveEngineDescription(m.catalog, cur.Engine)
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s", m.styles.Label.Render("Engine:        "), engStr),
 	)
@@ -170,35 +303,125 @@ func (m model) renderPreviewLines() ([]string, bool) {
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Description:   "), cur.Description),
 		)
 	}
-
-	// Check IWAD
-	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-	if _, ok := m.resolveFile(cur.IWAD); ok {
-		iwadStatus = m.styles.StatusReady.Render("[✓ Found]")
-	}
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s %s", m.styles.Label.Render("IWAD:          "), cur.IWAD, iwadStatus),
 	)
 
-	if len(cur.Files) > 0 || hasReadme {
+	if len(fileEntries) > 0 {
 		previewLines = append(previewLines, m.styles.Label.Render("Files:"))
-		for _, f := range cur.Files {
-			fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-			if _, ok := m.resolveFile(f.Name); ok {
-				fStatus = m.styles.StatusReady.Render("[✓ Found]")
-			} else if f.Optional {
-				fStatus = m.styles.Help.Render("[Optional]")
-			}
-			previewLines = append(previewLines, fmt.Sprintf("  - %-22s %s", f.Name, fStatus))
-		}
-		if hasReadme {
-			previewLines = append(previewLines,
-				fmt.Sprintf("  - %-22s %s", filepath.Base(readmePath), m.styles.TagUZDoom.Render("[✓ Readme]")),
-			)
+		for _, entry := range fileEntries {
+			previewLines = append(previewLines, formatSingleFileLine(entry, detailsWidth))
 		}
 	}
 
+	maxLines := geom.interiorHeight
+	if !geom.sideBySide {
+		maxLines = geom.detailsHeight - 2
+	}
+	if maxLines > 0 && len(previewLines) > maxLines {
+		return m.condensePreviewLines(
+			cur, engStr, iwadStatus, fileEntries, detailsWidth, maxLines, hasReadme,
+		), hasReadme
+	}
+
 	return previewLines, hasReadme
+}
+
+func (m model) condensePreviewLines(
+	cur preset.Preset,
+	engStr string,
+	iwadStatus string,
+	fileEntries []previewFileEntry,
+	detailsWidth int,
+	maxLines int,
+	hasReadme bool,
+) []string {
+	presetVal := m.styles.ValueBold.Render(cur.Name)
+	if cur.IsCustom() {
+		presetVal += " " + m.styles.TagUZDoom.Render("[Custom WAD]")
+	} else if cur.Overridden {
+		presetVal += " " + m.styles.TagUZDoom.Render("[Overridden]")
+	}
+
+	headLines := []string{
+		fmt.Sprintf("%s%s", m.styles.Label.Render("Preset:        "), presetVal),
+		fmt.Sprintf("%s%s", m.styles.Label.Render("Engine:        "), engStr),
+	}
+	iwadLine := fmt.Sprintf("%s%s %s", m.styles.Label.Render("IWAD:          "), cur.IWAD, iwadStatus)
+
+	var fileBlock []string
+	if len(fileEntries) > 0 {
+		fileBlock = append(fileBlock, m.styles.Label.Render("Files:"))
+		for _, entry := range fileEntries {
+			fileBlock = append(fileBlock, formatSingleFileLine(entry, detailsWidth))
+		}
+		availFileLines := maxLines - len(headLines) - 1
+		if len(headLines)+1+len(fileBlock) > maxLines {
+			colNameW := (detailsWidth-17)/2 - 12
+			if colNameW > 17 {
+				colNameW = 17
+			}
+			if colNameW < 8 {
+				colNameW = 8
+			}
+			fileBlock = m.packTwoColumnFiles(fileEntries, colNameW, availFileLines, hasReadme)
+		}
+	}
+
+	var metaCandidates []string
+	if len(cur.Args) > 0 {
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(cur.Args, " ")),
+		)
+	}
+	switch {
+	case cur.Author != "" && cur.ReleaseDate != "":
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s (%s)", m.styles.Label.Render("Author:        "), cur.Author, cur.ReleaseDate),
+		)
+	case cur.Author != "":
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Author:        "), cur.Author),
+		)
+	case cur.ReleaseDate != "":
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Released:      "), cur.ReleaseDate),
+		)
+	}
+	switch {
+	case cur.Category != "" && cur.Compatibility != "":
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s (%s)", m.styles.Label.Render("Category:      "), cur.Category, cur.Compatibility),
+		)
+	case cur.Category != "":
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Category:      "), cur.Category),
+		)
+	case cur.Compatibility != "":
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Compatibility: "), cur.Compatibility),
+		)
+	}
+	if cur.Description != "" {
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Description:   "), cur.Description),
+		)
+	}
+
+	budget := maxLines - len(headLines) - 1 - len(fileBlock)
+	if budget < 0 {
+		budget = 0
+	}
+	if budget > len(metaCandidates) {
+		budget = len(metaCandidates)
+	}
+
+	out := make([]string, 0, len(headLines)+budget+1+len(fileBlock))
+	out = append(out, headLines...)
+	out = append(out, metaCandidates[:budget]...)
+	out = append(out, iwadLine)
+	out = append(out, fileBlock...)
+	return out
 }
 
 func renderBoxWithTitle(content string, width int, title string, focused bool, styles ...ThemeStyles) string {
@@ -233,15 +456,8 @@ func renderBoxWithTitle(content string, width int, title string, focused bool, s
 		return rendered
 	}
 
-	titleW := lipgloss.Width(title)
-	displayTitle := title
-	if titleW > maxTitleWidth {
-		runes := []rune(title)
-		if len(runes) > maxTitleWidth {
-			displayTitle = string(runes[:maxTitleWidth-1]) + "…"
-		}
-		titleW = lipgloss.Width(displayTitle)
-	}
+	displayTitle := truncateANSI(title, maxTitleWidth)
+	titleW := lipgloss.Width(displayTitle)
 
 	remainingDashes := totalOuterWidth - titleW - 6
 	if remainingDashes < 0 {
@@ -287,7 +503,11 @@ func renderHeaderBar(leftPart, rightPart string, width int) string {
 
 func (m model) renderHeader() string {
 	leftPart := m.styles.RenderBrandPill(m.nerdFonts) + m.styles.FilterPrompt.Render("  Filter: ") + m.input.View()
-	rightPart := m.styles.RenderStatsPill(len(m.filtered), len(m.catalog.Presets), m.nerdFonts)
+	totalPresets := 0
+	if m.catalog != nil {
+		totalPresets = len(m.catalog.Presets)
+	}
+	rightPart := m.styles.RenderStatsPill(len(m.filtered), totalPresets, m.nerdFonts)
 	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
@@ -299,7 +519,7 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 		leftText := formatBoxContent(listLines, geom.leftWidth-2, geom.interiorHeight)
 		rightText := formatBoxContent(previewLines, geom.rightWidth-2, geom.interiorHeight)
 		leftBox := renderBoxWithTitle(leftText, geom.leftWidth, leftTitle, true, m.styles)
-		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, true, m.styles)
+		rightBox := renderBoxWithTitle(rightText, geom.rightWidth, rightTitle, false, m.styles)
 		gutterStr := strings.Repeat(" ", geom.gutter)
 		return lipgloss.JoinHorizontal(lipgloss.Top, leftBox, gutterStr, rightBox)
 	}
@@ -307,7 +527,7 @@ func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []strin
 	leftText := formatBoxContent(listLines, geom.boxWidth-2, geom.listHeight-2)
 	rightText := formatBoxContent(previewLines, geom.boxWidth-2, geom.detailsHeight-2)
 	leftBox := renderBoxWithTitle(leftText, geom.boxWidth, leftTitle, true, m.styles)
-	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, true, m.styles)
+	rightBox := renderBoxWithTitle(rightText, geom.boxWidth, rightTitle, false, m.styles)
 	return leftBox + "\n" + rightBox
 }
 
@@ -327,7 +547,7 @@ func (m model) renderReadmeView() string {
 
 func (m model) renderReadmeFooter() string {
 	return m.styles.FormatKeyHelp([]keyHelp{
-		{"↑/↓/PgUp/PgDn", "Scroll"},
+		{"↑/↓/PgUp/PgDn/g/G", "Scroll"},
 		{"Enter", "Launch"},
 		{"Tab/Esc/q", "Back"},
 	})
@@ -335,7 +555,7 @@ func (m model) renderReadmeFooter() string {
 
 func (m model) renderFooter(hasReadme bool) string {
 	items := []keyHelp{
-		{"↑/↓", "Navigate"},
+		{"↑/↓/PgUp/PgDn", "Navigate"},
 	}
 	if hasReadme {
 		items = append(items, keyHelp{"Tab", "View README"})

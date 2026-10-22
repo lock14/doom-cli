@@ -7,12 +7,15 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "aaliens_v1_2.wad"
+      "name": "aaliens_v1_2.wad",
+      "aliases": [
+        "aaliens.wad"
+      ]
     }
   ],
   "category": "Community Megawad",
   "compatibility": "MBF",
-  "description": "MBF / Complevel 11 with custom color palette",
+  "description": "MBF complevel 11 megawad with custom color palette",
   "author": "Paul \"skillsaw\" DeBruyne",
   "release_date": "2016",
   "sources": [

@@ -1,21 +1,21 @@
-# Repository Design Principles
+# Repository design principles
 
-*   **Declarative Entity Catalog & Single Source of Truth**:
+*   **Declarative entity catalog and single source of truth**:
     *   `catalog/*.json` (`engine.<id>.json` and `preset.<id>.json`) is the sole source of truth for all curated engine
         and preset definitions, IWAD mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs.
-    *   **Single Root Embed**: All embedded assets (`catalog/*.json`, `dsda-doom/dsda-doom.cfg`, `uzdoom/autoexec.cfg`)
+    *   **Single root embed**: All embedded assets (`catalog/*.json`, `dsda-doom/dsda-doom.cfg`, `uzdoom/autoexec.cfg`)
         are embedded once at the repository root in `embed.go` (`doomcli.FS`). Do not create duplicate asset copies
         under `internal/*/data/`.
-    *   **Synchronize & Lint**: Run `doom presets build` to synchronize `catalog/*.json` into `README.md`, and run
+    *   **Synchronize and lint**: Run `doom presets build` to synchronize `catalog/*.json` into `README.md`, and run
         `doom presets lint` to validate strict schema rules, engine references, SHA-256 digests, personal path checks,
         and `README.md` table parity.
-    *   **Parity Verification**: Run `make check` (or `go test -v ./internal/preset ./internal/templates`) to verify
+    *   **Parity verification**: Run `make check` (or `go test -v ./internal/preset ./internal/templates`) to verify
         that `README.md` matches `catalog/*.json` and all files comply with path invariants.
-*   **Portability & Path Invariants**:
+*   **Portability and path invariants**:
     *   **Never commit personal user paths, display resolutions, or refresh rates**: Never commit absolute personal
         paths like `/home/<username>/`, hardcoded local display resolutions, or fixed monitor refresh rates into
         configuration files, catalog entities, or code.
-    *   **Use Standard Placeholder Tokens**:
+    *   **Use standard placeholder tokens**:
         *   In `dsda-doom/dsda-doom.cfg`, `screen_resolution` must use `__RESOLUTION__` and `snd_soundfont` must
             use `__SOUNDFONT__`.
         *   In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use
@@ -23,70 +23,83 @@
         *   Deployment tooling (`doom config install`, `doom setup`) dynamically substitutes `__HOME__`,
             `__RESOLUTION__` (via native display detection), `__REFRESH_RATE__`, and `__SOUNDFONT__` at
             installation time.
-    *   **Respect Platform Standard Directories**:
-        *   **UZDoom Config**: `~/.config/uzdoom/autoexec.cfg` (Linux) /
-            `~/Library/Application Support/uzdoom/` (macOS) /
-            `%USERPROFILE%\Games\Doom\bin\autoexec.cfg` (Windows)
-        *   **DSDA-Doom Config**: `~/.local/share/dsda-doom/dsda-doom.cfg` (Linux) /
-            `~/Library/Application Support/dsda-doom/` (macOS) /
-            `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` (Windows)
-        *   **Binaries**: `~/.local/bin/` (Linux/macOS) / `%USERPROFILE%\Games\Doom\bin\` (Windows)
-        *   **WADs Directory**: `~/.local/share/games/uzdoom/` (Linux) /
-            `~/Library/Application Support/games/uzdoom/` (macOS) / `%USERPROFILE%\Games\Doom\wads\` (Windows)
-        *   **SoundFonts**: `~/.local/share/soundfonts/` (Linux) /
-            `~/Library/Application Support/soundfonts/` (macOS) / `%USERPROFILE%\Games\Doom\soundfonts\` (Windows)
-        *   **CLI Config, Themes & User Catalog**: `~/.config/doom-cli/` (Linux) /
-            `~/Library/Application Support/doom-cli/` (macOS) / `%LOCALAPPDATA%\doom-cli\` (Windows), with user
+    *   **Respect platform standard directories**:
+        *   **UZDoom configuration**: `~/.config/uzdoom/autoexec.cfg` on Linux,
+            `~/Library/Application Support/uzdoom/` on macOS, and
+            `%USERPROFILE%\Games\Doom\bin\autoexec.cfg` on Windows.
+        *   **DSDA-Doom configuration**: `~/.local/share/dsda-doom/dsda-doom.cfg` on Linux,
+            `~/Library/Application Support/dsda-doom/` on macOS, and
+            `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` on Windows.
+        *   **Binaries**: `~/.local/bin/` on Linux and macOS, and `%USERPROFILE%\Games\Doom\bin\` on Windows.
+        *   **WADs directory**: `~/.local/share/games/uzdoom/` on Linux,
+            `~/Library/Application Support/games/uzdoom/` on macOS, and `%USERPROFILE%\Games\Doom\wads\` on Windows.
+        *   **SoundFonts**: `~/.local/share/soundfonts/` on Linux,
+            `~/Library/Application Support/soundfonts/` on macOS, and `%USERPROFILE%\Games\Doom\soundfonts\` on Windows.
+        *   **CLI configuration, themes, and user catalog**: `~/.config/doom-cli/` on Linux,
+            `~/Library/Application Support/doom-cli/` on macOS, and `%LOCALAPPDATA%\doom-cli\` on Windows, with user
             entity files in `<ConfigDir>/catalog.d/*.json`.
-*   **Destructive Safety & Backup Policy**:
-    *   **Mandatory Atomic Writes & Non-Destructive Backups**: Any configuration or catalog write (`doom config install`,
-        `doom setup`, `doom config set`, `doom engines add`, `doom presets add`, `doom presets config`) must use
-        `fsutil.WriteFileAtomic` (temp file in same directory + `os.Rename`) and `fsutil.BackupFile` to create
-        non-clobbering timestamped backups (`.bak.<timestamp>`, appending `-1`, `-2` on same-second collisions) before
-        overwriting any existing user file.
-    *   **Preserve Unrelated Configuration**: When adding new engine variables, aliases, or keybindings, avoid
+*   **Destructive safety and backup policy**:
+    *   **Mandatory atomic writes and non-destructive backups**: Any configuration or catalog write
+        (`doom config install`, `doom setup`, `doom config set`, `doom engines add`, `doom presets add`,
+        `doom presets config`) must use `fsutil.WriteFileAtomic` (temporary file in the same directory followed by
+        `os.Rename`) and `fsutil.BackupFile` to create non-clobbering timestamped backups (`.bak.<timestamp>`,
+        appending `-1` and `-2` on same-second collisions) before overwriting any existing user file.
+    *   **Preserve unrelated configuration**: When adding new engine variables, aliases, or keybindings, avoid
         modifying or removing unrelated settings unless explicitly requested. `config.json` preserves unknown top-level
         keys across round-trips, and `doom presets config` preserves untouched override fields across successive calls.
-    *   **Archive Security & Path Containment**: All archive extractions (`archive/zip`), direct file downloads, and
+    *   **Archive security and path containment**: All archive extractions (`archive/zip`), direct file downloads, and
         relative sub-path resolutions must sanitize paths against `..` traversal, drive-letter, and absolute path
         sequences using `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
-*   **Doom Engine Selection & Preset Hygiene**:
+*   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
-        and speedrunning precision are desired (e.g. *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*, *Legacy of Rust*,
-        *Sigil*).
-    *   **UZDoom**: Use for mapsets requiring ZDoom/GZDoom features, advanced scripting, high-res texture packs like
-        OTEX (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
-    *   **Two-Layer Entity Catalog & Quarantine**: Built-in entities in `catalog/*.json` serve as the immutable curated
-        layer (`LayerCurated`). User engines (`engine.<id>.json`), custom presets (`preset.<id>.json`), and surgical
-        overrides (`override.preset.<id>.json`, `override.engine.<id>.json`) live in `<ConfigDir>/catalog.d/`.
-        Malformed user entity files are quarantined with a diagnostic warning without breaking valid siblings.
-    *   **No Duplicate IWADs**: Never include the base game IWAD (`DOOM.WAD`, `DOOM2.WAD`, etc.) inside `files`.
+        and speedrunning precision are desired (such as *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*,
+        *Legacy of Rust*, and *Sigil*).
+    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom features, advanced scripting, high-resolution texture
+        packs like OTEX (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
+    *   **Two-layer entity catalog and quarantine**: Built-in entities in `catalog/*.json` serve as the immutable
+        curated layer (`LayerCurated`). User engines (`engine.<id>.json`), custom presets (`preset.<id>.json`), and
+        surgical overrides (`override.preset.<id>.json`, `override.engine.<id>.json`) live in
+        `<ConfigDir>/catalog.d/`. Malformed user entity files are quarantined with a diagnostic warning without
+        breaking valid siblings.
+    *   **No duplicate IWADs**: Never include the base game IWAD (`DOOM.WAD`, `DOOM2.WAD`) inside `files`.
         The IWAD must only be specified in `iwad`.
-    *   **Load Ordering**: Ensure DeHackEd/BEX patches (`.deh`, `.bex`) and resource files are ordered correctly
-        relative to map PWADs and optional music wads (`{"name": "idkfa 2024.wad", "optional": true}`).
-    *   **Optional Asset Degradation**: Optional files (`"optional": true`, such as `idkfa 2024.wad`) must not prevent
+    *   **Load ordering**: Ensure DeHackEd and BEX patches (`.deh`, `.bex`) and resource files are ordered correctly
+        relative to map PWADs and optional music WADs (`{"name": "idkfa 2024.wad", "optional": true}`).
+    *   **Optional asset degradation**: Optional files (`"optional": true`, such as `idkfa 2024.wad`) must not prevent
         presets from running when absent. Missing required files must cleanly abort execution with a descriptive error
         before engine invocation.
-    *   **Filename Normalization & Alias Tolerance**: Case-insensitive and whitespace/dash/underscore-normalized
-        matching across configured WAD roots (`wads_dir` and `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), and
-        1-level child directories (for non-IWAD files) ensures maps and patches resolve reliably. Rerelease add-on
-        aliases (`gdturbo.wad` -> `gd.wad`, `sigil2.wad` -> `SIGIL_II_V1_0.WAD`, `sunder.wad` -> `SUNDER_V2512.wad`,
-        `doomzero.wad`/`DOOMZERO.DEH`) must be discovered by `doom wads extract`.
-    *   **Visual Aesthetic & Frame Pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
+    *   **Filename normalization and declarative catalog aliases**: Case-insensitive and whitespace-, dash-, and
+        underscore-normalized matching (`preset.NormalizeFilename`) across configured WAD roots (`wads_dir` and
+        `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
+        Steam and GOG extraction ensures maps and patches resolve without redundant case or punctuation entries. When
+        upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `gd.wad` for
+        `gdturbo.wad`, `sigil.wad` for `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`,
+        `sunder.wad` or `sunder_2512.wad` for `SUNDER_V2512.wad`, and `aaliens.wad` for `aaliens_v1_2.wad`), declare
+        `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`. Both `preset.KnownAliases` and
+        `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog rather than maintaining
+        separate hardcoded filename tables.
+    *   **Embedded DeHackEd extraction**: When a preset declares both a `.wad` and `.deh` file and its direct `.wad`
+        download source embeds a `DEHACKED` lump (such as `DoomZero.wad`), `wad.Downloader` extracts the embedded
+        `DEHACKED` lump atomically into the expected `.deh` file.
+    *   **Visual aesthetic and frame pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
         (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`,
         and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0`
         with `render_vsync 1` and `uncapped_framerate 1` so high-refresh monitors pace frames smoothly to native
         monitor refresh rates.
-*   **TUI Styling & Font Glyph Hygiene**:
-    *   **Clean Typography Over Emojis**: Emojis (e.g. `💀`) render with fixed vendor bitmaps/colors regardless of
+*   **TUI styling and font glyph hygiene**:
+    *   **Monospace TUI specification and overrides**: Terminal UI work in `internal/tui/`, `cmd/doom/play.go`, and
+        `cmd/doom/themes.go` is governed by `.agents/rules/monospace-tui.md` and the embedded Monospace Design TUI
+        (`mono-tui v0.2.5`) reference library under `.agents/skills/mono-tui-design/` and
+        `.agents/skills/mono-tui-audit/`.
+    *   **Clean typography over emojis**: Emojis render with fixed vendor bitmaps and colors regardless of
         ANSI foreground escapes. They clash with light backgrounds (such as monochrome white pills). Use clean
         typography (`DOOM`) instead of emojis for branded badges.
-    *   **Universal Fallback by Default**: Avoid Unicode Private Use Area (PUA) glyphs (such as ``, ``, ``, ``)
+    *   **Universal fallback by default**: Avoid Unicode Private Use Area (PUA) glyphs (such as ``, ``, ``, ``)
         in standard rendering. Default to universal rectangular badges and plain text prompts (`Filter: `,
         `README Viewer`) that render flawlessly in 100% of standard system fonts. Keep Powerlevel10k rounded
-        capsule ends opt-in via `--nerd-fonts` / `nerd_fonts: true`.
+        capsule ends opt-in via `--nerd-fonts` or `nerd_fonts: true`.
 
-# Package Structure & Architecture Conventions
+# Package structure and architecture conventions
 
 The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary on
 Linux, macOS, and Windows:
@@ -95,7 +108,7 @@ Linux, macOS, and Windows:
     `uzdoom/autoexec.cfg`.
 *   `catalog/`: Curated one-entity-per-file JSON catalog (`engine.<id>.json`, `preset.<id>.json`).
 *   `cmd/doom/`: Modular Cobra CLI command implementations:
-    *   `main.go`: Entrypoint, root command, global flags, and path/catalog helpers.
+    *   `main.go`: Entrypoint, root command, global flags, and path and catalog helpers.
     *   `play.go`: `doom play` interactive launcher command.
     *   `launch.go`: `doom launch` direct preset execution command.
     *   `setup.go`: `doom setup` automated turnkey workflow command.
@@ -120,9 +133,9 @@ Linux, macOS, and Windows:
     *   `store.go`: User `catalog.d` write operations (`AddEngine`, `RemoveEngine`, `AddPreset`, `ConfigPreset`,
         `ResetPresetOverride`, `RemovePreset`).
     *   `lint.go`: Catalog schema, reference, digest, personal-path, and `README.md` parity linter (`LintCatalog`).
-    *   `resolve.go`: Multi-root cached `DirIndex`, case-insensitive/whitespace-tolerant file resolution, safe relative
-        sub-paths, 1-level child directory scan, and `KnownAliases` matching.
-    *   `decode.go`: Document decoding with DOS Code Page 437 / CP437 box-drawing detection.
+    *   `resolve.go`: Multi-root cached `DirIndex`, case-insensitive and whitespace-tolerant file resolution, safe
+        relative sub-paths, 1-level child directory scan, and `KnownAliases` matching.
+    *   `decode.go`: Document decoding with DOS Code Page 437 (CP437) box-drawing detection.
     *   `compiler.go`: `README.md` preset table generator and synchronizer (`doom presets build`).
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
 *   `internal/templates/`: Embedded engine configuration templates and timestamped backup deployer.
@@ -134,97 +147,148 @@ Linux, macOS, and Windows:
     *   `theme.go`: Theme loader, custom JSON theme parser, and style builders.
     *   `builtin_themes.go`: Curated 60-30-10 color palettes.
 *   `internal/wad/`:
-    *   `downloader.go`: Multi-mirror SHA-256 verified archive and direct `.wad`/`.pk3` downloader.
-    *   `extract.go`: Zip Slip hardened archive extractor and DeHackEd/BEX ordering.
+    *   `downloader.go`: Multi-mirror SHA-256 verified archive and direct `.wad` and `.pk3` downloader.
+    *   `extract.go`: Zip Slip hardened archive extractor and DeHackEd and BEX ordering.
     *   `soundfont.go`: Roland SC-55 SoundFont downloader and installer.
 
-# Naming & Code Style Conventions
+# Naming and code style conventions
 
 *   **Formatting**: Always format code using `gofmt -s -w .` (simplifying slice and composite literal syntax).
-*   **Maximum Line Length (120 Columns)**: Enforce a strict 120-character maximum line length limit across the
+*   **Maximum line length (120 columns)**: Enforce a strict 120-character maximum line length limit across the
     repository via `.editorconfig` and Revive's `line-length-limit` rule in `revive.toml`. Long strings, command
     invocations, and error messages must be wrapped cleanly.
-*   **Receiver Naming**: Use short (1-2 letters), mnemonic receiver names consistently across methods on a type.
+*   **Receiver naming**: Use short (1 to 2 letters), mnemonic receiver names consistently across methods on a type.
     Never use `this` or `self`.
-*   **Avoid Identifier Shadowing**: Never shadow Go built-in identifiers (`min`, `max`, `len`, `cap`, `new`,
+*   **Avoid identifier shadowing**: Never shadow Go built-in identifiers (`min`, `max`, `len`, `cap`, `new`,
     `clear`, `copy`, `close`, `delete`). Use descriptive identifiers such as `maxVal`, `count`, or `limit`.
-*   **Documentation Comments**: All exported packages, types, interfaces, constants, and functions must have
+*   **Documentation comments**: All exported packages, types, interfaces, constants, and functions must have
     comprehensive Go doc comments starting with the symbol name and adhering to standard Go and `revive` conventions.
-*   **Static Analysis & Linting**: Enforce clean linting via `revive -config revive.toml -formatter friendly ./...`
+*   **Static analysis and linting**: Enforce clean linting via `revive -config revive.toml -formatter friendly ./...`
     and `go vet ./...`.
 
-# Testing Conventions
+# Testing conventions
 
-*   **Table-Driven Tests**: Table-driven tests are standard for unit testing. Each test case struct must include a
+*   **Table-driven tests**: Table-driven tests are standard for unit testing. Each test case struct must include a
     descriptive `name` string field.
-*   **Parallel Execution**: Use `t.Parallel()` on unit tests and table-driven subtests that do not mutate the process
+*   **Parallel execution**: Use `t.Parallel()` on unit tests and table-driven subtests that do not mutate the process
     environment (`t.Setenv`) or package-level globals. Never combine `t.Parallel()` with `t.Setenv` or global CLI flags.
-*   **Performance Benchmarking**: Maintain `*_bench_test.go` benchmarks for performance-sensitive subsystems (e.g.
-    CP437 decoding, file resolution, Steam VDF parsing, and TUI fuzzy search/layout calculation).
-*   **Hardened Concurrency & Randomization**: All tests must execute cleanly under `-race` (race detector) and
+*   **Performance benchmarking**: Maintain `*_bench_test.go` benchmarks for performance-sensitive subsystems (such as
+    CP437 decoding, file resolution, Steam VDF parsing, and TUI fuzzy search and layout calculation).
+*   **Hardened concurrency and randomization**: All tests must execute cleanly under `-race` (race detector) and
     `-shuffle=on` (test order randomization).
-*   **Filesystem Isolation**: File resolution, deployment, and extraction tests must execute within isolated
+*   **Filesystem isolation**: File resolution, deployment, and extraction tests must execute within isolated
     temporary directories (`t.TempDir()` or `os.MkdirTemp`) and clean up completely.
-*   **Parity & Path Auditing**: Every test run includes automated validation that:
+*   **Parity and path auditing**: Every test run includes automated validation that:
     1. Curated entities in `catalog/*.json` pass `LintCatalog` and synchronize with `README.md`.
-    2. Zero absolute personal user paths (`/home/`, `%USERPROFILE%`) exist in configuration templates, catalog
-       entities, or test fixtures.
+    2. Zero absolute personal user paths exist in configuration templates, catalog entities, documentation, or test
+       fixtures.
 
-# Documentation Roles & Boundaries
+# Technical writing and typography conventions
 
-*   **`README.md` (User-Facing)**: Reserved strictly for players and end-users of the `doom` CLI and source ports.
-    Focuses on installation, `doom setup`, gameplay (`doom play`), preset catalogs, directory layouts, and game file
-    acquisition. Must **not** contain internal developer commands, agent instructions, or compiler details.
-*   **`CONTRIBUTING.md` (Contributor-Facing)**: Dedicated guide for human open-source developers. Details prerequisites,
-    Makefile targets, Go code style, testing requirements, and PR guidelines.
-*   **`AGENTS.md` (Agent & Architectural Invariants)**: The single canonical, authoritative reference at the repository
-    root for autonomous agents (including Claude Code, which natively reads `AGENTS.md`), architecture invariants, path
-    tokens, safety rules, and code quality checklists. Keep `AGENTS.md` as a single root file without splitting into
-    `.agents/` or creating `CLAUDE.md` symlinks.
-*   **Documentation Synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
-    mechanics are modified, all relevant documentation (**Go doc comments**, **`README.md`**, **`CONTRIBUTING.md`**,
-    **`AGENTS.md`**, and **`llms.txt`**) MUST be updated in the same pull request.
+*   **Typography and formatting restraint**:
+    *   **One format per span**: Never combine bold, italics, code font, or hyperlinks on the same text (no bolded
+        code spans, no bolded links, and no bold-italics).
+    *   **Strict role separation**:
+        *   **Code font**: Use backticks strictly for literal code, CLI commands, flags, file paths, configuration
+            keys, and keyboard shortcuts. Keep sentence punctuation outside backticks.
+        *   **Bold**: Use bold (`**...**`) only for UI labels and run-in list headings followed by a colon (`:`).
+            Never use a dash after a run-in heading, and never use bold for mid-sentence emphasis or whole clauses.
+        *   **Italics**: Use italics (`_..._` or `*...*`) only when introducing a term on first use or for titles of
+            standalone works (such as game and megawad titles in prose).
+    *   **Sentence-case headings and table headers**: Use sentence case for all document titles, section headings, and
+        table column headers (capitalizing only the first word and proper nouns like `CLI`, `TUI`, `WAD`, `WADs`,
+        `IWAD`, `PWAD`, `UZDoom`, `DSDA-Doom`, `Linux`, `macOS`, `Windows`, `JSON`, `ANSI`, `Nerd Fonts`, `README`,
+        `Go`, `Makefile`, and `Git`), with no trailing punctuation.
+    *   **No decorative symbols or arrows in prose**: Omit decorative emojis, GitHub emoji shortcodes, LaTeX math
+        expressions, ASCII arrows, and inequality signs as prose connectors outside code blocks and diagrams. Write
+        plain English verbs ("maps to", "takes precedence over") instead.
+    *   **No horizontal section dividers**: Do not place horizontal rules (`---`) between sections; Markdown headings
+        provide structural hierarchy.
+    *   **Clean punctuation and list discipline**: Do not use italic parenthetical asides for notes, tips, or
+        alternatives; state important details as normal sentences or table entries. Do not use slashes (`/`) in prose
+        to join alternatives (write "or" or "and" instead), reserving `/` for file paths, URLs, and literal commands
+        or keys.
+*   **Surface-specific standards**:
+    *   **READMEs**: Follow Diátaxis structure in `README.md` (concise summary, quick start, task guides, reference
+        tables, and troubleshooting). Apply the dual representation rule so interactive keybindings, CLI flags, and
+        environment variables appear both conceptually in prose and tabularly in reference tables. Document only
+        behavior verified against the current codebase (zero aspirational documentation).
+    *   **Pull request descriptions**: Follow the Google CL Description style with a standalone imperative title, a
+        summary that explains "why" before "what" grouped by subsystem, and a lean checklist without decorative emojis.
+    *   **Issues**: Structure bug reports around four factual sections (environment, numbered steps to reproduce,
+        expected behavior, and actual behavior with terminal logs) and frame feature proposals around the workflow
+        problem before proposing a CLI or schema design.
+    *   **Comments**: Start every exported Go doc comment with the symbol name and state its contract. Keep
+        implementation comments focused on "why" a non-obvious constraint exists rather than "what" the code does, and
+        prefix non-blocking review polish suggestions with `Nit:`.
+    *   **Commit messages**: Follow Chris Beams' seven rules: imperative subject line of 50 characters or fewer (hard
+        cap at 72) with no trailing period, a blank line, and a 72-character wrapped plain-text body explaining what
+        and why.
 
-# Pull Request & Workflow Conventions
+# Documentation roles and boundaries
 
-*   **Accurate & Detailed Commits**: Use imperative commit messages describing the architectural change (e.g.
+*   **User-facing documentation**: `README.md` is reserved strictly for players and end-users of the `doom` CLI and
+    source ports. Focuses on installation, `doom setup`, gameplay (`doom play`), preset catalogs, directory layouts,
+    and game file acquisition. Must not contain internal developer commands, agent instructions, or compiler details.
+*   **Contributor-facing documentation**: `CONTRIBUTING.md` is the dedicated guide for human open-source developers.
+    Details prerequisites, Makefile targets, Go code style, testing requirements, and pull request guidelines.
+*   **Agent and architectural invariants**: `AGENTS.md` is the single canonical, authoritative reference at the
+    repository root for autonomous agents (including Claude Code, which natively reads `AGENTS.md`), architecture
+    invariants, path tokens, safety rules, and code quality checklists. Keep `AGENTS.md` at the repository root
+    without moving it into `.agents/AGENTS.md` or creating `CLAUDE.md` symlinks; scoped conditional rules and agent
+    skills live in `.agents/rules/` and `.agents/skills/`.
+*   **Documentation synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
+    mechanics are modified, all relevant documentation (Go doc comments, `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
+    and `llms.txt`) must be updated in the same pull request.
+
+# Pull request and workflow conventions
+
+*   **Accurate and detailed commits**: Use imperative commit messages describing the architectural change (such as
     `Adopt Go tooling, static analysis, and testing patterns from collections`).
-*   **PR Description Synchronization**: Whenever subsequent commits in a PR branch modify, fix, or expand upon the
-    original changeset (e.g. CI adjustments, bug fixes, refactoring), the PR description must be proactively updated
-    via `gh pr edit` to reflect the latest state of the PR.
-*   **Path Invariant Verification**: Verify `git diff` contains zero hardcoded personal user paths before committing.
-*   **PR Template Completion**: Ensure the PR template checklist is completely satisfied.
+*   **Pull request description synchronization**: Whenever subsequent commits in a pull request branch modify, fix, or
+    expand upon the original changeset (such as CI adjustments, bug fixes, or refactoring), the pull request
+    description must be proactively updated via `gh pr edit` to reflect the latest state.
+*   **Path invariant verification**: Verify `git diff` contains zero hardcoded personal user paths before committing.
+*   **Pull request template completion**: Ensure the pull request template checklist is completely satisfied.
 
-# Continuous Learning & Principle Encoding
+# Continuous learning and principle encoding
 
-*   **Persist User Corrections**: Whenever an agent is corrected, redirected, or receives feedback on repository
-    conventions, it **must immediately encode the underlying principle into `AGENTS.md`** before concluding the task.
+*   **Persist user corrections**: Whenever an agent is corrected, redirected, or receives feedback on repository
+    conventions, it must immediately encode the underlying principle into `AGENTS.md` before concluding the task.
     This ensures all future agent sessions automatically inherit the correction.
-*   **Windows Engine Configuration Locality**: On Windows, source ports (DSDA-Doom, UZDoom) operate in portable
-    mode and read configurations relative to their program directory (`$PROGDIR` / `BinDir`), NOT Unix-style AppData
+*   **Windows engine configuration locality**: On Windows, source ports (DSDA-Doom, UZDoom) operate in portable
+    mode and read configurations relative to their program directory (`$PROGDIR` or `BinDir`), not Unix-style AppData
     subdirectories. Deploying `dsda-doom.cfg` and `autoexec.cfg` directly to `BinDir` (defaulting to
     `%USERPROFILE%\Games\Doom\bin\`) ensures both launcher-mediated and direct executable invocations load the
-    intended configs.
-*   **Persistent Asset Directory Hierarchy**: Users can override and persist all asset and execution directories
+    intended configurations.
+*   **Persistent asset directory hierarchy**: Users can override and persist all asset and execution directories
     (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json`. The
-    resolution hierarchy strictly respects: CLI flags (`--wads-dir`, `--bin-dir`, `--soundfonts-dir`) > Environment
-    variables (`DOOM_WADS_DIR`/`WADS_DIR`, `DOOM_WADS_DIRS`/`WADS_DIRS`, `DOOM_BIN_DIR`/`BIN_DIR`,
-    `DOOM_SF_DIR`/`SF_DIR`) > User configuration (`config.json`) > Platform defaults. Engine launch synthesis and
-    configuration deployment always adhere to this resolved hierarchy.
-*   **Symmetric Two-Layer Entity Catalog**: Keep user preferences (`config.json`) strictly separated from entity
+    resolution hierarchy strictly respects CLI flags (`--wads-dir`, `--bin-dir`, `--soundfonts-dir`), which take
+    precedence over environment variables (`DOOM_WADS_DIR` or `WADS_DIR`, `DOOM_WADS_DIRS` or `WADS_DIRS`,
+    `DOOM_BIN_DIR` or `BIN_DIR`, `DOOM_SF_DIR` or `SF_DIR`), which take precedence over user configuration
+    (`config.json`), which takes precedence over platform defaults. Engine launch synthesis and configuration
+    deployment always adhere to this resolved hierarchy.
+*   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.
-*   **Engine Installer Idempotency & Proton Discovery**: `doom setup` and `doom engines install` must check for existing
-    executable binaries in `BinDir` and skip redundant asset downloads unless `--force` is specified. Steam discovery
-    must traverse up to depth 15 to discover game files inside Steam Proton prefixes (`compatdata/<id>/pfx/...`).
+*   **Engine installer idempotency and Proton discovery**: `doom setup` and `doom engines install` must check for
+    existing executable binaries in `BinDir` and skip redundant asset downloads unless `--force` is specified. Steam
+    discovery must traverse up to depth 15 to discover game files inside Steam Proton prefixes
+    (`compatdata/<id>/pfx/...`).
+*   **Catalog-driven WAD aliases and Steam target synthesis**: Never duplicate WAD filenames or alias tables across
+    `internal/preset/resolve.go` and `internal/steam/discover.go`, and never add aliases that only differ by case,
+    spaces, dashes, or underscores (which `preset.NormalizeFilename` matches automatically and `LintCatalog` rejects).
+    Declare true alternate filename stems once in `files[].aliases` inside `catalog/preset.<id>.json`;
+    `preset.KnownAliases` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog.
 
-# Pre-Completion Verification Checklist
+# Pre-completion verification checklist
 
-Before completing any changes, agents MUST run and verify the following commands succeed without errors or warnings:
+Before completing any changes, agents must run and verify the following commands succeed without errors or warnings:
 
 1. `make format-check` (verify `gofmt -s -l .` reports zero unformatted files).
 2. `make tidy-check` (verify `go mod tidy && git diff --exit-code go.mod go.sum`).
-3. `make lint` (verify `go vet ./...` and `revive -config revive.toml -set_exit_status` pass with zero warnings/errors).
+3. `make lint` (verify `go vet ./...` and `revive -config revive.toml -set_exit_status` pass with zero warnings or
+   errors).
 4. `make check` (runs full suite: formatting check, tidy check, linters, `go test -v -race -shuffle=on ./...`,
    preset parity invariants, and path invariant inspection verifying zero hardcoded personal user paths).
 5. `govulncheck ./...` (when installed, verify zero known vulnerabilities).

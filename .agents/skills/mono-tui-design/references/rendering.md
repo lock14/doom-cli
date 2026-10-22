@@ -1,0 +1,1121 @@
+# Monospace Design TUI Rendering Reference
+
+**Version 0.2.5** — Exact characters, SGR codes, and measurements for Monospace TUI (`mono-tui`) implementers.
+
+This document is the concrete companion to the [Monospace Design TUI Standard](monospace-tui-design-standard.md). Where the standard says "single-line border," this document specifies the exact Unicode codepoint. Where the standard says "dim," this document gives the SGR escape sequence. Implementers SHOULD keep this open alongside the standard.
+
+### Changelog
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 0.2.5 | 2026-04-18 | Updated named palette set and synced reference publication with the v0.2.5 documentation release. |
+| 0.1.2 | 2026-04-17 | No rendering token changes; version advanced to remain in sync with standard v0.1.2 and pattern-library publication. |
+| 0.1.1 | 2026-03-05 | Added §R10 Workflow Archetype Rendering (step indicators, breadcrumb trails, queue counters, stage indicators, category indicators) |
+| 0.1.0 | — | Initial release |
+
+---
+
+## §R1 Box-Drawing Characters
+
+### §R1.1 Single-Line (Light)
+
+Used for: Level 1 panels, Level 2 menus, inactive windows (Standard §6.1, §6.2).
+
+| Glyph | Name | Unicode | Description |
+|-------|------|---------|-------------|
+| `─` | BOX DRAWINGS LIGHT HORIZONTAL | U+2500 | Horizontal line |
+| `│` | BOX DRAWINGS LIGHT VERTICAL | U+2502 | Vertical line |
+| `┌` | BOX DRAWINGS LIGHT DOWN AND RIGHT | U+250C | Top-left corner |
+| `┐` | BOX DRAWINGS LIGHT DOWN AND LEFT | U+2510 | Top-right corner |
+| `└` | BOX DRAWINGS LIGHT UP AND RIGHT | U+2514 | Bottom-left corner |
+| `┘` | BOX DRAWINGS LIGHT UP AND LEFT | U+2518 | Bottom-right corner |
+| `├` | BOX DRAWINGS LIGHT VERTICAL AND RIGHT | U+251C | Left T-junction |
+| `┤` | BOX DRAWINGS LIGHT VERTICAL AND LEFT | U+2524 | Right T-junction |
+| `┬` | BOX DRAWINGS LIGHT DOWN AND HORIZONTAL | U+252C | Top T-junction |
+| `┴` | BOX DRAWINGS LIGHT UP AND HORIZONTAL | U+2534 | Bottom T-junction |
+| `┼` | BOX DRAWINGS LIGHT VERTICAL AND HORIZONTAL | U+253C | Cross junction |
+
+### §R1.2 Heavy (Thick)
+
+Used for: optional emphasis borders, header separators.
+
+| Glyph | Name | Unicode |
+|-------|------|---------|
+| `━` | BOX DRAWINGS HEAVY HORIZONTAL | U+2501 |
+| `┃` | BOX DRAWINGS HEAVY VERTICAL | U+2503 |
+| `┏` | BOX DRAWINGS HEAVY DOWN AND RIGHT | U+250F |
+| `┓` | BOX DRAWINGS HEAVY DOWN AND LEFT | U+2513 |
+| `┗` | BOX DRAWINGS HEAVY UP AND RIGHT | U+2517 |
+| `┛` | BOX DRAWINGS HEAVY UP AND LEFT | U+251B |
+| `┣` | BOX DRAWINGS HEAVY VERTICAL AND RIGHT | U+2523 |
+| `┫` | BOX DRAWINGS HEAVY VERTICAL AND LEFT | U+252B |
+| `┳` | BOX DRAWINGS HEAVY DOWN AND HORIZONTAL | U+2533 |
+| `┻` | BOX DRAWINGS HEAVY UP AND HORIZONTAL | U+253B |
+| `╋` | BOX DRAWINGS HEAVY VERTICAL AND HORIZONTAL | U+254B |
+
+### §R1.3 Double-Line
+
+Used for: Level 3 dialogs, Level 4 modals, active windows (Standard §6.1, §6.2).
+
+| Glyph | Name | Unicode |
+|-------|------|---------|
+| `═` | BOX DRAWINGS DOUBLE HORIZONTAL | U+2550 |
+| `║` | BOX DRAWINGS DOUBLE VERTICAL | U+2551 |
+| `╔` | BOX DRAWINGS DOUBLE DOWN AND RIGHT | U+2554 |
+| `╗` | BOX DRAWINGS DOUBLE DOWN AND LEFT | U+2557 |
+| `╚` | BOX DRAWINGS DOUBLE UP AND RIGHT | U+255A |
+| `╝` | BOX DRAWINGS DOUBLE UP AND LEFT | U+255D |
+| `╠` | BOX DRAWINGS DOUBLE VERTICAL AND RIGHT | U+2560 |
+| `╣` | BOX DRAWINGS DOUBLE VERTICAL AND LEFT | U+2563 |
+| `╦` | BOX DRAWINGS DOUBLE DOWN AND HORIZONTAL | U+2566 |
+| `╩` | BOX DRAWINGS DOUBLE UP AND HORIZONTAL | U+2569 |
+| `╬` | BOX DRAWINGS DOUBLE VERTICAL AND HORIZONTAL | U+256C |
+
+### §R1.4 Rounded Corners
+
+Used for: cosmetic non-interactive containers only (Standard §6.6).
+
+| Glyph | Name | Unicode |
+|-------|------|---------|
+| `╭` | BOX DRAWINGS LIGHT ARC DOWN AND RIGHT | U+256D |
+| `╮` | BOX DRAWINGS LIGHT ARC DOWN AND LEFT | U+256E |
+| `╰` | BOX DRAWINGS LIGHT ARC UP AND RIGHT | U+256F |
+| `╯` | BOX DRAWINGS LIGHT ARC UP AND LEFT | U+2570 |
+
+### §R1.5 Dashed Lines
+
+Used for: optional separators, visual grouping within panels.
+
+| Glyph | Name | Unicode |
+|-------|------|---------|
+| `┄` | BOX DRAWINGS LIGHT TRIPLE DASH HORIZONTAL | U+2504 |
+| `┆` | BOX DRAWINGS LIGHT TRIPLE DASH VERTICAL | U+2506 |
+| `┈` | BOX DRAWINGS LIGHT QUADRUPLE DASH HORIZONTAL | U+2508 |
+| `┊` | BOX DRAWINGS LIGHT QUADRUPLE DASH VERTICAL | U+250A |
+| `╌` | BOX DRAWINGS HEAVY TRIPLE DASH HORIZONTAL | U+254C |
+| `╎` | BOX DRAWINGS HEAVY TRIPLE DASH VERTICAL | U+254E |
+
+### §R1.6 Block and Shade Characters
+
+Used for: progress bars, sparklines, scroll indicators, shadows.
+
+| Glyph | Name | Unicode | Coverage |
+|-------|------|---------|----------|
+| `░` | LIGHT SHADE | U+2591 | 25% fill |
+| `▒` | MEDIUM SHADE | U+2592 | 50% fill |
+| `▓` | DARK SHADE | U+2593 | 75% fill |
+| `█` | FULL BLOCK | U+2588 | 100% fill |
+| `▄` | LOWER HALF BLOCK | U+2584 | Bottom half |
+| `▀` | UPPER HALF BLOCK | U+2580 | Top half |
+| `▌` | LEFT HALF BLOCK | U+258C | Left half |
+| `▐` | RIGHT HALF BLOCK | U+2590 | Right half |
+| `▏` | LEFT ONE EIGHTH BLOCK | U+258F | 1/8 left |
+| `▎` | LEFT ONE QUARTER BLOCK | U+258E | 1/4 left |
+| `▍` | LEFT THREE EIGHTHS BLOCK | U+258D | 3/8 left |
+| `▋` | LEFT FIVE EIGHTHS BLOCK | U+258B | 5/8 left |
+| `▊` | LEFT THREE QUARTERS BLOCK | U+258A | 3/4 left |
+| `▉` | LEFT SEVEN EIGHTHS BLOCK | U+2589 | 7/8 left |
+
+### §R1.7 Status and Indicator Symbols
+
+Used for: status displays, selection marks, navigation indicators.
+
+| Glyph | Name | Unicode | Use |
+|-------|------|---------|-----|
+| `◉` | FISHEYE | U+25C9 | Active/healthy status |
+| `○` | WHITE CIRCLE | U+25CB | Inactive status |
+| `●` | BLACK CIRCLE | U+25CF | Filled indicator |
+| `▸` | BLACK RIGHT-POINTING SMALL TRIANGLE | U+25B8 | Focus/selection indicator |
+| `▴` | BLACK UP-POINTING SMALL TRIANGLE | U+25B4 | Sort ascending |
+| `▾` | BLACK DOWN-POINTING SMALL TRIANGLE | U+25BE | Sort descending |
+| `⚠` | WARNING SIGN | U+26A0 | Warning status |
+| `✓` | CHECK MARK | U+2713 | Success/confirmed |
+| `✗` | BALLOT X | U+2717 | Error/failed |
+| `⋯` | MIDLINE HORIZONTAL ELLIPSIS | U+22EF | Truncation indicator |
+| `↑` | UPWARDS ARROW | U+2191 | Scroll up indicator |
+| `↓` | DOWNWARDS ARROW | U+2193 | Scroll down indicator |
+
+### §R1.8 Focus Bracket Markers
+
+Used for: alternative focus indication when reverse video is insufficient (Standard §7.2, §8.1).
+
+```
+[▸ focused item ◂]
+```
+
+| Glyph | Name | Unicode | Position |
+|-------|------|---------|----------|
+| `[` | LEFT SQUARE BRACKET | U+005B | Before indicator |
+| `▸` | BLACK RIGHT-POINTING SMALL TRIANGLE | U+25B8 | After opening bracket + space |
+| `◂` | BLACK LEFT-POINTING SMALL TRIANGLE | U+25C2 | Before closing bracket + space |
+| `]` | RIGHT SQUARE BRACKET | U+005D | After indicator |
+
+Total width overhead: 6 characters (3 prefix `[▸ ` + 3 suffix ` ◂]`).
+
+### §R1.9 Mnemonic Rendering
+
+Mnemonics (Standard §2.4) are underlined letters enabling single-keystroke selection in menus. Source notation uses tilde (`~F~ile`) or ampersand (`&File`).
+
+**Visual rendering:** The mnemonic character MUST be rendered with underline (SGR 4). If the terminal does not support underline, use a contrasting foreground color (bright white when surrounding text is dimmer).
+
+```
+Example — "File" with F as mnemonic:
+  Source:  ~F~ile
+  Render:  ESC[4mFESC[24mile
+           ─────         ────
+           underlined F   normal "ile"
+```
+
+---
+
+## §R2 SGR (Select Graphic Rendition) Codes
+
+### §R2.1 Attribute Codes
+
+All styling uses CSI sequences: `ESC[{params}m` (where ESC = `\x1b` or `\033`).
+
+| Code | Attribute | Reset Code | Use in Monospace TUI |
+|------|-----------|-----------|-------------|
+| 0 | Reset all | — | Clear all attributes |
+| 1 | Bold | 22 | Display and Title typography (Standard §7.1) |
+| 2 | Dim (faint) | 22 | Label typography, Disabled state (Standard §7.1, §8.1) |
+| 3 | Italic | 23 | Sparingly — not in standard typography roles |
+| 4 | Underline | 24 | Hovered state, mnemonics (Standard §8.1) |
+| 7 | Reverse video | 27 | Focused and Selected states (Standard §8.1) |
+| 9 | Strikethrough | 29 | Deprecated items only |
+
+### §R2.2 Typography Role → SGR Mapping
+
+| Typography Role | SGR Sequence | Example |
+|----------------|-------------|---------|
+| Display | `ESC[1m` (+ uppercase in source) | `ESC[1mDASHBOARDESC[22m` |
+| Title | `ESC[1m` | `ESC[1mSection HeaderESC[22m` |
+| Body | (no attributes) | `Normal content text` |
+| Label | `ESC[2m` | `ESC[2mLast updated: 12:34ESC[22m` |
+
+### §R2.3 State → SGR Mapping
+
+| State | SGR Sequence | Notes |
+|-------|-------------|-------|
+| Enabled | (no attributes) | Default rendering |
+| Focused | `ESC[7m` | Reverse video |
+| Hovered | `ESC[4m` | Underline (mouse contexts) |
+| Pressed | `ESC[7m` → `ESC[27m` (within ≤100ms) | Brief reverse flash |
+| Selected | `ESC[7m` + fill mark character | Reverse video with `[X]` or `(*)` |
+| Disabled | `ESC[2m` | Dim/faint |
+| Error | `ESC[31m` or `ESC[91m` | Red foreground (standard or bright) |
+| Error (severe) | `ESC[41m` | Red background |
+
+### §R2.4 Standard Foreground Colors
+
+| Color | Standard FG | Bright FG | Standard BG | Bright BG |
+|-------|------------|-----------|------------|-----------|
+| Black | 30 | 90 | 40 | 100 |
+| Red | 31 | 91 | 41 | 101 |
+| Green | 32 | 92 | 42 | 102 |
+| Yellow | 33 | 93 | 43 | 103 |
+| Blue | 34 | 94 | 44 | 104 |
+| Magenta | 35 | 95 | 45 | 105 |
+| Cyan | 36 | 96 | 46 | 106 |
+| White | 37 | 97 | 47 | 107 |
+| Default | 39 | — | 49 | — |
+
+### §R2.5 Extended Color Sequences
+
+**256-color mode:**
+
+```
+Foreground: ESC[38;5;{n}m    (n = 0–255)
+Background: ESC[48;5;{n}m    (n = 0–255)
+```
+
+**Truecolor (24-bit):**
+
+```
+Foreground: ESC[38;2;{r};{g};{b}m    (r, g, b = 0–255)
+Background: ESC[48;2;{r};{g};{b}m    (r, g, b = 0–255)
+```
+
+---
+
+## §R3 256-Color Palette
+
+### §R3.1 Palette Structure
+
+| Index Range | Content |
+|------------|---------|
+| 0–7 | Standard ANSI colors (black, red, green, yellow, blue, magenta, cyan, white) |
+| 8–15 | Bright ANSI colors |
+| 16–231 | 6×6×6 color cube: `index = 16 + 36r + 6g + b` (r, g, b = 0–5) |
+| 232–255 | 24-step grayscale ramp (232 = darkest, 255 = lightest) |
+
+### §R3.2 Semantic Role → 256-Color Mapping
+
+#### Dark Theme (default)
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 75 (light blue) | 17 (dark blue) | fg #5fafff, bg #00005f |
+| Secondary | 109 (muted blue) | 236 (dark gray) | fg #87afaf, bg #303030 |
+| Tertiary | 79 (teal) | 236 (dark gray) | fg #5fd7af, bg #303030 |
+| Error | 196 (bright red) | 52 (dark red) | fg #ff0000, bg #5f0000 |
+| Neutral fg | 252 (light gray) | — | fg #d0d0d0 |
+| Neutral bg | — | 235 (near-black) | bg #262626 |
+| Surface | 252 | 234 (charcoal) | bg #1c1c1c |
+
+#### Light Theme
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 25 (dark blue) | 189 (light blue) | fg #005faf, bg #d7d7ff |
+| Secondary | 66 (muted blue) | 254 (near-white) | fg #5f8787, bg #e4e4e4 |
+| Tertiary | 30 (dark teal) | 254 (near-white) | fg #008787, bg #e4e4e4 |
+| Error | 124 (dark red) | 224 (light pink) | fg #af0000, bg #ffd7d7 |
+| Neutral fg | 235 (dark gray) | — | fg #262626 |
+| Neutral bg | — | 255 (white) | bg #eeeeee |
+| Surface | 235 | 231 (pure white) | bg #ffffff |
+
+### §R3.3 Status Color Mapping
+
+| Status | Dark Theme (FG index) | Light Theme (FG index) | Paired Symbol |
+|--------|----------------------|----------------------|---------------|
+| Healthy / Success | 40 (green) | 28 (dark green) | `◉` or `✓` |
+| Error / Critical | 196 (bright red) | 124 (dark red) | `✗` or `●` |
+| Warning / Caution | 220 (yellow) | 172 (orange) | `⚠` or `▲` |
+| Inactive / Disabled | 240 (gray) | 247 (gray) | `○` or `—` |
+
+### §R3.4 Named Palettes
+
+The Dark Theme and Light Theme mappings above (§R3.2) define the default palettes. Applications MAY offer additional named palettes. Eight named palettes are defined here, drawn from the historical research that informs the standard. All palettes map to the same five semantic roles (§5.1); they differ only in color assignment.
+
+#### Default
+
+Source: Textual framework default dark theme. This is the standard modern dark palette — the recommended starting point for new applications. It uses the same 256-color mappings defined in §R3.2 Dark Theme.
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 75 (light blue) | 17 (dark blue) | fg #5fafff, bg #00005f |
+| Secondary | 109 (muted blue) | 236 (dark gray) | fg #87afaf, bg #303030 |
+| Tertiary | 79 (teal) | 236 (dark gray) | fg #5fd7af, bg #303030 |
+| Error | 196 (bright red) | 52 (dark red) | fg #ff0000, bg #5f0000 |
+| Neutral fg | 252 (light gray) | — | fg #d0d0d0 |
+| Neutral bg | — | 235 (near-black) | bg #262626 |
+| Surface | 252 | 234 (charcoal) | bg #1c1c1c |
+
+Status colors:
+
+| Status | Foreground (index) | Paired Symbol |
+|--------|-------------------|---------------|
+| Healthy / Success | 40 (green) | `◉` or `✓` |
+| Error / Critical | 196 (bright red) | `✗` or `●` |
+| Warning / Caution | 220 (yellow) | `⚠` or `▲` |
+| Inactive / Disabled | 240 (gray) | `○` or `—` |
+
+#### Monochrome
+
+Source: CUA `cpAppMonochrome` system palette, Turbo Vision `cpAppBlackWhite` palette, and the capability-detection degradation path (§5.6).
+
+No color indices are used. All semantic differentiation is achieved through SGR text attributes on a black background.
+
+| Semantic Role | Foreground | Background | SGR Attributes |
+|--------------|-----------|-----------|----------------|
+| Primary | White | Black | **Bold** (SGR 1) |
+| Secondary | White | Black | Normal |
+| Tertiary | White | Black | Underline (SGR 4) |
+| Error | White | Black | **Bold** + Reverse (SGR 1;7) |
+| Neutral fg | White | Black | Dim (SGR 2) |
+| Neutral bg | — | Black | — |
+| Surface | White | Black | — |
+| Focus indicator | Black | White | Reverse (SGR 7) |
+| Selected item | Black | White | Reverse (SGR 7) |
+| Disabled | White | Black | Dim (SGR 2) |
+
+Status mapping under Monochrome:
+
+| Status | Rendering | Paired Symbol |
+|--------|----------|---------------|
+| Healthy / Success | Normal | `◉` or `✓` |
+| Error / Critical | Bold + Reverse | `✗` or `●` |
+| Warning / Caution | Bold | `⚠` or `▲` |
+| Inactive / Disabled | Dim | `○` or `—` |
+
+Example — Dashboard rendered in Monochrome:
+
+```
+┌── Service Monitor ────────────────────────────────────────────────────────────┐
+│ File  View  Help                                                    [BOLD]    │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  CPU: 34%          Services: 12/12          Alerts: 3          Mem: 61%       │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Service              │ Status   │ Uptime       │ CPU     │ Memory             │
+│──────────────────────│──────────│──────────────│─────────│──────────────────-─│
+│ > api-gateway        │  OK      │ 14d  3h 22m  │   2.1%  │  340MB  [REVERSE]  │
+│   auth-service       │  OK      │ 14d  3h 22m  │   0.8%  │  128MB             │
+│   worker-pool        │  WARN    │  0d  1h 45m  │  78.3%  │  1.2GB  [BOLD]     │
+│   notification-svc   │  DOWN    │  0d  0h 00m  │   0.0%  │    0MB  [REV+B]    │
+│   metrics-collector  │  OK      │ 14d  3h 22m  │   1.4%  │  256MB             │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ ? Help  r Refresh  / Filter  q Quit                         5 services  [DIM] │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+SGR rendering:  Title bar ─ BOLD.  Focused row ─ REVERSE.  ◉ OK ─ normal.
+⚠ WARN ─ BOLD.  ✗ DOWN ─ BOLD+REVERSE.  Footer ─ DIM.  All white on black.
+```
+
+#### OS/2
+
+Source: OS/2 Presentation Manager text-mode conventions as seen in OS/2 terminal emulators like Softerm. Yellow-green text on CGA blue, with light gray action bars and status lines. The window title bar uses yellow on dark blue. Selections use reverse video. Active windows use double-line borders with brighter attributes; inactive windows use single-line borders with dimmer attributes (§5.5).
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 14 (yellow) | 1 (blue) | fg #FFFF55, bg #0000AA |
+| Secondary | 7 (light gray) | 1 (blue) | fg #AAAAAA, bg #0000AA |
+| Tertiary | 0 (black) | 7 (light gray) | fg #000000, bg #AAAAAA |
+| Error | 12 (light red) | 1 (blue) | fg #FF5555, bg #0000AA |
+| Neutral fg | 0 (black) | — | fg #000000 |
+| Neutral bg | — | 7 (light gray) | bg #AAAAAA |
+| Surface | 14 (yellow) | 1 (blue) | bg #0000AA |
+
+Key conventions:
+
+- **Action bar**: Black on light gray — the CUA standard. Distinguished from the blue panel area.
+- **Title bar**: Yellow on dark blue. Window name displayed in the title frame.
+- **Panels**: Yellow or light gray text on blue. Terminal text area uses yellow on blue.
+- **Status line**: Black on light gray, with status indicators (Online, Half Duplex, etc.).
+- **Active/inactive windows**: Bright borders (active) vs. dim borders (inactive), with double-line vs. single-line distinction (§6.1).
+
+#### Turbo Pascal
+
+Source: Borland Turbo Vision palette system (1990) as seen in the Turbo Pascal 7.0 and Turbo C++ IDEs. The desktop uses a `░` dither pattern in light gray on blue. Editor windows show white text on blue. Menu bar and status line use black on light gray. Window frames are white on blue; active windows use double-line borders, inactive use single-line. Dialog boxes use black on light gray, visually distinct from the blue editor surface. Buttons use black on green.
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 15 (white) | 1 (blue) | fg #FFFFFF, bg #0000AA |
+| Secondary | 7 (light gray) | 1 (blue) | fg #AAAAAA, bg #0000AA |
+| Tertiary | 0 (black) | 2 (green) | fg #000000, bg #00AA00 |
+| Error | 12 (light red) | 1 (blue) | fg #FF5555, bg #0000AA |
+| Neutral fg | 0 (black) | — | fg #000000 |
+| Neutral bg | — | 7 (light gray) | bg #AAAAAA |
+| Surface | 15 (white) | 1 (blue) | bg #0000AA |
+
+Key conventions from the Borland IDE:
+
+- **Desktop**: `░` dither pattern — light gray (7) on blue (1). Visible behind all windows.
+- **Editor area**: White (15) on blue (1). Comments and secondary text in light gray (7).
+- **Window frames**: White (15) on blue (1). Double-line for active, single-line for inactive.
+- **Menu bar and status line**: Black (0) on light gray (7). Hotkey letters highlighted in red or yellow.
+- **Dialog boxes**: Black on light gray. A visually distinct surface from the blue editor area.
+- **Buttons**: Black on green (`[ OK ]`). Default button uses highlighted delimiters.
+
+#### Amber Phosphor
+
+Source: DEC VT220 and VT320 amber phosphor (P3) displays, widely deployed in business and institutional computing through the 1980s. Control Data Corporation PLATO terminals also used amber-orange plasma displays. The single-hue-on-black aesthetic predates color terminals entirely.
+
+All UI elements are rendered in shades of amber (`#FFB000` at full brightness) on a black background. Semantic roles are distinguished by brightness level within the single hue.
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 214 (bright amber) | 0 (black) | fg #ffaf00, bg #000000 |
+| Secondary | 172 (medium amber) | 0 (black) | fg #d78700, bg #000000 |
+| Tertiary | 214 (bright amber) | 0 (black) | fg #ffaf00, bg #000000 (underline) |
+| Error | 214 (bright amber) | 0 (black) | fg #ffaf00, bg #000000 (reverse) |
+| Neutral fg | 136 (dim amber) | — | fg #af8700 |
+| Neutral bg | — | 0 (black) | bg #000000 |
+| Surface | 136 | 0 (black) | bg #000000 |
+
+Because amber is a single-hue palette, SGR attributes provide essential differentiation:
+
+| Element | Color | Additional SGR |
+|---------|-------|---------------|
+| Focused / active | Bright amber (214) | Bold (SGR 1) |
+| Body text | Medium amber (172) | Normal |
+| Secondary / labels | Dim amber (136) | Dim (SGR 2) |
+| Selected item | Black on amber | Reverse (SGR 7) |
+| Error state | Black on amber | Reverse + Bold |
+| Disabled | Dim amber (136) | Dim (SGR 2) |
+| Links / interactive | Bright amber (214) | Underline (SGR 4) |
+
+Example — Dashboard rendered in Amber Phosphor:
+
+```
+┌── Service Monitor ────────────────────────────────────────────────────────────┐
+│ File  View  Help                                                [bright amber]│
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                          [medium amber / blk] │
+│  CPU: 34%          Services: 12/12          Alerts: 3          Mem: 61%       │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Service              │ Status   │ Uptime       │ CPU     │ Memory             │
+│──────────────────────│──────────│──────────────│─────────│───────────────────-│
+│ > api-gateway        │  OK      │ 14d  3h 22m  │   2.1%  │  340MB  [REVERSE]  │
+│   auth-service       │  OK      │ 14d  3h 22m  │   0.8%  │  128MB  [med amb]  │
+│   worker-pool        │  WARN    │  0d  1h 45m  │  78.3%  │  1.2GB  [BOLD]     │
+│   notification-svc   │  DOWN    │  0d  0h 00m  │   0.0%  │    0MB  [REV+B]    │
+│   metrics-collector  │  OK      │ 14d  3h 22m  │   1.4%  │  256MB  [med amb]  │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ ?Help  r Refresh  /Filter  q Quit                          5 services [dim]   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+Color rendering:  All amber on black.  Title ─ bright amber (#ffaf00), BOLD.
+Body text ─ medium amber (#d78700).  Focused row ─ REVERSE (black on amber).
+⚠ WARN ─ bright amber, BOLD.  ✗ DOWN ─ REVERSE+BOLD.  Footer ─ dim amber
+(#af8700).  Borders ─ dim amber.
+```
+
+#### Green Phosphor
+
+Source: DEC VT100 and VT101 green phosphor (P1) displays — the original "green screen" terminal that defined the early Unix and VAX/VMS experience. Also used in IBM 3278 display terminals and countless institutional systems through the 1970s–1980s.
+
+Structurally identical to Amber Phosphor but in green. All UI elements rendered in shades of green (`#33FF00` at full brightness) on black.
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 82 (bright green) | 0 (black) | fg #5fff00, bg #000000 |
+| Secondary | 34 (medium green) | 0 (black) | fg #00af00, bg #000000 |
+| Tertiary | 82 (bright green) | 0 (black) | fg #5fff00, bg #000000 (underline) |
+| Error | 82 (bright green) | 0 (black) | fg #5fff00, bg #000000 (reverse) |
+| Neutral fg | 28 (dim green) | — | fg #008700 |
+| Neutral bg | — | 0 (black) | bg #000000 |
+| Surface | 28 | 0 (black) | bg #000000 |
+
+SGR attribute usage follows the same pattern as Amber Phosphor:
+
+| Element | Color | Additional SGR |
+|---------|-------|---------------|
+| Focused / active | Bright green (82) | Bold (SGR 1) |
+| Body text | Medium green (34) | Normal |
+| Secondary / labels | Dim green (28) | Dim (SGR 2) |
+| Selected item | Black on green | Reverse (SGR 7) |
+| Error state | Black on green | Reverse + Bold |
+| Disabled | Dim green (28) | Dim (SGR 2) |
+| Links / interactive | Bright green (82) | Underline (SGR 4) |
+
+Example — Dashboard rendered in Green Phosphor:
+
+```
+┌── Service Monitor ────────────────────────────────────────────────────────────┐
+│ File  View  Help                                               [bright green] │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                         [medium green / blk]  │
+│  CPU: 34%          Services: 12/12          Alerts: 3          Mem: 61%       │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Service              │ Status   │ Uptime       │ CPU     │ Memory             │
+│──────────────────────│──────────│──────────────│─────────│──────────────────-─│
+│ > api-gateway        │  OK      │ 14d  3h 22m  │   2.1%  │  340MB  [REVERSE]  │
+│   auth-service       │  OK      │ 14d  3h 22m  │   0.8%  │  128MB  [med grn]  │
+│   worker-pool        │  WARN    │  0d  1h 45m  │  78.3%  │  1.2GB  [BOLD]     │
+│   notification-svc   │  DOWN    │  0d  0h 00m  │   0.0%  │    0MB  [REV+B]    │
+│   metrics-collector  │  OK      │ 14d  3h 22m  │   1.4%  │  256MB  [med grn]  │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ ?Help  r Refresh  /Filter  q Quit                          5 services [dim]   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+Color rendering:  All green on black.  Title ─ bright green (#5fff00), BOLD.
+Body text ─ medium green (#00af00).  Focused row ─ REVERSE (black on green).
+⚠ WARN ─ bright green, BOLD.  ✗ DOWN ─ REVERSE+BOLD.  Footer ─ dim green
+(#008700).  Borders ─ dim green.
+```
+
+#### Airlock
+
+Source: The Airlock AI-agent security proxy — a guardrail enforcement layer that inspects, scores, and controls LLM tool-call traffic in real time. The palette uses a cool operator blue for the primary live state, with warm warning and error signals layered on top of a neutral control-room surface. The aesthetic communicates operational security: stable traffic and active guardrails read as calm blue, while warnings and blocks interrupt that baseline immediately.
+
+| Semantic Role | Foreground (index) | Background (index) | Hex Approximation |
+|--------------|-------------------|-------------------|-------------------|
+| Primary | 75 (blue) | 236 (dark gray) | fg #5fafff, bg #303030 |
+| Secondary | 109 (muted blue) | 236 (dark gray) | fg #87afaf, bg #303030 |
+| Tertiary | 214 (orange) | 236 (dark gray) | fg #ffaf00, bg #303030 |
+| Error | 167 (red) | 52 (dark red) | fg #d75f5f, bg #5f0000 |
+| Neutral fg | 252 (light gray) | — | fg #d0d0d0 |
+| Neutral bg | — | 235 (near-black) | bg #262626 |
+| Surface | 252 | 234 (charcoal) | bg #1c1c1c |
+
+Status colors:
+
+| Status | Foreground (index) | Paired Symbol |
+|--------|-------------------|---------------|
+| Healthy / Live | 117 (bright blue) | `◉` or `✓` |
+| Error / Blocked | 167 (red) | `⊘` or `✗` |
+| Warning / Paused | 214 (orange) | `⚠` or `⏸` |
+| Inactive / Shadow | 245 (gray) | `○` or `—` |
+
+Key conventions: Primary is a steady operator blue rather than a warning-coded hue. The dominant signal says "traffic is live and under control" without reading as success-toast green. Tertiary stays orange because the "half-open" and "elevated score" states are the most operationally interesting. The status symbols include `⊘` (block) and `⏸` (paused) to match Airlock's enforcement vocabulary.
+
+```
+Example — Dashboard rendered in Airlock:
+
+┌── Service Monitor ────────────────────────────────────────────────────────────┐
+│ File  View  Help                                                              │
+├───────────────────────────────────────────────────────────────────────────────┤
+│                                                                               │
+│  CPU: 34%          Services: 12/12          Alerts: 3          Mem: 61%       │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Service              │ Status   │ Uptime       │ CPU     │ Memory             │
+│──────────────────────│──────────│──────────────│─────────│────────────────────│
+│ > api-gateway        │  OK      │ 14d  3h 22m  │   2.1%  │  340MB  [blue bg]  │
+│   auth-service       │  OK      │ 14d  3h 22m  │   0.8%  │  128MB  [blue]     │
+│   worker-pool        │  WARN    │  0d  1h 45m  │  78.3%  │  1.2GB  [orange]   │
+│   notification-svc   │  DOWN    │  0d  0h 00m  │   0.0%  │    0MB  [red]      │
+│   metrics-collector  │  OK      │ 14d  3h 22m  │   1.4%  │  256MB  [blue]     │
+│                                                                               │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ ? Help  r Refresh  / Filter  q Quit                           5 services      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+Color rendering:  Dark charcoal background (#1c1c1c).  Title ─ blue (#5fafff).
+Body text ─ light gray (#d0d0d0).  Secondary labels ─ muted blue (#87afaf).
+Focused row ─ blue on dark gray (#303030).  ✓ OK ─ bright blue (#87d7ff).
+⚠ WARN ─ orange (#ffaf00).  ✗ DOWN ─ red (#d75f5f).  Borders ─ dim gray
+(#585858).  Footer ─ dim gray.
+```
+
+---
+
+## §R4 Component Measurements
+
+All measurements are in character cells (cols × rows).
+
+### §R4.1 Push Button
+
+```
+< Label >     (standard)
+» Label «     (default button)
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1 row |
+| Min width | Label length + 4 (2 padding chars each side) |
+| Padding | 1 space each side inside delimiters |
+| Delimiter (standard) | `<` and `>` |
+| Delimiter (default) | `»` and `«` |
+| Gap between buttons | 2 cols |
+
+### §R4.2 Entry Field
+
+```
+Label: [input text here____]
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1 row |
+| Min width | 10 cols (including brackets) |
+| Max width | 60 cols |
+| Fill character | `_` (underscore) or `·` (middle dot) |
+| Bracket delimiters | `[` and `]` |
+| Label gap | 1 space between label and field |
+
+### §R4.3 Toggle / Checkbox
+
+```
+[X] Enabled option
+[ ] Disabled option
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1 row per option |
+| Indicator width | 3 cols (`[X]` or `[ ]`) |
+| Gap to label | 1 space |
+| Vertical gap between options | 0 rows (consecutive lines) |
+
+### §R4.4 Radio Group
+
+```
+(*) Selected option
+( ) Unselected option A
+( ) Unselected option B
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1 row per option |
+| Indicator width | 3 cols (`(*)` or `( )`) |
+| Gap to label | 1 space |
+| Vertical gap between options | 0 rows |
+| Group label | 1 row above group, Title typography |
+
+### §R4.5 List Box
+
+```
+┌── Select Model ──────────┐
+│ > claude-3-opus          │
+│   claude-3-sonnet        │
+│   gpt-4-turbo            │
+│   gpt-4o                 │
+│   gemini-1.5-pro      ↓  │
+└──────────────────────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Min height | 3 rows (content) + 2 (border) = 5 rows |
+| Max height | 15 rows (content) + 2 (border) = 17 rows |
+| Min width | 20 cols (including border) |
+| Highlight bar | Reverse video on focused row |
+| Selection indicator | `▸` (1 col) before focused item |
+| Scroll indicator | `↑` / `↓` in right border when content overflows |
+| Border | Level 1 (single-line) |
+
+### §R4.6 Data Table
+
+```
+│ Name         │ Status │ Latency │ Errors │
+│──────────────│────────│─────────│────────│
+│ claude-3     │ ◉ OK   │  120ms  │ 0      │
+│ gpt-4        │ ⚠ SLOW │  890ms  │ 2      │
+```
+
+| Property | Value |
+|----------|-------|
+| Header row | 1 row, Title typography (bold) |
+| Separator | 1 row of `─` characters below header |
+| Data row height | 1 row |
+| Cell horizontal padding | 1 space each side |
+| Column separator | `│` (single vertical line) |
+| Min column width | Longest header or data value + 2 (padding) |
+| Sort indicator | `▴` (ascending) or `▾` (descending) after header text |
+
+### §R4.7 Metric Card
+
+```
+▲ Requests: 1,234
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1 row (compact) or 2–3 rows (expanded) |
+| Icon/symbol | 1–2 cols |
+| Gap icon → label | 1 space |
+| Gap label → value | 1 space (or `: `) |
+| Separator between cards | `│` with 1 space padding each side |
+
+### §R4.8 Dialog
+
+```
+╔══ Confirm Delete ══════════════════╗
+║                                    ║
+║  Are you sure you want to delete   ║
+║  "report.pdf"?                     ║
+║                                    ║
+║         < Delete >  < Cancel >     ║
+║                                    ║
+╚════════════════════════════════════╝
+```
+
+| Property | Value |
+|----------|-------|
+| Min width | 30 cols |
+| Max width | 72 cols |
+| Min height | 5 rows (content) + 2 (border) = 7 rows |
+| Padding | 2 cols horizontal, 1 row vertical (inside border) |
+| Border | Level 3 (double-line) |
+| Shadow | 2-col × 1-row offset |
+| Title | Centered in top border |
+| Button area | Bottom of content, right-aligned or centered |
+| Button gap | 2 cols between buttons |
+
+### §R4.9 Menu (Pull-Down)
+
+```
+┌──────────-────────┐
+│ New           ^N  │
+│ Open...       ^O  │
+│ Save          ^S  │
+│───────────────────│
+│ Close         ^W  │
+└───────────-───────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Item height | 1 row |
+| Max items | 10 |
+| Min width | Longest item text + shortcut + 4 (padding) |
+| Max width | 40 cols |
+| Horizontal padding | 1 space each side |
+| Separator | Full-width `─` line |
+| Shortcut alignment | Right-aligned, 2 spaces before right border |
+| Border | Level 2 (single-line) |
+| Shadow | 2-col × 1-row offset |
+| Cascade indicator | `▸` suffix (right-aligned) |
+| Disabled items | Dim (SGR 2), no shortcut highlight |
+
+### §R4.10 Spin Button
+
+```
+Model Count: < 5 >
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1 row |
+| Decrease indicator | `<` |
+| Increase indicator | `>` |
+| Value padding | 1 space each side of value |
+| Max recommended values | 20 |
+
+### §R4.11 Footer Key Strip
+
+```
+F1 Help  F5 Refresh  / Filter  q Quit
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 1–2 rows |
+| Key label | Key name in bold or contrasting color |
+| Action label | Body typography |
+| Gap key → action | 1 space |
+| Gap between pairs | 2+ spaces |
+| Position | Absolute bottom of terminal |
+
+---
+
+## §R5 Shadow Rendering
+
+### §R5.1 Algorithm
+
+Shadows create depth illusion for Level 2–4 elements (Standard §6.4).
+
+**Offset:** 2 columns right, 1 row down from the bordered element's edges.
+
+**Rendering steps:**
+
+1. Record the character content in cells that will be covered by shadow.
+2. Apply dim attribute (SGR 2) to those cells, preserving character codes.
+3. Shadow cells form an L-shape: the right edge (2 cols wide, full height of element) and the bottom edge (full width of element, 1 row tall), excluding the overlap with the element itself.
+
+**Visual diagram:**
+
+```
+┌──────────┐
+│ Content  │░░
+│          │░░
+└──────────┘░░
+  ░░░░░░░░░░░░
+```
+
+Where `░` represents shadow cells (underlying characters rendered dim).
+
+### §R5.2 Shadow Cell Attribute
+
+In 16-color mode, shadow cells use attribute byte `0x08` (dark gray foreground on black background), preserving the original character code. In 256-color or truecolor mode, shadow cells apply SGR 2 (dim) to whatever attributes the underlying cell had.
+
+### §R5.3 Scrim Rendering
+
+Scrims create a dimmed backdrop behind Level 4 modal overlays (Standard §6.5).
+
+**Rendering steps:**
+
+1. Determine the bounding rectangle of the modal overlay (including its border and shadow).
+2. For every cell **outside** the modal's bounding rectangle, apply SGR 2 (dim) while preserving the cell's existing character code and foreground color.
+3. The modal itself renders normally (no dim) at its elevation level.
+4. When the modal is dismissed, restore all cells to their original attributes.
+
+**Capability degradation:**
+
+| Color Mode | Scrim Rendering |
+|-----------|----------------|
+| Truecolor | SGR 2 (dim) on all background cells |
+| 256-color | SGR 2 (dim) on all background cells |
+| 16-color | SGR 2 (dim) on all background cells |
+| Monochrome | No scrim — modal distinguished by double-line border only |
+
+---
+
+## §R6 Braille Sparkline Encoding
+
+### §R6.1 Braille Pattern Block
+
+Unicode Braille Patterns occupy U+2800–U+28FF (256 characters). Each character represents a 2×4 dot matrix within one character cell, providing **2× horizontal and 4× vertical sub-cell resolution**.
+
+### §R6.2 Dot Position → Bit Mapping
+
+Each Braille character's codepoint is `U+2800 + bitmask`, where bits map to dot positions:
+
+```
+Position:    Bit:
+┌───┬───┐
+│ 1 │ 4 │   bit 0 = dot 1 (top-left)
+│ 2 │ 5 │   bit 1 = dot 2 (mid-left)
+│ 3 │ 6 │   bit 2 = dot 3 (lower-left)
+│ 7 │ 8 │   bit 3 = dot 7 (bottom-left)
+└───┴───┘   bit 4 = dot 4 (top-right)
+            bit 5 = dot 5 (mid-right)
+            bit 6 = dot 6 (lower-right)
+            bit 7 = dot 8 (bottom-right)
+```
+
+### §R6.3 Sparkline Construction Algorithm
+
+To render a sparkline from a sequence of values:
+
+1. **Normalize** values to a 0–3 range (for single-column sparklines) or 0–7 range (for two-column sparklines using both dot columns).
+2. **For each character cell** in the sparkline, determine which vertical dots to fill based on the normalized value. A value of 0 = no dots; a value of 3 = dots at positions 7, 3, 2 (bottom three on left column).
+3. **Compute the bitmask** by OR-ing the bits for each active dot position.
+4. **Emit** `U+2800 + bitmask`.
+
+**Example — single-column bar chart (left column only):**
+
+| Value (0–4) | Active dots | Bitmask | Character |
+|-------------|------------|---------|-----------|
+| 0 | none | 0x00 | `⠀` (blank) |
+| 1 | 7 | 0x40 | `⡀` |
+| 2 | 3, 7 | 0x44 | `⡄` |
+| 3 | 2, 3, 7 | 0x46 | `⡆` |
+| 4 | 1, 2, 3, 7 | 0x47 | `⡇` |
+
+### §R6.4 Progress Bar Using Eighth Blocks
+
+For linear progress bars, use eighth-block characters for smooth fill:
+
+| Progress | Character Sequence |
+|----------|-------------------|
+| 0/8 | ` ` (space) |
+| 1/8 | `▏` (U+258F) |
+| 2/8 | `▎` (U+258E) |
+| 3/8 | `▍` (U+258D) |
+| 4/8 | `▌` (U+258C) |
+| 5/8 | `▋` (U+258B) |
+| 6/8 | `▊` (U+258A) |
+| 7/8 | `▉` (U+2589) |
+| 8/8 | `█` (U+2588) |
+
+A progress bar of width W cols at P% completion:
+
+```
+filled_cells = floor(W * P / 100)
+partial = ((W * P / 100) - filled_cells) * 8   → index into eighth-block table
+output = "█" × filled_cells + eighth_block[partial] + " " × remaining
+```
+
+---
+
+## §R7 Color Capability Detection
+
+### §R7.1 Detection Algorithm
+
+Applications MUST detect color capability at startup using this priority order:
+
+```
+1. If COLORTERM == "truecolor" or COLORTERM == "24bit":
+     → Truecolor (24-bit, 16.7M colors)
+2. Else if TERM contains "256color":
+     → 256-color mode
+3. Else if TERM == "dumb":
+     → Monochrome (attributes only: bold, dim, underline, reverse)
+4. Else:
+     → 16-color ANSI (standard + bright)
+```
+
+### §R7.2 Graceful Degradation
+
+| Feature | Truecolor | 256-color | 16-color | Monochrome |
+|---------|----------|-----------|----------|------------|
+| Semantic roles (§R3.2) | Exact hex | Nearest 256 index | Nearest ANSI | N/A |
+| Status colors (§R3.3) | Exact hex | Nearest 256 index | Standard red/green/yellow | Bold/dim/reverse |
+| Elevation shadows | Dim + color | Dim + index 240 | Dim (SGR 2) | Reverse video strip |
+| Scrim (Level 4) | Semi-transparent dim | Dim all bg cells | Dim all bg cells | Reverse video border |
+| Typography | Full SGR | Full SGR | Full SGR | Bold, dim, reverse only |
+
+---
+
+## §R8 Escape Sequence Quick Reference
+
+### §R8.1 Cursor Movement
+
+| Sequence | Action |
+|----------|--------|
+| `ESC[{n}A` | Cursor up n rows |
+| `ESC[{n}B` | Cursor down n rows |
+| `ESC[{n}C` | Cursor right n cols |
+| `ESC[{n}D` | Cursor left n cols |
+| `ESC[{row};{col}H` | Move cursor to row, col (1-based) |
+| `ESC[s` | Save cursor position |
+| `ESC[u` | Restore cursor position |
+| `ESC[?25h` | Show cursor |
+| `ESC[?25l` | Hide cursor |
+
+### §R8.2 Scrolling Regions
+
+| Sequence | Action |
+|----------|--------|
+| `ESC[{top};{bottom}r` | Set scrolling region (1-based row numbers) |
+| `ESC[r` | Reset scrolling region to full screen |
+
+### §R8.3 Screen Operations
+
+| Sequence | Action |
+|----------|--------|
+| `ESC[2J` | Clear entire screen |
+| `ESC[K` | Clear from cursor to end of line |
+| `ESC[1K` | Clear from start of line to cursor |
+| `ESC[2K` | Clear entire line |
+
+### §R8.4 Mouse Tracking (SGR Extended)
+
+| Sequence | Action |
+|----------|--------|
+| `ESC[?1000h` | Enable basic mouse tracking |
+| `ESC[?1002h` | Enable button-event (drag) tracking |
+| `ESC[?1003h` | Enable all-motion tracking |
+| `ESC[?1006h` | Enable SGR extended encoding |
+| `ESC[?1000l` | Disable mouse tracking |
+| `ESC[?1006l` | Disable SGR encoding |
+
+SGR mouse event format: `ESC[<{button};{col};{row}M` (press) or `m` (release).
+
+Button values: 0=left, 1=middle, 2=right, 64=scroll-up, 65=scroll-down. Modifier bits: +4=Shift, +8=Meta, +16=Control.
+
+---
+
+## §R9 Mixed Border Junctions
+
+When single-line and double-line borders meet (e.g., a Level 1 panel inside a Level 3 dialog), use mixed junction characters:
+
+| Glyph | Unicode | Description |
+|-------|---------|-------------|
+| `╟` | U+255F | Double vertical, single right |
+| `╢` | U+2562 | Double vertical, single left |
+| `╤` | U+2564 | Single vertical, double horizontal (top) |
+| `╧` | U+2567 | Single vertical, double horizontal (bottom) |
+| `╫` | U+256B | Double vertical, single horizontal cross |
+| `╪` | U+256A | Single vertical, double horizontal cross |
+| `╓` | U+2553 | Double vertical, single horizontal (down-right) |
+| `╖` | U+2556 | Double vertical, single horizontal (down-left) |
+| `╙` | U+2559 | Double vertical, single horizontal (up-right) |
+| `╜` | U+255C | Double vertical, single horizontal (up-left) |
+
+---
+
+## §R10 Workflow Archetype Rendering
+
+Rendering specifications for visual elements used by workflow archetypes (Standard §12).
+
+### §R10.1 Step Indicator (Wizard / Pipeline)
+
+Used in Wizard (§12.1) and Pipeline (§12.6) workflows to show progress through a multi-step sequence.
+
+**Inline format** (panel title or header row):
+
+```
+Step 2 of 5 ── Configure Network
+```
+
+**Breadcrumb format** (compact, for narrow terminals):
+
+```
+Source › Config › Preview
+         ~~~~~~
+```
+
+Active step rendered in **bold** (SGR 1). Completed steps in **normal** (SGR 0). Future steps in **dim** (SGR 2). The `›` separator is U+203A SINGLE RIGHT-POINTING ANGLE QUOTATION MARK.
+
+**Sidebar step list** (Region A, when available):
+
+```
+ ✓ 1  Source
+ ▸ 2  Configure    ← current
+   3  Preview
+   4  Execute
+   5  Results
+```
+
+| Element | Glyph | Unicode | SGR |
+|---------|-------|---------|-----|
+| Completed step marker | `✓` | U+2713 | Normal (SGR 0) + status-success color |
+| Current step indicator | `▸` | U+25B8 | Bold (SGR 1) + primary color |
+| Future step (no marker) | ` ` | U+0020 | Dim (SGR 2) |
+
+Measurements:
+- Sidebar step list width: 2 (marker) + 1 (space) + step number width + 2 (space) + label = minimum 12 cols
+- Inline step indicator: `Step N of M ── Label` = 12 + label length cols
+
+### §R10.2 Breadcrumb Trail (Drill-Down)
+
+Used in Drill-Down (§12.5) workflows to show the navigation path from root to current level.
+
+```
+Overview › Cluster A › Node 7 › Containers
+```
+
+Rendering:
+- Each level is a text label
+- Separator: ` › ` (space + U+203A + space = 3 cols)
+- Current level (rightmost): **bold** (SGR 1)
+- Parent levels: **normal** (SGR 0)
+- Truncation: when the trail exceeds available width, collapse leftmost levels to `… › `
+
+```
+… › Node 7 › Containers
+```
+
+The ellipsis is U+2026 HORIZONTAL ELLIPSIS.
+
+Placement: panel title bar or first row of Region B.
+
+### §R10.3 Queue Counter (Review-Approve)
+
+Used in Review-Approve (§12.7) workflows to show queue position and remaining items.
+
+```
+ 3 of 17 remaining ── Review: PR #482
+```
+
+| Element | Rendering |
+|---------|-----------|
+| Position / total | `{current} of {total}` in bold (SGR 1) |
+| Status summary | `remaining` / `reviewed` in normal (SGR 0) |
+| Item identifier | After ` ── ` separator in bold (SGR 1) |
+
+When a decision is made and auto-advance occurs, the counter updates before the next item renders.
+
+### §R10.4 Stage Indicator (Pipeline Execution)
+
+Used during Pipeline (§12.6) execution to show stage progress alongside the progress bar (§R6.4).
+
+```
+Executing ███████████░░░░░░░░░  56%  1,204 / 2,148 records
+```
+
+| Element | Rendering |
+|---------|-----------|
+| Stage label | Bold (SGR 1): `Executing`, `Complete`, `Failed` |
+| Progress bar | §R6.4 eighth-block encoding, width = available cols - label - stats |
+| Percentage | Normal (SGR 0), right-aligned, 3–4 cols |
+| Stats | Normal (SGR 0), format: `{processed} / {total} {unit}` |
+
+Error during execution:
+
+```
+Failed ██████████████░░░░░░  70%  ERROR at record 1,504
+```
+
+The progress bar fill switches to status-error color. The error message replaces the stats.
+
+### §R10.5 Category Indicator (Configuration)
+
+Used in Configuration (§12.8) workflows to show which settings category is active and which have unsaved changes.
+
+```
+ ▸ General ●
+   Network
+   Security
+   Advanced ●
+```
+
+| Element | Glyph | Unicode | Meaning |
+|---------|-------|---------|---------|
+| Active category | `▸` | U+25B8 | Current selection |
+| Modified marker | `●` | U+25CF | Category has unsaved changes |
+
+The modified marker renders in status-warning color (Standard §5.2). Active category label renders in **bold** (SGR 1). Inactive categories in **normal** (SGR 0).

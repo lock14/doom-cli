@@ -42,7 +42,7 @@ jobs:
             echo "No Go files changed. Skipping benchmarks."
             echo "packages=[]" >> $GITHUB_OUTPUT
             echo "empty=true" >> $GITHUB_OUTPUT
-            echo "## 📊 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
+            echo "## Benchmark regression check" >> $GITHUB_STEP_SUMMARY
             echo "No Go files changed. Benchmarks skipped." >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
@@ -65,16 +65,16 @@ jobs:
             echo "No existing packages changed. Skipping benchmarks."
             echo "packages=[]" >> $GITHUB_OUTPUT
             echo "empty=true" >> $GITHUB_OUTPUT
-            echo "## 📊 Benchmark Regression Check" >> $GITHUB_STEP_SUMMARY
+            echo "## Benchmark regression check" >> $GITHUB_STEP_SUMMARY
             echo "No existing package changes detected. Benchmarks skipped." >> $GITHUB_STEP_SUMMARY
           else
             JSON=$(printf "%s\n" "${PKGS[@]}" | jq -R . | jq -s -c .)
             echo "Detected packages for benchmark matrix: $JSON"
             echo "packages=$JSON" >> $GITHUB_OUTPUT
             echo "empty=false" >> $GITHUB_OUTPUT
-            echo "## 📊 Benchmark Regression Check Plan" >> $GITHUB_STEP_SUMMARY
-            echo "**Base Ref:** \`$BASE\`" >> $GITHUB_STEP_SUMMARY
-            echo "**Packages to benchmark in parallel:** \`${PKGS[*]}\`" >> $GITHUB_STEP_SUMMARY
+            echo "## Benchmark regression check plan" >> $GITHUB_STEP_SUMMARY
+            echo "**Base ref**: \`$BASE\`" >> $GITHUB_STEP_SUMMARY
+            echo "**Packages to benchmark in parallel**: \`${PKGS[*]}\`" >> $GITHUB_STEP_SUMMARY
           fi
 
   benchmark:
@@ -121,10 +121,10 @@ jobs:
 
           # Write Markdown summary to GitHub Actions Step Summary UI
           {
-            echo "## 📊 Benchmark Regression Check: \`${{ matrix.pkg }}\`"
+            echo "## Benchmark regression check: \`${{ matrix.pkg }}\`"
             echo ""
-            echo "**Base Ref:** \`$BASE\`"
-            echo "**Tested Package:** \`${{ matrix.pkg }}\`"
+            echo "**Base ref**: \`$BASE\`"
+            echo "**Tested package**: \`${{ matrix.pkg }}\`"
             echo ""
             echo "<details open><summary><b>Benchmark diff report</b></summary>"
             echo ""

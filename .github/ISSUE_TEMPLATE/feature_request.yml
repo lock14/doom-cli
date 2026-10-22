@@ -1,23 +1,18 @@
-name: 💡 Feature Request
-description: Propose a new preset, engine integration, CLI feature, or config profile enhancement
+name: Feature request
+description: Propose a new preset, engine integration, CLI feature, or configuration profile enhancement
 title: "[Feature]: "
 labels: ["enhancement"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thank you for suggesting a feature or preset! Please describe your proposal in detail.
-
   - type: dropdown
     id: category
     attributes:
-      label: Feature Category
+      label: Feature category
       options:
-        - "New Preset or Engine (catalog/*.json)"
-        - "CLI Feature (cmd/doom)"
-        - "Engine Support or Config Profile"
-        - "Game Asset Extraction / WAD Fetching"
-        - "Interactive TUI Launcher"
+        - "New preset or engine (catalog/*.json)"
+        - "CLI feature (cmd/doom)"
+        - "Engine support or configuration profile"
+        - "Game asset extraction or WAD fetching"
+        - "Interactive TUI launcher"
         - "Other"
     validations:
       required: true
@@ -25,22 +20,22 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: Problem or Motivation
-      description: Is your feature related to a specific workflow problem, missing megawad preset, or engine need?
-      placeholder: I would like to be able to...
+      label: Problem or use case
+      description: Workflow limitation, missing megawad preset, or engine requirement this proposal addresses.
+      placeholder: Describe the workflow problem or use case...
     validations:
       required: true
 
   - type: textarea
     id: proposal
     attributes:
-      label: Proposed Solution / Implementation Details
+      label: Proposed solution and implementation details
       description: |
-        Describe the feature or preset details (e.g. megawad title, engine choice, IWAD, PWAD order, DeHackEd file, idgames download URL).
+        Describe the proposed CLI behavior, schema changes, or preset details (megawad title, engine choice, IWAD, PWAD load order, DeHackEd patch, and idgames download URL).
       placeholder: |
-        Preset Name: ...
-        Engine: dsda-doom / uzdoom
-        IWAD: doom2.wad
+        Preset name: ...
+        Engine: dsda-doom or uzdoom
+        IWAD: DOOM2.WAD
         PWADs: ...
         Download URLs: ...
     validations:
@@ -49,7 +44,7 @@ body:
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives Considered
-      description: Describe any alternative solutions or workarounds you have considered.
+      label: Alternatives considered
+      description: Alternative approaches or workarounds evaluated.
     validations:
       required: false

@@ -3,6 +3,7 @@ package wad
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,44 @@ import (
 	"github.com/lock14/doom-cli/internal/fsutil"
 	"github.com/lock14/doom-cli/internal/preset"
 )
+
+// ExtractWADLump extracts the raw payload of the first non-empty lump matching lumpName
+// (case-insensitive, up to 8 ASCII characters) from an IWAD or PWAD byte slice.
+func ExtractWADLump(wadData []byte, lumpName string) ([]byte, bool) {
+	if len(wadData) < 12 {
+		return nil, false
+	}
+	ident := string(wadData[0:4])
+	if ident != "PWAD" && ident != "IWAD" {
+		return nil, false
+	}
+	numLumps := int64(binary.LittleEndian.Uint32(wadData[4:8]))
+	dirOffset := int64(binary.LittleEndian.Uint32(wadData[8:12]))
+	dataLen := int64(len(wadData))
+	if numLumps <= 0 || numLumps > 65536 || dirOffset < 12 || dirOffset+numLumps*16 > dataLen {
+		return nil, false
+	}
+
+	want := strings.ToUpper(strings.TrimSpace(lumpName))
+	for i := int64(0); i < numLumps; i++ {
+		entry := wadData[dirOffset+i*16 : dirOffset+(i+1)*16]
+		lumpPos := int64(binary.LittleEndian.Uint32(entry[0:4]))
+		lumpSize := int64(binary.LittleEndian.Uint32(entry[4:8]))
+		if lumpSize <= 0 || lumpPos < 12 || lumpPos+lumpSize > dataLen {
+			continue
+		}
+		nameBytes := entry[8:16]
+		if nul := bytes.IndexByte(nameBytes, 0); nul >= 0 {
+			nameBytes = nameBytes[:nul]
+		}
+		if strings.EqualFold(string(nameBytes), want) {
+			out := make([]byte, lumpSize)
+			copy(out, wadData[lumpPos:lumpPos+lumpSize])
+			return out, true
+		}
+	}
+	return nil, false
+}
 
 func isZip(path string) bool {
 	f, err := os.Open(path)
@@ -27,7 +66,12 @@ func isZip(path string) bool {
 	return bytes.Equal(buf[:], []byte{'P', 'K', 0x03, 0x04})
 }
 
-func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []string) error {
+func (d *Downloader) extractFromZip(
+	zipPath string,
+	_ int64,
+	expectedFiles []string,
+	presets ...preset.Preset,
+) error {
 	zr, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("failed opening zip: %w", err)
@@ -35,6 +79,7 @@ func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []str
 	defer zr.Close()
 
 	cleanWadsDir := filepath.Clean(d.WadsDir)
+	aliasCat := &preset.Catalog{Presets: presets}
 
 	var wadFiles []*zip.File
 	var dehFiles []*zip.File
@@ -43,7 +88,7 @@ func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []str
 		if zf.FileInfo().IsDir() {
 			continue
 		}
-		// CodeQL / Zip Slip defense: skip entries containing path traversal
+		// CodeQL and Zip Slip defense: skip entries containing path traversal
 		cleanName := filepath.Clean(zf.Name)
 		if strings.HasPrefix(cleanName, "..") ||
 			strings.Contains(cleanName, "/../") ||
@@ -97,11 +142,16 @@ func (d *Downloader) extractFromZip(zipPath string, _ int64, expectedFiles []str
 			}
 		}
 
-		// 3. Known aliases
+		// 3. Known aliases (curated and preset-defined)
 		if match == nil {
-			for _, alias := range preset.KnownAliases(expLower) {
+			for _, alias := range aliasCat.FileAliases(expBase) {
+				aliasNorm := preset.NormalizeFilename(alias)
 				for _, zf := range zr.File {
-					if strings.EqualFold(filepath.Base(zf.Name), alias) {
+					if zf.FileInfo().IsDir() {
+						continue
+					}
+					zfBase := filepath.Base(zf.Name)
+					if strings.EqualFold(zfBase, alias) || preset.NormalizeFilename(zfBase) == aliasNorm {
 						match = zf
 						break
 					}

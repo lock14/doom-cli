@@ -29,28 +29,129 @@ func isIWADName(name string) bool {
 	return knownIWADNames[strings.ToLower(strings.TrimSpace(name))]
 }
 
-// KnownAliases returns any recognized alternate filenames for a given target filename.
-func KnownAliases(name string) []string {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "gdturbo.wad":
-		return []string{"gd.wad"}
-	case "gd.wad":
-		return []string{"gdturbo.wad"}
-	case "doom.wad":
-		return []string{"doom1.wad"}
-	case "sigil_ii_v1_0.wad":
-		return []string{"sigil2.wad", "sigil_ii.wad"}
-	case "sigil2.wad":
-		return []string{"sigil_ii_v1_0.wad"}
-	case "sigil_ii.wad":
-		return []string{"sigil_ii_v1_0.wad"}
-	case "sunder_v2512.wad":
-		return []string{"sunder.wad"}
-	case "sunder.wad":
-		return []string{"sunder_v2512.wad"}
-	default:
+var (
+	curatedAliasesOnce sync.Once
+	curatedAliasMap    map[string][]string
+)
+
+func buildAliasMap(presets []Preset) map[string][]string {
+	groups := [][]string{
+		{"DOOM.WAD", "DOOM1.WAD"},
+	}
+	for _, p := range presets {
+		for _, f := range p.Files {
+			if len(f.Aliases) == 0 {
+				continue
+			}
+			base := filepath.Base(strings.TrimSpace(f.Name))
+			if base == "" || isIWADName(base) {
+				continue
+			}
+			grp := make([]string, 0, 1+len(f.Aliases))
+			grp = append(grp, base)
+			for _, al := range f.Aliases {
+				trimmed := strings.TrimSpace(al)
+				if trimmed == "" || strings.ContainsAny(trimmed, `/\`) || isIWADName(trimmed) {
+					continue
+				}
+				grp = append(grp, trimmed)
+			}
+			if len(grp) > 1 {
+				groups = append(groups, grp)
+			}
+		}
+	}
+
+	out := make(map[string][]string)
+	for _, grp := range groups {
+		for _, member := range grp {
+			key := NormalizeFilename(member)
+			if key == "" {
+				continue
+			}
+			existing := out[key]
+			for _, other := range grp {
+				otherNorm := NormalizeFilename(other)
+				if otherNorm == "" || otherNorm == key {
+					continue
+				}
+				dup := false
+				for _, prev := range existing {
+					if NormalizeFilename(prev) == otherNorm {
+						dup = true
+						break
+					}
+				}
+				if !dup {
+					existing = append(existing, other)
+				}
+			}
+			out[key] = existing
+		}
+	}
+	return out
+}
+
+func mergeAliasMaps(maps ...map[string][]string) map[string][]string {
+	out := make(map[string][]string)
+	for _, m := range maps {
+		for key, aliases := range m {
+			existing := out[key]
+			for _, al := range aliases {
+				alNorm := NormalizeFilename(al)
+				if alNorm == "" || alNorm == key {
+					continue
+				}
+				dup := false
+				for _, prev := range existing {
+					if NormalizeFilename(prev) == alNorm {
+						dup = true
+						break
+					}
+				}
+				if !dup {
+					existing = append(existing, al)
+				}
+			}
+			out[key] = existing
+		}
+	}
+	return out
+}
+
+func getCuratedAliasMap() map[string][]string {
+	curatedAliasesOnce.Do(func() {
+		_, cat, err := loadEmbeddedCurated()
+		if err != nil || cat == nil {
+			curatedAliasMap = buildAliasMap(nil)
+			return
+		}
+		curatedAliasMap = buildAliasMap(cat.Presets)
+	})
+	return curatedAliasMap
+}
+
+// FileAliases returns any recognized alternate filenames for name across the catalog's presets.
+func (c *Catalog) FileAliases(name string) []string {
+	key := NormalizeFilename(filepath.Base(strings.TrimSpace(name)))
+	if key == "" {
 		return nil
 	}
+	if c == nil {
+		return append([]string(nil), getCuratedAliasMap()[key]...)
+	}
+	merged := mergeAliasMaps(getCuratedAliasMap(), buildAliasMap(c.Presets))
+	return append([]string(nil), merged[key]...)
+}
+
+// KnownAliases returns any recognized alternate filenames for a given target filename
+// derived from the curated preset catalog and base IWAD mappings.
+func KnownAliases(name string) []string {
+	key := NormalizeFilename(filepath.Base(strings.TrimSpace(name)))
+	if key == "" {
+		return nil
+	}
+	return append([]string(nil), getCuratedAliasMap()[key]...)
 }
 
 type rootCache struct {
@@ -58,6 +159,8 @@ type rootCache struct {
 	entries []os.DirEntry
 	subOnce sync.Once
 	subdirs []subDirCache
+	relMu   sync.Mutex
+	relDirs map[string][]os.DirEntry
 }
 
 type subDirCache struct {
@@ -68,7 +171,8 @@ type subDirCache struct {
 // DirIndex caches directory entries across one or more WAD root directories for
 // fast case-insensitive, normalized, alias-tolerant, and 1-level subdirectory resolution.
 type DirIndex struct {
-	roots []*rootCache
+	roots    []*rootCache
+	aliasMap map[string][]string
 }
 
 // NewDirIndex creates a DirIndex for the provided WAD root directories (root 0 is primary).
@@ -92,6 +196,64 @@ func NewDirIndex(roots ...string) *DirIndex {
 		idx.roots = append(idx.roots, rc)
 	}
 	return idx
+}
+
+// WithCatalog configures the DirIndex to resolve file aliases declared across cat
+// in addition to the embedded curated catalog. It returns idx for method chaining.
+func (idx *DirIndex) WithCatalog(cat *Catalog) *DirIndex {
+	if idx == nil || cat == nil {
+		return idx
+	}
+	return idx.WithPresets(cat.Presets...)
+}
+
+// WithPresets configures the DirIndex to resolve file aliases declared on presets
+// in addition to the embedded curated catalog. It returns idx for method chaining.
+func (idx *DirIndex) WithPresets(presets ...Preset) *DirIndex {
+	if idx == nil || len(presets) == 0 {
+		return idx
+	}
+	base := idx.aliasMap
+	if base == nil {
+		base = getCuratedAliasMap()
+	}
+	idx.aliasMap = mergeAliasMaps(base, buildAliasMap(presets))
+	return idx
+}
+
+func (idx *DirIndex) aliasesFor(targetName string) []string {
+	key := NormalizeFilename(filepath.Base(strings.TrimSpace(targetName)))
+	if key == "" {
+		return nil
+	}
+	if idx != nil && idx.aliasMap != nil {
+		return idx.aliasMap[key]
+	}
+	return getCuratedAliasMap()[key]
+}
+
+func (idx *DirIndex) fileAliases(f FileSpec) []string {
+	var out []string
+	seen := make(map[string]bool)
+	add := func(al string) {
+		trimmed := strings.TrimSpace(al)
+		if trimmed == "" {
+			return
+		}
+		norm := NormalizeFilename(trimmed)
+		if norm == "" || seen[norm] {
+			return
+		}
+		seen[norm] = true
+		out = append(out, trimmed)
+	}
+	for _, al := range f.Aliases {
+		add(al)
+	}
+	for _, al := range idx.aliasesFor(f.Name) {
+		add(al)
+	}
+	return out
 }
 
 func (rc *rootCache) loadSubdirs() []subDirCache {
@@ -124,7 +286,7 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 		return "", false
 	}
 
-	// Relative sub-path (e.g. "sub/foo.wad" or "sub\foo.wad")
+	// Relative sub-path (such as "sub/foo.wad" or "sub\foo.wad")
 	if strings.ContainsAny(targetName, `/\`) {
 		return idx.resolveRelativeSubpath(targetName)
 	}
@@ -137,7 +299,8 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 	}
 
 	// 2. Alias match across root 0..N top-level entries
-	for _, alias := range KnownAliases(targetName) {
+	aliases := idx.aliasesFor(targetName)
+	for _, alias := range aliases {
 		for _, rc := range idx.roots {
 			if p, ok := resolveSingle(rc.dir, rc.entries, alias); ok {
 				return p, true
@@ -154,7 +317,7 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 				}
 			}
 		}
-		for _, alias := range KnownAliases(targetName) {
+		for _, alias := range aliases {
 			for _, rc := range idx.roots {
 				for _, sub := range rc.loadSubdirs() {
 					if p, ok := resolveSingle(sub.dir, sub.entries, alias); ok {
@@ -168,6 +331,32 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 	return "", false
 }
 
+func (rc *rootCache) readRelDir(subDirRel string) ([]os.DirEntry, string, bool) {
+	if subDirRel == "" {
+		return rc.entries, rc.dir, true
+	}
+	parentDir, err := fsutil.SafeJoin(rc.dir, subDirRel)
+	if err != nil {
+		return nil, "", false
+	}
+	rc.relMu.Lock()
+	defer rc.relMu.Unlock()
+	if rc.relDirs != nil {
+		if entries, cached := rc.relDirs[subDirRel]; cached {
+			return entries, parentDir, entries != nil
+		}
+	} else {
+		rc.relDirs = make(map[string][]os.DirEntry)
+	}
+	entries, readErr := os.ReadDir(parentDir)
+	if readErr != nil {
+		rc.relDirs[subDirRel] = nil
+		return nil, "", false
+	}
+	rc.relDirs[subDirRel] = entries
+	return entries, parentDir, true
+}
+
 func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	cleanRel, err := fsutil.CleanRel(targetName)
 	if err != nil {
@@ -178,16 +367,15 @@ func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	subDirRel := strings.Join(parts[:len(parts)-1], "/")
 
 	for _, rc := range idx.roots {
-		parentDir := rc.dir
-		if subDirRel != "" {
-			var parentErr error
-			parentDir, parentErr = fsutil.SafeJoin(rc.dir, subDirRel)
-			if parentErr != nil {
-				continue
-			}
+		entries, parentDir, ok := rc.readRelDir(subDirRel)
+		if !ok {
+			continue
 		}
-		if entries, readErr := os.ReadDir(parentDir); readErr == nil {
-			if p, ok := resolveSingle(parentDir, entries, baseName); ok {
+		if p, found := resolveSingle(parentDir, entries, baseName); found {
+			return p, true
+		}
+		for _, alias := range idx.aliasesFor(baseName) {
+			if p, found := resolveSingle(parentDir, entries, alias); found {
 				return p, true
 			}
 		}
@@ -208,15 +396,81 @@ func (idx *DirIndex) ResolveReadme(p Preset) (string, bool) {
 		if path, ok := idx.ResolveFile(base + ".txt"); ok {
 			return path, true
 		}
+		for _, al := range idx.fileAliases(f) {
+			alExt := filepath.Ext(al)
+			alBase := strings.TrimSuffix(al, alExt)
+			if alBase != "" {
+				if path, ok := idx.ResolveFile(alBase + ".txt"); ok {
+					return path, true
+				}
+			}
+		}
 	}
 	nameClean := strings.ReplaceAll(p.Name, " ", "") + ".txt"
 	if path, ok := idx.ResolveFile(nameClean); ok {
+		return path, true
+	}
+	if path, ok := idx.resolveReadmePrefix(p); ok {
 		return path, true
 	}
 	if !p.HasRequiredFiles() {
 		iwadBase := strings.TrimSuffix(p.IWAD, filepath.Ext(p.IWAD))
 		if path, ok := idx.ResolveFile(iwadBase + ".txt"); ok {
 			return path, true
+		}
+	}
+	return "", false
+}
+
+func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
+	var stems []string
+	seen := make(map[string]bool)
+	addStem := func(raw string) {
+		norm := NormalizeFilename(raw)
+		if norm == "" || seen[norm] {
+			return
+		}
+		seen[norm] = true
+		stems = append(stems, norm)
+	}
+	for _, f := range p.Files {
+		if f.Optional {
+			continue
+		}
+		base := filepath.Base(strings.TrimSpace(f.Name))
+		addStem(strings.TrimSuffix(base, filepath.Ext(base)))
+		for _, al := range idx.fileAliases(f) {
+			addStem(strings.TrimSuffix(al, filepath.Ext(al)))
+		}
+	}
+	addStem(p.Name)
+
+	matchEntries := func(dir string, entries []os.DirEntry, prefix string) (string, bool) {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			norm := NormalizeFilename(entry.Name())
+			if strings.HasSuffix(norm, ".txt") && strings.HasPrefix(norm, prefix) {
+				return filepath.Join(dir, entry.Name()), true
+			}
+		}
+		return "", false
+	}
+
+	for _, stem := range stems {
+		prefix := stem + "readme"
+		for _, rc := range idx.roots {
+			if path, ok := matchEntries(rc.dir, rc.entries, prefix); ok {
+				return path, true
+			}
+		}
+		for _, rc := range idx.roots {
+			for _, sub := range rc.loadSubdirs() {
+				if path, ok := matchEntries(sub.dir, sub.entries, prefix); ok {
+					return path, true
+				}
+			}
 		}
 	}
 	return "", false

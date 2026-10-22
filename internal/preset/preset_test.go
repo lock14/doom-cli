@@ -265,10 +265,14 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(root1, "av", "DOOM2.WAD"), []byte("IWAD"), 0o644)
 
 	// Create alias files
+	sigilWad := filepath.Join(root0, "sigil.wad")
+	_ = os.WriteFile(sigilWad, []byte("PWAD"), 0o644)
 	sigil2Wad := filepath.Join(root0, "sigil2.wad")
 	_ = os.WriteFile(sigil2Wad, []byte("PWAD"), 0o644)
 	sunderWad := filepath.Join(root1, "sunder.wad")
 	_ = os.WriteFile(sunderWad, []byte("PWAD"), 0o644)
+	aaliensWad := filepath.Join(root1, "aaliens.wad")
+	_ = os.WriteFile(aaliensWad, []byte("PWAD"), 0o644)
 
 	idx := NewDirIndex(root0, root1)
 
@@ -284,8 +288,10 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 		{name: "traversal rejected", query: "../evil.wad", wantOK: false},
 		{name: "1-level subdir non-IWAD in root1", query: "av.wad", wantOK: true, wantPath: avSub},
 		{name: "IWAD in subdir ignored", query: "DOOM2.WAD", wantOK: false},
+		{name: "alias sigil to SIGIL_V1_23", query: "SIGIL_V1_23.wad", wantOK: true, wantPath: sigilWad},
 		{name: "alias sigil2 to SIGIL_II_V1_0", query: "SIGIL_II_V1_0.WAD", wantOK: true, wantPath: sigil2Wad},
 		{name: "alias sunder to SUNDER_V2512", query: "SUNDER_V2512.wad", wantOK: true, wantPath: sunderWad},
+		{name: "alias aaliens to aaliens_v1_2", query: "aaliens_v1_2.wad", wantOK: true, wantPath: aaliensWad},
 	}
 
 	for _, tc := range tests {
@@ -302,11 +308,120 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	}
 }
 
+func TestLintCatalog_FileAliasesValidation(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+
+	// Redundant alias, path-separator alias, cross-IWAD alias (HERETIC.WAD on DOOM2 preset),
+	// and canonical target collision (SCYTHE.WAD)
+	badPreset := `{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "custom-alias-test",
+  "name": "Custom Alias Test",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "my_map.wad",
+      "aliases": ["MY-MAP.WAD", "sub/other.wad", "HERETIC.WAD", "SCYTHE.WAD"]
+    }
+  ]
+}`
+	targetFile := filepath.Join(userDir, "preset.custom-alias-test.json")
+	if err := os.WriteFile(targetFile, []byte(badPreset), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Override with invalid alias
+	badOverride := `{
+  "schema_version": 1,
+  "kind": "override",
+  "target": { "kind": "preset", "id": "scythe" },
+  "append_files": [
+    {
+      "name": "extra_mod.wad",
+      "aliases": ["EXTRA-MOD.WAD"]
+    }
+  ]
+}`
+	ovFile := filepath.Join(userDir, "override.preset.scythe.json")
+	if err := os.WriteFile(ovFile, []byte(badOverride), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := LintCatalog("", userDir)
+	if err != nil {
+		t.Fatalf("LintCatalog error: %v", err)
+	}
+	if !HasErrors(diags) {
+		t.Fatal("expected lint errors for invalid file aliases, got none")
+	}
+
+	var joined strings.Builder
+	for _, d := range diags {
+		joined.WriteString(d.Message + "\n")
+	}
+	out := joined.String()
+	for _, wantSub := range []string{
+		"redundant with normalized filename",
+		"must not contain path separators",
+		"must not match iwad \"HERETIC.WAD\"",
+		"conflicts with canonical target \"SCYTHE.WAD\"",
+		"file extra_mod.wad alias \"EXTRA-MOD.WAD\" is redundant",
+	} {
+		if !strings.Contains(out, wantSub) {
+			t.Errorf("expected lint diagnostics to contain %q, got:\n%s", wantSub, out)
+		}
+	}
+}
+
+func TestDirIndex_WithCatalogCustomAliases(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	aliasFile := filepath.Join(wadsDir, "custom_short.wad")
+	if err := os.WriteFile(aliasFile, []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	aliasTxt := filepath.Join(wadsDir, "custom_short.txt")
+	if err := os.WriteFile(aliasTxt, []byte("readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	customPreset := Preset{
+		ID:     "custom-pack",
+		Name:   "Custom Pack",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files: []FileSpec{
+			{
+				Name:    "custom_pack_v2.wad",
+				Aliases: []string{"custom_short.wad"},
+			},
+		},
+	}
+	cat := &Catalog{Presets: []Preset{customPreset}}
+	idx := NewDirIndex(wadsDir).WithCatalog(cat)
+
+	got, ok := idx.ResolveFile("custom_pack_v2.wad")
+	if !ok || got != aliasFile {
+		t.Fatalf("ResolveFile(\"custom_pack_v2.wad\") = (%q, %v), want (%q, true)", got, ok, aliasFile)
+	}
+
+	gotTxt, okTxt := idx.ResolveReadme(customPreset)
+	if !okTxt || gotTxt != aliasTxt {
+		t.Fatalf("ResolveReadme(customPreset) = (%q, %v), want (%q, true)", gotTxt, okTxt, aliasTxt)
+	}
+}
+
 func TestResolveReadmeRegression2(t *testing.T) {
 	t.Parallel()
 	wadsDir := t.TempDir()
 
-	for _, txt := range []string{"doom.txt", "doom2.txt", "plutonia.txt", "tnt.txt", "heretic.txt", "hexen.txt"} {
+	for _, txt := range []string{
+		"doom.txt", "doom2.txt", "plutonia.txt", "tnt.txt", "heretic.txt", "hexen.txt",
+		"aaliens.txt", "gd.txt", "sigil.txt", "sigil2.txt", "sunder.txt",
+	} {
 		if err := os.WriteFile(filepath.Join(wadsDir, txt), []byte("readme"), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -316,7 +431,7 @@ func TestResolveReadmeRegression2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCuratedCatalog: %v", err)
 	}
-	idx := NewDirIndex(wadsDir)
+	idx := NewDirIndex(wadsDir).WithCatalog(cat)
 
 	basePresets := []struct {
 		name    string
@@ -328,6 +443,11 @@ func TestResolveReadmeRegression2(t *testing.T) {
 		{name: "TNT: Evilution", wantTxt: "tnt.txt"},
 		{name: "Heretic", wantTxt: "heretic.txt"},
 		{name: "Hexen", wantTxt: "hexen.txt"},
+		{name: "Ancient Aliens", wantTxt: "aaliens.txt"},
+		{name: "Going Down Turbo", wantTxt: "gd.txt"},
+		{name: "Sigil", wantTxt: "sigil.txt"},
+		{name: "Sigil II", wantTxt: "sigil2.txt"},
+		{name: "Sunder", wantTxt: "sunder.txt"},
 	}
 
 	for _, tc := range basePresets {
@@ -352,6 +472,20 @@ func TestResolveReadmeRegression2(t *testing.T) {
 	if got, ok := idx.ResolveReadme(*av); ok {
 		t.Fatalf("expected Alien Vendetta not to borrow IWAD readme, got %q", got)
 	}
+
+	// Verify <stem>ReadMe*.txt fallback (such as SunderReadMeV2.TXT from Sunder_2512.zip)
+	sunderDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(sunderDir, "SunderReadMeV2.TXT"), []byte("sunder readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sunderPreset := cat.Find("Sunder")
+	if sunderPreset == nil {
+		t.Fatal("Sunder preset not found")
+	}
+	sunderIdx := NewDirIndex(sunderDir).WithCatalog(cat)
+	if got, ok := sunderIdx.ResolveReadme(*sunderPreset); !ok || filepath.Base(got) != "SunderReadMeV2.TXT" {
+		t.Fatalf("ResolveReadme(Sunder) with SunderReadMeV2.TXT = (%q, %v), want SunderReadMeV2.TXT", got, ok)
+	}
 }
 
 func TestDecodeTextCP437(t *testing.T) {
@@ -363,5 +497,365 @@ func TestDecodeTextCP437(t *testing.T) {
 	cp437 := []byte{0xc9, 0xcd, 0xbb} // ╔═╗ in CP437
 	if got := DecodeText(cp437); got != "╔═╗" {
 		t.Fatalf("unexpected CP437 decode: %q", got)
+	}
+}
+
+func TestLintDocumentation_ViolationsDetected(t *testing.T) {
+	t.Parallel()
+	tmpRoot := t.TempDir()
+	sampleUserPath := "/Users/" + "johndoe"
+
+	badContributing := strings.Join([]string{
+		"# Contributing",
+		"",
+		"Path `" + sampleUserPath + "/doom` and **bold `code`**.",
+		"Second stacked line: **[link](missing.md)**.",
+		"*(Note: parenthetical aside)*",
+		"Emoji: \U0001f41b and :white_check_mark:",
+		"Prose arrow: step A -> step B",
+		"Second arrow: step C => step D",
+		"",
+		"| Column | Value |",
+		"| :--- | :--- |",
+		"| **Bold Cell** | Val |",
+		"| **Second Bold Cell** | Val2 |",
+		"",
+		"---",
+		"",
+		"[Broken anchor](#nonexistent-heading)",
+		"[Broken titled link](missing_titled.md \"Title\")",
+		"",
+		"```json",
+		"{invalid json}",
+		"```",
+	}, "\n")
+
+	if err := os.WriteFile(filepath.Join(tmpRoot, "CONTRIBUTING.md"), []byte(badContributing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	wfDir := filepath.Join(tmpRoot, ".github", "workflows")
+	if err := os.MkdirAll(wfDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	badBenchmark := "echo \"## \U0001f4ca Benchmark\" && ls " + sampleUserPath + "/doom\n"
+	if err := os.WriteFile(filepath.Join(wfDir, "benchmark.yml"), []byte(badBenchmark), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := LintCatalog(tmpRoot, "")
+	if err != nil {
+		t.Fatalf("LintCatalog error: %v", err)
+	}
+
+	var joined strings.Builder
+	for _, d := range diags {
+		joined.WriteString(d.String() + "\n")
+	}
+	out := joined.String()
+
+	for _, wantSub := range []string{
+		"contains personal path",
+		"contains decorative emoji or shortcode",
+		"contains stacked bold span \"**bold `code`**\"",
+		"contains stacked bold span \"**[link](missing.md)**\"",
+		"contains italic parenthetical aside",
+		"contains bolded first-column table cell \"| **Bold Cell** |\"",
+		"contains bolded first-column table cell \"| **Second Bold Cell** |\"",
+		"contains ASCII arrow \"->\"",
+		"contains ASCII arrow \"=>\"",
+		"contains horizontal rule divider '---'",
+		"broken relative file link \"missing.md\"",
+		"broken relative file link \"missing_titled.md\"",
+		"broken anchor link \"#nonexistent-heading\"",
+		"invalid JSON code block",
+		"benchmark.yml: contains decorative emoji or shortcode \"\U0001f4ca\"",
+		"benchmark.yml: contains personal path \"" + sampleUserPath + "\"",
+	} {
+		if !strings.Contains(out, wantSub) {
+			t.Errorf("expected lint diagnostics to contain %q, got:\n%s", wantSub, out)
+		}
+	}
+}
+
+func TestLintDocumentation_EdgeCasesAndStackedFormatting(t *testing.T) {
+	t.Parallel()
+	tmpRoot := t.TempDir()
+
+	parenFile := filepath.Join(tmpRoot, "file(1).md")
+	if err := os.WriteFile(parenFile, []byte("# Paren file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	validContributing := strings.Join([]string{
+		"# Contributing",
+		"",
+		"<!-- HTML comment should not trigger arrow lint -->",
+		"",
+		"## Diátaxis config_file",
+		"",
+		"### Examples",
+		"",
+		"- **First label**: use `doom play` and **Second label**: see [Contributing](CONTRIBUTING.md).",
+		"- **Inline code**: do not write `*(Note: aside)*`, ``**`code`**``, `->`, or `<->` in prose.",
+		"- **Escaped link**: see [Paren](file\\(1\\).md), [Duplicate](#examples-1), " +
+			"and [Slug](#diátaxis-config_file).",
+		"",
+		"| Column | Value |",
+		"| :--- | :--- |",
+		"| Plain cell | Val |",
+		"",
+		"### Examples",
+		"",
+		"```markdown",
+		"**`code inside fenced block`**",
+		"*(Note: inside fenced block)*",
+		"| **Bold inside fenced block** | Val |",
+		"a -> b <-> c",
+		"---",
+		"```",
+	}, "\n")
+
+	if err := os.WriteFile(filepath.Join(tmpRoot, "CONTRIBUTING.md"), []byte(validContributing), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := LintCatalog(tmpRoot, "")
+	if err != nil {
+		t.Fatalf("LintCatalog error: %v", err)
+	}
+	for _, d := range diags {
+		if strings.HasSuffix(d.Path, "CONTRIBUTING.md") {
+			t.Errorf("unexpected lint diagnostic on valid CONTRIBUTING.md: %s", d.String())
+		}
+	}
+
+	stackedCases := []struct {
+		name      string
+		line      string
+		wantMatch string
+	}{
+		{
+			name:      "bold wrapping code",
+			line:      "Use **`doom play`** here",
+			wantMatch: "**`doom play`**",
+		},
+		{
+			name:      "bold wrapping link",
+			line:      "See **[DSDA-Doom](https://example.com)**",
+			wantMatch: "**[DSDA-Doom](https://example.com)**",
+		},
+		{
+			name:      "link wrapping bold",
+			line:      "See [**DSDA-Doom**](https://example.com)",
+			wantMatch: "[**DSDA-Doom**](https://example.com)",
+		},
+		{
+			name:      "triple asterisk bold italics",
+			line:      "Avoid ***bold italics*** in prose",
+			wantMatch: "***bold italics***",
+		},
+		{
+			name:      "bold wrapping underscore italics",
+			line:      "Avoid **_bold italics_** in prose",
+			wantMatch: "**_bold italics_**",
+		},
+		{
+			name:      "underscore italics wrapping bold",
+			line:      "Avoid _**bold italics**_ in prose",
+			wantMatch: "_**bold italics**_",
+		},
+		{
+			name:      "two separate bold spans with code between",
+			line:      "- **First**: run `doom` and **Second**: done.",
+			wantMatch: "",
+		},
+	}
+
+	for _, tc := range stackedCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := findStackedFormatting(tc.line)
+			if got != tc.wantMatch {
+				t.Errorf("findStackedFormatting(%q) = %q, want %q", tc.line, got, tc.wantMatch)
+			}
+		})
+	}
+}
+
+func TestDocumentationEntityJSONBlocks(t *testing.T) {
+	t.Parallel()
+	rootDir := filepath.Join("..", "..")
+	for _, relDoc := range []string{"README.md", "CONTRIBUTING.md"} {
+		relDoc := relDoc
+		t.Run(relDoc, func(t *testing.T) {
+			t.Parallel()
+			raw, err := os.ReadFile(filepath.Join(rootDir, relDoc))
+			if err != nil {
+				t.Fatalf("reading %s: %v", relDoc, err)
+			}
+			lines := strings.Split(string(raw), "\n")
+			inJSON := false
+			var buf strings.Builder
+			entityCount := 0
+			for _, line := range lines {
+				trimmed := strings.TrimSpace(line)
+				if strings.HasPrefix(trimmed, "```") {
+					if !inJSON {
+						lang := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(trimmed, "```")))
+						if lang == "json" {
+							inJSON = true
+							buf.Reset()
+						}
+					} else {
+						inJSON = false
+						block := buf.String()
+						if strings.Contains(block, `"kind"`) {
+							entityCount++
+							if _, decErr := DecodeEntity([]byte(block)); decErr != nil {
+								t.Errorf("%s entity JSON block failed DecodeEntity: %v\n%s", relDoc, decErr, block)
+							}
+						}
+					}
+					continue
+				}
+				if inJSON {
+					buf.WriteString(line)
+					buf.WriteByte('\n')
+				}
+			}
+			if entityCount == 0 {
+				t.Errorf("expected at least one entity JSON block in %s", relDoc)
+			}
+		})
+	}
+}
+
+func TestMonospaceTUIOverridesNotStale(t *testing.T) {
+	t.Parallel()
+	rootDir := filepath.Join("..", "..")
+	overridesPath := filepath.Join(rootDir, ".agents", "rules", "monospace-tui.md")
+	overridesRaw, err := os.ReadFile(overridesPath)
+	if err != nil {
+		t.Fatalf("reading %s: %v", overridesPath, err)
+	}
+	stdRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "standard.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading standard.md: %v", err)
+	}
+	rendRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "rendering.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading rendering.md: %v", err)
+	}
+	patRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "patterns.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading patterns.md: %v", err)
+	}
+	corpus := string(stdRaw) + "\n" + string(rendRaw) + "\n" + string(patRaw)
+
+	var currentHeading string
+	var currentHeadingLine int
+	currentHasOriginal := false
+	checked := 0
+	overrideHeadings := 0
+
+	checkPreviousHeading := func() {
+		if currentHeading == "" {
+			return
+		}
+		if (strings.HasPrefix(currentHeading, "[OVERRIDE]") || strings.HasPrefix(currentHeading, "[WAIVE]")) &&
+			!currentHasOriginal {
+			t.Errorf(
+				"%s:%d (%s): missing **Original**: quote for override or waiver heading",
+				overridesPath, currentHeadingLine, currentHeading,
+			)
+		}
+	}
+
+	for idx, line := range strings.Split(string(overridesRaw), "\n") {
+		lineNum := idx + 1
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "### ") {
+			checkPreviousHeading()
+			currentHeading = strings.TrimPrefix(trimmed, "### ")
+			currentHeadingLine = lineNum
+			currentHasOriginal = false
+			if strings.HasPrefix(currentHeading, "[OVERRIDE]") || strings.HasPrefix(currentHeading, "[WAIVE]") {
+				overrideHeadings++
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## ") {
+			checkPreviousHeading()
+			currentHeading = ""
+			currentHeadingLine = 0
+			currentHasOriginal = false
+			continue
+		}
+		bulletBody := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(trimmed, "*"), "-"))
+		var quoted string
+		switch {
+		case strings.HasPrefix(bulletBody, "**Original**: "):
+			quoted = strings.TrimSpace(strings.TrimPrefix(bulletBody, "**Original**: "))
+		case strings.HasPrefix(bulletBody, "**Original:** "):
+			quoted = strings.TrimSpace(strings.TrimPrefix(bulletBody, "**Original:** "))
+		default:
+			continue
+		}
+		checked++
+		currentHasOriginal = true
+		if quoted == "" {
+			t.Errorf("%s:%d (%s): empty Original field", overridesPath, lineNum, currentHeading)
+			continue
+		}
+		if !strings.Contains(corpus, quoted) {
+			t.Errorf(
+				"%s:%d (%s): Original text not found verbatim in standard.md, rendering.md, or patterns.md:\n  %s",
+				overridesPath, lineNum, currentHeading, quoted,
+			)
+		}
+	}
+	checkPreviousHeading()
+
+	if overrideHeadings == 0 {
+		t.Fatalf("expected at least one [OVERRIDE] or [WAIVE] heading in %s, found 0", overridesPath)
+	}
+	if checked == 0 {
+		t.Fatalf("expected at least one Original entry in %s, found 0", overridesPath)
+	}
+}
+
+func TestDirIndex_CachedRelativeSubpath(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	subDir := filepath.Join(wadsDir, "Maps_Sub")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wadPath := filepath.Join(subDir, "Episode_One.wad")
+	if err := os.WriteFile(wadPath, []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := NewDirIndex(wadsDir)
+	got1, ok1 := idx.ResolveFile("Maps_Sub/episode_one.wad")
+	if !ok1 || got1 != wadPath {
+		t.Fatalf("first ResolveFile = (%q, %v), want (%q, true)", got1, ok1, wadPath)
+	}
+
+	// Remove the file from disk after initial scan to verify subsequent resolution uses cached entries.
+	if err := os.Remove(wadPath); err != nil {
+		t.Fatal(err)
+	}
+	got2, ok2 := idx.ResolveFile("Maps_Sub/episode_one.wad")
+	if !ok2 || got2 != wadPath {
+		t.Fatalf("cached ResolveFile = (%q, %v), want (%q, true)", got2, ok2, wadPath)
 	}
 }

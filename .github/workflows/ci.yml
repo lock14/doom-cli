@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   format-and-tidy:
-    name: Format & Module Hygiene
+    name: Format and Module Hygiene
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -46,7 +46,7 @@ jobs:
           git diff --exit-code go.mod go.sum
 
   lint:
-    name: Lint & Static Analysis
+    name: Lint and Static Analysis
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -83,7 +83,7 @@ jobs:
           go-version: 'stable'
 
   test:
-    name: Test & Build (${{ matrix.os }})
+    name: Test and Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -147,10 +147,10 @@ jobs:
       - test
     if: always()
     steps:
-      - name: Evaluate Upstream Job Statuses
+      - name: Evaluate upstream job statuses
         run: |
           echo "Evaluating CI pipeline job results:"
-          echo "Format & Tidy: ${{ needs.format-and-tidy.result }}"
+          echo "Format and Tidy: ${{ needs.format-and-tidy.result }}"
           echo "Lint:          ${{ needs.lint.result }}"
           echo "Govulncheck:   ${{ needs.govulncheck.result }}"
           echo "Test Matrix:   ${{ needs.test.result }}"
@@ -159,8 +159,8 @@ jobs:
              [ "${{ needs.lint.result }}" != "success" ] || \
              [ "${{ needs.govulncheck.result }}" != "success" ] || \
              [ "${{ needs.test.result }}" != "success" ]; then
-            echo "❌ CI Gatekeeper failed: One or more upstream checks did not succeed."
+            echo "CI Gatekeeper failed: One or more upstream checks did not succeed."
             exit 1
           fi
 
-          echo "✅ All required CI checks passed successfully!"
+          echo "All required CI checks passed."

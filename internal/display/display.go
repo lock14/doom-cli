@@ -23,8 +23,8 @@ var (
 	reKscreenRate = regexp.MustCompile(`@(\d+)`)
 )
 
-// DetectDisplay discovers both the primary monitor's resolution (e.g. "1920x1080")
-// and refresh rate in Hz (e.g. 60, 144, 240) in a single query pass where possible.
+// DetectDisplay discovers both the primary monitor's resolution (such as "1920x1080")
+// and refresh rate in Hz (such as 60, 144, or 240) in a single query pass where possible.
 func DetectDisplay() (string, int) {
 	res, rate := detectDisplayOS(runtime.GOOS)
 	if !reResFormat.MatchString(res) {
@@ -36,7 +36,7 @@ func DetectDisplay() (string, int) {
 	return res, rate
 }
 
-// DetectResolution attempts to discover the primary monitor's resolution (e.g. "1920x1080").
+// DetectResolution attempts to discover the primary monitor's resolution (such as "1920x1080").
 func DetectResolution() string {
 	res := detectResolutionOS(runtime.GOOS)
 	if !reResFormat.MatchString(res) {
@@ -45,7 +45,7 @@ func DetectResolution() string {
 	return res
 }
 
-// DetectRefreshRate attempts to discover the primary monitor's refresh rate in Hz (e.g. 60, 144, 240).
+// DetectRefreshRate attempts to discover the primary monitor's refresh rate in Hz (such as 60, 144, or 240).
 func DetectRefreshRate() int {
 	rate := detectRefreshRateOS(runtime.GOOS)
 	if rate <= 0 {
@@ -118,7 +118,7 @@ func detectDisplayOS(goos string) (string, int) {
 	case "windows":
 		return detectResolutionOS(goos), detectRefreshRateOS(goos)
 
-	default: // linux / unix
+	default: // linux and unix
 		var res string
 		var rate int
 		if out, err := exec.Command("xrandr").Output(); err == nil {
@@ -167,7 +167,7 @@ func detectResolutionOS(goos string) string {
 			}
 		}
 
-	default: // linux / unix
+	default: // linux and unix
 		if out, err := exec.Command("xrandr").Output(); err == nil {
 			if res, _ := parseXrandrDisplay(string(out)); res != "" {
 				return res

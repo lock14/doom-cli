@@ -17,9 +17,25 @@
       "optional": true
     }
   ],
+  "sources": [
+    {
+      "url": "https://archive.org/download/doom-wads-21-pack/Doom%20WADS%2029-PACK.zip/Doom%20WADS%2FDoomZero.wad",
+      "sha256": "24930ac68b7cbcf3dd94909b46de930fc04a8ec234a731e4781f2ef6e03b1fbe"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/forum/topic/109216-doom-zero-launch-and-celebrating-25-years-of-doom-ii/",
+      "rel": "doomworld"
+    },
+    {
+      "url": "https://www.moddb.com/mods/doom-zero",
+      "rel": "moddb"
+    }
+  ],
   "category": "Community Megawad",
   "compatibility": "Vanilla / DEH",
-  "description": "Anniversary megawad + DEH modifications",
+  "description": "Anniversary megawad with DeHackEd modifications",
   "author": "Christopher Golden",
   "release_date": "2019",
   "sort": 80

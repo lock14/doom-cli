@@ -1,32 +1,33 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Supported versions
 
-We support security updates for the following versions of `doom-cli`:
+Security updates are provided for the following versions of `doom-cli`:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| Latest  | :white_check_mark: |
-| < 1.0   | :x:                |
+| Version | Supported |
+| :--- | :--- |
+| Latest | Yes |
+| < 1.0 | No |
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-We take the security of `doom-cli` seriously. If you discover a security vulnerability, please report it responsibly by following these steps:
+If you discover a security vulnerability in `doom-cli`, report it privately using the following steps:
 
-1. **Do not** report security vulnerabilities through public GitHub issues or discussions.
-2. Please use the [GitHub Private Vulnerability Reporting](https://github.com/lock14/doom-cli/security/advisories/new) feature on this repository.
+1. Do not report security vulnerabilities through public GitHub issues or discussions.
+2. Submit a report using [GitHub Private Vulnerability Reporting](https://github.com/lock14/doom-cli/security/advisories/new) on this repository.
 3. If private vulnerability reporting is unavailable, contact the maintainer directly.
 
-### What to Include in Your Report
+### What to include in your report
 
-To help us triage and resolve the issue quickly, please include:
-* A detailed description of the vulnerability.
-* Steps to reproduce the issue or minimal CLI command sequence.
-* Impact assessment (e.g. unintended file deletion, path traversal, arbitrary code execution).
+Include the following details to help triage and resolve the issue:
+
+* A clear description of the vulnerability and affected subsystem.
+* Numbered steps or a minimal CLI command sequence to reproduce the issue.
+* An impact assessment (such as unintended file deletion, path traversal, or arbitrary code execution).
 * Any suggested fixes or mitigations.
 
-### Response Timeline
+### Response timeline
 
-* We will acknowledge receipt of your vulnerability report within 48 hours.
-* We will provide a status update and estimated timeline for a fix within 7 days.
-* Once a fix is verified, a patch release and security advisory will be published.
+* Receipt of a vulnerability report is acknowledged within 48 hours.
+* A status update and estimated fix timeline are provided within 7 days.
+* Once a fix is verified, a patch release and security advisory are published.

@@ -280,7 +280,7 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 		ov.AppendArgs = append([]string(nil), (*req.AppendArgs)...)
 	}
 	if req.AppendFiles != nil {
-		ov.AppendFiles = append([]FileSpec(nil), (*req.AppendFiles)...)
+		ov.AppendFiles = cloneFileSpecs(*req.AppendFiles)
 	}
 
 	data, err := MarshalEntity(ov)
@@ -312,7 +312,7 @@ func ResetPresetOverride(userDir string, layered *Catalog, key string) (*Preset,
 	return target, true, nil
 }
 
-// RemovePreset deletes a user preset (<userDir>/preset.<id>.json) and/or any
+// RemovePreset deletes a user preset (<userDir>/preset.<id>.json) and any
 // user override (<userDir>/override.preset.<id>.json) for the matching preset.
 // If the target is a built-in curated preset with no user files, RemovePreset returns an error.
 func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Preset, error) {

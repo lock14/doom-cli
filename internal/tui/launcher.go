@@ -25,6 +25,7 @@ type model struct {
 	catalog       *preset.Catalog
 	wadsDir       string
 	dirIndex      *preset.DirIndex
+	readmeCache   map[string]string
 	searchTargets []string
 	input         textinput.Model
 	filtered      []preset.Preset
@@ -40,18 +41,30 @@ type model struct {
 	viewport      viewport.Model
 }
 
+func readmeCacheKey(p preset.Preset) string {
+	if p.ID != "" {
+		return p.ID
+	}
+	return p.Name
+}
+
 func (m model) resolveFile(name string) (string, bool) {
 	if m.dirIndex != nil {
 		return m.dirIndex.ResolveFile(name)
 	}
-	return preset.ResolveFile(m.wadsDir, name)
+	return preset.NewDirIndex(m.wadsDir).WithCatalog(m.catalog).ResolveFile(name)
 }
 
 func (m model) resolveReadme(p preset.Preset) (string, bool) {
+	if m.readmeCache != nil {
+		if path, cached := m.readmeCache[readmeCacheKey(p)]; cached {
+			return path, path != ""
+		}
+	}
 	if m.dirIndex != nil {
 		return m.dirIndex.ResolveReadme(p)
 	}
-	return preset.ResolveReadme(m.wadsDir, p)
+	return preset.NewDirIndex(m.wadsDir).WithCatalog(m.catalog).WithPresets(p).ResolveReadme(p)
 }
 
 func initialModel(
@@ -75,6 +88,9 @@ func initialModelWithRoots(
 	nerdFonts bool,
 	initialPreset ...string,
 ) model {
+	if catalog == nil {
+		catalog = &preset.Catalog{}
+	}
 	if theme.Name == "" {
 		theme = DefaultTheme
 	}
@@ -95,7 +111,7 @@ func initialModelWithRoots(
 	ti.Width = calculateSearchWidth(w)
 
 	cursor := 0
-	if len(initialPreset) > 0 && initialPreset[0] != "" && catalog != nil {
+	if len(initialPreset) > 0 && initialPreset[0] != "" {
 		for i, p := range catalog.Presets {
 			if strings.EqualFold(p.Name, initialPreset[0]) || strings.EqualFold(p.ID, initialPreset[0]) {
 				cursor = i
@@ -104,10 +120,15 @@ func initialModelWithRoots(
 		}
 	}
 
-	var searchTargets []string
-	if catalog != nil {
-		for _, p := range catalog.Presets {
-			searchTargets = append(searchTargets, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+	dirIndex := preset.NewDirIndex(wadRoots...).WithCatalog(catalog)
+	readmeCache := make(map[string]string, len(catalog.Presets))
+	searchTargets := make([]string, 0, len(catalog.Presets))
+	for _, p := range catalog.Presets {
+		searchTargets = append(searchTargets, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+		if path, ok := dirIndex.ResolveReadme(p); ok {
+			readmeCache[readmeCacheKey(p)] = path
+		} else {
+			readmeCache[readmeCacheKey(p)] = ""
 		}
 	}
 
@@ -122,7 +143,8 @@ func initialModelWithRoots(
 		nerdFonts:     nerdFonts,
 		catalog:       catalog,
 		wadsDir:       primaryWadsDir,
-		dirIndex:      preset.NewDirIndex(wadRoots...),
+		dirIndex:      dirIndex,
+		readmeCache:   readmeCache,
 		searchTargets: searchTargets,
 		input:         ti,
 		filtered:      catalog.Presets,
@@ -142,6 +164,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.WindowSizeMsg:
 			m.width = msg.Width
 			m.height = msg.Height
+			m.input.Width = calculateSearchWidth(m.width)
 			_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 			m.viewport.Width = vpWidth
 			m.viewport.Height = vpHeight
@@ -152,8 +175,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				m.quitting = true
 				return m, tea.Quit
-			case "esc", "q", "tab", "ctrl+r":
+			case "esc", "q", "Q", "tab", "ctrl+r":
 				m.viewingReadme = false
+				return m, nil
+			case "g", "home":
+				m.viewport.GotoTop()
+				return m, nil
+			case "G", "end":
+				m.viewport.GotoBottom()
 				return m, nil
 			case "enter":
 				if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
@@ -189,7 +218,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "tab", "ctrl+r":
-			if len(m.filtered) > 0 && m.cursor < len(m.filtered) {
+			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
 				cur := m.filtered[m.cursor]
 				if txtPath, ok := m.resolveReadme(cur); ok {
 					content, err := preset.ReadReadme(txtPath)
@@ -205,7 +234,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "up", "ctrl+p":
+		case "up", "ctrl+p", "ctrl+k":
 			if m.cursor > 0 {
 				m.cursor--
 			} else if len(m.filtered) > 0 {
@@ -213,11 +242,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "down", "ctrl+n":
+		case "down", "ctrl+n", "ctrl+j":
 			if m.cursor < len(m.filtered)-1 {
 				m.cursor++
 			} else {
 				m.cursor = 0
+			}
+			return m, nil
+
+		case "pgup", "ctrl+u":
+			if len(m.filtered) > 0 {
+				step := m.computeLayout().maxVisible
+				if msg.String() == "ctrl+u" {
+					step /= 2
+				}
+				if step < 1 {
+					step = 1
+				}
+				m.cursor -= step
+				if m.cursor < 0 {
+					m.cursor = 0
+				}
+			}
+			return m, nil
+
+		case "pgdown", "ctrl+d":
+			if len(m.filtered) > 0 {
+				step := m.computeLayout().maxVisible
+				if msg.String() == "ctrl+d" {
+					step /= 2
+				}
+				if step < 1 {
+					step = 1
+				}
+				m.cursor += step
+				if m.cursor >= len(m.filtered) {
+					m.cursor = len(m.filtered) - 1
+				}
 			}
 			return m, nil
 		}
@@ -236,6 +297,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) updateFiltered(query string) {
+	if m.catalog == nil {
+		m.filtered = nil
+		return
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
 		m.filtered = m.catalog.Presets
@@ -271,7 +336,7 @@ func (m model) View() string {
 
 	geom := m.computeLayout()
 	listLines := m.renderListLines(geom)
-	previewLines, hasReadme := m.renderPreviewLines()
+	previewLines, hasReadme := m.renderPreviewLines(geom)
 	panels := m.renderPanels(geom, listLines, previewLines)
 
 	header := m.renderHeader()

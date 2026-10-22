@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/lock14/doom-cli/internal/preset"
 )
 
 func TestParseLibraryFolders(t *testing.T) {
@@ -53,6 +56,47 @@ func TestParseLibraryFolders(t *testing.T) {
 	}
 }
 
+func TestDefaultTargetPatterns_DerivedFromCatalog(t *testing.T) {
+	t.Parallel()
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+	patterns := DefaultTargetPatterns()
+	if len(patterns) == 0 {
+		t.Fatal("expected non-empty DefaultTargetPatterns()")
+	}
+
+	destByNormSource := make(map[string]string)
+	for _, tp := range patterns {
+		key := preset.NormalizeFilename(tp.SourcePattern)
+		destLower := strings.ToLower(tp.DestName)
+		if prev, exists := destByNormSource[key]; exists && prev == destLower {
+			t.Errorf("duplicate normalized target pattern %q -> %q", tp.SourcePattern, tp.DestName)
+		}
+		destByNormSource[key] = destLower
+	}
+
+	for _, p := range cat.Presets {
+		iwadNorm := preset.NormalizeFilename(filepath.Base(p.IWAD))
+		if _, ok := destByNormSource[iwadNorm]; !ok {
+			t.Errorf("preset %s IWAD %q missing from DefaultTargetPatterns", p.ID, p.IWAD)
+		}
+		for _, f := range p.Files {
+			fNorm := preset.NormalizeFilename(filepath.Base(f.Name))
+			if _, ok := destByNormSource[fNorm]; !ok {
+				t.Errorf("preset %s file %q missing from DefaultTargetPatterns", p.ID, f.Name)
+			}
+			for _, al := range f.Aliases {
+				alNorm := preset.NormalizeFilename(al)
+				if gotDest, ok := destByNormSource[alNorm]; !ok || gotDest != strings.ToLower(filepath.Base(f.Name)) {
+					t.Errorf("preset %s alias %q -> %q missing from DefaultTargetPatterns", p.ID, al, f.Name)
+				}
+			}
+		}
+	}
+}
+
 func TestDiscoverAndExtract(t *testing.T) {
 	t.Parallel()
 	tmpDir, err := os.MkdirTemp("", "steam_extract_*")
@@ -67,11 +111,12 @@ func TestDiscoverAndExtract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create mock game files
+	// Create mock game files (including normalized underscore variant idkfa_2024.wad and aliases)
 	_ = os.WriteFile(filepath.Join(doomDir, "doom2.wad"), []byte("doom2-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "gd.wad"), []byte("gdturbo-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "DOOMZERO.DEH"), []byte("doomzero-deh-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "sigil2.wad"), []byte("sigil2-data"), 0644)
+	_ = os.WriteFile(filepath.Join(doomDir, "idkfa_2024.wad"), []byte("idkfa-data"), 0644)
 
 	destWads := filepath.Join(tmpDir, "target_wads")
 	var out bytes.Buffer
@@ -80,8 +125,8 @@ func TestDiscoverAndExtract(t *testing.T) {
 		t.Fatalf("DiscoverAndExtract failed: %v", err)
 	}
 
-	if count != 4 {
-		t.Fatalf("expected 4 files extracted, got %d\nOutput: %s", count, out.String())
+	if count != 5 {
+		t.Fatalf("expected 5 files extracted, got %d\nOutput: %s", count, out.String())
 	}
 
 	// Verify target names:
@@ -89,17 +134,17 @@ func TestDiscoverAndExtract(t *testing.T) {
 	// gd.wad -> gdturbo.wad
 	// DOOMZERO.DEH -> DOOMZERO.DEH
 	// sigil2.wad -> SIGIL_II_V1_0.WAD
-	if _, err := os.Stat(filepath.Join(destWads, "DOOM2.WAD")); err != nil {
-		t.Errorf("DOOM2.WAD was not created: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(destWads, "gdturbo.wad")); err != nil {
-		t.Errorf("gdturbo.wad was not created from gd.wad: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(destWads, "DOOMZERO.DEH")); err != nil {
-		t.Errorf("DOOMZERO.DEH was not created: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(destWads, "SIGIL_II_V1_0.WAD")); err != nil {
-		t.Errorf("SIGIL_II_V1_0.WAD was not created from sigil2.wad: %v", err)
+	// idkfa_2024.wad -> idkfa 2024.wad (via normalized matching)
+	for _, wantFile := range []string{
+		"DOOM2.WAD",
+		"gdturbo.wad",
+		"DOOMZERO.DEH",
+		"SIGIL_II_V1_0.WAD",
+		"idkfa 2024.wad",
+	} {
+		if _, err := os.Stat(filepath.Join(destWads, wantFile)); err != nil {
+			t.Errorf("%s was not created: %v", wantFile, err)
+		}
 	}
 
 	// Run again without force: count should be 0
@@ -110,5 +155,32 @@ func TestDiscoverAndExtract(t *testing.T) {
 	}
 	if count2 != 0 {
 		t.Errorf("expected 0 files on second run without force, got %d", count2)
+	}
+
+	// Verify DiscoverAndExtractForCatalog extracts custom user-layer preset aliases
+	_ = os.WriteFile(filepath.Join(doomDir, "custom_addon.wad"), []byte("custom-data"), 0644)
+	customCat := &preset.Catalog{
+		Presets: []preset.Preset{
+			{
+				ID:     "custom-addon",
+				Name:   "Custom Addon",
+				Engine: "dsda-doom",
+				IWAD:   "DOOM2.WAD",
+				Files: []preset.FileSpec{
+					{Name: "custom_addon_v2.wad", Aliases: []string{"custom_addon.wad"}},
+				},
+			},
+		},
+	}
+	out.Reset()
+	count3, err := DiscoverAndExtractForCatalog(customCat, []string{mockSteam}, destWads, false, &out)
+	if err != nil {
+		t.Fatalf("DiscoverAndExtractForCatalog failed: %v", err)
+	}
+	if count3 != 1 {
+		t.Fatalf("expected 1 custom file extracted, got %d\nOutput: %s", count3, out.String())
+	}
+	if _, err := os.Stat(filepath.Join(destWads, "custom_addon_v2.wad")); err != nil {
+		t.Errorf("custom_addon_v2.wad was not created from custom_addon.wad: %v", err)
 	}
 }
