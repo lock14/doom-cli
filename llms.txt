@@ -77,7 +77,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and catalog-driven game file extraction.
 - `internal/templates/`: Embedded configuration templates and backup deployment engine.
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
-- `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, and SoundFont installer (`downloader.go`, `extract.go`, `soundfont.go`).
+- `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, embedded `DEHACKED` lump extractor, and SoundFont installer (`downloader.go`, `extract.go`, `soundfont.go`).
 
 ## Key design invariants
 

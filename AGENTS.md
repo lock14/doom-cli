@@ -74,9 +74,13 @@
         Steam and GOG extraction ensures maps and patches resolve without redundant case or punctuation entries. When
         upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `gd.wad` for
         `gdturbo.wad`, `sigil.wad` for `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`,
-        `sunder.wad` for `SUNDER_V2512.wad`, and `aaliens.wad` for `aaliens_v1_2.wad`), declare `"aliases"` directly
-        on the `FileSpec` in `catalog/preset.<id>.json`. Both `preset.KnownAliases` and `steam.DefaultTargetPatterns()`
-        derive their mappings automatically from the catalog rather than maintaining separate hardcoded filename tables.
+        `sunder.wad` or `sunder_2512.wad` for `SUNDER_V2512.wad`, and `aaliens.wad` for `aaliens_v1_2.wad`), declare
+        `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`. Both `preset.KnownAliases` and
+        `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog rather than maintaining
+        separate hardcoded filename tables.
+    *   **Embedded DeHackEd extraction**: When a preset declares both a `.wad` and `.deh` file and its direct `.wad`
+        download source embeds a `DEHACKED` lump (such as `DoomZero.wad`), `wad.Downloader` extracts the embedded
+        `DEHACKED` lump atomically into the expected `.deh` file.
     *   **Visual aesthetic and frame pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
         (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`,
         and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0`
