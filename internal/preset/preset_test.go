@@ -731,3 +731,67 @@ func TestDocumentationEntityJSONBlocks(t *testing.T) {
 		})
 	}
 }
+
+func TestMonospaceTUIOverridesNotStale(t *testing.T) {
+	t.Parallel()
+	rootDir := filepath.Join("..", "..")
+	overridesPath := filepath.Join(rootDir, ".agents", "rules", "monospace-tui.md")
+	overridesRaw, err := os.ReadFile(overridesPath)
+	if err != nil {
+		t.Fatalf("reading %s: %v", overridesPath, err)
+	}
+	stdRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "standard.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading standard.md: %v", err)
+	}
+	rendRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "rendering.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading rendering.md: %v", err)
+	}
+	patRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "patterns.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading patterns.md: %v", err)
+	}
+	corpus := string(stdRaw) + "\n" + string(rendRaw) + "\n" + string(patRaw)
+
+	var currentHeading string
+	checked := 0
+	for idx, line := range strings.Split(string(overridesRaw), "\n") {
+		lineNum := idx + 1
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "### ") {
+			currentHeading = strings.TrimPrefix(trimmed, "### ")
+			continue
+		}
+		bulletBody := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(trimmed, "*"), "-"))
+		var quoted string
+		switch {
+		case strings.HasPrefix(bulletBody, "**Original**: "):
+			quoted = strings.TrimSpace(strings.TrimPrefix(bulletBody, "**Original**: "))
+		case strings.HasPrefix(bulletBody, "**Original:** "):
+			quoted = strings.TrimSpace(strings.TrimPrefix(bulletBody, "**Original:** "))
+		default:
+			continue
+		}
+		checked++
+		if quoted == "" {
+			t.Errorf("%s:%d (%s): empty Original field", overridesPath, lineNum, currentHeading)
+			continue
+		}
+		if !strings.Contains(corpus, quoted) {
+			t.Errorf(
+				"%s:%d (%s): Original text not found verbatim in standard.md, rendering.md, or patterns.md:\n  %s",
+				overridesPath, lineNum, currentHeading, quoted,
+			)
+		}
+	}
+	if checked == 0 {
+		t.Fatalf("expected at least one Original entry in %s, found 0", overridesPath)
+	}
+}

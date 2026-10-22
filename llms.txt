@@ -78,6 +78,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `internal/templates/`: Embedded configuration templates and backup deployment engine.
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
 - `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, embedded `DEHACKED` lump extractor, and SoundFont installer (`downloader.go`, `extract.go`, `soundfont.go`).
+- `.agents/`: Conditional TUI design rules (`.agents/rules/monospace-tui.md`) and `mono-tui v0.2.5` design and audit skills (`.agents/skills/mono-tui-design/`, `.agents/skills/mono-tui-audit/`).
 
 ## Key design invariants
 

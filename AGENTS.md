@@ -87,6 +87,10 @@
         with `render_vsync 1` and `uncapped_framerate 1` so high-refresh monitors pace frames smoothly to native
         monitor refresh rates.
 *   **TUI styling and font glyph hygiene**:
+    *   **Monospace TUI specification and overrides**: Terminal UI work in `internal/tui/`, `cmd/doom/play.go`, and
+        `cmd/doom/themes.go` is governed by `.agents/rules/monospace-tui.md` and the embedded Monospace Design TUI
+        (`mono-tui v0.2.5`) reference library under `.agents/skills/mono-tui-design/` and
+        `.agents/skills/mono-tui-audit/`.
     *   **Clean typography over emojis**: Emojis render with fixed vendor bitmaps and colors regardless of
         ANSI foreground escapes. They clash with light backgrounds (such as monochrome white pills). Use clean
         typography (`DOOM`) instead of emojis for branded badges.
@@ -230,8 +234,9 @@ Linux, macOS, and Windows:
     Details prerequisites, Makefile targets, Go code style, testing requirements, and pull request guidelines.
 *   **Agent and architectural invariants**: `AGENTS.md` is the single canonical, authoritative reference at the
     repository root for autonomous agents (including Claude Code, which natively reads `AGENTS.md`), architecture
-    invariants, path tokens, safety rules, and code quality checklists. Keep `AGENTS.md` as a single root file without
-    splitting into `.agents/` or creating `CLAUDE.md` symlinks.
+    invariants, path tokens, safety rules, and code quality checklists. Keep `AGENTS.md` at the repository root
+    without moving it into `.agents/AGENTS.md` or creating `CLAUDE.md` symlinks; scoped conditional rules and agent
+    skills live in `.agents/rules/` and `.agents/skills/`.
 *   **Documentation synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
     mechanics are modified, all relevant documentation (Go doc comments, `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
     and `llms.txt`) must be updated in the same pull request.
