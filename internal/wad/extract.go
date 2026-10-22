@@ -3,6 +3,7 @@ package wad
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,44 @@ import (
 	"github.com/lock14/doom-cli/internal/fsutil"
 	"github.com/lock14/doom-cli/internal/preset"
 )
+
+// ExtractWADLump extracts the raw payload of the first non-empty lump matching lumpName
+// (case-insensitive, up to 8 ASCII characters) from an IWAD or PWAD byte slice.
+func ExtractWADLump(wadData []byte, lumpName string) ([]byte, bool) {
+	if len(wadData) < 12 {
+		return nil, false
+	}
+	ident := string(wadData[0:4])
+	if ident != "PWAD" && ident != "IWAD" {
+		return nil, false
+	}
+	numLumps := int64(binary.LittleEndian.Uint32(wadData[4:8]))
+	dirOffset := int64(binary.LittleEndian.Uint32(wadData[8:12]))
+	dataLen := int64(len(wadData))
+	if numLumps <= 0 || numLumps > 65536 || dirOffset < 12 || dirOffset+numLumps*16 > dataLen {
+		return nil, false
+	}
+
+	want := strings.ToUpper(strings.TrimSpace(lumpName))
+	for i := int64(0); i < numLumps; i++ {
+		entry := wadData[dirOffset+i*16 : dirOffset+(i+1)*16]
+		lumpPos := int64(binary.LittleEndian.Uint32(entry[0:4]))
+		lumpSize := int64(binary.LittleEndian.Uint32(entry[4:8]))
+		if lumpSize <= 0 || lumpPos < 12 || lumpPos+lumpSize > dataLen {
+			continue
+		}
+		nameBytes := entry[8:16]
+		if nul := bytes.IndexByte(nameBytes, 0); nul >= 0 {
+			nameBytes = nameBytes[:nul]
+		}
+		if strings.EqualFold(string(nameBytes), want) {
+			out := make([]byte, lumpSize)
+			copy(out, wadData[lumpPos:lumpPos+lumpSize])
+			return out, true
+		}
+	}
+	return nil, false
+}
 
 func isZip(path string) bool {
 	f, err := os.Open(path)

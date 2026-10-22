@@ -225,14 +225,24 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 
 	ext := urlExtension(src.URL)
 	if ext == ".wad" || ext == ".pk3" {
-		if len(expectedFiles) != 1 {
-			return fmt.Errorf("direct %s download requires exactly 1 expected file, got %d", ext, len(expectedFiles))
-		}
+		return d.installDirectAsset(ext, tmpArchive, expectedFiles)
+	}
+
+	if isZip(tmpArchive) {
+		return d.extractFromZip(tmpArchive, size, expectedFiles, p)
+	}
+
+	return fmt.Errorf("downloaded payload from %s is not a valid zip archive", src.URL)
+}
+
+func (d *Downloader) installDirectAsset(ext, tmpArchive string, expectedFiles []string) error {
+	data, err := os.ReadFile(tmpArchive)
+	if err != nil {
+		return err
+	}
+
+	if len(expectedFiles) == 1 {
 		dest, err := fsutil.SafeJoin(d.WadsDir, expectedFiles[0])
-		if err != nil {
-			return err
-		}
-		data, err := os.ReadFile(tmpArchive)
 		if err != nil {
 			return err
 		}
@@ -243,11 +253,46 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 		return nil
 	}
 
-	if isZip(tmpArchive) {
-		return d.extractFromZip(tmpArchive, size, expectedFiles, p)
+	if ext == ".wad" {
+		var wadTargets []string
+		var dehTargets []string
+		for _, exp := range expectedFiles {
+			lower := strings.ToLower(exp)
+			switch {
+			case strings.HasSuffix(lower, ".wad"):
+				wadTargets = append(wadTargets, exp)
+			case strings.HasSuffix(lower, ".deh") || strings.HasSuffix(lower, ".bex"):
+				dehTargets = append(dehTargets, exp)
+			default:
+				return fmt.Errorf("direct %s download requires 1 expected file, got %d", ext, len(expectedFiles))
+			}
+		}
+		if len(wadTargets) == 1 && len(dehTargets) == 1 {
+			dehData, ok := ExtractWADLump(data, "DEHACKED")
+			if !ok {
+				return fmt.Errorf("direct .wad download missing embedded DEHACKED lump for %s", dehTargets[0])
+			}
+			wadDest, err := fsutil.SafeJoin(d.WadsDir, wadTargets[0])
+			if err != nil {
+				return err
+			}
+			dehDest, err := fsutil.SafeJoin(d.WadsDir, dehTargets[0])
+			if err != nil {
+				return err
+			}
+			if _, err := fsutil.WriteFileAtomic(wadDest, data, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", wadTargets[0], wadDest)
+			if _, err := fsutil.WriteFileAtomic(dehDest, dehData, 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(d.Out, "    Extracted: DEHACKED -> %s\n", dehDest)
+			return nil
+		}
 	}
 
-	return fmt.Errorf("downloaded payload from %s is not a valid zip archive", src.URL)
+	return fmt.Errorf("direct %s download requires 1 expected file, got %d", ext, len(expectedFiles))
 }
 
 // DownloadAll downloads all downloadable community megawads in the catalog.

@@ -9,8 +9,25 @@
     {
       "name": "SUNDER_V2512.wad",
       "aliases": [
-        "sunder.wad"
+        "sunder.wad",
+        "sunder_2512.wad"
       ]
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://dsdarchive.com/files/wads/doom2/5016/Sunder_2512.zip",
+      "sha256": "ef9cdb178e4147b66b24b6cca39f7a4b5044841ed7f64cca3875f734e291a7c7"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://dsdarchive.com/wads/sunder",
+      "rel": "dsda"
+    },
+    {
+      "url": "https://www.doomworld.com/forum/topic/46002-sunder-updated-with-new-maps-hooray/",
+      "rel": "doomworld"
     }
   ],
   "category": "Community Megawad",

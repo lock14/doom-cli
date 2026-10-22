@@ -472,6 +472,20 @@ func TestResolveReadmeRegression2(t *testing.T) {
 	if got, ok := idx.ResolveReadme(*av); ok {
 		t.Fatalf("expected Alien Vendetta not to borrow IWAD readme, got %q", got)
 	}
+
+	// Verify <stem>ReadMe*.txt fallback (such as SunderReadMeV2.TXT from Sunder_2512.zip)
+	sunderDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(sunderDir, "SunderReadMeV2.TXT"), []byte("sunder readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sunderPreset := cat.Find("Sunder")
+	if sunderPreset == nil {
+		t.Fatal("Sunder preset not found")
+	}
+	sunderIdx := NewDirIndex(sunderDir).WithCatalog(cat)
+	if got, ok := sunderIdx.ResolveReadme(*sunderPreset); !ok || filepath.Base(got) != "SunderReadMeV2.TXT" {
+		t.Fatalf("ResolveReadme(Sunder) with SunderReadMeV2.TXT = (%q, %v), want SunderReadMeV2.TXT", got, ok)
+	}
 }
 
 func TestDecodeTextCP437(t *testing.T) {

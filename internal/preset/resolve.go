@@ -390,10 +390,67 @@ func (idx *DirIndex) ResolveReadme(p Preset) (string, bool) {
 	if path, ok := idx.ResolveFile(nameClean); ok {
 		return path, true
 	}
+	if path, ok := idx.resolveReadmePrefix(p); ok {
+		return path, true
+	}
 	if !p.HasRequiredFiles() {
 		iwadBase := strings.TrimSuffix(p.IWAD, filepath.Ext(p.IWAD))
 		if path, ok := idx.ResolveFile(iwadBase + ".txt"); ok {
 			return path, true
+		}
+	}
+	return "", false
+}
+
+func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
+	var stems []string
+	seen := make(map[string]bool)
+	addStem := func(raw string) {
+		norm := NormalizeFilename(raw)
+		if norm == "" || seen[norm] {
+			return
+		}
+		seen[norm] = true
+		stems = append(stems, norm)
+	}
+	for _, f := range p.Files {
+		if f.Optional {
+			continue
+		}
+		base := filepath.Base(strings.TrimSpace(f.Name))
+		addStem(strings.TrimSuffix(base, filepath.Ext(base)))
+		for _, al := range idx.fileAliases(f) {
+			addStem(strings.TrimSuffix(al, filepath.Ext(al)))
+		}
+	}
+	addStem(p.Name)
+
+	matchEntries := func(dir string, entries []os.DirEntry, prefix string) (string, bool) {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+			norm := NormalizeFilename(entry.Name())
+			if strings.HasSuffix(norm, ".txt") && strings.HasPrefix(norm, prefix) {
+				return filepath.Join(dir, entry.Name()), true
+			}
+		}
+		return "", false
+	}
+
+	for _, stem := range stems {
+		prefix := stem + "readme"
+		for _, rc := range idx.roots {
+			if path, ok := matchEntries(rc.dir, rc.entries, prefix); ok {
+				return path, true
+			}
+		}
+		for _, rc := range idx.roots {
+			for _, sub := range rc.loadSubdirs() {
+				if path, ok := matchEntries(sub.dir, sub.entries, prefix); ok {
+					return path, true
+				}
+			}
 		}
 	}
 	return "", false

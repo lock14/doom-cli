@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -15,6 +16,23 @@ import (
 
 	"github.com/lock14/doom-cli/internal/preset"
 )
+
+func buildTestPWADWithDehacked(dehPayload string) []byte {
+	data := []byte(dehPayload)
+	var out bytes.Buffer
+	_, _ = out.WriteString("PWAD")
+	var hdr [8]byte
+	binary.LittleEndian.PutUint32(hdr[0:4], 1)
+	binary.LittleEndian.PutUint32(hdr[4:8], uint32(12+len(data)))
+	_, _ = out.Write(hdr[:])
+	_, _ = out.Write(data)
+	var entry [16]byte
+	binary.LittleEndian.PutUint32(entry[0:4], 12)
+	binary.LittleEndian.PutUint32(entry[4:8], uint32(len(data)))
+	copy(entry[8:16], "DEHACKED")
+	_, _ = out.Write(entry[:])
+	return out.Bytes()
+}
 
 func TestFilterExpectedFiles(t *testing.T) {
 	t.Parallel()
@@ -133,6 +151,9 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		case "/direct.wad":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("PWAD-DIRECT"))
+		case "/doomzero.wad":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(buildTestPWADWithDehacked("Patch File for DeHackEd v3.0"))
 		case "/archive.7z":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("7z-content"))
@@ -214,6 +235,32 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		}
 		if err := dl.DownloadPreset(p); err == nil || !strings.Contains(err.Error(), "unsupported archive format") {
 			t.Fatalf("expected unsupported archive format error, got: %v", err)
+		}
+	})
+
+	t.Run("direct wad download extracts embedded DEHACKED lump for expected deh file", func(t *testing.T) {
+		t.Parallel()
+		wadsDir := filepath.Join(t.TempDir(), "wads")
+		dl := NewDownloader(wadsDir, false, nil)
+		p := preset.Preset{
+			Name:   "Doom Zero",
+			Engine: "dsda-doom",
+			IWAD:   "DOOM2.WAD",
+			Files: []preset.FileSpec{
+				{Name: "DOOMZERO.DEH"},
+				{Name: "DoomZero.wad"},
+			},
+			Sources: []preset.Source{{URL: fmt.Sprintf("%s/doomzero.wad", server.URL)}},
+		}
+		if err := dl.DownloadPreset(p); err != nil {
+			t.Fatalf("direct .wad with embedded DEHACKED failed: %v", err)
+		}
+		if !dl.IsPresetInstalled(p) {
+			t.Fatalf("expected Doom Zero preset to be installed")
+		}
+		gotDeh, err := os.ReadFile(filepath.Join(wadsDir, "DOOMZERO.DEH"))
+		if err != nil || string(gotDeh) != "Patch File for DeHackEd v3.0" {
+			t.Fatalf("extracted DOOMZERO.DEH mismatch: %q (err=%v)", string(gotDeh), err)
 		}
 	})
 
