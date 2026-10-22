@@ -159,6 +159,8 @@ type rootCache struct {
 	entries []os.DirEntry
 	subOnce sync.Once
 	subdirs []subDirCache
+	relMu   sync.Mutex
+	relDirs map[string][]os.DirEntry
 }
 
 type subDirCache struct {
@@ -329,6 +331,32 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 	return "", false
 }
 
+func (rc *rootCache) readRelDir(subDirRel string) ([]os.DirEntry, string, bool) {
+	if subDirRel == "" {
+		return rc.entries, rc.dir, true
+	}
+	parentDir, err := fsutil.SafeJoin(rc.dir, subDirRel)
+	if err != nil {
+		return nil, "", false
+	}
+	rc.relMu.Lock()
+	defer rc.relMu.Unlock()
+	if rc.relDirs != nil {
+		if entries, cached := rc.relDirs[subDirRel]; cached {
+			return entries, parentDir, entries != nil
+		}
+	} else {
+		rc.relDirs = make(map[string][]os.DirEntry)
+	}
+	entries, readErr := os.ReadDir(parentDir)
+	if readErr != nil {
+		rc.relDirs[subDirRel] = nil
+		return nil, "", false
+	}
+	rc.relDirs[subDirRel] = entries
+	return entries, parentDir, true
+}
+
 func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	cleanRel, err := fsutil.CleanRel(targetName)
 	if err != nil {
@@ -339,23 +367,15 @@ func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	subDirRel := strings.Join(parts[:len(parts)-1], "/")
 
 	for _, rc := range idx.roots {
-		parentDir := rc.dir
-		if subDirRel != "" {
-			var parentErr error
-			parentDir, parentErr = fsutil.SafeJoin(rc.dir, subDirRel)
-			if parentErr != nil {
-				continue
-			}
-		}
-		entries, readErr := os.ReadDir(parentDir)
-		if readErr != nil {
+		entries, parentDir, ok := rc.readRelDir(subDirRel)
+		if !ok {
 			continue
 		}
-		if p, ok := resolveSingle(parentDir, entries, baseName); ok {
+		if p, found := resolveSingle(parentDir, entries, baseName); found {
 			return p, true
 		}
 		for _, alias := range idx.aliasesFor(baseName) {
-			if p, ok := resolveSingle(parentDir, entries, alias); ok {
+			if p, found := resolveSingle(parentDir, entries, alias); found {
 				return p, true
 			}
 		}

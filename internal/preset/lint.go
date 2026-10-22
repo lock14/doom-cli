@@ -404,6 +404,9 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 		"SECURITY.md",
 		"llms.txt",
 		filepath.Join(".github", "PULL_REQUEST_TEMPLATE.md"),
+		filepath.Join(".agents", "rules", "monospace-tui.md"),
+		filepath.Join(".agents", "skills", "mono-tui-design", "SKILL.md"),
+		filepath.Join(".agents", "skills", "mono-tui-audit", "SKILL.md"),
 	}
 	yamlFiles := []string{
 		filepath.Join(".github", "ISSUE_TEMPLATE", "bug_report.yml"),
@@ -447,6 +450,8 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 		}
 
 		lines := strings.Split(text, "\n")
+		isAgentDoc := strings.HasPrefix(filepath.ToSlash(relDoc), ".agents/")
+		inFrontmatter := false
 		inFence := false
 		fenceLang := ""
 		fenceStartLine := 0
@@ -457,6 +462,16 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 		for idx, line := range lines {
 			lineNum := idx + 1
 			trimmed := strings.TrimSpace(line)
+			if isAgentDoc && idx == 0 && trimmed == "---" {
+				inFrontmatter = true
+				continue
+			}
+			if inFrontmatter {
+				if trimmed == "---" {
+					inFrontmatter = false
+				}
+				continue
+			}
 			if strings.HasPrefix(trimmed, "```") {
 				if !inFence {
 					inFence = true
@@ -523,11 +538,22 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 			}
 		}
 
-		if relDoc == "README.md" || relDoc == "CONTRIBUTING.md" {
+		if relDoc == "README.md" || relDoc == "CONTRIBUTING.md" || isAgentDoc {
+			inFrontmatter = false
 			inFence = false
 			docDir := filepath.Dir(docPath)
-			for _, line := range lines {
+			for idx, line := range lines {
 				trimmed := strings.TrimSpace(line)
+				if isAgentDoc && idx == 0 && trimmed == "---" {
+					inFrontmatter = true
+					continue
+				}
+				if inFrontmatter {
+					if trimmed == "---" {
+						inFrontmatter = false
+					}
+					continue
+				}
 				if strings.HasPrefix(trimmed, "```") {
 					inFence = !inFence
 					continue

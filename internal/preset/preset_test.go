@@ -731,3 +731,131 @@ func TestDocumentationEntityJSONBlocks(t *testing.T) {
 		})
 	}
 }
+
+func TestMonospaceTUIOverridesNotStale(t *testing.T) {
+	t.Parallel()
+	rootDir := filepath.Join("..", "..")
+	overridesPath := filepath.Join(rootDir, ".agents", "rules", "monospace-tui.md")
+	overridesRaw, err := os.ReadFile(overridesPath)
+	if err != nil {
+		t.Fatalf("reading %s: %v", overridesPath, err)
+	}
+	stdRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "standard.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading standard.md: %v", err)
+	}
+	rendRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "rendering.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading rendering.md: %v", err)
+	}
+	patRaw, err := os.ReadFile(
+		filepath.Join(rootDir, ".agents", "skills", "mono-tui-design", "references", "patterns.md"),
+	)
+	if err != nil {
+		t.Fatalf("reading patterns.md: %v", err)
+	}
+	corpus := string(stdRaw) + "\n" + string(rendRaw) + "\n" + string(patRaw)
+
+	var currentHeading string
+	var currentHeadingLine int
+	currentHasOriginal := false
+	checked := 0
+	overrideHeadings := 0
+
+	checkPreviousHeading := func() {
+		if currentHeading == "" {
+			return
+		}
+		if (strings.HasPrefix(currentHeading, "[OVERRIDE]") || strings.HasPrefix(currentHeading, "[WAIVE]")) &&
+			!currentHasOriginal {
+			t.Errorf(
+				"%s:%d (%s): missing **Original**: quote for override or waiver heading",
+				overridesPath, currentHeadingLine, currentHeading,
+			)
+		}
+	}
+
+	for idx, line := range strings.Split(string(overridesRaw), "\n") {
+		lineNum := idx + 1
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "### ") {
+			checkPreviousHeading()
+			currentHeading = strings.TrimPrefix(trimmed, "### ")
+			currentHeadingLine = lineNum
+			currentHasOriginal = false
+			if strings.HasPrefix(currentHeading, "[OVERRIDE]") || strings.HasPrefix(currentHeading, "[WAIVE]") {
+				overrideHeadings++
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "## ") {
+			checkPreviousHeading()
+			currentHeading = ""
+			currentHeadingLine = 0
+			currentHasOriginal = false
+			continue
+		}
+		bulletBody := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(trimmed, "*"), "-"))
+		var quoted string
+		switch {
+		case strings.HasPrefix(bulletBody, "**Original**: "):
+			quoted = strings.TrimSpace(strings.TrimPrefix(bulletBody, "**Original**: "))
+		case strings.HasPrefix(bulletBody, "**Original:** "):
+			quoted = strings.TrimSpace(strings.TrimPrefix(bulletBody, "**Original:** "))
+		default:
+			continue
+		}
+		checked++
+		currentHasOriginal = true
+		if quoted == "" {
+			t.Errorf("%s:%d (%s): empty Original field", overridesPath, lineNum, currentHeading)
+			continue
+		}
+		if !strings.Contains(corpus, quoted) {
+			t.Errorf(
+				"%s:%d (%s): Original text not found verbatim in standard.md, rendering.md, or patterns.md:\n  %s",
+				overridesPath, lineNum, currentHeading, quoted,
+			)
+		}
+	}
+	checkPreviousHeading()
+
+	if overrideHeadings == 0 {
+		t.Fatalf("expected at least one [OVERRIDE] or [WAIVE] heading in %s, found 0", overridesPath)
+	}
+	if checked == 0 {
+		t.Fatalf("expected at least one Original entry in %s, found 0", overridesPath)
+	}
+}
+
+func TestDirIndex_CachedRelativeSubpath(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	subDir := filepath.Join(wadsDir, "Maps_Sub")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	wadPath := filepath.Join(subDir, "Episode_One.wad")
+	if err := os.WriteFile(wadPath, []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	idx := NewDirIndex(wadsDir)
+	got1, ok1 := idx.ResolveFile("Maps_Sub/episode_one.wad")
+	if !ok1 || got1 != wadPath {
+		t.Fatalf("first ResolveFile = (%q, %v), want (%q, true)", got1, ok1, wadPath)
+	}
+
+	// Remove the file from disk after initial scan to verify subsequent resolution uses cached entries.
+	if err := os.Remove(wadPath); err != nil {
+		t.Fatal(err)
+	}
+	got2, ok2 := idx.ResolveFile("Maps_Sub/episode_one.wad")
+	if !ok2 || got2 != wadPath {
+		t.Fatalf("cached ResolveFile = (%q, %v), want (%q, true)", got2, ok2, wadPath)
+	}
+}
