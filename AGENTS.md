@@ -72,9 +72,9 @@
         underscore-normalized matching (`preset.NormalizeFilename`) across configured WAD roots (`wads_dir` and
         `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
         Steam and GOG extraction ensures maps and patches resolve without redundant case or punctuation entries. When
-        upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `gd.wad` for
-        `gdturbo.wad`, `sigil.wad` for `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`,
-        `sunder.wad` or `sunder_2512.wad` for `SUNDER_V2512.wad`, and `aaliens.wad` for `aaliens_v1_2.wad`), declare
+        upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `sigil.wad` for
+        `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`, `sunder.wad` or
+        `SUNDER_V2512.wad` for `Sunder 2512.wad`, and `aaliens_v1_2.wad` for `aaliens.wad`), declare
         `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`. Both `preset.KnownAliases` and
         `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog rather than maintaining
         separate hardcoded filename tables.

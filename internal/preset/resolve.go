@@ -391,6 +391,9 @@ func (idx *DirIndex) ResolveReadme(p Preset) (string, bool) {
 		return "", false
 	}
 	for _, f := range p.Files {
+		if f.Optional {
+			continue
+		}
 		ext := filepath.Ext(f.Name)
 		base := strings.TrimSuffix(f.Name, ext)
 		if path, ok := idx.ResolveFile(base + ".txt"); ok {
@@ -445,13 +448,17 @@ func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
 	}
 	addStem(p.Name)
 
-	matchEntries := func(dir string, entries []os.DirEntry, prefix string) (string, bool) {
+	matchEntries := func(dir string, entries []os.DirEntry, stem string) (string, bool) {
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
 			}
 			norm := NormalizeFilename(entry.Name())
-			if strings.HasSuffix(norm, ".txt") && strings.HasPrefix(norm, prefix) {
+			if !strings.HasSuffix(norm, ".txt") || !strings.HasPrefix(norm, stem) {
+				continue
+			}
+			rest := strings.TrimSuffix(strings.TrimPrefix(norm, stem), ".txt")
+			if IsReadmeSuffix(rest) {
 				return filepath.Join(dir, entry.Name()), true
 			}
 		}
@@ -459,21 +466,36 @@ func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
 	}
 
 	for _, stem := range stems {
-		prefix := stem + "readme"
 		for _, rc := range idx.roots {
-			if path, ok := matchEntries(rc.dir, rc.entries, prefix); ok {
+			if path, ok := matchEntries(rc.dir, rc.entries, stem); ok {
 				return path, true
 			}
 		}
 		for _, rc := range idx.roots {
 			for _, sub := range rc.loadSubdirs() {
-				if path, ok := matchEntries(sub.dir, sub.entries, prefix); ok {
+				if path, ok := matchEntries(sub.dir, sub.entries, stem); ok {
 					return path, true
 				}
 			}
 		}
 	}
 	return "", false
+}
+
+// IsReadmeSuffix reports whether a normalized suffix after a preset or WAD stem
+// represents a README or versioned documentation suffix (such as "readme*",
+// "v<digit>*", or "<digit>.<digit>*") without matching sequel numbers ("2").
+func IsReadmeSuffix(rest string) bool {
+	if strings.HasPrefix(rest, "readme") {
+		return true
+	}
+	if len(rest) >= 2 && rest[0] == 'v' && rest[1] >= '0' && rest[1] <= '9' {
+		return true
+	}
+	if len(rest) >= 3 && rest[0] >= '0' && rest[0] <= '9' && strings.ContainsRune(rest, '.') {
+		return true
+	}
+	return false
 }
 
 // NormalizeFilename strips spaces, dashes, underscores, and lowers case for fuzzy matching.

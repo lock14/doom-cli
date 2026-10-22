@@ -73,12 +73,31 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 
-	zipBytes := createTestZip(t, map[string]string{
-		"Eviternity II.wad": "content-eviternity",
-		"sub/gd.wad":        "content-gdturbo",
-		"custom_short.wad":  "content-custom",
-		"patch_file.bex":    "content-bex",
-	})
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	for _, entry := range []struct {
+		name    string
+		content string
+	}{
+		{name: "Credits.txt", content: "credits-only"},
+		{name: "Eviternity II.wad", content: "content-eviternity"},
+		{name: "eviternityii.txt", content: "eviternity-ii-readme"},
+		{name: "sub/SUNDER_V2512.wad", content: "content-sunder"},
+		{name: "custom_short.wad", content: "content-custom"},
+		{name: "patch_file.bex", content: "content-bex"},
+	} {
+		f, err := zw.Create(entry.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write([]byte(entry.content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	zipBytes := buf.Bytes()
 
 	zipPath := filepath.Join(tmpDir, "test.zip")
 	if err := os.WriteFile(zipPath, zipBytes, 0o644); err != nil {
@@ -95,8 +114,8 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	}
 
 	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{
-		"eviternityii.wad",
-		"sub/gdturbo.wad",
+		"Eviternity II.wad",
+		"sub/Sunder 2512.wad",
 		"custom_v2.wad",
 		"patch.bex",
 	}, customPreset)
@@ -104,14 +123,14 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 		t.Fatalf("unexpected extract error: %v", err)
 	}
 
-	c1, err := os.ReadFile(filepath.Join(wadsDir, "eviternityii.wad"))
+	c1, err := os.ReadFile(filepath.Join(wadsDir, "Eviternity II.wad"))
 	if err != nil || string(c1) != "content-eviternity" {
-		t.Errorf("eviternityii.wad content mismatch: %s (err: %v)", string(c1), err)
+		t.Errorf("Eviternity II.wad content mismatch: %s (err: %v)", string(c1), err)
 	}
 
-	c2, err := os.ReadFile(filepath.Join(wadsDir, "sub", "gdturbo.wad"))
-	if err != nil || string(c2) != "content-gdturbo" {
-		t.Errorf("sub/gdturbo.wad content mismatch: %s (err: %v)", string(c2), err)
+	c2, err := os.ReadFile(filepath.Join(wadsDir, "sub", "Sunder 2512.wad"))
+	if err != nil || string(c2) != "content-sunder" {
+		t.Errorf("sub/Sunder 2512.wad content mismatch: %s (err: %v)", string(c2), err)
 	}
 
 	cCustom, err := os.ReadFile(filepath.Join(wadsDir, "custom_v2.wad"))
@@ -122,6 +141,63 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	c3, err := os.ReadFile(filepath.Join(wadsDir, "patch.bex"))
 	if err != nil || string(c3) != "content-bex" {
 		t.Errorf("patch.bex content mismatch: %s (err: %v)", string(c3), err)
+	}
+
+	// Verify eviternityii.txt was preferred over Credits.txt
+	cReadme, err := os.ReadFile(filepath.Join(wadsDir, "eviternityii.txt"))
+	if err != nil || string(cReadme) != "eviternity-ii-readme" {
+		t.Errorf("eviternityii.txt content mismatch: %s (err: %v)", string(cReadme), err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "Credits.txt")); !os.IsNotExist(err) {
+		t.Errorf("expected Credits.txt not to be extracted when eviternityii.txt matches")
+	}
+
+	// Verify <stem>ReadMe*.txt is preferred over <stem>_Changelog.txt when both share the stem prefix
+	sunderBuf := new(bytes.Buffer)
+	sunderZW := zip.NewWriter(sunderBuf)
+	for _, entry := range []struct {
+		name    string
+		content string
+	}{
+		{name: "Sunder_Changelog.txt", content: "changelog-only"},
+		{name: "Sunder 2512.wad", content: "sunder-wad"},
+		{name: "SunderReadMeV2.TXT", content: "sunder-readme-v2"},
+	} {
+		f, err := sunderZW.Create(entry.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.Write([]byte(entry.content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := sunderZW.Close(); err != nil {
+		t.Fatal(err)
+	}
+	sunderZipPath := filepath.Join(tmpDir, "sunder.zip")
+	if err := os.WriteFile(sunderZipPath, sunderBuf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sunderWadsDir := filepath.Join(tmpDir, "sunder_wads")
+	sunderDL := NewDownloader(sunderWadsDir, false, nil)
+	if err := sunderDL.extractFromZip(
+		sunderZipPath,
+		int64(sunderBuf.Len()),
+		[]string{"Sunder 2512.wad"},
+		preset.Preset{Name: "Sunder"},
+	); err != nil {
+		t.Fatalf("unexpected sunder extract error: %v", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(sunderWadsDir, "SunderReadMeV2.TXT")); err != nil ||
+		string(got) != "sunder-readme-v2" {
+		t.Errorf(
+			"expected SunderReadMeV2.TXT to be extracted over Sunder_Changelog.txt, got %q (err=%v)",
+			string(got),
+			err,
+		)
+	}
+	if _, err := os.Stat(filepath.Join(sunderWadsDir, "Sunder_Changelog.txt")); !os.IsNotExist(err) {
+		t.Errorf("expected Sunder_Changelog.txt not to be extracted when SunderReadMeV2.TXT is present")
 	}
 }
 

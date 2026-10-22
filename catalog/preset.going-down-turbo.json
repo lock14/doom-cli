@@ -7,10 +7,7 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "gdturbo.wad",
-      "aliases": [
-        "gd.wad"
-      ]
+      "name": "gdturbo.wad"
     }
   ],
   "category": "Community Megawad",
@@ -20,7 +17,13 @@
   "release_date": "2024",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gd.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gdturbo.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/gdturbo",
+      "rel": "idgames"
     }
   ],
   "sort": 130

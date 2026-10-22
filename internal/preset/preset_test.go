@@ -271,7 +271,7 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	_ = os.WriteFile(sigil2Wad, []byte("PWAD"), 0o644)
 	sunderWad := filepath.Join(root1, "sunder.wad")
 	_ = os.WriteFile(sunderWad, []byte("PWAD"), 0o644)
-	aaliensWad := filepath.Join(root1, "aaliens.wad")
+	aaliensWad := filepath.Join(root1, "aaliens_v1_2.wad")
 	_ = os.WriteFile(aaliensWad, []byte("PWAD"), 0o644)
 
 	idx := NewDirIndex(root0, root1)
@@ -290,8 +290,9 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 		{name: "IWAD in subdir ignored", query: "DOOM2.WAD", wantOK: false},
 		{name: "alias sigil to SIGIL_V1_23", query: "SIGIL_V1_23.wad", wantOK: true, wantPath: sigilWad},
 		{name: "alias sigil2 to SIGIL_II_V1_0", query: "SIGIL_II_V1_0.WAD", wantOK: true, wantPath: sigil2Wad},
+		{name: "alias sunder to Sunder 2512", query: "Sunder 2512.wad", wantOK: true, wantPath: sunderWad},
 		{name: "alias sunder to SUNDER_V2512", query: "SUNDER_V2512.wad", wantOK: true, wantPath: sunderWad},
-		{name: "alias aaliens to aaliens_v1_2", query: "aaliens_v1_2.wad", wantOK: true, wantPath: aaliensWad},
+		{name: "alias aaliens_v1_2 to aaliens", query: "aaliens.wad", wantOK: true, wantPath: aaliensWad},
 	}
 
 	for _, tc := range tests {
@@ -313,7 +314,7 @@ func TestLintCatalog_FileAliasesValidation(t *testing.T) {
 	userDir := t.TempDir()
 
 	// Redundant alias, path-separator alias, cross-IWAD alias (HERETIC.WAD on DOOM2 preset),
-	// and canonical target collision (SCYTHE.WAD)
+	// and canonical target collision (scythe.wad)
 	badPreset := `{
   "schema_version": 1,
   "kind": "preset",
@@ -367,7 +368,7 @@ func TestLintCatalog_FileAliasesValidation(t *testing.T) {
 		"redundant with normalized filename",
 		"must not contain path separators",
 		"must not match iwad \"HERETIC.WAD\"",
-		"conflicts with canonical target \"SCYTHE.WAD\"",
+		"conflicts with canonical target \"scythe.wad\"",
 		"file extra_mod.wad alias \"EXTRA-MOD.WAD\" is redundant",
 	} {
 		if !strings.Contains(out, wantSub) {
@@ -420,7 +421,8 @@ func TestResolveReadmeRegression2(t *testing.T) {
 
 	for _, txt := range []string{
 		"doom.txt", "doom2.txt", "plutonia.txt", "tnt.txt", "heretic.txt", "hexen.txt",
-		"aaliens.txt", "gd.txt", "sigil.txt", "sigil2.txt", "sunder.txt",
+		"idkfa 2024.txt", "aaliens.txt", "deathless1.1.txt", "eviternityii.txt", "gdturbo.txt",
+		"sigil.txt", "sigil2.txt", "SODFINAL.txt", "sunder.txt",
 	} {
 		if err := os.WriteFile(filepath.Join(wadsDir, txt), []byte("readme"), 0o644); err != nil {
 			t.Fatal(err)
@@ -444,9 +446,12 @@ func TestResolveReadmeRegression2(t *testing.T) {
 		{name: "Heretic", wantTxt: "heretic.txt"},
 		{name: "Hexen", wantTxt: "hexen.txt"},
 		{name: "Ancient Aliens", wantTxt: "aaliens.txt"},
-		{name: "Going Down Turbo", wantTxt: "gd.txt"},
+		{name: "Deathless", wantTxt: "deathless1.1.txt"},
+		{name: "Eviternity II", wantTxt: "eviternityii.txt"},
+		{name: "Going Down Turbo", wantTxt: "gdturbo.txt"},
 		{name: "Sigil", wantTxt: "sigil.txt"},
 		{name: "Sigil II", wantTxt: "sigil2.txt"},
+		{name: "Speed of Doom", wantTxt: "SODFINAL.txt"},
 		{name: "Sunder", wantTxt: "sunder.txt"},
 	}
 
@@ -464,13 +469,26 @@ func TestResolveReadmeRegression2(t *testing.T) {
 		})
 	}
 
-	// Verify a megawad with required PWADs does NOT borrow doom2.txt
+	// Verify a megawad with required PWADs does NOT borrow doom2.txt or sequel .txt
 	av := cat.Find("Alien Vendetta")
 	if av == nil {
 		t.Fatal("Alien Vendetta not found")
 	}
 	if got, ok := idx.ResolveReadme(*av); ok {
 		t.Fatalf("expected Alien Vendetta not to borrow IWAD readme, got %q", got)
+	}
+
+	scytheDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(scytheDir, "scythe2.txt"), []byte("scythe 2 readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scythe1 := cat.Find("Scythe")
+	if scythe1 == nil {
+		t.Fatal("Scythe preset not found")
+	}
+	scytheIdx := NewDirIndex(scytheDir).WithCatalog(cat)
+	if got, ok := scytheIdx.ResolveReadme(*scythe1); ok {
+		t.Fatalf("expected Scythe not to falsely resolve scythe2.txt, got %q", got)
 	}
 
 	// Verify <stem>ReadMe*.txt fallback (such as SunderReadMeV2.TXT from Sunder_2512.zip)

@@ -7,9 +7,9 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "aaliens_v1_2.wad",
+      "name": "aaliens.wad",
       "aliases": [
-        "aaliens.wad"
+        "aaliens_v1_2.wad"
       ]
     }
   ],
