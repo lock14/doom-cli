@@ -18,10 +18,11 @@ Consult these documents in precedence order (higher overrides lower when rules c
    and workflow archetypes, keyboard ergonomics, focus navigation, elevation, layout responsiveness, and content
    formatting.
 3. **Rendering and implementation reference**: [rendering.md](../skills/mono-tui-design/references/rendering.md) for
-   Unicode box-drawing tables, ANSI color tiers, terminal resize and scroll mechanics, and defensive rendering
-   checklists.
-4. **Canonical pattern library**: [patterns.md](../skills/mono-tui-design/references/patterns.md) for annotated ASCII
-   wireframe patterns and checklist verification.
+   Unicode box-drawing tables, layout geometry, ANSI color tiers, component measurements, and color capability
+   degradation.
+4. **Canonical pattern library**: [patterns.md](../skills/mono-tui-design/references/patterns.md) for reusable
+   interaction patterns (`Footer Command Bar`, `Focused Surface`, `Master-Detail`, `Expand-to-Focus`, and
+   `Search/Select Set`) and audit checklists.
 5. **Skill workflows**: [mono-tui-design](../skills/mono-tui-design/SKILL.md) for designing and implementing TUI
    features, and [mono-tui-audit](../skills/mono-tui-audit/SKILL.md) for auditing existing TUI views.
 
@@ -30,13 +31,13 @@ Consult these documents in precedence order (higher overrides lower when rules c
 The `doom play` interactive launcher (`internal/tui/`) maps to the following `mono-tui` archetypes:
 
 *   **Screen archetype**: `§11.5` fuzzy finder (`model` in `internal/tui/launcher.go`) paired with a responsive
-    `Master-Detail` split view (`renderMainContent` in `internal/tui/render.go` with the `Presets` list pane on the
-    left and the `Details & Launch Info` preview pane on the right) and an `Expand-to-Focus` full-pane CP437 document
-    viewer (`viewingReadme` viewport in `internal/tui/launcher.go` and `renderReadmePane` in `internal/tui/render.go`).
-*   **Workflow archetype**: `§12.4` search-act. Typing filters presets in real time across name, engine, category,
-    summary, and WAD filenames; highlighting a preset previews its IWAD, PWADs, DeHackEd patches, and documentation
-    status; pressing `Enter` launches the selected preset, or pressing `Tab`, `Ctrl+R`, or `i` (when the filter input
-    is empty) opens the bundled CP437 README in the full-pane viewer.
+    `Master-Detail` split view (`renderPanels` in `internal/tui/render.go` with the `Presets` list pane on the left
+    and the `Preset Details` preview pane on the right) and an `Expand-to-Focus` full-pane CP437 document viewer
+    (`viewingReadme` viewport in `internal/tui/launcher.go` and `renderReadmeView` in `internal/tui/render.go`).
+*   **Workflow archetype**: `§12.4` search-act. Typing filters presets in real time across `Name`, `Engine`, and
+    `Category`; highlighting a preset previews its IWAD, PWADs, DeHackEd patches, and documentation status; pressing
+    `Enter` launches the selected preset, or pressing `Tab` or `Ctrl+R` opens the bundled CP437 README in the full-pane
+    viewer.
 
 ## Project overrides and conventions
 
@@ -44,38 +45,79 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 
 *   **Original**: Applications MUST NOT use double-line borders for Level 0–2 elements. Applications MUST NOT use single-line borders for Level 3–4 elements.
 *   **Project rule**: `renderBoxWithTitle` in `internal/tui/render.go` uses `lipgloss.RoundedBorder()` (`╭╮╰╯` with
-    single-line `─│` edges) across all launcher panes (`Presets`, `Details & Launch Info`, and `README Viewer`). Active
-    and inactive focus levels are distinguished through theme border and title tokens (`BorderFgActive` and
-    `TitleActive` versus `BorderFgMuted` and `TitleMuted`) rather than switching to double-line `╔╗╚╝═║` characters.
+    single-line `─│` edges) across all launcher panes (`Presets`, `Preset Details`, and `README Viewer`). Active and
+    inactive focus levels are distinguished through theme border and title tokens (`BorderFgActive` and bold
+    `TitleActive` versus `BorderFgInactive` and normal-weight `TitleInactive`) rather than switching to double-line
+    `╔╗╚╝═║` characters (`§5.5` and `§9.6`).
 *   **Reason**: Lipgloss rounded single-line borders provide a cohesive visual style across modern terminals while
-    letting color tokens and header badges communicate active pane focus.
+    letting color tokens and bold title typography communicate active pane focus.
 
 ### [OVERRIDE] §6.3 left-aligned panel titles in top border
 
 *   **Original**: Window and panel titles MUST be centered in the top border row:
 *   **Project rule**: `renderBoxWithTitle` in `internal/tui/render.go` left-aligns panel titles immediately after the
-    top-left border corner (`╭── Presets (18) ──...──╮` and `╭── Details & Launch Info ──...──╮`), truncating long
-    titles with `…` when the panel width is narrow.
+    top-left border corner (`╭── Presets (32) ──...──╮` and `╭── Preset Details ──...──╮`), truncating long titles
+    with `…` when the panel width is narrow.
 *   **Reason**: Left-aligned panel titles keep scan lines anchored to the left margin above left-aligned preset rows
     and metadata labels across wide and narrow terminal widths.
 
 ### [OVERRIDE] §6.6 rounded corners for interactive launcher panes
 
 *   **Original**: Rounded corner characters (`╭╮╰╯`) MAY be used for cosmetic, non-interactive containers (e.g., decorative cards, informational callouts). Rounded corners MUST NOT be used for interactive windows, dialogs, or panels that participate in the elevation system.
-*   **Project rule**: Interactive launcher containers (`Presets`, `Details & Launch Info`, and `README Viewer`) use
+*   **Project rule**: Interactive launcher containers (`Presets`, `Preset Details`, and `README Viewer`) use
     `lipgloss.RoundedBorder()` (`╭╮╰╯`) as their standard frame geometry.
 *   **Reason**: Keeps container framing consistent with the Lipgloss component ecosystem used throughout `internal/tui/`.
+
+### [OVERRIDE] §1.6 90-column side-by-side split breakpoint
+
+*   **Original**: | Compact | 40–79 | Region A collapses; Region C hidden or stacked below B; footer reduces to single row |
+*   **Project rule**: `computeLayout` in `internal/tui/layout.go` switches from the stacked vertical layout to the
+    side-by-side split layout (`Presets` on the left, `Preset Details` on the right) at `sideBySideMinWidth = 90`
+    columns (`m.width >= 90`) rather than `80` columns. When stacked (`m.width < 90`, including `80×24`),
+    `renderPreviewLines` (`internal/tui/render.go`) condenses metadata rows so `IWAD:` and `Files:` remain visible
+    (`§1.5`).
+*   **Reason**: The left `Presets` pane requires `44` columns plus `4` border columns and a `2`-column gutter (`50`
+    columns total), so stacking below `90` columns gives `Preset Details` a full `78`-column width at `80×24` instead
+    of cramping it into `30` columns.
+
+### [OVERRIDE] §7.2 and §8.1 left quarter-block cursor bar and bold highlight for list selection
+
+*   **Original**: - Focused text MUST use reverse video (SGR 7).
+*   **Project rule**: `renderListLines` in `internal/tui/render.go` indicates the active preset row using a `2`-column
+    left quarter-block cursor bar (`▎ `, `U+258E` via `CursorBar`) paired with bold accent typography (`CursorText`,
+    `SGR 1`) rather than full-row reverse video (`SGR 7`) or `[▸ item ◂]` bracket markers.
+*   **Reason**: Preserves clean horizontal scan lines and right-aligned `[DSDA]` and `[UZDoom]` engine badges without
+    full-row background blocks overpowering the `60-30-10` palette while maintaining a non-color glyph indicator
+    (`▎ `) for accessibility (`§5.3` and `§9.6`).
+
+### [OVERRIDE] §4.4 and §R4.2 frameless filter prompt without underscore fill
+
+*   **Original**: - Empty entry fields MUST display fill characters (underscores `_` or dots `·`) to indicate their width.
+*   **Project rule**: `renderHeader` in `internal/tui/render.go` and `initialModelWithRoots` in
+    `internal/tui/launcher.go` render the search bar as a frameless `  Filter: ` prompt followed by `m.input`
+    (`Type to search presets...` placeholder) without `[...]` brackets or `_` and `·` fill characters.
+*   **Reason**: Matches the header bar conventions of modern terminal fuzzy finders (`§11.5`) and avoids visual noise in
+    the top brand and stats bar.
+
+### [OVERRIDE] §1.4 and §R4.11 bullet-separated footer key strip
+
+*   **Original**: Format: `F1 Help  F5 Refresh  / Filter  q Quit` — key name followed by action label, separated by 2+ spaces. (CUA §1 function key area, Norton Commander F-key bar)
+*   **Project rule**: `ThemeStyles.FormatKeyHelp` in `internal/tui/theme.go` joins `keyHelp` pairs (`renderFooter` and
+    `renderReadmeFooter` in `internal/tui/render.go`) using a muted bullet separator (`"  •  "`, `U+2022` via `Bullet`)
+    rather than whitespace alone.
+*   **Reason**: Clearly delineates compound key labels (such as `↑/↓/PgUp/PgDn Navigate` and `Esc/Ctrl+C Quit`) from
+    adjacent action descriptions across all terminal widths.
 
 ### [OVERRIDE] §2.2 direct common-key bindings and always-active fuzzy search input
 
 *   **Original**: All single-letter key bindings MUST be case-insensitive — `r` and `R` trigger the same action, `d` and `D` trigger the same action, etc. Applications MUST bind both cases but MUST display only the lowercase form in the footer key strip.
-*   **Project rule**: In the primary launcher view (`!m.viewingReadme`), the fuzzy search `textinput.Model` is focused
-    by default (`§11.5`) so printable characters immediately filter presets; single-letter shortcuts `q` (quit) and `i`
-    (inspect README) trigger only when the filter input is empty, while modifier and special keys (`↑`, `↓`, `Ctrl+P`,
-    `Ctrl+N`, `Ctrl+K`, `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`, `Ctrl+D`, `Home`, `End`, `Tab`, `Ctrl+R`, `Enter`, `Esc`,
-    and `Ctrl+C`) work regardless of filter text. Inside the `README Viewer` (`m.viewingReadme`), Vim and pager keys
-    are bound deliberately by case (`j` and `k`, `d` and `u`, `f` and `b`, `Space`, `g` for top, `G` for bottom, and
-    `q`, `Esc`, `Tab`, or `Ctrl+R` to close).
+*   **Project rule**: In the primary launcher view (`!m.viewingReadme`), the fuzzy search `textinput.Model` (`m.input`)
+    is focused by default (`§11.5`) so all printable characters immediately filter presets; modifier and special keys
+    (`↑`, `↓`, `Ctrl+P`, `Ctrl+N`, `Ctrl+K`, `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`, `Ctrl+D`, `Tab`, `Ctrl+R`, `Enter`,
+    `Esc`, and `Ctrl+C`, with `Home` and `End` moving the filter text cursor) work regardless of filter text. Inside
+    the `README Viewer` (`m.viewingReadme`), Vim and pager keys are bound deliberately by case (`j` and `k`, `d` and
+    `u`, `f` and `b`, `Space`, `g` and `Home` for top, `G` and `End` for bottom, and `q`, `Q`, `Esc`, `Tab`, or
+    `Ctrl+R` to close).
 *   **Reason**: Matches `fzf` and Telescope ergonomics in the fuzzy finder while preserving standard `less` and Vim
     navigation (`g` versus `G`) in the document reader.
 
@@ -85,8 +127,10 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 *   **Project rule**: All TUI colors are governed by `Theme` and `ThemeStyles` in `internal/tui/theme.go` and
     `internal/tui/builtin_themes.go`. The CLI ships 10 built-in 60-30-10 palettes (`classic` ANSI-16 default, `blood`,
     `toxic`, `inferno`, `frost`, `plasma`, `heretic`, `amber`, `sigil`, and `monochrome`) and loads custom user themes
-    from `<ConfigDir>/themes/<name>.json`. Never hardcode raw ANSI color numbers or hex strings in `render.go` or
-    `launcher.go`.
+    from `<ConfigDir>/themes/<name>.json`. TrueColor text tokens adhere to `§9.5` WCAG AA contrast thresholds while 30%
+    structural border tokens (`BorderActive` and `BorderInactive`) use intentional atmospheric contrast, and
+    `MonochromeTheme.StatusMissing` uses bold reverse video (`SGR 1;7`, `§R3.4`). Never hardcode raw ANSI color numbers
+    or hex strings in `render.go` or `launcher.go`.
 *   **Reason**: Preserves Doom-inspired episode and source-port palettes alongside an ANSI-16 default (`classic`) and
     high-contrast accessibility (`monochrome`).
 
@@ -114,33 +158,35 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 
 ### [P1] universal rectangular badges by default and opt-in Nerd Fonts capsules
 
-*   **Project rule**: Default all badges (` DOOM `, `[DSDA]`, `[UZDoom]`, `[Ready]`, `[Missing IWAD]`) and prompts
-    (`Filter: `, `README Viewer: `) to universal ASCII and standard Unicode glyphs (`•`, `✓`, `✗`, `…`) with zero
-    Unicode Private Use Area (PUA) characters or emojis. Rounded Powerlevel10k capsule caps (`U+E0B6` and `U+E0B4`) and
-    Nerd Font icons in `renderCapsule` (`internal/tui/render.go`) must only render when `--nerd-fonts` or
-    `nerd_fonts: true` is active (`m.nerdFonts`).
+*   **Project rule**: Default all badges (` DOOM `, `[DSDA]`, `[UZDoom]`, `[✓ Found]`, `[✗ Missing]`, `[Optional]`,
+    `[✓ Readme]`) and prompts (`  Filter: `, `  README Viewer`) to universal ASCII and standard Unicode glyphs (`•`,
+    `✓`, `✗`, `…`) with zero Unicode Private Use Area (PUA) characters or emojis. `RenderBrandPill`, `RenderStatsPill`,
+    and `RenderScrollPill` (`internal/tui/theme.go`) must only call `renderCapsule` (`internal/tui/render.go`) with
+    rounded Powerlevel10k capsule caps (`U+E0B6` and `U+E0B4`) when `--nerd-fonts` or `nerd_fonts: true` is active
+    (`m.nerdFonts`).
 *   **Reason**: Guarantees zero tofu (`□` or `?`) in 100% of out-of-the-box system fonts while supporting opt-in
     powerline styling. See [AGENTS.md](../../AGENTS.md).
 
 ### [P2] ANSI-safe width math and responsive layout clamping
 
-*   **Project rule**: All layout geometry (`calculateLayout` in `internal/tui/layout.go`) and line clipping
-    (`truncateANSI` in `internal/tui/render.go`) must measure visible cell widths via `lipgloss.Width` / `x/ansi`,
-    clamp pane dimensions down to small terminals without negative padding panics, and terminate truncated lines with
-    `\x1b[0m` so styling never bleeds into adjacent borders.
+*   **Project rule**: All layout geometry (`computeLayout` in `internal/tui/layout.go`), list row formatting
+    (`padOrTruncateName` in `internal/tui/render.go`), and line clipping (`truncateANSI` in `internal/tui/render.go`)
+    must measure visible cell widths via `lipgloss.Width`, clamp pane dimensions down to small terminals without
+    negative padding panics, and terminate truncated lines with `\x1b[0m` so styling never bleeds into adjacent borders.
 *   **Reason**: Prevents right-border drift, UTF-8 byte-slicing corruption, and resize panics across narrow or rapidly
-    resized terminal windows (`§7.2` and `§R4.2`).
+    resized terminal windows (`§1.5` and `§1.6`).
 
 ### [P3] cached multi-root directory index on the UI thread
 
 *   **Project rule**: `model` (`internal/tui/launcher.go`) must resolve IWAD, PWAD, and README paths exclusively
-    through the pre-constructed `*preset.DirIndex` (`m.dirIndex`) and cached README map (`m.readmeCache`). Never perform
-    uncached `os.ReadDir` walks inside `View()` or per-keypress `Update()` cycles.
+    through the pre-constructed `*preset.DirIndex` (`m.dirIndex`, including cached relative subdirectory entries) and
+    cached README map (`m.readmeCache`). Never perform uncached `os.ReadDir` walks inside `View()` or per-keypress
+    `Update()` cycles.
 *   **Reason**: Keeps fuzzy filtering and scrolling responsive on large multi-directory WAD collections.
 
 ### [P4] non-TTY and basic terminal numbered menu fallback
 
 *   **Project rule**: When standard input or output is not an interactive terminal or when the fallback menu is
-    invoked, `RunFallbackMenu` in `internal/tui/menu.go` provides a clean numbered selection prompt with graceful
+    invoked, `RunNumberedMenu` in `internal/tui/menu.go` provides a clean numbered selection prompt with graceful
     `EOF` and interrupt handling.
 *   **Reason**: Ensures `doom play` remains usable in basic terminals, serial consoles, and non-fullscreen environments.

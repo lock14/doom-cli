@@ -683,3 +683,367 @@ func TestTruncateANSI(t *testing.T) {
 		})
 	}
 }
+
+func TestModel_PagingAndControlNavigation(t *testing.T) {
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+	m := initialModel(cat, "", DefaultTheme, false)
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// Ctrl+J moves down, Ctrl+K moves up
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
+	m = newM.(model)
+	if m.cursor != 1 {
+		t.Fatalf("expected cursor 1 after Ctrl+J, got %d", m.cursor)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlK})
+	m = newM.(model)
+	if m.cursor != 0 {
+		t.Fatalf("expected cursor 0 after Ctrl+K, got %d", m.cursor)
+	}
+
+	// PgDown advances by full page (geom.maxVisible)
+	geom := m.computeLayout()
+	halfStep := geom.maxVisible / 2
+	if halfStep < 1 {
+		halfStep = 1
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = newM.(model)
+	if m.cursor != geom.maxVisible {
+		t.Fatalf("expected cursor %d after PgDown, got %d", geom.maxVisible, m.cursor)
+	}
+
+	// Ctrl+D advances by half page (halfStep)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+	m = newM.(model)
+	if m.cursor != geom.maxVisible+halfStep {
+		t.Fatalf("expected cursor %d after Ctrl+D, got %d", geom.maxVisible+halfStep, m.cursor)
+	}
+
+	// PgUp moves back by full page (geom.maxVisible)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m = newM.(model)
+	if m.cursor != halfStep {
+		t.Fatalf("expected cursor %d after PgUp, got %d", halfStep, m.cursor)
+	}
+
+	// Ctrl+U moves back by half page to 0
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	m = newM.(model)
+	if m.cursor != 0 {
+		t.Fatalf("expected cursor 0 after Ctrl+U, got %d", m.cursor)
+	}
+
+	// Printable 'q' and 'i' on empty filter feed into text input rather than quitting
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+	m = newM.(model)
+	if m.quitting {
+		t.Fatal("expected 'q' not to quit launcher when filter is focused")
+	}
+	if m.input.Value() != "q" {
+		t.Fatalf("expected filter input 'q', got %q", m.input.Value())
+	}
+
+	// Home and End move the filter text input cursor without resetting preset list cursor
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'u', 'a', 'k', 'e'}})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	m = newM.(model)
+	if m.input.Position() != 0 {
+		t.Fatalf("expected filter input cursor at 0 after Home, got %d", m.input.Position())
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	m = newM.(model)
+	if m.input.Position() != len(m.input.Value()) {
+		t.Fatalf("expected filter input cursor at %d after End, got %d", len(m.input.Value()), m.input.Position())
+	}
+}
+
+func TestModel_ReadmeViewer_TopBottomAndShiftQ(t *testing.T) {
+	tmpDir := t.TempDir()
+	var lines []string
+	for i := 0; i < 60; i++ {
+		lines = append(lines, "Readme line content for scrolling test")
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "av.txt"), []byte(strings.Join(lines, "\n")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := mockCatalog()
+	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = newM.(model)
+
+	// Open readme viewer
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = newM.(model)
+	if !m.viewingReadme {
+		t.Fatal("expected viewingReadme == true")
+	}
+
+	// Resizing while inside README viewer updates both viewport and search input width
+	newM, _ = m.Update(tea.WindowSizeMsg{Width: 60, Height: 24})
+	m = newM.(model)
+	if m.input.Width != calculateSearchWidth(60) {
+		t.Errorf("expected m.input.Width == %d after resize in README viewer, got %d",
+			calculateSearchWidth(60), m.input.Width)
+	}
+
+	// Jump to bottom with 'G'
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	m = newM.(model)
+	if !m.viewport.AtBottom() {
+		t.Errorf("expected viewport at bottom after 'G'")
+	}
+
+	// Jump to top with 'g'
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+	m = newM.(model)
+	if !m.viewport.AtTop() {
+		t.Errorf("expected viewport at top after 'g'")
+	}
+
+	// Jump to bottom with End and top with Home
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnd})
+	m = newM.(model)
+	if !m.viewport.AtBottom() {
+		t.Errorf("expected viewport at bottom after End")
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyHome})
+	m = newM.(model)
+	if !m.viewport.AtTop() {
+		t.Errorf("expected viewport at top after Home")
+	}
+
+	// Close with 'Q'
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'Q'}})
+	m = newM.(model)
+	if m.viewingReadme {
+		t.Errorf("expected viewingReadme == false after 'Q'")
+	}
+}
+
+func TestModel_80x24_AllCuratedPresetsShowIWADAndFiles(t *testing.T) {
+	origProfile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(3)
+	defer lipgloss.SetColorProfile(origProfile)
+
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	// Create a readme for Legacy of Rust (6 files) to test worst-case 80x24 file density
+	if err := os.WriteFile(filepath.Join(tmpDir, "id1.txt"), []byte("Legacy of Rust readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	for idx, p := range m.filtered {
+		m.cursor = idx
+		view := m.View()
+		if !strings.Contains(view, "IWAD:") || !strings.Contains(view, p.IWAD) {
+			t.Errorf("preset %q at 80x24 missing IWAD %q in view:\n%s", p.Name, p.IWAD, view)
+		}
+		if len(p.Files) > 0 {
+			if !strings.Contains(view, "Files:") {
+				t.Errorf("preset %q at 80x24 missing Files: label in view:\n%s", p.Name, view)
+			}
+			for _, f := range p.Files {
+				if !strings.Contains(view, f.Name) {
+					t.Errorf("preset %q at 80x24 clipped required/optional file %q in view:\n%s", p.Name, f.Name, view)
+				}
+			}
+		}
+		if p.ID == "legacy-of-rust" && !strings.Contains(view, "[✓ Readme]") {
+			t.Errorf("expected Legacy of Rust at 80x24 to show [✓ Readme], got:\n%s", view)
+		}
+	}
+}
+
+func TestModel_ReadmeCache_NoDiskReadOnRender(t *testing.T) {
+	tmpDir := t.TempDir()
+	txtPath := filepath.Join(tmpDir, "av.txt")
+	if err := os.WriteFile(txtPath, []byte("Readme content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := mockCatalog()
+	m := initialModel(cat, tmpDir, DefaultTheme, false)
+
+	// Remove the file from disk after initialModel has populated readmeCache
+	if err := os.Remove(txtPath); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := m.resolveReadme(cat.Presets[0])
+	if !ok || got != txtPath {
+		t.Fatalf("resolveReadme = (%q, %v), want cached (%q, true)", got, ok, txtPath)
+	}
+}
+
+func TestRunNumberedMenu_EOFAndNilCatalog(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+
+	// Empty reader (EOF before newline) returns nil, nil cleanly
+	selected, err := RunNumberedMenu(mockCatalog(), strings.NewReader(""), &out)
+	if err != nil || selected != nil {
+		t.Fatalf("RunNumberedMenu on EOF = (%v, %v), want (nil, nil)", selected, err)
+	}
+
+	// Nil catalog does not panic
+	out.Reset()
+	selected, err = RunNumberedMenu(nil, strings.NewReader(""), &out)
+	if err != nil || selected != nil {
+		t.Fatalf("RunNumberedMenu on nil catalog = (%v, %v), want (nil, nil)", selected, err)
+	}
+
+	// initialModel with nil catalog does not panic on View or updateFiltered
+	m := initialModel(nil, "", DefaultTheme, false)
+	m.updateFiltered("doom")
+	view := m.View()
+	if !strings.Contains(view, "0 / 0 presets") {
+		t.Errorf("expected '0 / 0 presets' for nil catalog view, got:\n%s", view)
+	}
+}
+
+func TestPadOrTruncateName(t *testing.T) {
+	t.Parallel()
+	if got := padOrTruncateName("Doom", 10); lipgloss.Width(got) != 10 {
+		t.Errorf("padOrTruncateName(\"Doom\", 10) width = %d, want 10", lipgloss.Width(got))
+	}
+	if got := padOrTruncateName("Back to Saturn X Episode 1: Get Out Of My Stations", 18); lipgloss.Width(got) != 18 ||
+		!strings.HasSuffix(got, "…") {
+		t.Errorf(
+			"padOrTruncateName long string = %q (width %d), want width 18 ending with '…'",
+			got, lipgloss.Width(got),
+		)
+	}
+	if got := padOrTruncateName("日本語テストマップ", 10); lipgloss.Width(got) != 10 {
+		t.Errorf("padOrTruncateName wide CJK string = %q (width %d), want width 10", got, lipgloss.Width(got))
+	}
+}
+
+func TestRenderBoxWithTitle_WideCharactersAndEngineBadge(t *testing.T) {
+	t.Parallel()
+	box := renderBoxWithTitle("body", 24, "README: 日本語テストマップ (test.txt)", true, defaultStyles)
+	lines := strings.Split(box, "\n")
+	if len(lines) == 0 {
+		t.Fatal("expected non-empty box lines")
+	}
+	if gotW := lipgloss.Width(lines[0]); gotW != 26 {
+		t.Errorf("top border width with CJK title = %d, want 26: %q", gotW, lines[0])
+	}
+
+	cat := &preset.Catalog{
+		Engines: map[string]preset.EngineConfig{
+			"cjk-eng": {
+				ID:    "cjk-eng",
+				Badge: "日本語エンジン",
+			},
+		},
+	}
+	tag := formatEngineTagWithCatalog(cat, "cjk-eng", defaultStyles)
+	if gotW := lipgloss.Width(tag); gotW != 8 {
+		t.Errorf("formatEngineTagWithCatalog wide CJK badge width = %d, want 8: %q", gotW, tag)
+	}
+}
+
+func TestModel_80x24_CustomPresetLongFilenamesAndManyFiles(t *testing.T) {
+	origProfile := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(3)
+	defer lipgloss.SetColorProfile(origProfile)
+
+	tmpDir := t.TempDir()
+	longFirst := "very_long_custom_megawad_episode_one_final_v2.wad"
+	if err := os.WriteFile(filepath.Join(tmpDir, longFirst), []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "many.txt"), []byte("Readme text"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := &preset.Catalog{
+		Presets: []preset.Preset{
+			{
+				ID:     "custom-long-6",
+				Name:   "Custom Long Filenames",
+				Engine: "dsda-doom",
+				IWAD:   "DOOM2.WAD",
+				Files: []preset.FileSpec{
+					{Name: longFirst},
+					{Name: "second_col_patch.deh"},
+					{Name: "third_long_custom_resource_pack_v1.wad"},
+					{Name: "fourth_col_music.wad", Optional: true},
+					{Name: "fifth_extra_textures_pack_final.wad"},
+					{Name: "sixth_col_fix.bex"},
+				},
+				Layer: preset.LayerUser,
+			},
+			{
+				ID:     "custom-many-12",
+				Name:   "Custom Many Files",
+				Engine: "uzdoom",
+				IWAD:   "DOOM2.WAD",
+				Files: []preset.FileSpec{
+					{Name: "many.wad"},
+					{Name: "part02.wad"},
+					{Name: "part03.wad"},
+					{Name: "part04.wad"},
+					{Name: "part05.wad"},
+					{Name: "part06.wad"},
+					{Name: "part07.wad"},
+					{Name: "part08.wad"},
+					{Name: "part09.wad"},
+					{Name: "part10.wad"},
+					{Name: "part11.wad"},
+					{Name: "part12.wad"},
+				},
+				Layer: preset.LayerUser,
+			},
+		},
+	}
+
+	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// 1. Verify long filenames in column 1 do not push column 2 or status badges off-screen at 80x24
+	viewLong := m.View()
+	for _, want := range []string{
+		"IWAD:",
+		"Files:",
+		"[✓ Found]",
+		"second_col_patch… [✗ Missing]",
+		"[Optional]",
+		"sixth_col_fix.bex [✗ Missing]",
+	} {
+		if !strings.Contains(viewLong, want) {
+			t.Errorf("expected 80x24 view for custom-long-6 to contain %q, got:\n%s", want, viewLong)
+		}
+	}
+
+	// 2. Verify >10 files + README at 80x24 displays (+N more files) and preserves [✓ Readme]
+	m.cursor = 1
+	viewMany := m.View()
+	for _, want := range []string{
+		"IWAD:",
+		"Files:",
+		"(+4 more files)",
+		"many.txt",
+		"[✓ Readme]",
+	} {
+		if !strings.Contains(viewMany, want) {
+			t.Errorf("expected 80x24 view for custom-many-12 to contain %q, got:\n%s", want, viewMany)
+		}
+	}
+}

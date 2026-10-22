@@ -15,21 +15,23 @@ Monospace Design TUI (`mono-tui v0.2.5`) specification and `doom-cli`'s project 
    "Project rule" entry.
 2. [standard.md](../mono-tui-design/references/standard.md): Check keyboard navigation, focus indicators, layout
    responsiveness, and content formatting rules that are not overridden.
-3. [rendering.md](../mono-tui-design/references/rendering.md): Check `§R6` defensive rendering checklists (box
-   alignment, ANSI reset discipline, scroll bounds, resize safety, and color contrast).
-4. [patterns.md](../mono-tui-design/references/patterns.md): Compare against `Master-Detail`, `Expand-to-Focus`,
-   `Responsive Breakpoints`, and `Full-Screen Application Shell` checklists.
+3. [rendering.md](../mono-tui-design/references/rendering.md): Check `§R1` to `§R4` and `§R7` rendering rules (box
+   alignment, SGR reset discipline, component measurements, and color capability degradation).
+4. [patterns.md](../mono-tui-design/references/patterns.md): Compare against `Footer Command Bar`, `Focused Surface`,
+   `Master-Detail`, `Expand-to-Focus`, and `Search/Select Set` checklists.
 5. [AGENTS.md](../../../AGENTS.md): Verify repository-wide glyph hygiene, 120-column line limits, and test coverage.
 
 ## Step-by-step audit checklist
 
 1. **Glyph and badge hygiene**:
    * Confirm zero emojis or Unicode Private Use Area (PUA) characters appear when `m.nerdFonts` is `false` (`[P1]`).
-   * Confirm `renderCapsule` uses rectangular brackets or spaces by default and only emits `U+E0B6` and `U+E0B4` when
+   * Confirm `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill` (`internal/tui/theme.go`) use rectangular
+     badges by default and only call `renderCapsule` (`internal/tui/render.go`) with `U+E0B6` and `U+E0B4` when
      `m.nerdFonts` is `true`.
 2. **Container framing and focus clarity**:
    * Confirm panes render through `renderBoxWithTitle` with `lipgloss.RoundedBorder()`, left-aligned top-border titles,
-     and active focus distinguished via `BorderFgActive` and `TitleActive` (`[OVERRIDE] §6.1`, `§6.3`, and `§6.6`).
+     and active focus distinguished via `BorderFgActive` and bold `TitleActive` versus `BorderFgInactive` and
+     normal-weight `TitleInactive` (`[OVERRIDE] §6.1`, `§6.3`, and `§6.6`, plus `§5.5` and `§9.6`).
    * Confirm no drop shadows (`░`) or modal scrims are rendered on the `Expand-to-Focus` `README Viewer` pane (`[WAIVE]
      §6.4` and `§6.5`).
 3. **Theme and color token discipline**:
@@ -37,20 +39,22 @@ Monospace Design TUI (`mono-tui v0.2.5`) specification and `doom-cli`'s project 
      all 10 built-in palettes in `internal/tui/builtin_themes.go` (`[OVERRIDE] §R3.2`, including `classic` ANSI-16 and
      `monochrome`).
 4. **Width math, truncation, and resize safety**:
-   * Confirm `calculateLayout` (`internal/tui/layout.go`) clamps widths and heights to non-negative values down to tiny
-     terminal dimensions (`width < 45` or `height < 12`, `[P2]` and `§R6`).
-   * Confirm `truncateANSI` measures visible cell width and appends `…` (`U+2026`, `[OVERRIDE] §R1.7`) plus `\x1b[0m`
-     when truncating.
+   * Confirm `computeLayout` (`internal/tui/layout.go`) and `renderPreviewLines` (`internal/tui/render.go`) preserve
+     `IWAD:` and `Files:` visibility at `80×24` (`§1.5`) and clamp widths and heights to non-negative values down to
+     tiny terminal dimensions (`width < 45` or `height < 12`, `[P2]` and `§1.6`).
+   * Confirm `padOrTruncateName` and `truncateANSI` measure visible cell width via `lipgloss.Width` and append `…`
+     (`U+2026`, `[OVERRIDE] §R1.7`) plus `\x1b[0m` when truncating.
 5. **Keyboard bindings and footer parity**:
    * Confirm every active keybinding in `Update()` (`internal/tui/launcher.go`) for both launcher mode and
-     `README Viewer` mode is accurately reflected in `renderFooter` (`internal/tui/render.go`, `[OVERRIDE] §2.2` and
-     `§2.5`).
+     `README Viewer` mode is accurately reflected in `renderFooter` and `renderReadmeFooter` (`internal/tui/render.go`,
+     `[OVERRIDE] §2.2`, `§1.4`, `§2.3`, and `§R4.11`).
 6. **UI thread performance**:
-   * Confirm `View()` and `renderDetailsContent()` use `m.dirIndex` (`*preset.DirIndex`) and `m.readmeCache` with zero
-     uncached filesystem directory scans (`[P3]`).
+   * Confirm `View()` and `renderPreviewLines` (`internal/tui/render.go`) use `m.dirIndex` (`*preset.DirIndex`) and
+     `m.readmeCache` with zero uncached filesystem directory scans (`[P3]`).
 7. **Override freshness**:
-   * Run `go test -v ./internal/preset -run TestMonospaceTUIOverridesNotStale` to verify every `- **Original**:` quote
-     in `.agents/rules/monospace-tui.md` still matches `standard.md` or `rendering.md` verbatim.
+   * Run `go test -v ./internal/preset -run TestMonospaceTUIOverridesNotStale` to verify every `### [OVERRIDE]` and
+     `### [WAIVE]` section in `.agents/rules/monospace-tui.md` includes a verbatim `- **Original**:` quote from
+     `standard.md`, `rendering.md`, or `patterns.md`.
 
 ## Audit report format
 

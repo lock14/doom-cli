@@ -220,7 +220,7 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 
 ![Interactive preset browser](assets/tui-presets.png)
 
-- **Fuzzy search**: Type characters to filter presets immediately by name, engine, or category, use `↑` or `Ctrl+P` and `↓` or `Ctrl+N` to move the selection cursor, and press `Enter` to launch the selected preset.
+- **Fuzzy search**: Type characters to filter presets immediately by name, engine, or category, use `Home` and `End` to move the filter text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the selection cursor, page through the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to launch the selected preset.
 - **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, and release metadata.
 - **File readiness indicators**: Displays `[✓ Found]` when required files resolve on disk, `[✗ Missing]` when required files are absent, and `[Optional]` when optional files are absent.
 - **In-app README viewer**: Press `Tab` or `Ctrl+R` on any preset to read its bundled idgames `.txt` documentation in a scrollable viewport with automatic CP437 box-drawing decoding.
@@ -231,8 +231,11 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 | Key | Action |
 | :--- | :--- |
 | Character keys | Filter presets immediately by name, engine, or category |
-| `↑` or `Ctrl+P` | Move selection up |
-| `↓` or `Ctrl+N` | Move selection down |
+| `Home` or `End` | Move text cursor to start or end of filter input |
+| `↑`, `Ctrl+P`, or `Ctrl+K` | Move selection up |
+| `↓`, `Ctrl+N`, or `Ctrl+J` | Move selection down |
+| `PgUp` or `Ctrl+U` | Move selection up one page or half page |
+| `PgDn` or `Ctrl+D` | Move selection down one page or half page |
 | `Enter` | Launch selected preset |
 | `Tab` or `Ctrl+R` | Open bundled README in document viewer |
 | `Esc` or `Ctrl+C` | Quit launcher |
@@ -241,7 +244,7 @@ The interactive launcher (`doom play` or `doom`) provides a responsive, split-pa
 
 ![Built-in README viewer](assets/tui-readme.png)
 
-When viewing a preset's documentation via `Tab` or `Ctrl+R`, scroll line-by-line with `↑` or `k` and `↓` or `j`, page through with `PgUp`, `b`, `u`, `Ctrl+U`, `PgDn`, `f`, `d`, `Space`, or `Ctrl+D`, press `Enter` to launch the selected preset, or press `Tab`, `Ctrl+R`, `Esc`, or `q` to return to the preset list:
+When viewing a preset's documentation via `Tab` or `Ctrl+R`, scroll line-by-line with `↑` or `k` and `↓` or `j`, page through with `PgUp`, `b`, `u`, `Ctrl+U`, `PgDn`, `f`, `d`, `Space`, or `Ctrl+D`, jump to the top or bottom with `g`, `Home`, `G`, or `End`, press `Enter` to launch the selected preset, or press `Tab`, `Ctrl+R`, `Esc`, `q`, or `Q` to return to the preset list:
 
 | Key | Action |
 | :--- | :--- |
@@ -249,8 +252,10 @@ When viewing a preset's documentation via `Tab` or `Ctrl+R`, scroll line-by-line
 | `↓` or `j` | Scroll down one line |
 | `PgUp`, `b`, `u`, or `Ctrl+U` | Scroll up one page or half page |
 | `PgDn`, `f`, `d`, `Space`, or `Ctrl+D` | Scroll down one page or half page |
+| `g` or `Home` | Jump to top of document |
+| `G` or `End` | Jump to bottom of document |
 | `Enter` | Launch selected preset |
-| `Tab`, `Ctrl+R`, `Esc`, or `q` | Close document viewer and return to preset list |
+| `Tab`, `Ctrl+R`, `Esc`, `q`, or `Q` | Close document viewer and return to preset list |
 | `Ctrl+C` | Quit launcher |
 
 ## Themes and visual customization

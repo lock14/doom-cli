@@ -29,6 +29,10 @@ func engineDisplayLabel(catalog *preset.Catalog, engineKey string) string {
 
 // RunNumberedMenu provides a standard interactive menu without full-screen TUI.
 func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*preset.Preset, error) {
+	if catalog == nil {
+		catalog = &preset.Catalog{}
+	}
+
 	fmt.Fprintln(out, "======================================================")
 	fmt.Fprintln(out, "               DOOM PRESET LAUNCHER                   ")
 	fmt.Fprintln(out, "======================================================")
@@ -41,15 +45,16 @@ func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*pre
 	fmt.Fprintf(out, "Enter preset number to launch (or 'q' to quit): ")
 
 	scanner := bufio.NewScanner(in)
-	if scanner.Scan() {
-		text := strings.TrimSpace(scanner.Text())
-		if strings.EqualFold(text, "q") || text == "" {
-			return nil, nil
-		}
-		idx, err := strconv.Atoi(text)
-		if err == nil && idx >= 1 && idx <= len(catalog.Presets) {
-			return &catalog.Presets[idx-1], nil
-		}
+	if !scanner.Scan() {
+		return nil, scanner.Err()
+	}
+	text := strings.TrimSpace(scanner.Text())
+	if strings.EqualFold(text, "q") || text == "" {
+		return nil, nil
+	}
+	idx, err := strconv.Atoi(text)
+	if err == nil && idx >= 1 && idx <= len(catalog.Presets) {
+		return &catalog.Presets[idx-1], nil
 	}
 
 	return nil, fmt.Errorf("invalid menu selection")
