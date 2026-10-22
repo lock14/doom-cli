@@ -47,6 +47,6 @@ func BenchmarkResolveFile(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = ResolveFile(tmpDir, "eviternityii.wad")
+		_, _ = NewDirIndex(tmpDir).ResolveFile("eviternityii.wad")
 	}
 }

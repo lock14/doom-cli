@@ -123,14 +123,10 @@ func newPresetsCmd() *cobra.Command {
 	)
 	presetsAddCmd.Flags().StringVar(&addCategory, "category", "Custom", "Category or collection name")
 	presetsAddCmd.Flags().StringVar(&addDesc, "description", "", "Short description of the mapset")
-	presetsAddCmd.Flags().StringVar(&addDesc, "desc", "", "Short description of the mapset")
-	_ = presetsAddCmd.Flags().MarkHidden("desc")
 	presetsAddCmd.Flags().StringVar(&addAuthor, "author", "", "Map author or team")
 	presetsAddCmd.Flags().StringVar(&addRelease, "release", "", "Release year or date")
 	presetsAddCmd.Flags().StringVar(&addArgs, "args", "", "Default extra launch arguments")
 	presetsAddCmd.Flags().StringVar(&addSourceURL, "source-url", "", "HTTPS download URL for the WAD archive")
-	presetsAddCmd.Flags().StringVar(&addSourceURL, "download-url", "", "HTTPS download URL for the WAD archive")
-	_ = presetsAddCmd.Flags().MarkHidden("download-url")
 	presetsAddCmd.Flags().StringVar(
 		&addSourceSHA256, "source-sha256", "", "Expected SHA-256 hex digest for --source-url",
 	)
@@ -312,7 +308,7 @@ func runPresetsList(cmd *cobra.Command, args []string) error {
 
 	fmt.Fprintln(out, "=== Available Doom Presets ===")
 	for i, p := range cat.Presets {
-		tag := formatEngineBadge(cat, p.Engine)
+		tag := fmt.Sprintf("[%-8s]", cat.EngineBadge(p.Engine))
 		statusFlag := ""
 		if p.IsCustom() {
 			statusFlag = " [Custom]"
@@ -357,9 +353,11 @@ func runPresetsShow(cmd *cobra.Command, args []string) error {
 	}
 
 	engStr := p.Engine
-	if cat.Engines != nil {
-		if engCfg, ok := cat.Engines[p.Engine]; ok && engCfg.Description != "" {
+	if engCfg, ok := cat.FindEngine(p.Engine); ok {
+		if engCfg.Description != "" {
 			engStr = engCfg.Description
+		} else {
+			engStr = engCfg.EffectiveDisplayName()
 		}
 	}
 	engineOverridden := ""
@@ -417,23 +415,4 @@ func runPresetsShow(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func formatEngineBadge(cat *preset.Catalog, engineID string) string {
-	if cat != nil {
-		return fmt.Sprintf("[%-8s]", cat.EngineBadge(engineID))
-	}
-	switch strings.ToLower(engineID) {
-	case "dsda-doom", "dsda":
-		return "[DSDA    ]"
-	case "uzdoom", "zdoom":
-		return "[UZDoom  ]"
-	default:
-		tag := strings.ToUpper(engineID)
-		runes := []rune(tag)
-		if len(runes) > 6 {
-			tag = string(runes[:6])
-		}
-		return fmt.Sprintf("[%-8s]", tag)
-	}
 }

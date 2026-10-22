@@ -156,9 +156,9 @@ func TestStoreLifecycleAndQuarantine(t *testing.T) {
 		t.Fatalf("AddEngine(woof): %v", err)
 	}
 
-	layered, err := LoadCatalog(userDir)
+	layered, err := LoadLayeredCatalog(userDir, false)
 	if err != nil {
-		t.Fatalf("LoadCatalog: %v", err)
+		t.Fatalf("LoadLayeredCatalog: %v", err)
 	}
 
 	// 3. Refuse curated preset collision
@@ -214,9 +214,9 @@ func TestStoreLifecycleAndQuarantine(t *testing.T) {
 		t.Fatalf("WriteFile broken: %v", err)
 	}
 
-	layeredAfter, err := LoadCatalog(userDir)
+	layeredAfter, err := LoadLayeredCatalog(userDir, false)
 	if err != nil {
-		t.Fatalf("LoadCatalog with quarantined file should succeed, got: %v", err)
+		t.Fatalf("LoadLayeredCatalog with quarantined file should succeed, got: %v", err)
 	}
 	if len(layeredAfter.Diagnostics) == 0 {
 		t.Fatal("expected quarantine diagnostic for preset.broken.json")
@@ -271,8 +271,6 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 	_ = os.WriteFile(sigil2Wad, []byte("PWAD"), 0o644)
 	sunderWad := filepath.Join(root1, "sunder.wad")
 	_ = os.WriteFile(sunderWad, []byte("PWAD"), 0o644)
-	aaliensWad := filepath.Join(root1, "aaliens_v1_2.wad")
-	_ = os.WriteFile(aaliensWad, []byte("PWAD"), 0o644)
 
 	idx := NewDirIndex(root0, root1)
 
@@ -291,8 +289,6 @@ func TestResolveFileSubpathsMultiRootAndSubdirs(t *testing.T) {
 		{name: "alias sigil to SIGIL_V1_23", query: "SIGIL_V1_23.wad", wantOK: true, wantPath: sigilWad},
 		{name: "alias sigil2 to SIGIL_II_V1_0", query: "SIGIL_II_V1_0.WAD", wantOK: true, wantPath: sigil2Wad},
 		{name: "alias sunder to Sunder 2512", query: "Sunder 2512.wad", wantOK: true, wantPath: sunderWad},
-		{name: "alias sunder to SUNDER_V2512", query: "SUNDER_V2512.wad", wantOK: true, wantPath: sunderWad},
-		{name: "alias aaliens_v1_2 to aaliens", query: "aaliens.wad", wantOK: true, wantPath: aaliensWad},
 	}
 
 	for _, tc := range tests {

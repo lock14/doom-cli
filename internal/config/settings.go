@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"sort"
 
 	"github.com/lock14/doom-cli/internal/fsutil"
 )
@@ -20,10 +19,6 @@ type AppConfig struct {
 	BinDir        string   `json:"bin_dir,omitempty"`
 	SoundFontsDir string   `json:"soundfonts_dir,omitempty"`
 
-	// LegacyEntityKeys lists any legacy v1 entity keys ("engines", "presets",
-	// "launch_options") encountered in config.json so callers can emit a warning.
-	LegacyEntityKeys []string `json:"-"`
-
 	extra map[string]json.RawMessage
 }
 
@@ -35,8 +30,6 @@ var knownConfigKeys = map[string]bool{
 	"bin_dir":        true,
 	"soundfonts_dir": true,
 }
-
-var legacyEntityKeyNames = []string{"engines", "presets", "launch_options"}
 
 // LoadConfig reads the user configuration file if present, returning defaults if not found.
 // Unknown top-level JSON keys are preserved in memory so SaveConfig does not strip them.
@@ -69,11 +62,6 @@ func LoadConfig(paths *Paths) (*AppConfig, error) {
 				cfg.extra = make(map[string]json.RawMessage)
 			}
 			cfg.extra[k] = v
-		}
-	}
-	for _, k := range legacyEntityKeyNames {
-		if _, exists := cfg.extra[k]; exists {
-			cfg.LegacyEntityKeys = append(cfg.LegacyEntityKeys, k)
 		}
 	}
 
@@ -125,17 +113,4 @@ func SaveConfig(paths *Paths, cfg *AppConfig) error {
 
 	_, err := fsutil.WriteFileAtomic(paths.ConfigFile, buf.Bytes(), 0o644)
 	return err
-}
-
-// ExtraKeys returns the sorted list of unknown top-level keys preserved in AppConfig.
-func (c *AppConfig) ExtraKeys() []string {
-	if c == nil || len(c.extra) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(c.extra))
-	for k := range c.extra {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -53,13 +54,13 @@ func TestExtractEngineArgs(t *testing.T) {
 		{
 			name:       "play with --theme flag space separated",
 			subcommand: "play",
-			rawArgs:    []string{"doom", "play", "--theme", "cyberpunk", "-skill", "4"},
+			rawArgs:    []string{"doom", "play", "--theme", "plasma", "-skill", "4"},
 			expected:   []string{"-skill", "4"},
 		},
 		{
 			name:       "play with --theme= flag syntax",
 			subcommand: "play",
-			rawArgs:    []string{"doom", "play", "--theme=matrix", "-fast"},
+			rawArgs:    []string{"doom", "play", "--theme=toxic", "-fast"},
 			expected:   []string{"-fast"},
 		},
 		{
@@ -258,9 +259,19 @@ func TestRunConfigCommands(t *testing.T) {
 	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 	paths := getPaths()
 
-	// 1. Show with empty config
+	// 1. Show with empty config and verify default theme via config get
 	if err := runConfigShow(nil, nil); err != nil {
 		t.Fatalf("runConfigShow() error = %v", err)
+	}
+	var getOut bytes.Buffer
+	cfgCmd := newConfigCmd()
+	cfgCmd.SetOut(&getOut)
+	cfgCmd.SetArgs([]string{"get", "theme"})
+	if err := cfgCmd.Execute(); err != nil {
+		t.Fatalf("config get theme error = %v", err)
+	}
+	if strings.TrimSpace(getOut.String()) != "classic" {
+		t.Errorf("config get theme with empty config = %q, want %q", strings.TrimSpace(getOut.String()), "classic")
 	}
 
 	// 2. Set nerd-fonts on
@@ -388,7 +399,6 @@ func TestCanonicalConfigKey(t *testing.T) {
 		{name: "theme with spaces", input: "  THEME  ", expected: "theme", wantErr: false},
 		{name: "nerd-fonts standard", input: "nerd-fonts", expected: "nerd-fonts", wantErr: false},
 		{name: "nerd_fonts underscore", input: "nerd_fonts", expected: "nerd-fonts", wantErr: false},
-		{name: "nerdfonts squashed", input: "nerdfonts", expected: "nerd-fonts", wantErr: false},
 		{name: "wads-dir dash", input: "wads-dir", expected: "wads-dir", wantErr: false},
 		{name: "wads_dir underscore", input: "wads_dir", expected: "wads-dir", wantErr: false},
 		{name: "wads-dirs dash", input: "wads-dirs", expected: "wads-dirs", wantErr: false},
@@ -396,8 +406,7 @@ func TestCanonicalConfigKey(t *testing.T) {
 		{name: "bin-dir dash", input: "bin-dir", expected: "bin-dir", wantErr: false},
 		{name: "bin_dir underscore", input: "bin_dir", expected: "bin-dir", wantErr: false},
 		{name: "soundfonts-dir dash", input: "soundfonts-dir", expected: "soundfonts-dir", wantErr: false},
-		{name: "sf-dir short", input: "sf-dir", expected: "soundfonts-dir", wantErr: false},
-		{name: "sf_dir short underscore", input: "sf_dir", expected: "soundfonts-dir", wantErr: false},
+		{name: "soundfonts_dir underscore", input: "soundfonts_dir", expected: "soundfonts-dir", wantErr: false},
 		{name: "unknown key", input: "unknown", expected: "", wantErr: true},
 	}
 
@@ -449,8 +458,8 @@ func TestEnginesCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
-	t.Setenv("BIN_DIR", tempDir)
-	t.Setenv("WADS_DIR", tempDir)
+	t.Setenv("DOOM_BIN_DIR", tempDir)
+	t.Setenv("DOOM_WADS_DIR", tempDir)
 	t.Setenv("PATH", tempDir)
 
 	enginesCmd := newEnginesCmd()
@@ -461,9 +470,11 @@ func TestEnginesCommands(t *testing.T) {
 		t.Fatalf("engines list failed: %v", err)
 	}
 
-	// 2. engines add (also tests --bin / --args-style / --desc flag normalization)
+	// 2. engines add
 	enginesCmd = newEnginesCmd()
-	enginesCmd.SetArgs([]string{"add", "woof", "--bin", "woof", "--args-style", "boom", "--desc", "Woof MBF21"})
+	enginesCmd.SetArgs([]string{
+		"add", "woof", "--binary", "woof", "--style", "boom", "--description", "Woof MBF21",
+	})
 	if err := enginesCmd.Execute(); err != nil {
 		t.Fatalf("engines add failed: %v", err)
 	}
@@ -501,8 +512,8 @@ func TestPresetsCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
-	t.Setenv("BIN_DIR", tempDir)
-	t.Setenv("WADS_DIR", tempDir)
+	t.Setenv("DOOM_BIN_DIR", tempDir)
+	t.Setenv("DOOM_WADS_DIR", tempDir)
 
 	// 1. presets list
 	presetsCmd := newPresetsCmd()
@@ -518,11 +529,19 @@ func TestPresetsCommands(t *testing.T) {
 		t.Fatalf("presets show Alien Vendetta failed: %v", err)
 	}
 
-	// 3. presets add custom
+	// 3. presets add custom with a custom engine that has DisplayName but no Description
+	enginesCmd := newEnginesCmd()
+	enginesCmd.SetArgs([]string{
+		"add", "woof", "--binary", "woof", "--style", "boom", "--display-name", "Woof!",
+	})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines add woof failed: %v", err)
+	}
+
 	presetsCmd = newPresetsCmd()
 	presetsCmd.SetArgs([]string{
 		"add", "CustomMap",
-		"--engine", "uzdoom",
+		"--engine", "woof",
 		"--iwad", "DOOM2.WAD",
 		"--files", "custom.wad",
 		"--description", "My Custom Map",
@@ -532,10 +551,15 @@ func TestPresetsCommands(t *testing.T) {
 	}
 
 	// 4. presets show custom
+	var showOut bytes.Buffer
 	presetsCmd = newPresetsCmd()
+	presetsCmd.SetOut(&showOut)
 	presetsCmd.SetArgs([]string{"show", "CustomMap"})
 	if err := presetsCmd.Execute(); err != nil {
 		t.Fatalf("presets show CustomMap failed: %v", err)
+	}
+	if !strings.Contains(showOut.String(), "Engine:        Woof!") {
+		t.Errorf("expected presets show CustomMap to display 'Engine:        Woof!', got:\n%s", showOut.String())
 	}
 
 	// 5. presets config across multiple calls preserves prior fields
@@ -614,7 +638,6 @@ func TestWadsCommands(t *testing.T) {
 	tests := []struct {
 		name        string
 		commandName string
-		wantAliases []string
 	}{
 		{
 			name:        "fetch subcommand exists",
@@ -625,9 +648,8 @@ func TestWadsCommands(t *testing.T) {
 			commandName: "list",
 		},
 		{
-			name:        "extract-steam subcommand has extract alias",
-			commandName: "extract-steam",
-			wantAliases: []string{"extract"},
+			name:        "extract subcommand exists",
+			commandName: "extract",
 		},
 	}
 
@@ -637,12 +659,6 @@ func TestWadsCommands(t *testing.T) {
 			for _, cmd := range subCommands {
 				if cmd.Name() == tt.commandName {
 					found = true
-					if len(tt.wantAliases) > 0 {
-						if !reflect.DeepEqual(cmd.Aliases, tt.wantAliases) {
-							t.Errorf("cmd %q aliases = %v, want %v",
-								cmd.Name(), cmd.Aliases, tt.wantAliases)
-						}
-					}
 					break
 				}
 			}

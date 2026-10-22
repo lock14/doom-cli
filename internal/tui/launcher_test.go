@@ -49,7 +49,7 @@ func mockCatalog() *preset.Catalog {
 
 func TestModel_Filtering(t *testing.T) {
 	cat := mockCatalog()
-	m := initialModel(cat, "", DefaultTheme, false)
+	m := initialModel(cat, nil, ClassicTheme, false)
 
 	if len(m.filtered) != 3 {
 		t.Fatalf("expected 3 initial presets, got %d", len(m.filtered))
@@ -68,7 +68,7 @@ func TestModel_Filtering(t *testing.T) {
 
 func TestModel_Navigation(t *testing.T) {
 	cat := mockCatalog()
-	m := initialModel(cat, "", DefaultTheme, false)
+	m := initialModel(cat, nil, ClassicTheme, false)
 
 	// Down key
 	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -179,7 +179,7 @@ func TestModel_View_Layouts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := initialModel(cat, "", DefaultTheme, false)
+			m := initialModel(cat, nil, ClassicTheme, false)
 			newM, _ := m.Update(tea.WindowSizeMsg{Width: tt.width, Height: tt.height})
 			m = newM.(model)
 
@@ -248,7 +248,7 @@ func TestModel_View_Layouts(t *testing.T) {
 
 func TestModel_View_QuittingAndSelected(t *testing.T) {
 	cat := mockCatalog()
-	m := initialModel(cat, "", DefaultTheme, false)
+	m := initialModel(cat, nil, ClassicTheme, false)
 
 	m.quitting = true
 	if view := m.View(); !strings.Contains(view, "Cancelled.") {
@@ -278,7 +278,7 @@ func TestModel_ReadmeViewer(t *testing.T) {
 	}
 
 	cat := mockCatalog()
-	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	m := initialModel(cat, []string{tmpDir}, ClassicTheme, false)
 
 	// In initial view, readme tag and Author/Released should appear in preview
 	viewInitial := m.View()
@@ -408,7 +408,7 @@ func TestComputeLayout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := initialModel(cat, "", DefaultTheme, false)
+			m := initialModel(cat, nil, ClassicTheme, false)
 			m.width = tt.width
 			m.height = tt.height
 
@@ -533,7 +533,7 @@ func TestInitialModel_WithInitialPreset(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := initialModel(cat, "", DefaultTheme, false, tt.initialPreset...)
+			m := initialModel(cat, nil, ClassicTheme, false, tt.initialPreset...)
 			if m.cursor != tt.expectedIdx {
 				t.Errorf("initialModel(cat, \"\", %v) cursor = %d, expected %d",
 					tt.initialPreset, m.cursor, tt.expectedIdx)
@@ -544,7 +544,7 @@ func TestInitialModel_WithInitialPreset(t *testing.T) {
 
 func TestModel_WithCustomTheme(t *testing.T) {
 	cat := mockCatalog()
-	m := initialModel(cat, "", PlasmaTheme, false)
+	m := initialModel(cat, nil, PlasmaTheme, false)
 
 	if m.theme.Name != "plasma" {
 		t.Fatalf("expected theme 'plasma', got %q", m.theme.Name)
@@ -557,7 +557,7 @@ func TestModel_WithCustomTheme(t *testing.T) {
 }
 
 func TestFormatEngineTag(t *testing.T) {
-	styles := CompileStyles(DefaultTheme)
+	styles := CompileStyles(ClassicTheme)
 	tests := []struct {
 		engine   string
 		contains string
@@ -601,7 +601,7 @@ func TestModel_CustomPresetAndEngine(t *testing.T) {
 		},
 	}
 
-	m := initialModel(cat, "", DefaultTheme, false)
+	m := initialModel(cat, nil, ClassicTheme, false)
 	view := m.View()
 
 	if !strings.Contains(view, "[WOOF") {
@@ -689,7 +689,7 @@ func TestModel_PagingAndControlNavigation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCuratedCatalog: %v", err)
 	}
-	m := initialModel(cat, "", DefaultTheme, false)
+	m := initialModel(cat, nil, ClassicTheme, false)
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = newM.(model)
 
@@ -774,7 +774,7 @@ func TestModel_ReadmeViewer_TopBottomAndShiftQ(t *testing.T) {
 	}
 
 	cat := mockCatalog()
-	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	m := initialModel(cat, []string{tmpDir}, ClassicTheme, false)
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
 	m = newM.(model)
 
@@ -843,7 +843,7 @@ func TestModel_80x24_AllCuratedPresetsShowIWADAndFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	m := initialModel(cat, []string{tmpDir}, ClassicTheme, false)
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = newM.(model)
 
@@ -877,7 +877,7 @@ func TestModel_ReadmeCache_NoDiskReadOnRender(t *testing.T) {
 	}
 
 	cat := mockCatalog()
-	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	m := initialModel(cat, []string{tmpDir}, ClassicTheme, false)
 
 	// Remove the file from disk after initialModel has populated readmeCache
 	if err := os.Remove(txtPath); err != nil {
@@ -908,7 +908,7 @@ func TestRunNumberedMenu_EOFAndNilCatalog(t *testing.T) {
 	}
 
 	// initialModel with nil catalog does not panic on View or updateFiltered
-	m := initialModel(nil, "", DefaultTheme, false)
+	m := initialModel(nil, nil, ClassicTheme, false)
 	m.updateFiltered("doom")
 	view := m.View()
 	if !strings.Contains(view, "0 / 0 presets") {
@@ -1013,7 +1013,7 @@ func TestModel_80x24_CustomPresetLongFilenamesAndManyFiles(t *testing.T) {
 		},
 	}
 
-	m := initialModel(cat, tmpDir, DefaultTheme, false)
+	m := initialModel(cat, []string{tmpDir}, ClassicTheme, false)
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = newM.(model)
 

@@ -31,8 +31,8 @@
             `~/Library/Application Support/dsda-doom/` on macOS, and
             `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` on Windows.
         *   **Binaries**: `~/.local/bin/` on Linux and macOS, and `%USERPROFILE%\Games\Doom\bin\` on Windows.
-        *   **WADs directory**: `~/.local/share/games/uzdoom/` on Linux,
-            `~/Library/Application Support/games/uzdoom/` on macOS, and `%USERPROFILE%\Games\Doom\wads\` on Windows.
+        *   **WADs directory**: `~/.local/share/games/doom/` on Linux,
+            `~/Library/Application Support/games/doom/` on macOS, and `%USERPROFILE%\Games\Doom\wads\` on Windows.
         *   **SoundFonts**: `~/.local/share/soundfonts/` on Linux,
             `~/Library/Application Support/soundfonts/` on macOS, and `%USERPROFILE%\Games\Doom\soundfonts\` on Windows.
         *   **CLI configuration, themes, and user catalog**: `~/.config/doom-cli/` on Linux,
@@ -73,11 +73,10 @@
         `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
         Steam and GOG extraction ensures maps and patches resolve without redundant case or punctuation entries. When
         upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `sigil.wad` for
-        `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`, `sunder.wad` or
-        `SUNDER_V2512.wad` for `Sunder 2512.wad`, and `aaliens_v1_2.wad` for `aaliens.wad`), declare
-        `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`. Both `preset.KnownAliases` and
-        `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog rather than maintaining
-        separate hardcoded filename tables.
+        `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`, and `sunder.wad` for
+        `Sunder 2512.wad`), declare `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`. Both
+        `preset.DirIndex` and `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog
+        rather than maintaining separate hardcoded filename tables.
     *   **Embedded DeHackEd extraction**: When a preset declares both a `.wad` and `.deh` file and its direct `.wad`
         download source embeds a `DEHACKED` lump (such as `DoomZero.wad`), `wad.Downloader` extracts the embedded
         `DEHACKED` lump atomically into the expected `.deh` file.
@@ -112,7 +111,7 @@ Linux, macOS, and Windows:
     *   `play.go`: `doom play` interactive launcher command.
     *   `launch.go`: `doom launch` direct preset execution command.
     *   `setup.go`: `doom setup` automated turnkey workflow command.
-    *   `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract-steam` with `extract` alias).
+    *   `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract`).
     *   `engines.go`: `doom engines` subcommands (`list`, `add`, `remove`, `install`).
     *   `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build`, `lint`).
     *   `soundfont.go`: `doom soundfont install` subcommand.
@@ -134,7 +133,7 @@ Linux, macOS, and Windows:
         `ResetPresetOverride`, `RemovePreset`).
     *   `lint.go`: Catalog schema, reference, digest, personal-path, and `README.md` parity linter (`LintCatalog`).
     *   `resolve.go`: Multi-root cached `DirIndex`, case-insensitive and whitespace-tolerant file resolution, safe
-        relative sub-paths, 1-level child directory scan, and `KnownAliases` matching.
+        relative sub-paths, 1-level child directory scan, and catalog alias matching.
     *   `decode.go`: Document decoding with DOS Code Page 437 (CP437) box-drawing detection.
     *   `compiler.go`: `README.md` preset table generator and synchronizer (`doom presets build`).
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and game file extraction.
@@ -264,10 +263,9 @@ Linux, macOS, and Windows:
 *   **Persistent asset directory hierarchy**: Users can override and persist all asset and execution directories
     (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json`. The
     resolution hierarchy strictly respects CLI flags (`--wads-dir`, `--bin-dir`, `--soundfonts-dir`), which take
-    precedence over environment variables (`DOOM_WADS_DIR` or `WADS_DIR`, `DOOM_WADS_DIRS` or `WADS_DIRS`,
-    `DOOM_BIN_DIR` or `BIN_DIR`, `DOOM_SF_DIR` or `SF_DIR`), which take precedence over user configuration
-    (`config.json`), which takes precedence over platform defaults. Engine launch synthesis and configuration
-    deployment always adhere to this resolved hierarchy.
+    precedence over environment variables (`DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`, `DOOM_SF_DIR`), which
+    take precedence over user configuration (`config.json`), which takes precedence over platform defaults. Engine
+    launch synthesis and configuration deployment always adhere to this resolved hierarchy.
 *   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.
@@ -279,7 +277,7 @@ Linux, macOS, and Windows:
     `internal/preset/resolve.go` and `internal/steam/discover.go`, and never add aliases that only differ by case,
     spaces, dashes, or underscores (which `preset.NormalizeFilename` matches automatically and `LintCatalog` rejects).
     Declare true alternate filename stems once in `files[].aliases` inside `catalog/preset.<id>.json`;
-    `preset.KnownAliases` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog.
+    `preset.DirIndex` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog.
 
 # Pre-completion verification checklist
 

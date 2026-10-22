@@ -53,14 +53,14 @@ func newSetupCmd() *cobra.Command {
 
 			// 4. Steam IWADs
 			fmt.Fprintln(out, ">>> Step 4/5: Auto-discovering official Steam and GOG game files...")
-			if _, err := steam.DiscoverAndExtractForCatalog(cat, nil, paths.WadsDir, flagForce, out); err != nil {
+			if _, err := steam.DiscoverAndExtract(cat, nil, paths.WadsDir, flagForce, out); err != nil {
 				fmt.Fprintf(out, "Warning: steam discoverer encountered: %v\n", err)
 			}
 			fmt.Fprintln(out)
 
 			// 5. Community megawads
 			fmt.Fprintln(out, ">>> Step 5/5: Downloading community megawads...")
-			dl := wad.NewDownloaderWithRoots(paths.WadRoots(), flagForce, out)
+			dl := wad.NewDownloader(paths.WadRoots(), flagForce, out)
 			if err := dl.DownloadAll(cat); err != nil {
 				fmt.Fprintf(out, "Warning: some megawads failed to download: %v\n", err)
 			}

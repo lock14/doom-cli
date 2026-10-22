@@ -93,7 +93,7 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 ### [OVERRIDE] §4.4 and §R4.2 frameless filter prompt without underscore fill
 
 *   **Original**: - Empty entry fields MUST display fill characters (underscores `_` or dots `·`) to indicate their width.
-*   **Project rule**: `renderHeader` in `internal/tui/render.go` and `initialModelWithRoots` in
+*   **Project rule**: `renderHeader` in `internal/tui/render.go` and `initialModel` in
     `internal/tui/launcher.go` render the search bar as a frameless `  Filter: ` prompt followed by `m.input`
     (`Type to search presets...` placeholder) without `[...]` brackets or `_` and `·` fill characters.
 *   **Reason**: Matches the header bar conventions of modern terminal fuzzy finders (`§11.5`) and avoids visual noise in

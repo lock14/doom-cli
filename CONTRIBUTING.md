@@ -38,7 +38,7 @@ All contributions must respect the core repository invariants:
     *   **Filename normalization and declarative aliases**: Maintain case-insensitive and dash-, underscore-, and
         space-tolerant file resolution (`preset.NormalizeFilename`) across WAD roots, archive extraction, and Steam and
         GOG discovery. When an upstream archive or rerelease uses a distinct filename stem, declare `"aliases"` on the
-        `FileSpec` in `catalog/preset.<id>.json` so both `preset.KnownAliases` and `steam.DefaultTargetPatterns()`
+        `FileSpec` in `catalog/preset.<id>.json` so both `preset.DirIndex` and `steam.DefaultTargetPatterns()`
         derive from a single source of truth.
     *   **Two-layer catalog**: Curated defaults in `catalog/*.json` are immutable; user engines, presets, and overrides
         layer cleanly as individual drop-in files in `<ConfigDir>/catalog.d/*.json`, while `<ConfigDir>/config.json`
@@ -101,7 +101,7 @@ doom-cli/
 │   ├── play.go             # 'doom play' interactive launcher with Bubble Tea
 │   ├── launch.go           # 'doom launch' direct preset execution command
 │   ├── setup.go            # 'doom setup' turnkey installation workflow
-│   ├── wads.go             # 'doom wads' subcommands (list, fetch, extract-steam)
+│   ├── wads.go             # 'doom wads' subcommands (list, fetch, extract)
 │   ├── engines.go          # 'doom engines' subcommands (list, add, remove, install)
 │   ├── presets.go          # 'doom presets' subcommands (list, show, add, config, remove, build, lint)
 │   ├── soundfont.go        # 'doom soundfont install' subcommand

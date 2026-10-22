@@ -38,19 +38,13 @@ func DetectDisplay() (string, int) {
 
 // DetectResolution attempts to discover the primary monitor's resolution (such as "1920x1080").
 func DetectResolution() string {
-	res := detectResolutionOS(runtime.GOOS)
-	if !reResFormat.MatchString(res) {
-		return "1920x1080"
-	}
+	res, _ := DetectDisplay()
 	return res
 }
 
 // DetectRefreshRate attempts to discover the primary monitor's refresh rate in Hz (such as 60, 144, or 240).
 func DetectRefreshRate() int {
-	rate := detectRefreshRateOS(runtime.GOOS)
-	if rate <= 0 {
-		return 60
-	}
+	_, rate := DetectDisplay()
 	return rate
 }
 
@@ -116,7 +110,26 @@ func detectDisplayOS(goos string) (string, int) {
 		return "1920x1080", 60
 
 	case "windows":
-		return detectResolutionOS(goos), detectRefreshRateOS(goos)
+		res := "1920x1080"
+		resScript := "Add-Type -AssemblyName System.Windows.Forms; " +
+			"[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width.ToString() + 'x' + " +
+			"[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height.ToString()"
+		if out, err := exec.Command("powershell", "-NoProfile", "-Command", resScript).Output(); err == nil {
+			str := strings.TrimSpace(string(out))
+			if reResFormat.MatchString(str) {
+				res = str
+			}
+		}
+		rate := 60
+		rateScript := "Get-CimInstance Win32_VideoController | " +
+			"Select-Object -ExpandProperty CurrentRefreshRate -ErrorAction SilentlyContinue"
+		if out, err := exec.Command("powershell", "-NoProfile", "-Command", rateScript).Output(); err == nil {
+			str := strings.TrimSpace(string(out))
+			if val, err := strconv.Atoi(str); err == nil && val > 0 {
+				rate = val
+			}
+		}
+		return res, rate
 
 	default: // linux and unix
 		var res string
@@ -143,86 +156,6 @@ func detectDisplayOS(goos string) (string, int) {
 		}
 		return res, rate
 	}
-}
-
-func detectResolutionOS(goos string) string {
-	switch goos {
-	case "darwin":
-		if out, err := exec.Command("system_profiler", "SPDisplaysDataType").Output(); err == nil {
-			if res, _ := parseDarwinDisplay(string(out)); res != "" {
-				return res
-			}
-		}
-
-	case "windows":
-		// Windows PowerShell query for primary monitor resolution
-		psScript := "Add-Type -AssemblyName System.Windows.Forms; " +
-			"[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width.ToString() + 'x' + " +
-			"[System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height.ToString()"
-		cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
-		if out, err := cmd.Output(); err == nil {
-			str := strings.TrimSpace(string(out))
-			if reResFormat.MatchString(str) {
-				return str
-			}
-		}
-
-	default: // linux and unix
-		if out, err := exec.Command("xrandr").Output(); err == nil {
-			if res, _ := parseXrandrDisplay(string(out)); res != "" {
-				return res
-			}
-		}
-		if out, err := exec.Command("wlr-randr").Output(); err == nil {
-			if res, _ := parseWlrDisplay(string(out)); res != "" {
-				return res
-			}
-		}
-		if res := detectDRMResolution(); res != "" {
-			return res
-		}
-	}
-
-	return "1920x1080"
-}
-
-func detectRefreshRateOS(goos string) int {
-	switch goos {
-	case "darwin":
-		if out, err := exec.Command("system_profiler", "SPDisplaysDataType").Output(); err == nil {
-			if _, rate := parseDarwinDisplay(string(out)); rate > 0 {
-				return rate
-			}
-		}
-
-	case "windows":
-		psScript := "Get-CimInstance Win32_VideoController | " +
-			"Select-Object -ExpandProperty CurrentRefreshRate -ErrorAction SilentlyContinue"
-		cmd := exec.Command("powershell", "-NoProfile", "-Command", psScript)
-		if out, err := cmd.Output(); err == nil {
-			str := strings.TrimSpace(string(out))
-			if val, err := strconv.Atoi(str); err == nil && val > 0 {
-				return val
-			}
-		}
-
-	default: // linux
-		if out, err := exec.Command("xrandr").Output(); err == nil {
-			if _, rate := parseXrandrDisplay(string(out)); rate > 0 {
-				return rate
-			}
-		}
-		if out, err := exec.Command("wlr-randr").Output(); err == nil {
-			if _, rate := parseWlrDisplay(string(out)); rate > 0 {
-				return rate
-			}
-		}
-		if rate := detectKscreenRate(); rate > 0 {
-			return rate
-		}
-	}
-
-	return 60
 }
 
 func detectDRMResolution() string {

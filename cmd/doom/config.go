@@ -80,7 +80,7 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 
 	theme := cfg.Theme
 	if theme == "" {
-		theme = "default"
+		theme = "classic"
 	}
 
 	nerdStatus := "disabled (universal rectangular badges)"
@@ -132,7 +132,11 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 
 	switch canonKey {
 	case "theme":
-		fmt.Fprintln(out, cfg.Theme)
+		theme := cfg.Theme
+		if theme == "" {
+			theme = "classic"
+		}
+		fmt.Fprintln(out, theme)
 	case "nerd-fonts":
 		fmt.Fprintln(out, cfg.NerdFonts)
 	case "wads-dir":
@@ -242,15 +246,15 @@ func canonicalConfigKey(rawKey string) (string, error) {
 	switch key {
 	case "theme":
 		return "theme", nil
-	case "nerd-fonts", "nerd_fonts", "nerdfonts":
+	case "nerd-fonts", "nerd_fonts":
 		return "nerd-fonts", nil
-	case "wads-dir", "wads_dir", "wadsdir":
+	case "wads-dir", "wads_dir":
 		return "wads-dir", nil
-	case "wads-dirs", "wads_dirs", "wadsdirs":
+	case "wads-dirs", "wads_dirs":
 		return "wads-dirs", nil
-	case "bin-dir", "bin_dir", "bindir":
+	case "bin-dir", "bin_dir":
 		return "bin-dir", nil
-	case "soundfonts-dir", "soundfonts_dir", "soundfont-dir", "soundfont_dir", "sf-dir", "sf_dir":
+	case "soundfonts-dir", "soundfonts_dir":
 		return "soundfonts-dir", nil
 	default:
 		return "", fmt.Errorf(

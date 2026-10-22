@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ClassicTheme (aliased as DefaultTheme) is the standard semantic ANSI-16 theme tailored for classic Doom.
+// ClassicTheme is the standard semantic ANSI-16 theme tailored for classic Doom.
 var ClassicTheme = Theme{
 	Name:           "classic",
 	Description:    "Classic Doom Semantic ANSI (Adaptive)",
@@ -34,9 +34,6 @@ var ClassicTheme = Theme{
 	StatusMissing:  lipgloss.Color("1"),
 	Muted:          lipgloss.Color("8"),
 }
-
-// DefaultTheme is retained as an alias to ClassicTheme for backward compatibility.
-var DefaultTheme = ClassicTheme
 
 // BloodTheme is a gothic Crimson and Bone aesthetic inspired by Nightdive.
 var BloodTheme = Theme{
@@ -150,7 +147,7 @@ var FrostTheme = Theme{
 	Muted:          lipgloss.Color("#7589A3"),
 }
 
-// PlasmaTheme (aliased as CyberpunkTheme) is an electric cyan and neon magenta theme inspired by Plasma Rifle coils.
+// PlasmaTheme is an electric cyan and neon magenta theme inspired by Plasma Rifle coils.
 var PlasmaTheme = Theme{
 	Name:           "plasma",
 	Description:    "Plasma Rifle Coils and Electric Neon",
@@ -177,9 +174,6 @@ var PlasmaTheme = Theme{
 	StatusMissing:  lipgloss.Color("#FF2A6D"),
 	Muted:          lipgloss.Color("#8882A3"),
 }
-
-// CyberpunkTheme is retained as an alias to PlasmaTheme.
-var CyberpunkTheme = PlasmaTheme
 
 // HereticTheme is a dark fantasy amethyst and emerald theme inspired by Raven Software titles.
 var HereticTheme = Theme{
@@ -237,9 +231,6 @@ var AmberTheme = Theme{
 	Muted:          lipgloss.Color("#A67300"),
 }
 
-// MatrixTheme is retained as an alias pointing to AmberTheme.
-var MatrixTheme = AmberTheme
-
 // SigilTheme is an occult velvet maroon and pentagram red theme inspired by Romero's Sigil episodes.
 var SigilTheme = Theme{
 	Name:           "sigil",
@@ -296,38 +287,21 @@ var MonochromeTheme = Theme{
 	Muted:          lipgloss.Color("8"),
 }
 
-// BuiltinThemes maps lowercase theme names and aliases to their built-in Theme definitions.
+// BuiltinThemes maps lowercase theme names to their built-in Theme definitions.
 var BuiltinThemes = map[string]Theme{
-	"default":    ClassicTheme,
 	"classic":    ClassicTheme,
-	"doom":       ClassicTheme,
 	"blood":      BloodTheme,
-	"crimson":    BloodTheme,
 	"toxic":      ToxicTheme,
-	"phobos":     ToxicTheme,
-	"nukage":     ToxicTheme,
 	"inferno":    InfernoTheme,
-	"magma":      InfernoTheme,
 	"frost":      FrostTheme,
-	"nord":       FrostTheme,
-	"cocytus":    FrostTheme,
 	"plasma":     PlasmaTheme,
-	"cyberpunk":  PlasmaTheme,
-	"neon":       PlasmaTheme,
 	"heretic":    HereticTheme,
-	"dracula":    HereticTheme,
-	"hexen":      HereticTheme,
 	"amber":      AmberTheme,
-	"crt":        AmberTheme,
-	"vt220":      AmberTheme,
-	"matrix":     AmberTheme,
 	"sigil":      SigilTheme,
-	"romero":     SigilTheme,
 	"monochrome": MonochromeTheme,
-	"mono":       MonochromeTheme,
 }
 
-// GetBuiltinTheme retrieves a built-in theme by case-insensitive name or alias.
+// GetBuiltinTheme retrieves a built-in theme by case-insensitive name.
 func GetBuiltinTheme(name string) (Theme, bool) {
 	t, ok := BuiltinThemes[strings.ToLower(strings.TrimSpace(name))]
 	return t, ok

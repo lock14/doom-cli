@@ -33,7 +33,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom engines remove <name>`: Removes a custom engine from the user catalog.
 - `doom engines install [engine|all]`: Downloads portable engine binaries (`uzdoom`, `dsda-doom`, or custom recipes).
 - `doom soundfont install`: Downloads and installs curated Roland SC-55 SoundFont (`GeneralUser-GS.sf2`).
-- `doom wads extract`: Auto-discovers and imports official Steam and GOG commercial IWADs (`extract-steam` alias).
+- `doom wads extract`: Auto-discovers and imports official Steam and GOG commercial IWADs.
 - `doom wads fetch [preset|all]`: Downloads and extracts community megawads from idgames mirrors.
 - `doom wads list`: Inspects downloadable community megawads and expected files.
 - `doom presets list`: Lists all presets (built-in and custom) and engine assignments.
@@ -63,7 +63,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
   - `play.go`: `doom play` interactive Bubble Tea launcher.
   - `launch.go`: `doom launch` direct execution.
   - `setup.go`: `doom setup` automated turnkey workflow.
-  - `wads.go`: `doom wads` subcommands (`list`, `fetch`, and `extract-steam` with `extract` alias).
+  - `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract`).
   - `engines.go`: `doom engines` subcommands (`list`, `add`, `remove`, `install`).
   - `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build`, `lint`).
   - `soundfont.go`: `doom soundfont install`.
@@ -83,7 +83,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 ## Key design invariants
 
 - **Single source of truth**: Curated engines and presets are defined one-entity-per-file in `catalog/*.json`, with user entities and overrides layered from `<ConfigDir>/catalog.d/*.json`.
-- **Catalog-driven WAD aliases and Steam synthesis**: Alternate filename stems (`files[].aliases`) are declared once in `catalog/preset.<id>.json` and `<ConfigDir>/catalog.d/*.json`; `preset.KnownAliases`, `DirIndex`, and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog alongside normalized filename matching (`preset.NormalizeFilename`).
+- **Catalog-driven WAD aliases and Steam synthesis**: Alternate filename stems (`files[].aliases`) are declared once in `catalog/preset.<id>.json` and `<ConfigDir>/catalog.d/*.json`; `preset.DirIndex` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog alongside normalized filename matching (`preset.NormalizeFilename`).
 - **Portability**: Configuration templates use `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholders.
 - **Destructive safety**: Atomic writes and non-clobbering timestamped backups (`.bak.<timestamp>`) are created before modifying existing user files.
 - **Archive security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and SHA-256 verification.

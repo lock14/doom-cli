@@ -120,7 +120,7 @@ func TestDiscoverAndExtract(t *testing.T) {
 
 	destWads := filepath.Join(tmpDir, "target_wads")
 	var out bytes.Buffer
-	count, err := DiscoverAndExtract([]string{mockSteam}, destWads, false, &out)
+	count, err := DiscoverAndExtract(nil, []string{mockSteam}, destWads, false, &out)
 	if err != nil {
 		t.Fatalf("DiscoverAndExtract failed: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestDiscoverAndExtract(t *testing.T) {
 
 	// Run again without force: count should be 0
 	out.Reset()
-	count2, err := DiscoverAndExtract([]string{mockSteam}, destWads, false, &out)
+	count2, err := DiscoverAndExtract(nil, []string{mockSteam}, destWads, false, &out)
 	if err != nil {
 		t.Fatalf("second DiscoverAndExtract failed: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestDiscoverAndExtract(t *testing.T) {
 		t.Errorf("expected 0 files on second run without force, got %d", count2)
 	}
 
-	// Verify DiscoverAndExtractForCatalog extracts custom user-layer preset aliases
+	// Verify DiscoverAndExtract extracts custom user-layer preset aliases
 	_ = os.WriteFile(filepath.Join(doomDir, "custom_addon.wad"), []byte("custom-data"), 0644)
 	customCat := &preset.Catalog{
 		Presets: []preset.Preset{
@@ -173,9 +173,9 @@ func TestDiscoverAndExtract(t *testing.T) {
 		},
 	}
 	out.Reset()
-	count3, err := DiscoverAndExtractForCatalog(customCat, []string{mockSteam}, destWads, false, &out)
+	count3, err := DiscoverAndExtract(customCat, []string{mockSteam}, destWads, false, &out)
 	if err != nil {
-		t.Fatalf("DiscoverAndExtractForCatalog failed: %v", err)
+		t.Fatalf("DiscoverAndExtract failed: %v", err)
 	}
 	if count3 != 1 {
 		t.Fatalf("expected 1 custom file extracted, got %d\nOutput: %s", count3, out.String())

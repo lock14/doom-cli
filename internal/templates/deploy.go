@@ -97,11 +97,6 @@ func DeployConfigsTo(paths *config.Paths, out io.Writer) error {
 	return nil
 }
 
-// DeployConfigs installs autoexec.cfg and dsda-doom.cfg with backups.
-func DeployConfigs(paths *config.Paths) error {
-	return DeployConfigsTo(paths, os.Stdout)
-}
-
 // RenderAutoexec returns expected autoexec.cfg content with detected display and soundfont.
 func RenderAutoexec(paths *config.Paths) string {
 	rate := display.DetectRefreshRate()

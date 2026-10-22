@@ -9,15 +9,15 @@ import (
 
 func TestResolveForLinux(t *testing.T) {
 	t.Parallel()
-	p := ResolveFor("linux", "")
+	p := ResolveFor("linux")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), ".config/uzdoom") {
 		t.Errorf("expected .config/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
 	}
 	if !strings.Contains(filepath.ToSlash(p.DSDADir), ".local/share/dsda-doom") {
 		t.Errorf("expected .local/share/dsda-doom in DSDADir, got %s", p.DSDADir)
 	}
-	if !strings.Contains(filepath.ToSlash(p.WadsDir), ".local/share/games/uzdoom") {
-		t.Errorf("expected .local/share/games/uzdoom in WadsDir, got %s", p.WadsDir)
+	if !strings.Contains(filepath.ToSlash(p.WadsDir), ".local/share/games/doom") {
+		t.Errorf("expected .local/share/games/doom in WadsDir, got %s", p.WadsDir)
 	}
 	if !strings.Contains(filepath.ToSlash(p.ConfigDir), ".config/doom-cli") {
 		t.Errorf("expected .config/doom-cli in ConfigDir, got %s", p.ConfigDir)
@@ -32,12 +32,12 @@ func TestResolveForLinux(t *testing.T) {
 
 func TestResolveForDarwin(t *testing.T) {
 	t.Parallel()
-	p := ResolveFor("darwin", "")
+	p := ResolveFor("darwin")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Library/Application Support/uzdoom") {
 		t.Errorf("expected Library/Application Support/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
 	}
-	if !strings.Contains(filepath.ToSlash(p.WadsDir), "Library/Application Support/games/uzdoom") {
-		t.Errorf("expected Library/Application Support/games/uzdoom in WadsDir, got %s", p.WadsDir)
+	if !strings.Contains(filepath.ToSlash(p.WadsDir), "Library/Application Support/games/doom") {
+		t.Errorf("expected Library/Application Support/games/doom in WadsDir, got %s", p.WadsDir)
 	}
 	if !strings.Contains(filepath.ToSlash(p.ConfigDir), "Library/Application Support/doom-cli") {
 		t.Errorf("expected Library/Application Support/doom-cli in ConfigDir, got %s", p.ConfigDir)
@@ -46,7 +46,7 @@ func TestResolveForDarwin(t *testing.T) {
 
 func TestResolveForWindows(t *testing.T) {
 	t.Parallel()
-	p := ResolveFor("windows", "")
+	p := ResolveFor("windows")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Games/Doom/bin") {
 		t.Errorf("expected Games/Doom/bin in UZDoomDir, got %s", p.UZDoomDir)
 	}
@@ -64,15 +64,6 @@ func TestResolveForWindows(t *testing.T) {
 	}
 	if !strings.Contains(filepath.ToSlash(p.ConfigDir), "doom-cli") {
 		t.Errorf("expected doom-cli in ConfigDir, got %s", p.ConfigDir)
-	}
-}
-
-func TestCustomWadsDirOverride(t *testing.T) {
-	t.Parallel()
-	custom := "/my/custom/doom/wads"
-	p := ResolveFor("linux", custom)
-	if p.WadsDir != custom {
-		t.Errorf("expected custom WadsDir %s, got %s", custom, p.WadsDir)
 	}
 }
 

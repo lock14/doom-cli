@@ -16,14 +16,13 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
-var defaultStyles = CompileStyles(DefaultTheme)
+var defaultStyles = CompileStyles(ClassicTheme)
 
 type model struct {
 	theme         Theme
 	styles        ThemeStyles
 	nerdFonts     bool
 	catalog       *preset.Catalog
-	wadsDir       string
 	dirIndex      *preset.DirIndex
 	readmeCache   map[string]string
 	searchTargets []string
@@ -52,7 +51,7 @@ func (m model) resolveFile(name string) (string, bool) {
 	if m.dirIndex != nil {
 		return m.dirIndex.ResolveFile(name)
 	}
-	return preset.NewDirIndex(m.wadsDir).WithCatalog(m.catalog).ResolveFile(name)
+	return "", false
 }
 
 func (m model) resolveReadme(p preset.Preset) (string, bool) {
@@ -64,24 +63,10 @@ func (m model) resolveReadme(p preset.Preset) (string, bool) {
 	if m.dirIndex != nil {
 		return m.dirIndex.ResolveReadme(p)
 	}
-	return preset.NewDirIndex(m.wadsDir).WithCatalog(m.catalog).WithPresets(p).ResolveReadme(p)
+	return "", false
 }
 
 func initialModel(
-	catalog *preset.Catalog,
-	wadsDir string,
-	theme Theme,
-	nerdFonts bool,
-	initialPreset ...string,
-) model {
-	var roots []string
-	if wadsDir != "" {
-		roots = []string{wadsDir}
-	}
-	return initialModelWithRoots(catalog, roots, theme, nerdFonts, initialPreset...)
-}
-
-func initialModelWithRoots(
 	catalog *preset.Catalog,
 	wadRoots []string,
 	theme Theme,
@@ -92,7 +77,7 @@ func initialModelWithRoots(
 		catalog = &preset.Catalog{}
 	}
 	if theme.Name == "" {
-		theme = DefaultTheme
+		theme = ClassicTheme
 	}
 	styles := CompileStyles(theme)
 
@@ -132,17 +117,11 @@ func initialModelWithRoots(
 		}
 	}
 
-	primaryWadsDir := ""
-	if len(wadRoots) > 0 {
-		primaryWadsDir = wadRoots[0]
-	}
-
 	return model{
 		theme:         theme,
 		styles:        styles,
 		nerdFonts:     nerdFonts,
 		catalog:       catalog,
-		wadsDir:       primaryWadsDir,
 		dirIndex:      dirIndex,
 		readmeCache:   readmeCache,
 		searchTargets: searchTargets,
@@ -345,23 +324,8 @@ func (m model) View() string {
 	return "\n" + header + panels + footer + "\n"
 }
 
-// RunInteractiveLauncher runs the interactive Bubble Tea UI launcher against a single WADs directory.
+// RunInteractiveLauncher runs the interactive Bubble Tea UI launcher across one or more WAD roots.
 func RunInteractiveLauncher(
-	catalog *preset.Catalog,
-	wadsDir string,
-	theme Theme,
-	nerdFonts bool,
-	initialPreset ...string,
-) (*preset.Preset, error) {
-	var roots []string
-	if wadsDir != "" {
-		roots = []string{wadsDir}
-	}
-	return RunInteractiveLauncherWithRoots(catalog, roots, theme, nerdFonts, initialPreset...)
-}
-
-// RunInteractiveLauncherWithRoots runs the interactive Bubble Tea UI launcher across one or more WAD roots.
-func RunInteractiveLauncherWithRoots(
 	catalog *preset.Catalog,
 	wadRoots []string,
 	theme Theme,
@@ -372,7 +336,7 @@ func RunInteractiveLauncherWithRoots(
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
-	m := initialModelWithRoots(catalog, wadRoots, theme, nerdFonts, initialPreset...)
+	m := initialModel(catalog, wadRoots, theme, nerdFonts, initialPreset...)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

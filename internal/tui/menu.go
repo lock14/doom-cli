@@ -10,23 +10,6 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
-func engineDisplayLabel(catalog *preset.Catalog, engineKey string) string {
-	if catalog != nil {
-		if eng, ok := catalog.FindEngine(engineKey); ok {
-			return eng.EffectiveDisplayName()
-		}
-	}
-	if curated, err := preset.LoadCuratedCatalog(); err == nil {
-		if eng, ok := curated.FindEngine(engineKey); ok {
-			return eng.EffectiveDisplayName()
-		}
-	}
-	if strings.TrimSpace(engineKey) == "" {
-		return "UZDoom"
-	}
-	return engineKey
-}
-
 // RunNumberedMenu provides a standard interactive menu without full-screen TUI.
 func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*preset.Preset, error) {
 	if catalog == nil {
@@ -38,7 +21,7 @@ func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*pre
 	fmt.Fprintln(out, "======================================================")
 
 	for i, p := range catalog.Presets {
-		eng := engineDisplayLabel(catalog, p.Engine)
+		eng := catalog.EngineDisplayName(p.Engine)
 		fmt.Fprintf(out, "%2d. %-30s [%s]\n", i+1, p.Name, eng)
 	}
 	fmt.Fprintln(out)

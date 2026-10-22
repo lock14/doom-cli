@@ -134,7 +134,7 @@ func CompileStyles(t Theme) ThemeStyles {
 	}
 }
 
-// LoadThemeFile parses a JSON custom theme file, falling back to DefaultTheme for missing properties.
+// LoadThemeFile parses a JSON custom theme file, falling back to ClassicTheme for missing properties.
 func LoadThemeFile(path string) (Theme, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -146,7 +146,7 @@ func LoadThemeFile(path string) (Theme, error) {
 		return Theme{}, fmt.Errorf("parsing theme JSON: %w", err)
 	}
 
-	theme := DefaultTheme
+	theme := ClassicTheme
 	if c.Name != "" {
 		theme.Name = c.Name
 	} else {
@@ -216,7 +216,7 @@ func ResolveTheme(flagTheme, envTheme, configTheme, themesDir string) Theme {
 		}
 	}
 
-	return DefaultTheme
+	return ClassicTheme
 }
 
 // RenderBrandPill renders the DOOM badge using this theme's brand styles.
