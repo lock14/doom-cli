@@ -182,8 +182,9 @@ func (d *Downloader) extractFromZip(
 		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", filepath.Base(match.Name), destPath)
 	}
 
-	// Extract accompanying readme (.txt) if present in the archive
-	for _, tf := range txtFiles {
+	// Extract accompanying readme (.txt) if present in the archive, preferring entries
+	// whose normalized stem matches an expected file stem, alias, or preset name.
+	for _, tf := range orderReadmeCandidates(txtFiles, expectedFiles, aliasCat, presets) {
 		base := strings.ToLower(filepath.Base(tf.Name))
 		if strings.EqualFold(base, "license.txt") {
 			continue
@@ -204,6 +205,77 @@ func (d *Downloader) extractFromZip(
 	}
 
 	return nil
+}
+
+func orderReadmeCandidates(
+	txtFiles []*zip.File,
+	expectedFiles []string,
+	aliasCat *preset.Catalog,
+	presets []preset.Preset,
+) []*zip.File {
+	var stems []string
+	seen := make(map[string]bool)
+	addStem := func(raw string) {
+		norm := preset.NormalizeFilename(raw)
+		if norm == "" || seen[norm] {
+			return
+		}
+		seen[norm] = true
+		stems = append(stems, norm)
+	}
+	for _, exp := range expectedFiles {
+		expBase := filepath.Base(exp)
+		addStem(strings.TrimSuffix(expBase, filepath.Ext(expBase)))
+		for _, al := range aliasCat.FileAliases(expBase) {
+			alBase := filepath.Base(al)
+			addStem(strings.TrimSuffix(alBase, filepath.Ext(alBase)))
+		}
+	}
+	for _, p := range presets {
+		addStem(p.Name)
+	}
+
+	var exact, readmePrefix, otherPrefix, rest []*zip.File
+	for _, tf := range txtFiles {
+		base := filepath.Base(filepath.Clean(tf.Name))
+		txtStem := preset.NormalizeFilename(strings.TrimSuffix(base, filepath.Ext(base)))
+		if txtStem == "" || txtStem == "license" {
+			continue
+		}
+		matchedExact := false
+		matchedReadmePrefix := false
+		matchedOtherPrefix := false
+		for _, stem := range stems {
+			if txtStem == stem {
+				matchedExact = true
+				break
+			}
+			if strings.HasPrefix(txtStem, stem) {
+				if preset.IsReadmeSuffix(strings.TrimPrefix(txtStem, stem)) {
+					matchedReadmePrefix = true
+				} else {
+					matchedOtherPrefix = true
+				}
+			}
+		}
+		switch {
+		case matchedExact:
+			exact = append(exact, tf)
+		case matchedReadmePrefix:
+			readmePrefix = append(readmePrefix, tf)
+		case matchedOtherPrefix:
+			otherPrefix = append(otherPrefix, tf)
+		default:
+			rest = append(rest, tf)
+		}
+	}
+
+	out := make([]*zip.File, 0, len(exact)+len(readmePrefix)+len(otherPrefix)+len(rest))
+	out = append(out, exact...)
+	out = append(out, readmePrefix...)
+	out = append(out, otherPrefix...)
+	out = append(out, rest...)
+	return out
 }
 
 func extractZipFile(zf *zip.File, targetDir, destPath string) error {

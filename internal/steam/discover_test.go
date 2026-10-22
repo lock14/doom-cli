@@ -113,7 +113,7 @@ func TestDiscoverAndExtract(t *testing.T) {
 
 	// Create mock game files (including normalized underscore variant idkfa_2024.wad and aliases)
 	_ = os.WriteFile(filepath.Join(doomDir, "doom2.wad"), []byte("doom2-data"), 0644)
-	_ = os.WriteFile(filepath.Join(doomDir, "gd.wad"), []byte("gdturbo-data"), 0644)
+	_ = os.WriteFile(filepath.Join(doomDir, "sunder.wad"), []byte("sunder-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "DOOMZERO.DEH"), []byte("doomzero-deh-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "sigil2.wad"), []byte("sigil2-data"), 0644)
 	_ = os.WriteFile(filepath.Join(doomDir, "idkfa_2024.wad"), []byte("idkfa-data"), 0644)
@@ -131,13 +131,13 @@ func TestDiscoverAndExtract(t *testing.T) {
 
 	// Verify target names:
 	// doom2.wad -> DOOM2.WAD
-	// gd.wad -> gdturbo.wad
+	// sunder.wad -> Sunder 2512.wad
 	// DOOMZERO.DEH -> DOOMZERO.DEH
 	// sigil2.wad -> SIGIL_II_V1_0.WAD
 	// idkfa_2024.wad -> idkfa 2024.wad (via normalized matching)
 	for _, wantFile := range []string{
 		"DOOM2.WAD",
-		"gdturbo.wad",
+		"Sunder 2512.wad",
 		"DOOMZERO.DEH",
 		"SIGIL_II_V1_0.WAD",
 		"idkfa 2024.wad",

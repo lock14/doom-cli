@@ -7,10 +7,10 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "SUNDER_V2512.wad",
+      "name": "Sunder 2512.wad",
       "aliases": [
         "sunder.wad",
-        "sunder_2512.wad"
+        "SUNDER_V2512.wad"
       ]
     }
   ],
