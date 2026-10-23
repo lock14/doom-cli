@@ -20,5 +20,11 @@
       "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip"
     }
   ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity2",
+      "rel": "idgames"
+    }
+  ],
   "sort": 120
 }

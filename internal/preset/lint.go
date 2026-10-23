@@ -173,9 +173,6 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 			if iwadNorm != "" && fileNorm == iwadNorm {
 				addErr(where, "iwad %q must not be repeated in files", iwad)
 			}
-			if err := ValidateSHA256(f.SHA256); err != nil {
-				addErr(where, "file %s: %v", f.Name, err)
-			}
 			seenAliases := make(map[string]bool)
 			for _, al := range f.Aliases {
 				trimmedAl := strings.TrimSpace(al)

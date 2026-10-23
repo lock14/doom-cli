@@ -33,7 +33,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 	}
 
 	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
-	nerdFonts := flagNerdFonts || cfg.NerdFonts
+	nerdFonts := resolveNerdFonts(cmd, cfg)
 	extraArgs := extractEngineArgs("play", os.Args)
 
 	isInteractive := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
@@ -111,6 +111,7 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 	knownFlagsWithValue := map[string]bool{
 		"--engine": true, "-e": true,
 		"--wads-dir":       true,
+		"--wads-dirs":      true,
 		"--bin-dir":        true,
 		"--soundfonts-dir": true,
 		"--presets-file":   true,

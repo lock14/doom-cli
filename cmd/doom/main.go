@@ -19,6 +19,7 @@ var (
 
 	flagEngineOverride string
 	flagWadsDir        string
+	flagWadsDirs       string
 	flagBinDir         string
 	flagSoundFontsDir  string
 	flagDryRun         bool
@@ -46,6 +47,9 @@ func cmdErr(cmd *cobra.Command) io.Writer {
 func applyFlagOverrides(paths *config.Paths) {
 	if flagWadsDir != "" {
 		paths.WadsDir = flagWadsDir
+	}
+	if flagWadsDirs != "" {
+		paths.WadsDirs = config.ParsePathList(flagWadsDirs)
 	}
 	if flagBinDir != "" {
 		paths.SetBinDir(flagBinDir)
@@ -127,7 +131,9 @@ func newRootCmd() *cobra.Command {
 		Long: `doom is a modern, unified CLI and interactive terminal launcher for classic Doom.
 It manages source ports (UZDoom, DSDA-Doom), official Steam and GOG IWADs,
 Roland SC-55 SoundFonts, curated community megawads, and platform-native configurations.`,
-		Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
+		Version:            fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
+		Args:               cobra.ArbitraryArgs,
+		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// If no subcommands or arguments are passed, run interactive launcher (doom play)
 			return runPlay(cmd, args)
@@ -138,6 +144,9 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 		&flagEngineOverride, "engine", "e", "", "Override source port engine (uzdoom or dsda-doom)",
 	)
 	rootCmd.PersistentFlags().StringVar(&flagWadsDir, "wads-dir", "", "Custom path to WADs directory")
+	rootCmd.PersistentFlags().StringVar(
+		&flagWadsDirs, "wads-dirs", "", "Additional WAD search directories (comma or path-list separated)",
+	)
 	rootCmd.PersistentFlags().StringVar(&flagBinDir, "bin-dir", "", "Custom path to engines binary directory")
 	rootCmd.PersistentFlags().StringVar(
 		&flagSoundFontsDir, "soundfonts-dir", "", "Custom path to SoundFonts directory",

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -23,6 +24,7 @@ func newSetupCmd() *cobra.Command {
 			}
 
 			out := cmdOut(cmd)
+			errOut := cmdErr(cmd)
 			fmt.Fprintln(out, "============================================================")
 			fmt.Fprintln(out, "  Initiating Doom Setup")
 			fmt.Fprintln(out, "============================================================")
@@ -35,26 +37,33 @@ func newSetupCmd() *cobra.Command {
 			}
 			fmt.Fprintln(out)
 
+			var failedSteps []string
+
 			// 2. Engines
 			fmt.Fprintln(out, ">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
 			installer := engine.NewInstaller(paths.BinDir, out)
 			installer.Force = flagForce
 			if err := installer.InstallCatalog(cat); err != nil {
-				fmt.Fprintf(out, "Warning: engine installer encountered: %v\n", err)
+				fmt.Fprintf(errOut, "Warning: engine installer encountered: %v\n", err)
+				failedSteps = append(failedSteps, "engines")
 			}
 			fmt.Fprintln(out)
 
 			// 3. SoundFont
 			fmt.Fprintln(out, ">>> Step 3/5: Installing Roland SC-55 SoundFont...")
 			if _, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, out); err != nil {
-				fmt.Fprintf(out, "Warning: soundfont installer encountered: %v\n", err)
+				fmt.Fprintf(errOut, "Warning: soundfont installer encountered: %v\n", err)
+				failedSteps = append(failedSteps, "soundfont")
 			}
 			fmt.Fprintln(out)
 
 			// 4. Steam IWADs
 			fmt.Fprintln(out, ">>> Step 4/5: Auto-discovering official Steam and GOG game files...")
-			if _, err := steam.DiscoverAndExtract(cat, nil, paths.WadsDir, flagForce, out); err != nil {
-				fmt.Fprintf(out, "Warning: steam discoverer encountered: %v\n", err)
+			if _, err := steam.DiscoverAndExtract(
+				cat, nil, paths.WadsDir, flagForce, out, paths.WadsDirs...,
+			); err != nil {
+				fmt.Fprintf(errOut, "Warning: steam discoverer encountered: %v\n", err)
+				failedSteps = append(failedSteps, "steam extract")
 			}
 			fmt.Fprintln(out)
 
@@ -62,9 +71,18 @@ func newSetupCmd() *cobra.Command {
 			fmt.Fprintln(out, ">>> Step 5/5: Downloading community megawads...")
 			dl := wad.NewDownloader(paths.WadRoots(), flagForce, out)
 			if err := dl.DownloadAll(cat); err != nil {
-				fmt.Fprintf(out, "Warning: some megawads failed to download: %v\n", err)
+				fmt.Fprintf(errOut, "Warning: some megawads failed to download: %v\n", err)
+				failedSteps = append(failedSteps, "megawad downloads")
 			}
 			fmt.Fprintln(out)
+
+			if len(failedSteps) > 0 {
+				summary := strings.Join(failedSteps, ", ")
+				fmt.Fprintln(out, "============================================================")
+				fmt.Fprintf(out, "  ! Doom setup finished with errors in: %s\n", summary)
+				fmt.Fprintln(out, "============================================================")
+				return fmt.Errorf("setup completed with errors in: %s", summary)
+			}
 
 			fmt.Fprintln(out, "============================================================")
 			fmt.Fprintln(out, "  ✓ Doom setup complete!")

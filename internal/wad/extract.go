@@ -184,6 +184,8 @@ func (d *Downloader) extractFromZip(
 
 	// Extract accompanying readme (.txt) if present in the archive, preferring entries
 	// whose normalized stem matches an expected file stem, alias, or preset name.
+	// Generic fallback files (such as readme.txt) are saved as <primaryStem>.txt so
+	// DirIndex.ResolveReadme resolves them and archives never overwrite each other.
 	for _, tf := range orderReadmeCandidates(txtFiles, expectedFiles, aliasCat, presets) {
 		base := strings.ToLower(filepath.Base(tf.Name))
 		if strings.EqualFold(base, "license.txt") {
@@ -193,7 +195,8 @@ func (d *Downloader) extractFromZip(
 		if cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "..") {
 			continue
 		}
-		destPath, joinErr := fsutil.SafeJoin(cleanWadsDir, cleanName)
+		destName := readmeDestName(cleanName, expectedFiles, aliasCat, presets)
+		destPath, joinErr := fsutil.SafeJoin(cleanWadsDir, destName)
 		if joinErr != nil {
 			continue
 		}
@@ -207,12 +210,11 @@ func (d *Downloader) extractFromZip(
 	return nil
 }
 
-func orderReadmeCandidates(
-	txtFiles []*zip.File,
+func collectReadmeStems(
 	expectedFiles []string,
 	aliasCat *preset.Catalog,
 	presets []preset.Preset,
-) []*zip.File {
+) []string {
 	var stems []string
 	seen := make(map[string]bool)
 	addStem := func(raw string) {
@@ -234,6 +236,50 @@ func orderReadmeCandidates(
 	for _, p := range presets {
 		addStem(p.Name)
 	}
+	return stems
+}
+
+func readmeDestName(
+	cleanName string,
+	expectedFiles []string,
+	aliasCat *preset.Catalog,
+	presets []preset.Preset,
+) string {
+	stems := collectReadmeStems(expectedFiles, aliasCat, presets)
+	txtStem := preset.NormalizeFilename(strings.TrimSuffix(cleanName, filepath.Ext(cleanName)))
+	for _, stem := range stems {
+		if txtStem == stem {
+			return cleanName
+		}
+		if strings.HasPrefix(txtStem, stem) && preset.IsReadmeSuffix(strings.TrimPrefix(txtStem, stem)) {
+			return cleanName
+		}
+	}
+	for _, exp := range expectedFiles {
+		expBase := filepath.Base(strings.TrimSpace(exp))
+		ext := filepath.Ext(expBase)
+		if strings.EqualFold(ext, ".wad") || strings.EqualFold(ext, ".pk3") {
+			if stem := strings.TrimSuffix(expBase, ext); stem != "" {
+				return stem + ".txt"
+			}
+		}
+	}
+	for _, exp := range expectedFiles {
+		expBase := filepath.Base(strings.TrimSpace(exp))
+		if stem := strings.TrimSuffix(expBase, filepath.Ext(expBase)); stem != "" {
+			return stem + ".txt"
+		}
+	}
+	return cleanName
+}
+
+func orderReadmeCandidates(
+	txtFiles []*zip.File,
+	expectedFiles []string,
+	aliasCat *preset.Catalog,
+	presets []preset.Preset,
+) []*zip.File {
+	stems := collectReadmeStems(expectedFiles, aliasCat, presets)
 
 	var exact, readmePrefix, otherPrefix, rest []*zip.File
 	for _, tf := range txtFiles {

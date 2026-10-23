@@ -189,7 +189,10 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 
 		repoAuto := filepath.Join(repoDir, "uzdoom", "autoexec.cfg")
 		if _, err := os.Stat(filepath.Dir(repoAuto)); err == nil {
-			_ = os.WriteFile(repoAuto, []byte(text), 0o644)
+			if _, err := fsutil.WriteFileAtomic(repoAuto, []byte(text), 0o644); err != nil {
+				return err
+			}
+			fsutil.RemoveBackups(repoAuto)
 			fmt.Fprintf(out, "✓ Synced %s -> %s\n", autoDest, repoAuto)
 		}
 	}
@@ -203,7 +206,10 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 
 		repoDSDA := filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg")
 		if _, err := os.Stat(filepath.Dir(repoDSDA)); err == nil {
-			_ = os.WriteFile(repoDSDA, []byte(text), 0o644)
+			if _, err := fsutil.WriteFileAtomic(repoDSDA, []byte(text), 0o644); err != nil {
+				return err
+			}
+			fsutil.RemoveBackups(repoDSDA)
 			fmt.Fprintf(out, "✓ Synced %s -> %s\n", dsdaDest, repoDSDA)
 		}
 	}

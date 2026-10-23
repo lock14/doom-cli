@@ -400,3 +400,34 @@ func TestReadmeCustomThemeJSONBlock(t *testing.T) {
 		t.Errorf("expected populated CustomThemeFile fields in README.md example, got %+v", parsed)
 	}
 }
+
+func TestListCustomThemes(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	// 1. Valid custom theme
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "synthwave.json"),
+		[]byte(`{"name":"synthwave","description":"Neon synthwave"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	// 2. Shadowing built-in theme name (should be skipped)
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "classic.json"),
+		[]byte(`{"name":"classic","description":"Shadow built-in"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	// 3. Invalid JSON (should be skipped)
+	if err := os.WriteFile(filepath.Join(tmpDir, "broken.json"), []byte(`{bad`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ListCustomThemes(tmpDir)
+	if len(got) != 1 || got[0].Name != "synthwave" {
+		t.Fatalf("ListCustomThemes = %+v, want single 'synthwave' theme", got)
+	}
+}

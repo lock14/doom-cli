@@ -20,7 +20,7 @@
             use `__SOUNDFONT__`.
         *   In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use
             `__REFRESH_RATE__`.
-        *   Deployment tooling (`doom config install`, `doom setup`) dynamically substitutes `__HOME__`,
+        *   Deployment tooling (`doom config install`, `doom setup`) dynamically substitutes
             `__RESOLUTION__` (via native display detection), `__REFRESH_RATE__`, and `__SOUNDFONT__` at
             installation time.
     *   **Respect platform standard directories**:
@@ -36,17 +36,20 @@
         *   **SoundFonts**: `~/.local/share/soundfonts/` on Linux,
             `~/Library/Application Support/soundfonts/` on macOS, and `%USERPROFILE%\Games\Doom\soundfonts\` on Windows.
         *   **CLI configuration, themes, and user catalog**: `~/.config/doom-cli/` on Linux,
-            `~/Library/Application Support/doom-cli/` on macOS, and `%LOCALAPPDATA%\doom-cli\` on Windows, with user
-            entity files in `<ConfigDir>/catalog.d/*.json`.
+            `~/Library/Application Support/doom-cli/` on macOS, and `%LOCALAPPDATA%\doom-cli\` on Windows (overridable
+            via `DOOM_CONFIG_DIR`), with user entity files in `<ConfigDir>/catalog.d/*.json`.
 *   **Destructive safety and backup policy**:
     *   **Mandatory atomic writes and non-destructive backups**: Any configuration or catalog write
-        (`doom config install`, `doom setup`, `doom config set`, `doom engines add`, `doom presets add`,
-        `doom presets config`) must use `fsutil.WriteFileAtomic` (temporary file in the same directory followed by
-        `os.Rename`) and `fsutil.BackupFile` to create non-clobbering timestamped backups (`.bak.<timestamp>`,
-        appending `-1` and `-2` on same-second collisions) before overwriting any existing user file.
+        (`doom config install`, `doom setup`, `doom config set`, `doom engines add`, `doom engines config`,
+        `doom presets add`, `doom presets config`) must use `fsutil.WriteFileAtomic` (temporary file in the same
+        directory followed by `os.Rename`) and `fsutil.BackupFile` to create non-clobbering timestamped backups
+        (`.bak.<timestamp>`, appending `-1` and `-2` on same-second collisions and retaining at most
+        `MaxBackupsPerFile = 3` per file) before overwriting any existing user file, and clean up `.bak.*` files via
+        `fsutil.RemoveBackups` when deleting user entities or resetting overrides.
     *   **Preserve unrelated configuration**: When adding new engine variables, aliases, or keybindings, avoid
         modifying or removing unrelated settings unless explicitly requested. `config.json` preserves unknown top-level
-        keys across round-trips, and `doom presets config` preserves untouched override fields across successive calls.
+        keys across round-trips, and `doom presets config` and `doom engines config` preserve untouched override fields
+        across successive calls.
     *   **Archive security and path containment**: All archive extractions (`archive/zip`), direct file downloads, and
         relative sub-path resolutions must sanitize paths against `..` traversal, drive-letter, and absolute path
         sequences using `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
@@ -117,7 +120,7 @@ Linux, macOS, and Windows:
     *   `launch.go`: `doom launch` direct preset execution command.
     *   `setup.go`: `doom setup` automated turnkey workflow command.
     *   `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract`).
-    *   `engines.go`: `doom engines` subcommands (`list`, `add`, `remove`, `install`).
+    *   `engines.go`: `doom engines` subcommands (`list`, `add`, `config`, `remove`, `install`).
     *   `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build`, `lint`).
     *   `soundfont.go`: `doom soundfont install` subcommand.
     *   `config.go`: `doom config` subcommands (`show`, `get`, `set`, `toggle`, `install`, `diff`, `sync`).
@@ -130,12 +133,13 @@ Linux, macOS, and Windows:
     *   `installer.go`: Declarative source port asset downloading, SHA-256 verification, and portable binary
         installation (Zip Slip hardened).
 *   `internal/fsutil/`:
-    *   `fsutil.go`: Atomic file writing (`WriteFileAtomic`), non-clobbering timestamped backups (`BackupFile`), and
-        path-containment validation (`CleanRel`, `SafeJoin`).
+    *   `fsutil.go`: Atomic file writing (`WriteFileAtomic`), non-clobbering timestamped backups (`BackupFile`,
+        retaining at most `MaxBackupsPerFile = 3` per file, and `RemoveBackups`), and path-containment validation
+        (`CleanRel`, `SafeJoin`).
 *   `internal/preset/`:
     *   `preset.go`: Declarative entity types, strict JSON decoder, and two-layer catalog loader with quarantine.
-    *   `store.go`: User `catalog.d` write operations (`AddEngine`, `RemoveEngine`, `AddPreset`, `ConfigPreset`,
-        `ResetPresetOverride`, `RemovePreset`).
+    *   `store.go`: User `catalog.d` write operations (`AddEngine`, `ConfigEngine`, `ResetEngineOverride`,
+        `RemoveEngine`, `AddPreset`, `ConfigPreset`, `ResetPresetOverride`, `RemovePreset`).
     *   `lint.go`: Catalog schema, reference, digest, personal-path, and `README.md` parity linter (`LintCatalog`).
     *   `resolve.go`: Multi-root cached `DirIndex`, case-insensitive and whitespace-tolerant file resolution, safe
         relative sub-paths, 1-level child directory scan, and catalog alias matching.
@@ -266,11 +270,13 @@ Linux, macOS, and Windows:
     `%USERPROFILE%\Games\Doom\bin\`) ensures both launcher-mediated and direct executable invocations load the
     intended configurations.
 *   **Persistent asset directory hierarchy**: Users can override and persist all asset and execution directories
-    (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json`. The
-    resolution hierarchy strictly respects CLI flags (`--wads-dir`, `--bin-dir`, `--soundfonts-dir`), which take
-    precedence over environment variables (`DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`, `DOOM_SF_DIR`), which
-    take precedence over user configuration (`config.json`), which takes precedence over platform defaults. Engine
-    launch synthesis and configuration deployment always adhere to this resolved hierarchy.
+    (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json` (located
+    inside `DOOM_CONFIG_DIR` when set). The resolution hierarchy strictly respects CLI flags (`--theme`,
+    `--nerd-fonts`, `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`), which take precedence over
+    environment variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`,
+    `DOOM_BIN_DIR`, `DOOM_SF_DIR`), which take precedence over user configuration (`config.json`), which takes
+    precedence over platform defaults. Engine launch synthesis, configuration deployment, and `doom config show` and
+    `doom config get` always adhere to this resolved hierarchy.
 *   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.

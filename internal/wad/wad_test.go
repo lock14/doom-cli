@@ -423,3 +423,36 @@ func TestDownloader_ExtractFromZip_ZipSlipProtection(t *testing.T) {
 		t.Errorf("security violation: escaped readme was extracted to %s", escapedTxt)
 	}
 }
+
+func TestDownloader_FallbackReadmeRenamedToPrimaryStem(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	zipBytes := createTestZip(t, map[string]string{
+		"MyMegawad.wad": "pwad-data",
+		"readme.txt":    "generic readme content",
+	})
+	zipPath := filepath.Join(tmpDir, "megawad.zip")
+	if err := os.WriteFile(zipPath, zipBytes, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	wadsDir := filepath.Join(tmpDir, "wads")
+	dl := NewDownloader([]string{wadsDir}, false, nil)
+	p := preset.Preset{
+		Name:  "My Megawad",
+		Files: []preset.FileSpec{{Name: "MyMegawad.wad"}},
+	}
+	if err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{"MyMegawad.wad"}, p); err != nil {
+		t.Fatalf("extractFromZip failed: %v", err)
+	}
+
+	wantTxt := filepath.Join(wadsDir, "MyMegawad.txt")
+	data, err := os.ReadFile(wantTxt)
+	if err != nil || string(data) != "generic readme content" {
+		t.Fatalf("expected %s with generic readme content, got %q (err=%v)", wantTxt, string(data), err)
+	}
+	idx := preset.NewDirIndex(wadsDir)
+	if resolved, ok := idx.ResolveReadme(p); !ok || resolved != wantTxt {
+		t.Errorf("ResolveReadme = (%q, %v), want (%q, true)", resolved, ok, wantTxt)
+	}
+}

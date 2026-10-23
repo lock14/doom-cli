@@ -114,8 +114,8 @@ doom setup
 ```
 
 `doom setup` performs five automated steps:
-1. **Installs source ports**: Downloads portable binaries for UZDoom and DSDA-Doom into your local binary path.
-2. **Deploys engine configurations**: Installs curated configurations for UZDoom and DSDA-Doom, auto-detecting your display resolution and native monitor refresh rate while creating timestamped backups (`.bak.<timestamp>`) of any existing files.
+1. **Deploys engine configurations**: Installs curated configurations for UZDoom and DSDA-Doom, auto-detecting your display resolution and native monitor refresh rate while creating timestamped backups (`.bak.<timestamp>`) of any existing files.
+2. **Installs source ports**: Downloads portable binaries for UZDoom and DSDA-Doom into your local binary path.
 3. **Deploys MIDI SoundFont**: Downloads and installs the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth MIDI playback.
 4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*, *Heretic*, and *Hexen*, importing commercial IWADs and synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into your WADs directory.
 5. **Downloads community megawads**: Fetches and extracts free community megawads (*Eviternity I & II*, *Back to Saturn X*, *Ancient Aliens*, *Doom Zero*, *Sunder*, *Sunlust*, and others) and DeHackEd patches from idgames, DSDA, and community mirrors.
@@ -142,6 +142,8 @@ The `doom` CLI provides modular commands for granular management:
 | :--- | :--- |
 | `doom engines` or `doom engines list` | Lists all configured engines (built-in and custom) with binary status |
 | `doom engines add <name> [flags]` | Registers a custom source port engine in `catalog.d/engine.<id>.json` |
+| `doom engines config <name> [flags]` | Sets per-engine overrides in `catalog.d/override.engine.<id>.json` |
+| `doom engines config <name> --reset` | Clears custom engine overrides, reverting to base engine defaults |
 | `doom engines remove <name>` | Removes a custom engine from your user catalog |
 | `doom engines install [engine\|all]` | Downloads and installs portable binaries for `uzdoom` and `dsda-doom` |
 | `doom engines install --force` | Re-downloads and overwrites existing engine binaries |
@@ -179,13 +181,12 @@ The `doom` CLI provides modular commands for granular management:
 
 | Command | Description |
 | :--- | :--- |
-| `doom config show` | Displays active CLI user configuration (`config.json`) |
-| `doom config get <key>` | Retrieves a specific configuration value (such as `doom config get theme`) |
+| `doom config show` | Displays active CLI user configuration and source precedence |
+| `doom config get <key>` | Retrieves an effective configuration value (such as `doom config get theme`) |
 | `doom config set <key> <val>` | Sets a configuration value (such as `doom config set nerd-fonts on`) |
 | `doom config toggle <key>` | Toggles a boolean setting (such as `doom config toggle nerd-fonts`) |
 | `doom config install` | Deploys source port configuration files with display auto-detection and backups |
 | `doom config diff` | Shows differences between repository templates and live installed configurations |
-| `doom config sync` | Pulls live tweaks (keybindings, sensitivity) from the host system back into the repository |
 
 ### Themes and styling
 
@@ -481,11 +482,13 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 
 ## Environment variables
 
-Environment variables override persistent settings in `config.json` and platform defaults, while explicit CLI flags (`--theme`, `--wads-dir`, `--bin-dir`, `--soundfonts-dir`) take precedence over environment variables:
+Environment variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`, `DOOM_SF_DIR`) override persistent settings in `config.json` and platform defaults, while explicit CLI flags (`--theme`, `--nerd-fonts`, `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`) take precedence over environment variables:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
+| `DOOM_CONFIG_DIR` | Directory containing `config.json`, `themes/`, and `catalog.d/` | Platform standard CLI configuration directory |
 | `DOOM_THEME` | Color theme for the interactive launcher | `classic` (or value in `config.json`) |
+| `DOOM_NERD_FONTS` | Boolean toggle for Powerlevel10k rounded capsule badges | `false` (or value in `config.json`) |
 | `DOOM_WADS_DIR` | Primary directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
 | `DOOM_WADS_DIRS` | Additional read-only WAD search directories (comma or path-list separated) | `wads_dirs` in `config.json` |
 | `DOOM_BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |

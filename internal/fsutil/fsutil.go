@@ -9,12 +9,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
+// MaxBackupsPerFile is the maximum number of timestamped backup files retained per target file.
+const MaxBackupsPerFile = 3
+
 // BackupFile creates a non-destructive timestamped backup (.bak.<YYYYMMDDHHMMSS>)
-// if path already exists. If a backup with the same second-resolution timestamp
+// if path already exists, pruning older backup siblings so at most MaxBackupsPerFile
+// backups are retained. If a backup with the same second-resolution timestamp
 // already exists, a numeric suffix (-1, -2, ...) is appended so earlier backups
 // are never clobbered. If path does not exist, BackupFile returns ("", nil).
 func BackupFile(path string) (string, error) {
@@ -36,19 +42,113 @@ func BackupFile(path string) (string, error) {
 	defer in.Close()
 
 	ts := time.Now().Format("20060102150405")
-	baseBackup := fmt.Sprintf("%s.bak.%s", path, ts)
-	backupPath := baseBackup
-	for seq := 1; ; seq++ {
-		if _, statErr := os.Stat(backupPath); os.IsNotExist(statErr) {
-			break
-		}
-		backupPath = fmt.Sprintf("%s-%d", baseBackup, seq)
-	}
+	backupPath := nextBackupPath(path, ts)
 
 	if _, err := writeReaderTempAndRename(backupPath, in, info.Mode().Perm()); err != nil {
 		return "", fmt.Errorf("writing backup %s: %w", backupPath, err)
 	}
+	pruneBackups(path, MaxBackupsPerFile)
 	return backupPath, nil
+}
+
+func nextBackupPath(path, ts string) string {
+	dir := filepath.Dir(path)
+	baseName := filepath.Base(path) + ".bak." + ts
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return filepath.Join(dir, baseName)
+	}
+	maxSeq := -1
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == baseName {
+			if maxSeq < 0 {
+				maxSeq = 0
+			}
+			continue
+		}
+		if strings.HasPrefix(name, baseName+"-") {
+			suffix := strings.TrimPrefix(name, baseName+"-")
+			if seq, convErr := strconv.Atoi(suffix); convErr == nil && seq > maxSeq {
+				maxSeq = seq
+			}
+		}
+	}
+	if maxSeq < 0 {
+		return filepath.Join(dir, baseName)
+	}
+	return filepath.Join(dir, fmt.Sprintf("%s-%d", baseName, maxSeq+1))
+}
+
+type backupEntry struct {
+	name string
+	ts   string
+	seq  int
+}
+
+func pruneBackups(path string, keep int) {
+	if keep <= 0 || strings.TrimSpace(path) == "" {
+		return
+	}
+	dir := filepath.Dir(path)
+	prefix := filepath.Base(path) + ".bak."
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	var backups []backupEntry
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
+			continue
+		}
+		suffix := strings.TrimPrefix(entry.Name(), prefix)
+		tsPart := suffix
+		seq := 0
+		if before, after, ok := strings.Cut(suffix, "-"); ok {
+			if parsed, convErr := strconv.Atoi(after); convErr == nil {
+				tsPart = before
+				seq = parsed
+			}
+		}
+		backups = append(backups, backupEntry{
+			name: entry.Name(),
+			ts:   tsPart,
+			seq:  seq,
+		})
+	}
+	if len(backups) <= keep {
+		return
+	}
+	sort.Slice(backups, func(i, j int) bool {
+		if backups[i].ts != backups[j].ts {
+			return backups[i].ts < backups[j].ts
+		}
+		if backups[i].seq != backups[j].seq {
+			return backups[i].seq < backups[j].seq
+		}
+		return backups[i].name < backups[j].name
+	})
+	for _, old := range backups[:len(backups)-keep] {
+		_ = os.Remove(filepath.Join(dir, old.name))
+	}
+}
+
+// RemoveBackups deletes all timestamped backup files (<path>.bak.*) for path.
+func RemoveBackups(path string) {
+	if strings.TrimSpace(path) == "" {
+		return
+	}
+	dir := filepath.Dir(path)
+	prefix := filepath.Base(path) + ".bak."
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) {
+			_ = os.Remove(filepath.Join(dir, entry.Name()))
+		}
+	}
 }
 
 // WriteFileAtomic writes data to path atomically via a temporary file in the

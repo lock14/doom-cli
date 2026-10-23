@@ -44,12 +44,12 @@ func runThemesList(cmd *cobra.Command, args []string) error {
 	out := cmdOut(cmd)
 
 	activeTheme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
-	nerdFonts := flagNerdFonts || cfg.NerdFonts
+	nerdFonts := resolveNerdFonts(cmd, cfg)
 
 	fmt.Fprintln(out, "=== Available Doom Themes ===")
 	fmt.Fprintln(out)
 
-	themes := tui.ListBuiltinThemes()
+	themes := append(tui.ListBuiltinThemes(), tui.ListCustomThemes(paths.ThemesDir)...)
 	for _, t := range themes {
 		marker := "  "
 		if strings.EqualFold(t.Name, activeTheme.Name) {

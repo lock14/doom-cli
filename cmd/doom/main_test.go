@@ -447,11 +447,32 @@ func TestNewRootCmd(t *testing.T) {
 	}
 
 	// Verify persistent flags
-	for _, flag := range []string{"engine", "wads-dir", "bin-dir", "dry-run", "presets-file", "theme", "nerd-fonts"} {
+	for _, flag := range []string{
+		"engine", "wads-dir", "wads-dirs", "bin-dir", "dry-run", "presets-file", "theme", "nerd-fonts",
+	} {
 		if cmd.PersistentFlags().Lookup(flag) == nil {
 			t.Errorf("expected persistent flag %q on root command", flag)
 		}
 	}
+	if !cmd.FParseErrWhitelist.UnknownFlags {
+		t.Error("expected rootCmd.FParseErrWhitelist.UnknownFlags to be true")
+	}
+
+	// Verify bare `doom -skill 4` routes to rootCmd and passes argument validation
+	targetCmd, flags, findErr := cmd.Find([]string{"--dry-run", "-skill", "4"})
+	if findErr != nil {
+		t.Fatalf("cmd.Find([--dry-run -skill 4]) unexpected error: %v", findErr)
+	}
+	if targetCmd != cmd {
+		t.Fatalf("expected rootCmd to be matched for bare engine flags, got %q", targetCmd.Name())
+	}
+	if err := targetCmd.ParseFlags(flags); err != nil {
+		t.Fatalf("targetCmd.ParseFlags([--dry-run -skill 4]) unexpected error: %v", err)
+	}
+	if err := targetCmd.ValidateArgs(targetCmd.Flags().Args()); err != nil {
+		t.Fatalf("targetCmd.ValidateArgs([4]) unexpected error: %v", err)
+	}
+	flagDryRun = false
 }
 
 func TestEnginesCommands(t *testing.T) {
@@ -488,6 +509,48 @@ func TestEnginesCommands(t *testing.T) {
 		t.Fatalf("expected woof in cat.Engines, got %+v", cat.Engines)
 	}
 
+	// 2b. engines config on built-in dsda-doom across multiple calls, clearing fields, and reset
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetArgs([]string{
+		"config", "dsda-doom", "--binary", "/custom/dsda-doom", "--badge", "DSDA+", "--default-args", "-fast",
+	})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines config dsda-doom failed: %v", err)
+	}
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetArgs([]string{"config", "dsda-doom", "--append-arg", "-nomonsters"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines config dsda-doom --append-arg failed: %v", err)
+	}
+	_, _, cat, _ = loadAppState()
+	eng, ok := cat.FindEngine("dsda-doom")
+	if !ok || eng.Binary != "/custom/dsda-doom" || eng.Badge != "DSDA+" ||
+		!reflect.DeepEqual(eng.DefaultArgs, []string{"-fast", "-nomonsters"}) {
+		t.Fatalf("expected overridden dsda-doom with combined args, got %+v", eng)
+	}
+
+	// Clear badge and default-args back to empty via CLI flags
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetArgs([]string{"config", "dsda-doom", "--badge", "", "--default-args", "", "--append-arg", ""})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines config clear flags failed: %v", err)
+	}
+	_, _, cat, _ = loadAppState()
+	eng, ok = cat.FindEngine("dsda-doom")
+	if !ok || eng.Badge != "" || len(eng.DefaultArgs) != 0 {
+		t.Fatalf("expected cleared Badge and DefaultArgs on dsda-doom, got %+v", eng)
+	}
+
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetArgs([]string{"config", "dsda-doom", "--reset"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines config dsda-doom --reset failed: %v", err)
+	}
+	_, _, cat, _ = loadAppState()
+	if eng, ok := cat.FindEngine("dsda-doom"); !ok || eng.Binary != "dsda-doom" {
+		t.Fatalf("expected reset dsda-doom binary, got %+v", eng)
+	}
+
 	// 3. engines remove built-in (fails)
 	enginesCmd = newEnginesCmd()
 	enginesCmd.SetArgs([]string{"remove", "uzdoom"})
@@ -515,11 +578,20 @@ func TestPresetsCommands(t *testing.T) {
 	t.Setenv("DOOM_BIN_DIR", tempDir)
 	t.Setenv("DOOM_WADS_DIR", tempDir)
 
-	// 1. presets list
+	if err := os.WriteFile(filepath.Join(tempDir, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. presets list shows [✓ Ready] for Doom II and [✗ Missing] for unextracted megawads
+	var listOut bytes.Buffer
 	presetsCmd := newPresetsCmd()
+	presetsCmd.SetOut(&listOut)
 	presetsCmd.SetArgs([]string{"list"})
 	if err := presetsCmd.Execute(); err != nil {
 		t.Fatalf("presets list failed: %v", err)
+	}
+	if !strings.Contains(listOut.String(), "[✓ Ready]") || !strings.Contains(listOut.String(), "[✗ Missing]") {
+		t.Errorf("expected presets list to contain [✓ Ready] and [✗ Missing], got:\n%s", listOut.String())
 	}
 
 	// 2. presets show built-in
@@ -632,6 +704,11 @@ func TestPresetsCommands(t *testing.T) {
 }
 
 func TestWadsCommands(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	t.Setenv("DOOM_WADS_DIR", tempDir)
+
 	wadsCmd := newWadsCmd()
 	subCommands := wadsCmd.Commands()
 
@@ -667,6 +744,23 @@ func TestWadsCommands(t *testing.T) {
 			}
 		})
 	}
+
+	// Create sunlust.wad on disk and verify `wads list` reports [✓ Found: ...] and [✗ Missing]
+	sunlustPath := filepath.Join(tempDir, "sunlust.wad")
+	if err := os.WriteFile(sunlustPath, []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	wadsCmd = newWadsCmd()
+	wadsCmd.SetOut(&out)
+	wadsCmd.SetArgs([]string{"list"})
+	if err := wadsCmd.Execute(); err != nil {
+		t.Fatalf("wads list failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "sunlust.wad [✓ Found: "+sunlustPath+"]") ||
+		!strings.Contains(out.String(), "[✗ Missing]") {
+		t.Errorf("unexpected wads list output:\n%s", out.String())
+	}
 }
 
 func TestRootCmd_Version(t *testing.T) {
@@ -678,5 +772,173 @@ func TestRootCmd_Version(t *testing.T) {
 	}
 	if !strings.Contains(cmd.Version, "commit:") || !strings.Contains(cmd.Version, "built:") {
 		t.Errorf("expected rootCmd.Version to contain commit and built metadata, got %q", cmd.Version)
+	}
+}
+
+func TestConfigFourTierHierarchyAndCustomThemesList(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+
+	// Set config.json values including explicit nerd-fonts = off
+	if err := runConfigSet(nil, []string{"wads-dir", "/cfg/wads"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := runConfigSet(nil, []string{"theme", "amber"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := runConfigSet(nil, []string{"nerd-fonts", "off"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify explicit nerd_fonts: false in config.json reports (config) source when env/flag are unset
+	var out bytes.Buffer
+	cfgCmd := newConfigCmd()
+	cfgCmd.SetOut(&out)
+	cfgCmd.SetArgs([]string{"show"})
+	if err := cfgCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Nerd Fonts:     disabled (universal rectangular badges) (config)") {
+		t.Errorf("expected explicit nerd_fonts=false to report (config), got:\n%s", out.String())
+	}
+
+	// Override via env vars
+	t.Setenv("DOOM_WADS_DIR", "/env/wads")
+	t.Setenv("DOOM_THEME", "plasma")
+	t.Setenv("DOOM_NERD_FONTS", "true")
+
+	out.Reset()
+	cfgCmd = newConfigCmd()
+	cfgCmd.SetOut(&out)
+	cfgCmd.SetArgs([]string{"get", "wads-dir"})
+	if err := cfgCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "/env/wads" {
+		t.Errorf("config get wads-dir with env override = %q, want /env/wads", got)
+	}
+
+	out.Reset()
+	cfgCmd = newConfigCmd()
+	cfgCmd.SetOut(&out)
+	cfgCmd.SetArgs([]string{"get", "nerd-fonts"})
+	if err := cfgCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(out.String()); got != "true" {
+		t.Errorf("config get nerd-fonts with DOOM_NERD_FONTS=true = %q, want true", got)
+	}
+
+	// Override via flag
+	flagWadsDir = "/flag/wads"
+	flagWadsDirs = "/flag/extra1,/flag/extra2"
+	defer func() {
+		flagWadsDir = ""
+		flagWadsDirs = ""
+	}()
+
+	out.Reset()
+	cfgCmd = newConfigCmd()
+	cfgCmd.SetOut(&out)
+	cfgCmd.SetArgs([]string{"show"})
+	if err := cfgCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	showStr := out.String()
+	for _, want := range []string{
+		"Theme:          plasma (env)",
+		"Nerd Fonts:     enabled (Powerlevel10k rounded capsules) (env)",
+		"WADs Dir:       /flag/wads (flag)",
+		"WADs Dirs:      /flag/extra1, /flag/extra2 (flag)",
+	} {
+		if !strings.Contains(showStr, want) {
+			t.Errorf("expected config show to contain %q, got:\n%s", want, showStr)
+		}
+	}
+
+	// Custom theme in themes list
+	paths := getPaths()
+	if err := os.MkdirAll(paths.ThemesDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(paths.ThemesDir, "neon.json"),
+		[]byte(`{"name":"neon","description":"Custom neon"}`),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	themesCmd := newThemesCmd()
+	themesCmd.SetOut(&out)
+	themesCmd.SetArgs([]string{"list"})
+	if err := themesCmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "neon") {
+		t.Errorf("expected themes list to include custom theme 'neon', got:\n%s", out.String())
+	}
+}
+
+func TestSetupCommandPartialFailure(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("XDG_DATA_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	t.Setenv("DOOM_BIN_DIR", filepath.Join(tempDir, "bin"))
+	t.Setenv("DOOM_WADS_DIR", filepath.Join(tempDir, "wads"))
+
+	// Create a regular file at SoundFontsDir so Step 3 (InstallSoundFont) fails deterministically without network IO,
+	// and pre-create engine binaries and WAD files so Steps 2 and 5 succeed via idempotency checks.
+	sfConflictFile := filepath.Join(tempDir, "sf-conflict-file")
+	if err := os.WriteFile(sfConflictFile, []byte("not-a-dir"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOOM_SF_DIR", sfConflictFile)
+
+	binDir := filepath.Join(tempDir, "bin")
+	wadsDir := filepath.Join(tempDir, "wads")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(wadsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, binName := range []string{"uzdoom", "dsda-doom", "uzdoom.exe", "dsda-doom.exe"} {
+		if err := os.WriteFile(filepath.Join(binDir, binName), []byte("bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range cat.Presets {
+		for _, f := range p.Files {
+			if !f.Optional {
+				if err := os.WriteFile(filepath.Join(wadsDir, f.Name), []byte("wad"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+	}
+
+	var outBuf, errBuf bytes.Buffer
+	setupCmd := newSetupCmd()
+	setupCmd.SetOut(&outBuf)
+	setupCmd.SetErr(&errBuf)
+	err = setupCmd.Execute()
+	if err == nil {
+		t.Fatal("expected doom setup to return non-nil error on step failure, got nil")
+	}
+	if !strings.Contains(err.Error(), "soundfont") {
+		t.Errorf("expected setup error to mention failed step 'soundfont', got %v", err)
+	}
+	if !strings.Contains(errBuf.String(), "Warning: soundfont installer encountered:") {
+		t.Errorf("expected stderr to contain soundfont warning, got:\n%s", errBuf.String())
+	}
+	if !strings.Contains(outBuf.String(), "! Doom setup finished with errors in: soundfont") {
+		t.Errorf("expected stdout to contain partial failure summary, got:\n%s", outBuf.String())
 	}
 }

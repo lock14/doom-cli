@@ -138,3 +138,57 @@ func TestCopyFileAtomic(t *testing.T) {
 		t.Fatalf("dst content = %q (%v), want DOOM2", string(gotDst), err)
 	}
 }
+
+func TestBackupRetentionAndRemoveBackups(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "entity.json")
+
+	// 1st write creates target, writes 2..7 create 6 backups; only the 3 newest should remain.
+	var bakPaths []string
+	for i := 1; i <= 7; i++ {
+		bak, err := WriteFileAtomic(target, []byte{byte('0' + i)}, 0o644)
+		if err != nil {
+			t.Fatalf("WriteFileAtomic #%d: %v", i, err)
+		}
+		if bak != "" {
+			bakPaths = append(bakPaths, bak)
+		}
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	var remaining []string
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "entity.json.bak.") {
+			remaining = append(remaining, filepath.Join(dir, entry.Name()))
+		}
+	}
+	if len(remaining) != MaxBackupsPerFile {
+		t.Fatalf("retained backups = %d (%v), want %d", len(remaining), remaining, MaxBackupsPerFile)
+	}
+	// Verify the 3 newest backup paths (representing versions 4, 5, 6) are retained.
+	for idx, wantBak := range bakPaths[len(bakPaths)-MaxBackupsPerFile:] {
+		data, err := os.ReadFile(wantBak)
+		if err != nil {
+			t.Fatalf("expected newest backup %q to exist: %v", wantBak, err)
+		}
+		wantByte := byte('0' + 4 + idx)
+		if len(data) != 1 || data[0] != wantByte {
+			t.Errorf("backup %s content = %q, want %c", wantBak, string(data), wantByte)
+		}
+	}
+
+	RemoveBackups(target)
+	entriesAfter, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir after RemoveBackups: %v", err)
+	}
+	for _, entry := range entriesAfter {
+		if strings.HasPrefix(entry.Name(), "entity.json.bak.") {
+			t.Errorf("leftover backup after RemoveBackups: %s", entry.Name())
+		}
+	}
+}
