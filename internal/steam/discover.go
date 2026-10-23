@@ -3,12 +3,17 @@ package steam
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/lock14/doom-cli/internal/fsutil"
@@ -157,6 +162,12 @@ func GetSearchRoots() []string {
 			filepath.Join(prog, "Steam"),
 			`C:\GOG Games`,
 		)
+		if home != "" {
+			roots = append(roots,
+				filepath.Join(home, "Saved Games", "Nightdive Studios", "DOOM"),
+				filepath.Join(home, "Saved Games", "id Software"),
+			)
+		}
 		// Check available drive letters
 		for _, drive := range []string{"C", "D", "E", "F", "G"} {
 			roots = append(roots, drive+`:\Steam`, drive+`:\GOG Games`, drive+`:\Games`)
@@ -182,6 +193,9 @@ func GetSearchRoots() []string {
 
 	addRoot := func(r string) {
 		clean := filepath.Clean(r)
+		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
+			clean = filepath.Clean(resolved)
+		}
 		if seen[clean] {
 			return
 		}
@@ -223,10 +237,19 @@ func DiscoverAndExtract(
 		searchRoots = GetSearchRoots()
 	}
 
+	seenRoots := make(map[string]bool)
 	var existingRoots []string
 	for _, r := range searchRoots {
-		if fi, err := os.Stat(r); err == nil && fi.IsDir() {
-			existingRoots = append(existingRoots, r)
+		clean := filepath.Clean(r)
+		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
+			clean = filepath.Clean(resolved)
+		}
+		if seenRoots[clean] {
+			continue
+		}
+		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
+			seenRoots[clean] = true
+			existingRoots = append(existingRoots, clean)
 		}
 	}
 
@@ -284,8 +307,12 @@ func DiscoverAndExtract(
 	}
 	foundCount := 0
 	installedTargets := make(map[string]bool)
+	var idkfaDestName string
 
 	for _, tp := range patterns {
+		if idkfaDestName == "" && preset.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
+			idkfaDestName = tp.DestName
+		}
 		destFile, joinErr := fsutil.SafeJoin(wadsDir, tp.DestName)
 		if joinErr != nil {
 			continue
@@ -304,12 +331,45 @@ func DiscoverAndExtract(
 		if len(candidates) == 0 {
 			candidates = indexedNorm[preset.NormalizeFilename(tp.SourcePattern)]
 		}
+		if strings.EqualFold(tp.DestName, "extras.wad") && len(candidates) > 1 {
+			candidates = rankExtrasCandidates(candidates)
+		}
 		if len(candidates) > 0 {
 			src := candidates[0]
 			if err := copyFile(src, destFile); err == nil {
 				fmt.Fprintf(out, "✓ Found & Installed: %s\n    Source: %s\n", tp.DestName, src)
 				foundCount++
 				installedTargets[strings.ToLower(tp.DestName)] = true
+			}
+		}
+	}
+
+	if idkfaDestName != "" && !installedTargets[strings.ToLower(idkfaDestName)] {
+		if destFile, err := fsutil.SafeJoin(wadsDir, idkfaDestName); err == nil {
+			alreadyExists := false
+			if !force {
+				if fi, statErr := os.Stat(destFile); statErr == nil && fi.Size() > 0 {
+					alreadyExists = true
+				}
+			}
+			if !alreadyExists {
+				extrasCandidates := rankExtrasCandidates(indexed["extras.wad"])
+				if existingExtras, joinErr := fsutil.SafeJoin(wadsDir, "extras.wad"); joinErr == nil {
+					extrasCandidates = append(extrasCandidates, existingExtras)
+				}
+				for _, extrasSrc := range extrasCandidates {
+					tracks, synthErr := SynthesizeIDKFAWAD(extrasSrc, destFile)
+					if synthErr == nil && tracks > 0 {
+						fmt.Fprintf(
+							out,
+							"✓ Synthesized & Installed: %s (%d tracks)\n    Source: %s\n",
+							idkfaDestName, tracks, extrasSrc,
+						)
+						foundCount++
+						installedTargets[strings.ToLower(idkfaDestName)] = true
+						break
+					}
+				}
 			}
 		}
 	}
@@ -327,4 +387,194 @@ func DiscoverAndExtract(
 func copyFile(src, dst string) error {
 	_, err := fsutil.CopyFileAtomic(src, dst, 0o644)
 	return err
+}
+
+func rankExtrasCandidates(paths []string) []string {
+	ranked := append([]string(nil), paths...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		iRerelease := strings.Contains(strings.ToLower(ranked[i]), "rerelease")
+		jRerelease := strings.Contains(strings.ToLower(ranked[j]), "rerelease")
+		if iRerelease != jRerelease {
+			return iRerelease
+		}
+		var iSize, jSize int64
+		if fi, err := os.Stat(ranked[i]); err == nil {
+			iSize = fi.Size()
+		}
+		if fj, err := os.Stat(ranked[j]); err == nil {
+			jSize = fj.Size()
+		}
+		return iSize > jSize
+	})
+	return ranked
+}
+
+// idkfaReusedTrackSlots maps an H_ lump name in extras.wad to additional D_ lump
+// names that share the same composition in DOOM.WAD and DOOM2.WAD (per TRAKINFO).
+// Multiple WAD directory entries share the same lump offset and size without
+// duplicating audio payload bytes.
+var idkfaReusedTrackSlots = map[string][]string{
+	// Doom I reused music slots
+	"H_INTRO": {"D_INTROA"},
+	"H_E1M6":  {"D_E3M6"},
+	"H_E1M7":  {"D_E2M5", "D_E3M5"},
+	"H_E1M8":  {"D_E3M4"},
+	"H_E1M9":  {"D_E3M9"},
+	"H_E2M3":  {"D_INTER"},
+	"H_E2M7":  {"D_E3M7"},
+	"H_E2M9":  {"D_E3M1"},
+	// Doom II reused music slots
+	"H_RUNNIN": {"D_RUNNI2"},
+	"H_STALKS": {"D_STLKS2", "D_STLKS3"},
+	"H_COUNTD": {"D_COUNT2"},
+	"H_DOOM":   {"D_DOOM2"},
+	"H_THE_DA": {"D_THEDA2", "D_THEDA3"},
+	"H_SHAWN":  {"D_SHAWN2", "D_SHAWN3"},
+	"H_DDTBLU": {"D_DDTBL2", "D_DDTBL3"},
+	"H_DEAD":   {"D_DEAD2"},
+	"H_ROMERO": {"D_ROMER2"},
+	"H_MESSAG": {"D_MESSG2"},
+}
+
+// SynthesizeIDKFAWAD extracts Andrew Hulshult's IDKFA soundtrack lumps (prefixed with H_)
+// from a DOOM + DOOM II (2024) extras.wad file, renames each lump prefix from H_ to D_
+// (including reused map music slots from TRAKINFO) so classic source ports play them
+// automatically, and writes a valid PWAD atomically to dstPath.
+func SynthesizeIDKFAWAD(srcExtrasPath, dstPath string) (int, error) {
+	f, err := os.Open(srcExtrasPath)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+	fileSize := fi.Size()
+	if fileSize < 12 {
+		return 0, errors.New("file too small to be a WAD")
+	}
+
+	var hdr [12]byte
+	if _, err := io.ReadFull(f, hdr[:]); err != nil {
+		return 0, err
+	}
+	ident := string(hdr[0:4])
+	if ident != "PWAD" && ident != "IWAD" {
+		return 0, fmt.Errorf("invalid WAD header %q", ident)
+	}
+
+	numLumps := int64(binary.LittleEndian.Uint32(hdr[4:8]))
+	dirOffset := int64(binary.LittleEndian.Uint32(hdr[8:12]))
+	if numLumps <= 0 || numLumps > 65536 || dirOffset < 12 || dirOffset+numLumps*16 > fileSize {
+		return 0, errors.New("corrupt WAD directory bounds")
+	}
+
+	dirBuf := make([]byte, numLumps*16)
+	if _, err := f.ReadAt(dirBuf, dirOffset); err != nil {
+		return 0, err
+	}
+
+	type audioPayload struct {
+		srcPos int64
+		outPos uint32
+		size   uint32
+		hName  string
+		dName  string
+	}
+
+	var payloads []audioPayload
+	seenDNames := make(map[string]bool)
+	curOutPos := int64(12)
+
+	for i := int64(0); i < numLumps; i++ {
+		entry := dirBuf[i*16 : (i+1)*16]
+		lumpPos := int64(binary.LittleEndian.Uint32(entry[0:4]))
+		lumpSize := int64(binary.LittleEndian.Uint32(entry[4:8]))
+		if lumpSize <= 0 || lumpPos < 12 || lumpPos+lumpSize > fileSize {
+			continue
+		}
+		nameSlice := entry[8:16]
+		if nul := bytes.IndexByte(nameSlice, 0); nul >= 0 {
+			nameSlice = nameSlice[:nul]
+		}
+		upperName := strings.ToUpper(string(nameSlice))
+		if len(upperName) < 3 || !strings.HasPrefix(upperName, "H_") || lumpSize < 4 {
+			continue
+		}
+		var magic [4]byte
+		if _, err := f.ReadAt(magic[:], lumpPos); err != nil || string(magic[:]) != "OggS" {
+			continue
+		}
+		if curOutPos+lumpSize > math.MaxUint32 {
+			return 0, errors.New("synthesized WAD exceeds 4 GiB limit")
+		}
+		dName := "D_" + upperName[2:]
+		seenDNames[dName] = true
+		payloads = append(payloads, audioPayload{
+			srcPos: lumpPos,
+			outPos: uint32(curOutPos),
+			size:   uint32(lumpSize),
+			hName:  upperName,
+			dName:  dName,
+		})
+		curOutPos += lumpSize
+	}
+
+	if len(payloads) == 0 {
+		return 0, errors.New("no H_ soundtrack lumps found in extras.wad")
+	}
+
+	type wadDirEntry struct {
+		outPos uint32
+		size   uint32
+		name   [8]byte
+	}
+
+	var dirEntries []wadDirEntry
+	addDirEntry := func(outPos, size uint32, lumpName string) {
+		var nameBytes [8]byte
+		copy(nameBytes[:], lumpName)
+		dirEntries = append(dirEntries, wadDirEntry{
+			outPos: outPos,
+			size:   size,
+			name:   nameBytes,
+		})
+	}
+
+	for _, p := range payloads {
+		addDirEntry(p.outPos, p.size, p.dName)
+		for _, alias := range idkfaReusedTrackSlots[p.hName] {
+			if !seenDNames[alias] {
+				seenDNames[alias] = true
+				addDirEntry(p.outPos, p.size, alias)
+			}
+		}
+	}
+
+	var outHdr [12]byte
+	copy(outHdr[0:4], "PWAD")
+	binary.LittleEndian.PutUint32(outHdr[4:8], uint32(len(dirEntries)))
+	binary.LittleEndian.PutUint32(outHdr[8:12], uint32(curOutPos))
+
+	outDir := make([]byte, len(dirEntries)*16)
+	for i, de := range dirEntries {
+		dstEntry := outDir[i*16 : (i+1)*16]
+		binary.LittleEndian.PutUint32(dstEntry[0:4], de.outPos)
+		binary.LittleEndian.PutUint32(dstEntry[4:8], de.size)
+		copy(dstEntry[8:16], de.name[:])
+	}
+
+	readers := make([]io.Reader, 0, len(payloads)+2)
+	readers = append(readers, bytes.NewReader(outHdr[:]))
+	for _, p := range payloads {
+		readers = append(readers, io.NewSectionReader(f, p.srcPos, int64(p.size)))
+	}
+	readers = append(readers, bytes.NewReader(outDir))
+
+	if _, _, err := fsutil.WriteReaderAtomic(dstPath, io.MultiReader(readers...), 0o644); err != nil {
+		return 0, err
+	}
+	return len(dirEntries), nil
 }

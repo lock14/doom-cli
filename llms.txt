@@ -74,7 +74,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `internal/engine/`: Declarative source port binary installation and argument synthesis (`runner.go`, `installer.go`).
 - `internal/fsutil/`: Atomic file writes with timestamped backups and path-containment helpers (`fsutil.go`).
 - `internal/preset/`: Two-layer entity catalog, store operations, schema linting, multi-root file and alias resolution, CP437 decoding, and README sync (`preset.go`, `store.go`, `lint.go`, `resolve.go`, `decode.go`, `compiler.go`).
-- `internal/steam/`: Multi-library `libraryfolders.vdf` parsing and catalog-driven game file extraction.
+- `internal/steam/`: Multi-library `libraryfolders.vdf` parsing, catalog-driven game file extraction, and `idkfa 2024.wad` soundtrack synthesis from `extras.wad`.
 - `internal/templates/`: Embedded configuration templates and backup deployment engine.
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
 - `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, embedded `DEHACKED` lump extractor, and SoundFont installer (`downloader.go`, `extract.go`, `soundfont.go`).

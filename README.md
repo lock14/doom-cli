@@ -117,7 +117,7 @@ doom setup
 1. **Installs source ports**: Downloads portable binaries for UZDoom and DSDA-Doom into your local binary path.
 2. **Deploys engine configurations**: Installs curated configurations for UZDoom and DSDA-Doom, auto-detecting your display resolution and native monitor refresh rate while creating timestamped backups (`.bak.<timestamp>`) of any existing files.
 3. **Deploys MIDI SoundFont**: Downloads and installs the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth MIDI playback.
-4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*, *Heretic*, and *Hexen*, importing commercial IWADs and the `idkfa 2024.wad` soundtrack into your WADs directory.
+4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*, *Heretic*, and *Hexen*, importing commercial IWADs and synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into your WADs directory.
 5. **Downloads community megawads**: Fetches and extracts free community megawads (*Eviternity I & II*, *Back to Saturn X*, *Ancient Aliens*, *Doom Zero*, *Sunder*, *Sunlust*, and others) and DeHackEd patches from idgames, DSDA, and community mirrors.
 
 ## CLI command reference
