@@ -26,11 +26,11 @@ type Paths struct {
 
 // GetPaths returns the platform-idiomatic paths for the current running OS.
 func GetPaths() *Paths {
-	return ResolveFor(runtime.GOOS, "")
+	return ResolveFor(runtime.GOOS)
 }
 
-// ResolveFor returns the platform-idiomatic paths for the given target OS and optional custom WADs dir.
-func ResolveFor(targetOS string, customWadsDir string) *Paths {
+// ResolveFor returns the platform-idiomatic paths for the given target OS.
+func ResolveFor(targetOS string) *Paths {
 	home, _ := os.UserHomeDir()
 	if home == "" {
 		home = os.Getenv("HOME")
@@ -47,7 +47,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DataDir = filepath.Join(appSupport, "doom-cli")
 		p.ConfigDir = filepath.Join(appSupport, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
-		p.WadsDir = filepath.Join(appSupport, "games", "uzdoom")
+		p.WadsDir = filepath.Join(appSupport, "games", "doom")
 
 	case "windows":
 		localAppData := os.Getenv("LOCALAPPDATA")
@@ -81,7 +81,7 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 		p.DataDir = filepath.Join(xdgData, "doom-cli")
 		p.ConfigDir = filepath.Join(xdgConfig, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
-		p.WadsDir = filepath.Join(xdgData, "games", "uzdoom")
+		p.WadsDir = filepath.Join(xdgData, "games", "doom")
 	}
 
 	p.SetConfigDir(p.ConfigDir)
@@ -92,23 +92,14 @@ func ResolveFor(targetOS string, customWadsDir string) *Paths {
 
 	if envWads := os.Getenv("DOOM_WADS_DIR"); envWads != "" {
 		p.WadsDir = envWads
-	} else if envWads := os.Getenv("WADS_DIR"); envWads != "" {
-		p.WadsDir = envWads
 	}
 	if envWadsDirs := os.Getenv("DOOM_WADS_DIRS"); envWadsDirs != "" {
 		p.WadsDirs = ParsePathList(envWadsDirs)
 	}
-	if customWadsDir != "" {
-		p.WadsDir = customWadsDir
-	}
 	if envBin := os.Getenv("DOOM_BIN_DIR"); envBin != "" {
-		p.SetBinDirForOS(targetOS, envBin)
-	} else if envBin := os.Getenv("BIN_DIR"); envBin != "" {
 		p.SetBinDirForOS(targetOS, envBin)
 	}
 	if envSF := os.Getenv("DOOM_SF_DIR"); envSF != "" {
-		p.SetSoundFontsDir(envSF)
-	} else if envSF := os.Getenv("SF_DIR"); envSF != "" {
 		p.SetSoundFontsDir(envSF)
 	} else {
 		p.SoundFontFile = filepath.Join(p.SoundFontsDir, "GeneralUser-GS.sf2")

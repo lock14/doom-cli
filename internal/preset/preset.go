@@ -358,19 +358,32 @@ func (c *Catalog) Clone() *Catalog {
 	return out
 }
 
-// FindEngine resolves an engine by ID or alias (case-insensitive).
+// FindEngine resolves an engine by ID or alias (case-insensitive), falling back
+// to the embedded curated catalog when c is nil or does not contain a match.
 func (c *Catalog) FindEngine(key string) (EngineConfig, bool) {
-	if c == nil {
-		return EngineConfig{}, false
-	}
 	clean := strings.ToLower(strings.TrimSpace(key))
 	if clean == "" {
 		return EngineConfig{}, false
 	}
-	if eng, ok := c.Engines[clean]; ok {
+	if c != nil && len(c.Engines) > 0 {
+		if eng, ok := findEngineInMap(c.Engines, clean); ok {
+			return eng, true
+		}
+	}
+	_, curated, err := loadEmbeddedCurated()
+	if err == nil && curated != nil && curated != c {
+		if eng, ok := findEngineInMap(curated.Engines, clean); ok {
+			return eng, true
+		}
+	}
+	return EngineConfig{}, false
+}
+
+func findEngineInMap(engines map[string]EngineConfig, clean string) (EngineConfig, bool) {
+	if eng, ok := engines[clean]; ok {
 		return eng, true
 	}
-	for k, eng := range c.Engines {
+	for k, eng := range engines {
 		if strings.EqualFold(k, clean) || strings.EqualFold(eng.ID, clean) {
 			return eng, true
 		}
@@ -741,13 +754,6 @@ func LoadCatalogFromDir(dir string) (*Catalog, error) {
 	return buildCatalog(curatedEnts, nil), nil
 }
 
-// LoadCatalog loads the embedded curated catalog and layers any user entities from
-// userPath (either a directory of *.json entity files or a single entity JSON file).
-// If userPath is empty, only the embedded curated catalog is returned.
-func LoadCatalog(userPath string) (*Catalog, error) {
-	return LoadLayeredCatalog(userPath, false)
-}
-
 // LoadLayeredCatalog loads the embedded curated catalog and merges user entities from userPath.
 // When explicitPath is true, a non-existent userPath returns an error instead of being treated as empty.
 func LoadLayeredCatalog(userPath string, explicitPath bool) (*Catalog, error) {
@@ -887,7 +893,7 @@ func buildCatalog(curatedEnts, userEnts []Entity) *Catalog {
 		})
 
 		for _, p := range layerPresets {
-			if eng, ok := cat.FindEngine(p.Engine); ok {
+			if eng, ok := findEngineInMap(cat.Engines, strings.ToLower(strings.TrimSpace(p.Engine))); ok {
 				p.Engine = eng.ID
 			}
 			if idx, exists := presetIndex[p.ID]; exists {
@@ -946,7 +952,7 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 		s := ov.Set
 		if s.Engine != nil && *s.Engine != "" {
 			engName := *s.Engine
-			if eng, ok := cat.FindEngine(engName); ok {
+			if eng, ok := findEngineInMap(cat.Engines, strings.ToLower(strings.TrimSpace(engName))); ok {
 				engName = eng.ID
 			}
 			p.Engine = engName

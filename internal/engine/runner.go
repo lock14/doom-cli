@@ -16,24 +16,12 @@ import (
 // LaunchOptions contains options and overrides for preset execution.
 type LaunchOptions struct {
 	EngineOverride string
-	WadsDir        string
 	WadRoots       []string
 	BinDir         string
 	DryRun         bool
 	ExtraArgs      []string
 	Out            io.Writer
-	Engines        map[string]preset.EngineConfig
 	Catalog        *preset.Catalog
-}
-
-func (opts LaunchOptions) wadRoots() []string {
-	if len(opts.WadRoots) > 0 {
-		return opts.WadRoots
-	}
-	if opts.WadsDir != "" {
-		return []string{opts.WadsDir}
-	}
-	return nil
 }
 
 // LaunchPlan contains the resolved engine binary and constructed arguments ready for execution.
@@ -53,39 +41,10 @@ func resolveEngineConfig(name string, opts LaunchOptions) (preset.EngineConfig, 
 		clean = "dsda-doom"
 	}
 
+	if eng, ok := opts.Catalog.FindEngine(clean); ok {
+		return eng, nil
+	}
 	if opts.Catalog != nil {
-		if eng, ok := opts.Catalog.FindEngine(clean); ok {
-			return eng, nil
-		}
-		return preset.EngineConfig{}, fmt.Errorf("unknown engine %q", clean)
-	}
-
-	if len(opts.Engines) > 0 {
-		for k, eng := range opts.Engines {
-			if strings.EqualFold(k, clean) || strings.EqualFold(eng.ID, clean) {
-				if eng.ID == "" {
-					eng.ID = k
-				}
-				return eng, nil
-			}
-			for _, alias := range eng.Aliases {
-				if strings.EqualFold(alias, clean) {
-					if eng.ID == "" {
-						eng.ID = k
-					}
-					return eng, nil
-				}
-			}
-		}
-	}
-
-	if curated, err := preset.LoadCuratedCatalog(); err == nil {
-		if eng, ok := curated.FindEngine(clean); ok {
-			return eng, nil
-		}
-	}
-
-	if len(opts.Engines) > 0 {
 		return preset.EngineConfig{}, fmt.Errorf("unknown engine %q", clean)
 	}
 
@@ -123,9 +82,9 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 		return nil, err
 	}
 
-	roots := opts.wadRoots()
-	primaryDir := opts.WadsDir
-	if primaryDir == "" && len(roots) > 0 {
+	roots := opts.WadRoots
+	primaryDir := ""
+	if len(roots) > 0 {
 		primaryDir = roots[0]
 	}
 	idx := preset.NewDirIndex(roots...).WithCatalog(opts.Catalog).WithPresets(p)
@@ -134,7 +93,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	if !ok {
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
-				"Run 'doom wads extract-steam' if you own the game on Steam or GOG",
+				"Run 'doom wads extract' if you own the game on Steam or GOG",
 			p.IWAD,
 			primaryDir,
 		)

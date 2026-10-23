@@ -41,7 +41,7 @@ func TestPrepareLaunch_DSDADoom(t *testing.T) {
 
 	opts := LaunchOptions{
 		BinDir:    binDir,
-		WadsDir:   wadsDir,
+		WadRoots:  []string{wadsDir},
 		DryRun:    true,
 		ExtraArgs: []string{"-skill", "4"},
 	}
@@ -109,10 +109,10 @@ func TestPrepareLaunch_UZDoom_OptionalAudioAndLoadMapsAfterMods(t *testing.T) {
 
 	var out bytes.Buffer
 	opts := LaunchOptions{
-		BinDir:  binDir,
-		WadsDir: wadsDir,
-		DryRun:  true,
-		Out:     &out,
+		BinDir:   binDir,
+		WadRoots: []string{wadsDir},
+		DryRun:   true,
+		Out:      &out,
 	}
 
 	plan, err := PrepareLaunch(p, opts)
@@ -187,8 +187,8 @@ func TestPrepareLaunch_CustomEnginePrefixArgsAndBex(t *testing.T) {
 
 	opts := LaunchOptions{
 		BinDir:    binDir,
-		WadsDir:   wadsDir,
-		Engines:   customEngines,
+		WadRoots:  []string{wadsDir},
+		Catalog:   &preset.Catalog{Engines: customEngines},
 		DryRun:    true,
 		ExtraArgs: []string{"-warp", "15"},
 	}
@@ -431,9 +431,9 @@ func TestPrepareLaunch_CustomFileSpecAliases(t *testing.T) {
 	}
 
 	plan, err := PrepareLaunch(p, LaunchOptions{
-		BinDir:  binDir,
-		WadsDir: wadsDir,
-		DryRun:  true,
+		BinDir:   binDir,
+		WadRoots: []string{wadsDir},
+		DryRun:   true,
 	})
 	if err != nil {
 		t.Fatalf("PrepareLaunch failed to resolve custom FileSpec.Aliases: %v", err)

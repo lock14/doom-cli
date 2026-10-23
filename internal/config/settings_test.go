@@ -31,7 +31,7 @@ func TestSaveAndLoadConfig(t *testing.T) {
 	}
 
 	cfg := &AppConfig{
-		Theme:         "cyberpunk",
+		Theme:         "plasma",
 		NerdFonts:     true,
 		WadsDir:       "/custom/wads",
 		WadsDirs:      []string{"/extra/wads1", "/extra/wads2"},
@@ -48,8 +48,8 @@ func TestSaveAndLoadConfig(t *testing.T) {
 		t.Fatalf("failed to load saved config: %v", err)
 	}
 
-	if loaded.Theme != "cyberpunk" {
-		t.Errorf("expected loaded theme 'cyberpunk', got %q", loaded.Theme)
+	if loaded.Theme != "plasma" {
+		t.Errorf("expected loaded theme 'plasma', got %q", loaded.Theme)
 	}
 	if !loaded.NerdFonts {
 		t.Errorf("expected loaded NerdFonts true, got false")
@@ -75,7 +75,7 @@ func TestConfigPreservesUnknownKeysAndCreatesBackup(t *testing.T) {
 	p := &Paths{ConfigFile: configPath}
 
 	initial := "\xef\xbb\xbf{\n  \"theme\": \"blood\",\n" +
-		"  \"x_custom_future\": {\"keep\": \"me\"},\n  \"engines\": {}\n}\n"
+		"  \"x_custom_future\": {\"keep\": \"me\"}\n}\n"
 	if err := os.WriteFile(configPath, []byte(initial), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
@@ -83,9 +83,6 @@ func TestConfigPreservesUnknownKeysAndCreatesBackup(t *testing.T) {
 	cfg, err := LoadConfig(p)
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
-	}
-	if len(cfg.LegacyEntityKeys) != 1 || cfg.LegacyEntityKeys[0] != "engines" {
-		t.Fatalf("expected LegacyEntityKeys=[engines], got %v", cfg.LegacyEntityKeys)
 	}
 
 	cfg.NerdFonts = true

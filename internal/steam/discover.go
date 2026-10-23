@@ -202,14 +202,9 @@ func GetSearchRoots() []string {
 	return expanded
 }
 
-// DiscoverAndExtract searches for official game files across search roots and copies them into wadsDir.
-func DiscoverAndExtract(searchRoots []string, wadsDir string, force bool, out io.Writer) (int, error) {
-	return DiscoverAndExtractForCatalog(nil, searchRoots, wadsDir, force, out)
-}
-
-// DiscoverAndExtractForCatalog searches for official game files and catalog WADs across search roots
+// DiscoverAndExtract searches for official game files and catalog WADs across search roots
 // using target patterns synthesized from cat (or the curated catalog when cat is nil).
-func DiscoverAndExtractForCatalog(
+func DiscoverAndExtract(
 	cat *preset.Catalog,
 	searchRoots []string,
 	wadsDir string,

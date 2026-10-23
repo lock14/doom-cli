@@ -41,7 +41,7 @@ func runPlay(cmd *cobra.Command, args []string) error {
 
 	var lastPreset string
 	for {
-		selected, err := tui.RunInteractiveLauncherWithRoots(
+		selected, err := tui.RunInteractiveLauncher(
 			cat, paths.WadRoots(), theme, nerdFonts, lastPreset,
 		)
 		if err != nil {
@@ -54,13 +54,11 @@ func runPlay(cmd *cobra.Command, args []string) error {
 		lastPreset = selected.Name
 		opts := engine.LaunchOptions{
 			EngineOverride: flagEngineOverride,
-			WadsDir:        paths.WadsDir,
 			WadRoots:       paths.WadRoots(),
 			BinDir:         paths.BinDir,
 			DryRun:         flagDryRun,
 			ExtraArgs:      extraArgs,
 			Out:            os.Stdout,
-			Engines:        cat.Engines,
 			Catalog:        cat,
 		}
 

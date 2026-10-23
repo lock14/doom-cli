@@ -20,22 +20,8 @@ func formatKeyHelp(items []keyHelp) string {
 	return defaultStyles.FormatKeyHelp(items)
 }
 
-func resolveBadgeText(catalog *preset.Catalog, engine string) string {
-	if catalog != nil {
-		if eng, ok := catalog.FindEngine(engine); ok {
-			return eng.BadgeText()
-		}
-	}
-	if curated, err := preset.LoadCuratedCatalog(); err == nil {
-		if eng, ok := curated.FindEngine(engine); ok {
-			return eng.BadgeText()
-		}
-	}
-	return (preset.EngineConfig{ID: engine}).BadgeText()
-}
-
 func formatEngineTagWithCatalog(catalog *preset.Catalog, engine string, styles ThemeStyles) string {
-	badge := resolveBadgeText(catalog, engine)
+	badge := catalog.EngineBadge(engine)
 	switch {
 	case strings.EqualFold(badge, "DSDA"):
 		return styles.TagDSDA.Render("[DSDA]") + "  "
@@ -113,26 +99,6 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 		}
 	}
 	return listLines
-}
-
-func resolveEngineDescription(catalog *preset.Catalog, engineKey string) string {
-	if catalog != nil {
-		if eng, ok := catalog.FindEngine(engineKey); ok {
-			if eng.Description != "" {
-				return eng.Description
-			}
-			return eng.EffectiveDisplayName()
-		}
-	}
-	if curated, err := preset.LoadCuratedCatalog(); err == nil {
-		if eng, ok := curated.FindEngine(engineKey); ok {
-			if eng.Description != "" {
-				return eng.Description
-			}
-			return eng.EffectiveDisplayName()
-		}
-	}
-	return engineKey
 }
 
 type previewFileEntry struct {
@@ -244,7 +210,10 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 
 	cur := m.filtered[m.cursor]
 	readmePath, hasReadme := m.resolveReadme(cur)
-	engStr := resolveEngineDescription(m.catalog, cur.Engine)
+	engStr := m.catalog.EngineDisplayName(cur.Engine)
+	if eng, ok := m.catalog.FindEngine(cur.Engine); ok && eng.Description != "" {
+		engStr = eng.Description
+	}
 
 	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")
 	if _, ok := m.resolveFile(cur.IWAD); ok {

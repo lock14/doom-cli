@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,8 +46,8 @@ func TestDeployConfigs_And_Diff(t *testing.T) {
 		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
 	}
 
-	if err := DeployConfigs(paths); err != nil {
-		t.Fatalf("DeployConfigs failed: %v", err)
+	if err := DeployConfigsTo(paths, io.Discard); err != nil {
+		t.Fatalf("DeployConfigsTo failed: %v", err)
 	}
 
 	// Verify autoexec.cfg

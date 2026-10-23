@@ -168,8 +168,6 @@ The `doom` CLI provides modular commands for granular management:
 | `doom wads extract` | Auto-discovers and imports official Steam and GOG commercial IWADs |
 | `doom wads extract --force` | Re-extracts and overwrites existing IWADs in the destination directory |
 
-The `doom wads extract-steam` command is an alias for `doom wads extract`.
-
 ### SoundFont management
 
 | Command | Description |
@@ -277,7 +275,7 @@ doom play --theme toxic
 
 | Theme | Type | Description |
 | :--- | :--- | :--- |
-| `classic` | ANSI-16 | Classic Doom semantic ANSI palette that adapts to terminal colors (`default`) |
+| `classic` | ANSI-16 | Classic Doom semantic ANSI palette that adapts to terminal colors (default) |
 | `blood` | TrueColor | Gothic crimson (`#9B111E`) and bone white Nightdive software-plus palette |
 | `toxic` | TrueColor | Radioactive nukage green (`#70E000`) and hazard amber (`#FFB703`) Phobos techbase palette |
 | `inferno` | TrueColor | Volcanic molten magma (`#FF5400`) and charred basalt Episode 3 palette |
@@ -324,7 +322,7 @@ Theme resolution follows a four-step precedence order:
 1. `--theme <name>` CLI flag
 2. `DOOM_THEME` environment variable
 3. `theme` setting in user configuration (`config.json`)
-4. `default` built-in theme
+4. `classic` built-in theme
 
 ### Nerd Fonts and capsule badges
 
@@ -487,11 +485,11 @@ Environment variables override persistent settings in `config.json` and platform
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `DOOM_THEME` | Color theme for the interactive launcher | `default` (or value in `config.json`) |
-| `DOOM_WADS_DIR` or `WADS_DIR` | Primary directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
-| `DOOM_WADS_DIRS` or `WADS_DIRS` | Additional read-only WAD search directories (comma or path-list separated) | `wads_dirs` in `config.json` |
-| `DOOM_BIN_DIR` or `BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |
-| `DOOM_SF_DIR` or `SF_DIR` | Directory containing SoundFonts (`GeneralUser-GS.sf2`) | Platform standard SoundFonts directory |
+| `DOOM_THEME` | Color theme for the interactive launcher | `classic` (or value in `config.json`) |
+| `DOOM_WADS_DIR` | Primary directory containing game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
+| `DOOM_WADS_DIRS` | Additional read-only WAD search directories (comma or path-list separated) | `wads_dirs` in `config.json` |
+| `DOOM_BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |
+| `DOOM_SF_DIR` | Directory containing SoundFonts (`GeneralUser-GS.sf2`) | Platform standard SoundFonts directory |
 
 ## Directory layouts
 
@@ -500,7 +498,7 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 | Component | Linux (XDG) | macOS | Windows |
 | :--- | :--- | :--- | :--- |
 | Binaries | `~/.local/bin/` | `~/.local/bin/` | `%USERPROFILE%\Games\Doom\bin\` |
-| WADs and mods | `~/.local/share/games/uzdoom/` | `~/Library/Application Support/games/uzdoom/` | `%USERPROFILE%\Games\Doom\wads\` |
+| WADs and mods | `~/.local/share/games/doom/` | `~/Library/Application Support/games/doom/` | `%USERPROFILE%\Games\Doom\wads\` |
 | UZDoom configuration | `~/.config/uzdoom/autoexec.cfg` | `~/Library/Application Support/uzdoom/autoexec.cfg` | `%USERPROFILE%\Games\Doom\bin\autoexec.cfg` |
 | DSDA-Doom configuration | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` |
 | CLI configuration and themes | `~/.config/doom-cli/` | `~/Library/Application Support/doom-cli/` | `%LOCALAPPDATA%\doom-cli\` |
@@ -583,7 +581,7 @@ Flatpaks isolate applications from the rest of the filesystem, preventing the la
 ## Troubleshooting and FAQ
 
 ### "Base IWAD not found" error when launching
-Ensure commercial IWADs (`DOOM2.WAD`, `DOOM.WAD`, and others) are in your WAD directory (`~/.local/share/games/uzdoom/` on Linux). If you own the game on Steam or GOG, run:
+Ensure commercial IWADs (`DOOM2.WAD`, `DOOM.WAD`, and others) are in your WAD directory (`~/.local/share/games/doom/` on Linux). If you own the game on Steam or GOG, run:
 ```bash
 doom wads extract
 ```

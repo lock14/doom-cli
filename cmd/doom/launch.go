@@ -33,13 +33,11 @@ func newLaunchCmd() *cobra.Command {
 			errOut := cmdErr(cmd)
 			opts := engine.LaunchOptions{
 				EngineOverride: flagEngineOverride,
-				WadsDir:        paths.WadsDir,
 				WadRoots:       paths.WadRoots(),
 				BinDir:         paths.BinDir,
 				DryRun:         flagDryRun,
 				ExtraArgs:      extraArgs,
 				Out:            out,
-				Engines:        cat.Engines,
 				Catalog:        cat,
 			}
 

@@ -7,8 +7,8 @@ import (
 )
 
 func BenchmarkModel_ComputeLayout_SideBySide(b *testing.B) {
-	cat, _ := preset.LoadCatalog("")
-	m := initialModel(cat, "", DefaultTheme, false)
+	cat, _ := preset.LoadCuratedCatalog()
+	m := initialModel(cat, nil, ClassicTheme, false)
 	m.width = 120
 	m.height = 40
 
@@ -20,8 +20,8 @@ func BenchmarkModel_ComputeLayout_SideBySide(b *testing.B) {
 }
 
 func BenchmarkModel_ComputeLayout_Stacked(b *testing.B) {
-	cat, _ := preset.LoadCatalog("")
-	m := initialModel(cat, "", DefaultTheme, false)
+	cat, _ := preset.LoadCuratedCatalog()
+	m := initialModel(cat, nil, ClassicTheme, false)
 	m.width = 80
 	m.height = 24
 
@@ -33,8 +33,8 @@ func BenchmarkModel_ComputeLayout_Stacked(b *testing.B) {
 }
 
 func BenchmarkModel_FuzzyFiltering(b *testing.B) {
-	cat, _ := preset.LoadCatalog("")
-	m := initialModel(cat, "", DefaultTheme, false)
+	cat, _ := preset.LoadCuratedCatalog()
+	m := initialModel(cat, nil, ClassicTheme, false)
 
 	queries := []string{"alien", "evi", "boom", "sunder", "rust", "sigil"}
 	b.ReportAllocs()

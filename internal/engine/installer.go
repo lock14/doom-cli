@@ -107,22 +107,6 @@ func SelectAsset(recipe preset.PlatformRecipe, assets []GitHubAsset) (string, st
 	return "", "", false
 }
 
-// ResolveLatestGitHubURL queries the GitHub Releases API for an asset matching patternRegex,
-// falling back to fallbackURL if the API request fails or no asset matches.
-func (ins *Installer) ResolveLatestGitHubURL(repo, patternRegex, fallbackURL string) string {
-	recipe := preset.PlatformRecipe{
-		Assets: []string{patternRegex},
-	}
-	if fallbackURL != "" {
-		recipe.Pinned = &preset.PinnedRelease{URL: fallbackURL}
-	}
-	url, _, err := ins.resolveRecipeAsset(repo, recipe)
-	if err != nil {
-		return fallbackURL
-	}
-	return url
-}
-
 func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformRecipe) (string, string, error) {
 	var apiURL string
 	if strings.HasPrefix(repo, "http://") || strings.HasPrefix(repo, "https://") {
@@ -169,11 +153,6 @@ func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformReci
 	}
 
 	return "", "", fmt.Errorf("no matching release asset found for %s", repo)
-}
-
-// DownloadFile downloads a file from url to targetPath and verifies expectedSHA256 when non-empty.
-func (ins *Installer) DownloadFile(url, targetPath string) error {
-	return ins.DownloadFileVerified(url, targetPath, "")
 }
 
 // DownloadFileVerified downloads a file from url to targetPath and checks expectedSHA256 when provided.
@@ -293,41 +272,6 @@ func (ins *Installer) InstallCatalog(cat *preset.Catalog) error {
 		}
 	}
 	return errors.Join(errs...)
-}
-
-// InstallUZDoom downloads and installs UZDoom using its curated catalog recipe.
-func (ins *Installer) InstallUZDoom() error {
-	cat, err := preset.LoadCuratedCatalog()
-	if err != nil {
-		return err
-	}
-	eng, ok := cat.FindEngine("uzdoom")
-	if !ok {
-		return fmt.Errorf("curated engine uzdoom not found")
-	}
-	return ins.InstallEngine(eng)
-}
-
-// InstallDSDA downloads and installs DSDA-Doom using its curated catalog recipe.
-func (ins *Installer) InstallDSDA() error {
-	cat, err := preset.LoadCuratedCatalog()
-	if err != nil {
-		return err
-	}
-	eng, ok := cat.FindEngine("dsda-doom")
-	if !ok {
-		return fmt.Errorf("curated engine dsda-doom not found")
-	}
-	return ins.InstallEngine(eng)
-}
-
-// InstallAll installs all curated source ports, attempting each engine even if one fails.
-func (ins *Installer) InstallAll() error {
-	cat, err := preset.LoadCuratedCatalog()
-	if err != nil {
-		return err
-	}
-	return ins.InstallCatalog(cat)
 }
 
 func (ins *Installer) deployAsset(targetName, url, expectedSHA256 string) error {

@@ -25,14 +25,9 @@ type Downloader struct {
 	Out      io.Writer
 }
 
-// NewDownloader creates a new Downloader targeting wadsDir.
-func NewDownloader(wadsDir string, force bool, out io.Writer) *Downloader {
-	return NewDownloaderWithRoots([]string{wadsDir}, force, out)
-}
-
-// NewDownloaderWithRoots creates a new Downloader using roots[0] as the write directory
+// NewDownloader creates a new Downloader using roots[0] as the write directory
 // and checking all roots for existing files.
-func NewDownloaderWithRoots(roots []string, force bool, out io.Writer) *Downloader {
+func NewDownloader(roots []string, force bool, out io.Writer) *Downloader {
 	if out == nil {
 		out = io.Discard
 	}

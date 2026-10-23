@@ -69,8 +69,3 @@ func SyncReadme(rootDir string) error {
 	}
 	return err
 }
-
-// CompileOptionsFiles delegates to SyncReadme for backward compatibility.
-func CompileOptionsFiles(rootDir string) error {
-	return SyncReadme(rootDir)
-}

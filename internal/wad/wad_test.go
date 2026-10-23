@@ -82,7 +82,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 		{name: "Credits.txt", content: "credits-only"},
 		{name: "Eviternity II.wad", content: "content-eviternity"},
 		{name: "eviternityii.txt", content: "eviternity-ii-readme"},
-		{name: "sub/SUNDER_V2512.wad", content: "content-sunder"},
+		{name: "sub/sunder.wad", content: "content-sunder"},
 		{name: "custom_short.wad", content: "content-custom"},
 		{name: "patch_file.bex", content: "content-bex"},
 	} {
@@ -105,7 +105,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	}
 
 	wadsDir := filepath.Join(tmpDir, "wads")
-	dl := NewDownloader(wadsDir, false, nil)
+	dl := NewDownloader([]string{wadsDir}, false, nil)
 
 	customPreset := preset.Preset{
 		Files: []preset.FileSpec{
@@ -179,7 +179,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 		t.Fatal(err)
 	}
 	sunderWadsDir := filepath.Join(tmpDir, "sunder_wads")
-	sunderDL := NewDownloader(sunderWadsDir, false, nil)
+	sunderDL := NewDownloader([]string{sunderWadsDir}, false, nil)
 	if err := sunderDL.extractFromZip(
 		sunderZipPath,
 		int64(sunderBuf.Len()),
@@ -242,7 +242,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 	t.Run("zip download with valid sha256", func(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
-		dl := NewDownloader(wadsDir, false, nil)
+		dl := NewDownloader([]string{wadsDir}, false, nil)
 		p := preset.Preset{
 			Name:   "Alien Vendetta",
 			Engine: "dsda-doom",
@@ -263,7 +263,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 	t.Run("sha256 mismatch rejected", func(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
-		dl := NewDownloader(wadsDir, false, nil)
+		dl := NewDownloader([]string{wadsDir}, false, nil)
 		p := preset.Preset{
 			Name:   "Bad Digest",
 			Engine: "dsda-doom",
@@ -281,7 +281,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 	t.Run("direct pk3 download saved as pk3 without unzipping", func(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
-		dl := NewDownloader(wadsDir, false, nil)
+		dl := NewDownloader([]string{wadsDir}, false, nil)
 		p := preset.Preset{
 			Name:    "Direct PK3",
 			Engine:  "uzdoom",
@@ -301,7 +301,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 	t.Run("7z extension rejected before saving as wad", func(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
-		dl := NewDownloader(wadsDir, false, nil)
+		dl := NewDownloader([]string{wadsDir}, false, nil)
 		p := preset.Preset{
 			Name:    "Unsupported 7z",
 			Engine:  "dsda-doom",
@@ -317,7 +317,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 	t.Run("direct wad download extracts embedded DEHACKED lump for expected deh file", func(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
-		dl := NewDownloader(wadsDir, false, nil)
+		dl := NewDownloader([]string{wadsDir}, false, nil)
 		p := preset.Preset{
 			Name:   "Doom Zero",
 			Engine: "dsda-doom",
@@ -344,7 +344,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
 		wadsDir := filepath.Join(baseDir, "wads")
-		dl := NewDownloader(wadsDir, false, nil)
+		dl := NewDownloader([]string{wadsDir}, false, nil)
 		p := preset.Preset{
 			Name:    "Traversal",
 			Engine:  "dsda-doom",
@@ -407,7 +407,7 @@ func TestDownloader_ExtractFromZip_ZipSlipProtection(t *testing.T) {
 	}
 
 	wadsDir := filepath.Join(tmpDir, "wads")
-	dl := NewDownloader(wadsDir, false, nil)
+	dl := NewDownloader([]string{wadsDir}, false, nil)
 
 	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{"normal.wad"})
 	if err != nil {

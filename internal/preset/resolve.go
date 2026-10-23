@@ -144,16 +144,6 @@ func (c *Catalog) FileAliases(name string) []string {
 	return append([]string(nil), merged[key]...)
 }
 
-// KnownAliases returns any recognized alternate filenames for a given target filename
-// derived from the curated preset catalog and base IWAD mappings.
-func KnownAliases(name string) []string {
-	key := NormalizeFilename(filepath.Base(strings.TrimSpace(name)))
-	if key == "" {
-		return nil
-	}
-	return append([]string(nil), getCuratedAliasMap()[key]...)
-}
-
 type rootCache struct {
 	dir     string
 	entries []os.DirEntry
@@ -503,12 +493,6 @@ func NormalizeFilename(name string) string {
 	return filenameReplacer.Replace(strings.ToLower(name))
 }
 
-// ResolveFile searches for a required file within wadsDir with case-insensitivity,
-// normalization, safe sub-path handling, and known aliases.
-func ResolveFile(wadsDir string, targetName string) (string, bool) {
-	return NewDirIndex(wadsDir).ResolveFile(targetName)
-}
-
 func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (string, bool) {
 	if wadsDir == "" || targetName == "" {
 		return "", false
@@ -547,9 +531,4 @@ func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (st
 	}
 
 	return "", false
-}
-
-// ResolveReadme locates an accompanying documentation or text file for the preset.
-func ResolveReadme(wadsDir string, p Preset) (string, bool) {
-	return NewDirIndex(wadsDir).ResolveReadme(p)
 }

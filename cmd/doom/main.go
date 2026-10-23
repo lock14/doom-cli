@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -63,30 +62,16 @@ func loadPathsAndConfig() (*config.Paths, *config.AppConfig, error) {
 		return nil, nil, fmt.Errorf("loading config: %w", err)
 	}
 	if cfg != nil {
-		if len(cfg.LegacyEntityKeys) > 0 {
-			fmt.Fprintf(
-				os.Stderr,
-				"warning: legacy keys (%s) in %s are ignored; "+
-					"user engines, presets, and overrides now live in %s\n",
-				strings.Join(cfg.LegacyEntityKeys, ", "),
-				paths.ConfigFile,
-				paths.CatalogDir,
-			)
-		}
-		hasWadsEnv := os.Getenv("WADS_DIR") != "" || os.Getenv("DOOM_WADS_DIR") != ""
-		if cfg.WadsDir != "" && !hasWadsEnv {
+		if cfg.WadsDir != "" && os.Getenv("DOOM_WADS_DIR") == "" {
 			paths.WadsDir = cfg.WadsDir
 		}
-		hasWadsDirsEnv := os.Getenv("WADS_DIRS") != "" || os.Getenv("DOOM_WADS_DIRS") != ""
-		if len(cfg.WadsDirs) > 0 && !hasWadsDirsEnv {
+		if len(cfg.WadsDirs) > 0 && os.Getenv("DOOM_WADS_DIRS") == "" {
 			paths.WadsDirs = append([]string(nil), cfg.WadsDirs...)
 		}
-		hasBinEnv := os.Getenv("BIN_DIR") != "" || os.Getenv("DOOM_BIN_DIR") != ""
-		if cfg.BinDir != "" && !hasBinEnv {
+		if cfg.BinDir != "" && os.Getenv("DOOM_BIN_DIR") == "" {
 			paths.SetBinDir(cfg.BinDir)
 		}
-		hasSFEnv := os.Getenv("SF_DIR") != "" || os.Getenv("DOOM_SF_DIR") != ""
-		if cfg.SoundFontsDir != "" && !hasSFEnv {
+		if cfg.SoundFontsDir != "" && os.Getenv("DOOM_SF_DIR") == "" {
 			paths.SetSoundFontsDir(cfg.SoundFontsDir)
 		}
 	}

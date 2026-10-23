@@ -20,20 +20,8 @@ func TestGetBuiltinTheme(t *testing.T) {
 		found    bool
 	}{
 		{
-			name:     "exact default",
-			input:    "default",
-			expected: "classic",
-			found:    true,
-		},
-		{
 			name:     "exact classic",
 			input:    "classic",
-			expected: "classic",
-			found:    true,
-		},
-		{
-			name:     "alias doom",
-			input:    "doom",
 			expected: "classic",
 			found:    true,
 		},
@@ -46,12 +34,6 @@ func TestGetBuiltinTheme(t *testing.T) {
 		{
 			name:     "toxic theme",
 			input:    "toxic",
-			expected: "toxic",
-			found:    true,
-		},
-		{
-			name:     "alias phobos",
-			input:    "phobos",
 			expected: "toxic",
 			found:    true,
 		},
@@ -74,32 +56,14 @@ func TestGetBuiltinTheme(t *testing.T) {
 			found:    true,
 		},
 		{
-			name:     "alias cyberpunk",
-			input:    "cyberpunk",
-			expected: "plasma",
-			found:    true,
-		},
-		{
 			name:     "heretic theme",
 			input:    "heretic",
 			expected: "heretic",
 			found:    true,
 		},
 		{
-			name:     "alias dracula",
-			input:    "dracula",
-			expected: "heretic",
-			found:    true,
-		},
-		{
 			name:     "amber theme",
 			input:    "amber",
-			expected: "amber",
-			found:    true,
-		},
-		{
-			name:     "alias matrix",
-			input:    "matrix",
 			expected: "amber",
 			found:    true,
 		},
@@ -156,7 +120,7 @@ func TestListBuiltinThemes(t *testing.T) {
 
 func TestCompileStyles(t *testing.T) {
 	t.Parallel()
-	styles := CompileStyles(CyberpunkTheme)
+	styles := CompileStyles(PlasmaTheme)
 	rendered := styles.BrandBody.Render("TEST")
 	if rendered == "" {
 		t.Error("expected non-empty rendered string from compiled BrandBody style")
@@ -210,7 +174,7 @@ func TestResolveTheme(t *testing.T) {
 	}{
 		{
 			name:      "flag precedence over env and config",
-			flagTheme: "cyberpunk",
+			flagTheme: "plasma",
 			envTheme:  "blood",
 			expected:  "plasma",
 		},
@@ -218,14 +182,14 @@ func TestResolveTheme(t *testing.T) {
 			name:        "env precedence over config",
 			flagTheme:   "",
 			envTheme:    "blood",
-			configTheme: "matrix",
+			configTheme: "amber",
 			expected:    "blood",
 		},
 		{
 			name:        "config fallback when flag and env empty",
 			flagTheme:   "",
 			envTheme:    "",
-			configTheme: "matrix",
+			configTheme: "amber",
 			expected:    "amber",
 		},
 		{
@@ -244,7 +208,7 @@ func TestResolveTheme(t *testing.T) {
 			expected:    "violet",
 		},
 		{
-			name:        "all empty falls back to default",
+			name:        "all empty falls back to classic",
 			flagTheme:   "",
 			envTheme:    "",
 			configTheme: "",
@@ -266,7 +230,7 @@ func TestResolveTheme(t *testing.T) {
 
 func TestRenderBrandPill_NerdFonts(t *testing.T) {
 	t.Parallel()
-	styles := CompileStyles(DefaultTheme)
+	styles := CompileStyles(ClassicTheme)
 
 	// Solid badge without Nerd Fonts
 	standard := styles.RenderBrandPill(false)

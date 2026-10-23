@@ -31,7 +31,7 @@ func newWadsCmd() *cobra.Command {
 				target = args[0]
 			}
 
-			dl := wad.NewDownloaderWithRoots(paths.WadRoots(), flagForce, cmdOut(cmd))
+			dl := wad.NewDownloader(paths.WadRoots(), flagForce, cmdOut(cmd))
 			if strings.EqualFold(target, "all") {
 				return dl.DownloadAll(cat)
 			}
@@ -66,15 +66,14 @@ func newWadsCmd() *cobra.Command {
 	}
 
 	wadsExtractCmd := &cobra.Command{
-		Use:     "extract-steam",
-		Aliases: []string{"extract"},
-		Short:   "Auto-discover and copy official IWADs and expansions from Steam and GOG",
+		Use:   "extract",
+		Short: "Auto-discover and copy official IWADs and expansions from Steam and GOG",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
-			_, err = steam.DiscoverAndExtractForCatalog(cat, nil, paths.WadsDir, flagForce, cmdOut(cmd))
+			_, err = steam.DiscoverAndExtract(cat, nil, paths.WadsDir, flagForce, cmdOut(cmd))
 			return err
 		},
 	}
