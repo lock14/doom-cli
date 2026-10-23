@@ -22,9 +22,10 @@ All contributions must respect the core repository invariants:
     *   **Standard directory structures**: Respect platform standard directories (XDG on Linux,
         `~/Library/Application Support/` on macOS, and `%LOCALAPPDATA%` and `%USERPROFILE%\Games\Doom\` on Windows).
 *   **Destructive safety and backup policy**: Any configuration or catalog write (`doom config install`, `doom setup`,
-    `doom engines add`, `doom presets add`, `doom presets config`) must write atomically via same-directory temporary
-    rename and generate non-clobbering timestamped backups (`.bak.<timestamp>`) before overwriting any existing user
-    file.
+    `doom engines add`, `doom engines config`, `doom presets add`, `doom presets config`) must write atomically via
+    same-directory temporary rename and generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at
+    most `MaxBackupsPerFile = 3` per file and cleaning up backups on entity or override deletion) before overwriting any
+    existing user file.
 *   **Archive security and Zip Slip hardening**: All archive extractions (`archive/zip`) and relative sub-path
     resolutions must sanitize entry paths against `..` traversal sequences via `fsutil.SafeJoin` and verify containment
     before any filesystem write.
@@ -102,7 +103,7 @@ doom-cli/
 │   ├── launch.go           # 'doom launch' direct preset execution command
 │   ├── setup.go            # 'doom setup' turnkey installation workflow
 │   ├── wads.go             # 'doom wads' subcommands (list, fetch, extract)
-│   ├── engines.go          # 'doom engines' subcommands (list, add, remove, install)
+│   ├── engines.go          # 'doom engines' subcommands (list, add, config, remove, install)
 │   ├── presets.go          # 'doom presets' subcommands (list, show, add, config, remove, build, lint)
 │   ├── soundfont.go        # 'doom soundfont install' subcommand
 │   ├── config.go           # 'doom config' subcommands (show, get, set, toggle, install, diff, sync)
@@ -116,7 +117,7 @@ doom-cli/
 │   ├── fsutil/             # Atomic file writes (temporary file and rename), backups, and SafeJoin
 │   ├── preset/             # Two-layer entity catalog, store, linter, file resolver, README compiler
 │   │   ├── preset.go       # Entity models, strict decoding, layered catalog loader, quarantine
-│   │   ├── store.go        # User catalog.d write operations (AddEngine, AddPreset, ConfigPreset)
+│   │   ├── store.go        # User catalog.d write operations (AddEngine, ConfigEngine, AddPreset, ConfigPreset)
 │   │   ├── lint.go         # Schema, invariant, personal-path, and README parity linter
 │   │   ├── resolve.go      # Multi-root DirIndex, relative sub-path and 1-level subdirectory resolution
 │   │   ├── decode.go       # Robust text decoding with CP437 and DOS box-drawing character detection
@@ -213,6 +214,23 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
    ```bash
    go run ./cmd/doom themes list
    go run ./cmd/doom play --theme <new_theme>
+   ```
+
+### Synchronizing engine configuration templates
+
+When refining the curated engine configurations (`uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg`) after testing in-game settings on a local machine, use the hidden maintainer command `doom config sync`:
+
+1. Inspect differences between the repository templates and your installed system configurations:
+   ```bash
+   go run ./cmd/doom config diff
+   ```
+2. Pull live tweaks back into `uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg` (automatically restoring `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholder tokens):
+   ```bash
+   go run ./cmd/doom config sync
+   ```
+3. Verify no personal paths were introduced:
+   ```bash
+   go run ./cmd/doom presets lint
    ```
 
 ### Archive security (Zip Slip and path containment)

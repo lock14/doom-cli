@@ -218,12 +218,14 @@ func GetSearchRoots() []string {
 
 // DiscoverAndExtract searches for official game files and catalog WADs across search roots
 // using target patterns synthesized from cat (or the curated catalog when cat is nil).
+// When force is false, files already present in wadsDir or any extraWadRoots are skipped.
 func DiscoverAndExtract(
 	cat *preset.Catalog,
 	searchRoots []string,
 	wadsDir string,
 	force bool,
 	out io.Writer,
+	extraWadRoots ...string,
 ) (int, error) {
 	if out == nil {
 		out = io.Discard
@@ -305,6 +307,8 @@ func DiscoverAndExtract(
 	} else {
 		patterns = DefaultTargetPatterns()
 	}
+	wadRoots := append([]string{wadsDir}, extraWadRoots...)
+	dirIdx := preset.NewDirIndex(wadRoots...).WithCatalog(cat)
 	foundCount := 0
 	installedTargets := make(map[string]bool)
 	var idkfaDestName string
@@ -323,6 +327,12 @@ func DiscoverAndExtract(
 
 		if !force {
 			if fi, err := os.Stat(destFile); err == nil && fi.Size() > 0 {
+				continue
+			}
+			if _, ok := dirIdx.ResolveFile(tp.DestName); ok {
+				continue
+			}
+			if _, ok := dirIdx.ResolveFile(tp.SourcePattern); ok {
 				continue
 			}
 		}
@@ -350,11 +360,15 @@ func DiscoverAndExtract(
 			if !force {
 				if fi, statErr := os.Stat(destFile); statErr == nil && fi.Size() > 0 {
 					alreadyExists = true
+				} else if _, ok := dirIdx.ResolveFile(idkfaDestName); ok {
+					alreadyExists = true
 				}
 			}
 			if !alreadyExists {
 				extrasCandidates := rankExtrasCandidates(indexed["extras.wad"])
-				if existingExtras, joinErr := fsutil.SafeJoin(wadsDir, "extras.wad"); joinErr == nil {
+				if existingExtras, ok := dirIdx.ResolveFile("extras.wad"); ok {
+					extrasCandidates = append(extrasCandidates, existingExtras)
+				} else if existingExtras, joinErr := fsutil.SafeJoin(wadsDir, "extras.wad"); joinErr == nil {
 					extrasCandidates = append(extrasCandidates, existingExtras)
 				}
 				for _, extrasSrc := range extrasCandidates {

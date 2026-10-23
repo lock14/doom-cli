@@ -22,14 +22,24 @@ func formatKeyHelp(items []keyHelp) string {
 
 func formatEngineTagWithCatalog(catalog *preset.Catalog, engine string, styles ThemeStyles) string {
 	badge := catalog.EngineBadge(engine)
+	argsStyle := preset.GuessArgsStyle(engine, "")
+	if catalog != nil {
+		if eng, ok := catalog.FindEngine(engine); ok {
+			argsStyle = eng.EffectiveArgsStyle()
+		}
+	}
+	tagStyle := styles.TagUZDoom
+	if argsStyle == "boom" {
+		tagStyle = styles.TagDSDA
+	}
 	switch {
 	case strings.EqualFold(badge, "DSDA"):
-		return styles.TagDSDA.Render("[DSDA]") + "  "
+		return tagStyle.Render("[DSDA]") + "  "
 	case strings.EqualFold(badge, "UZDoom"):
-		return styles.TagUZDoom.Render("[UZDoom]")
+		return tagStyle.Render("[UZDoom]")
 	default:
 		formatted := "[" + padOrTruncateName(badge, 6) + "]"
-		return styles.TagUZDoom.Render(formatted)
+		return tagStyle.Render(formatted)
 	}
 }
 

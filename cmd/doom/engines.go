@@ -115,6 +115,103 @@ func newEnginesCmd() *cobra.Command {
 	enginesAddCmd.Flags().StringVar(&addDisplayName, "display-name", "", "Display name for the engine")
 	enginesAddCmd.Flags().StringVar(&addDescription, "description", "", "Description of the engine")
 
+	var cfgBinary, cfgStyle, cfgDefaultArgs, cfgPrefixArgs, cfgBadge, cfgDisplayName string
+	var cfgAppendArgs []string
+	var cfgReset bool
+	enginesConfigCmd := &cobra.Command{
+		Use:   "config <name>",
+		Short: "Configure overrides for a built-in or custom engine",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := strings.TrimSpace(args[0])
+			paths, _, cat, err := loadAppState()
+			if err != nil {
+				return err
+			}
+			writeDir, err := userCatalogWriteDir(paths)
+			if err != nil {
+				return err
+			}
+			out := cmdOut(cmd)
+
+			if cfgReset {
+				if err := preset.ResetEngineOverride(writeDir, cat, name); err != nil {
+					return err
+				}
+				fmt.Fprintf(out, "✓ Reset custom engine overrides for %q\n", name)
+				return nil
+			}
+
+			var opts preset.EngineOverrideOptions
+			changed := false
+			if cmd.Flags().Changed("binary") || cfgBinary != "" {
+				v := cfgBinary
+				opts.Binary = &v
+				changed = true
+			}
+			if cmd.Flags().Changed("style") || cfgStyle != "" {
+				v := cfgStyle
+				opts.ArgsStyle = &v
+				changed = true
+			}
+			if cmd.Flags().Changed("default-args") || cfgDefaultArgs != "" {
+				v := strings.Fields(cfgDefaultArgs)
+				opts.DefaultArgs = &v
+				changed = true
+			}
+			if cmd.Flags().Changed("append-arg") || len(cfgAppendArgs) > 0 {
+				v := append([]string(nil), cfgAppendArgs...)
+				opts.AppendArgs = &v
+				changed = true
+			}
+			if cmd.Flags().Changed("prefix-args") || cfgPrefixArgs != "" {
+				v := strings.Fields(cfgPrefixArgs)
+				opts.PrefixArgs = &v
+				changed = true
+			}
+			if cmd.Flags().Changed("badge") || cfgBadge != "" {
+				v := cfgBadge
+				opts.Badge = &v
+				changed = true
+			}
+			if cmd.Flags().Changed("display-name") || cfgDisplayName != "" {
+				v := cfgDisplayName
+				opts.DisplayName = &v
+				changed = true
+			}
+			if !changed {
+				return fmt.Errorf(
+					"no option flags provided (use --binary, --style, --default-args, " +
+						"--append-arg, --prefix-args, --badge, --display-name, or --reset)",
+				)
+			}
+
+			outPath, err := preset.ConfigEngine(writeDir, cat, name, opts)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "✓ Configured engine overrides for %q in %s\n", name, outPath)
+			return nil
+		},
+	}
+	enginesConfigCmd.Flags().StringVar(&cfgBinary, "binary", "", "Override executable name or absolute path")
+	enginesConfigCmd.Flags().StringVar(
+		&cfgStyle, "style", "", "Override argument format: boom (-file and -deh) or zdoom (-file)",
+	)
+	enginesConfigCmd.Flags().StringVar(
+		&cfgDefaultArgs, "default-args", "", "Replace default flags always passed to this engine",
+	)
+	enginesConfigCmd.Flags().StringSliceVar(
+		&cfgAppendArgs, "append-arg", nil, "Additional flag to append to default engine args (repeatable)",
+	)
+	enginesConfigCmd.Flags().StringVar(
+		&cfgPrefixArgs, "prefix-args", "",
+		"Wrapper command tokens prepended before the binary (such as flatpak run ...)",
+	)
+	enginesConfigCmd.Flags().StringVar(&cfgBadge, "badge", "", "Override short badge label for the launcher")
+	enginesConfigCmd.Flags().StringVar(&cfgDisplayName, "display-name", "", "Override display name for the engine")
+	enginesConfigCmd.Flags().BoolVar(&cfgReset, "reset", false, "Clear all custom overrides for this engine")
+
 	enginesRemoveCmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a custom engine from user catalog",
@@ -152,7 +249,7 @@ func newEnginesCmd() *cobra.Command {
 	}
 
 	enginesInstallCmd := &cobra.Command{
-		Use:   "install [uzdoom|dsda-doom|all]",
+		Use:   "install [<engine>|all]",
 		Short: "Download and deploy portable engine binaries",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths, _, cat, err := loadAppState()
@@ -172,14 +269,22 @@ func newEnginesCmd() *cobra.Command {
 
 			eng, ok := cat.FindEngine(target)
 			if !ok {
-				return fmt.Errorf("unknown engine target: %s (choose uzdoom, dsda-doom, or all)", target)
+				var installable []string
+				for id, e := range cat.Engines {
+					if e.Install != nil {
+						installable = append(installable, id)
+					}
+				}
+				sort.Strings(installable)
+				installable = append(installable, "all")
+				return fmt.Errorf("unknown engine target: %s (choose %s)", target, strings.Join(installable, ", "))
 			}
 			return ins.InstallEngine(eng)
 		},
 	}
 	enginesInstallCmd.Flags().BoolVar(&flagForce, "force", false, "Force re-download and overwrite existing files")
 
-	enginesCmd.AddCommand(enginesListCmd, enginesAddCmd, enginesRemoveCmd, enginesInstallCmd)
+	enginesCmd.AddCommand(enginesListCmd, enginesAddCmd, enginesConfigCmd, enginesRemoveCmd, enginesInstallCmd)
 	return enginesCmd
 }
 

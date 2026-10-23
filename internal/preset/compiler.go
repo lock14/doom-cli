@@ -62,10 +62,7 @@ func SyncReadme(rootDir string) error {
 	_, err = fsutil.WriteFileAtomic(readmeFile, []byte(updated), 0o644)
 	if err == nil {
 		// Remove any .bak file created for README.md in the git checkout
-		matches, _ := filepath.Glob(readmeFile + ".bak.*")
-		for _, m := range matches {
-			_ = os.Remove(m)
-		}
+		fsutil.RemoveBackups(readmeFile)
 	}
 	return err
 }

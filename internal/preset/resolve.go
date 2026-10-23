@@ -373,6 +373,38 @@ func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	return "", false
 }
 
+// IsPresetInstalled reports whether the preset's base IWAD (when specified) and all
+// non-optional PWAD, PK3, and DeHackEd files resolve in the indexed WAD directories.
+func (idx *DirIndex) IsPresetInstalled(p Preset) bool {
+	if idx == nil {
+		return false
+	}
+	if strings.TrimSpace(p.IWAD) != "" {
+		if _, ok := idx.ResolveFile(p.IWAD); !ok {
+			return false
+		}
+	}
+	for _, f := range p.Files {
+		if f.Optional {
+			continue
+		}
+		if _, ok := idx.ResolveFile(f.Name); ok {
+			continue
+		}
+		foundAlias := false
+		for _, al := range idx.fileAliases(f) {
+			if _, ok := idx.ResolveFile(al); ok {
+				foundAlias = true
+				break
+			}
+		}
+		if !foundAlias {
+			return false
+		}
+	}
+	return true
+}
+
 // ResolveReadme locates an accompanying documentation or text file for the preset.
 // Base IWAD presets (those with no non-optional files) fall back to <iwad>.txt,
 // whereas mapsets with required PWADs never borrow the base IWAD's text file.
@@ -388,6 +420,11 @@ func (idx *DirIndex) ResolveReadme(p Preset) (string, bool) {
 		base := strings.TrimSuffix(f.Name, ext)
 		if path, ok := idx.ResolveFile(base + ".txt"); ok {
 			return path, true
+		}
+		if strings.ContainsAny(base, `/\`) {
+			if path, ok := idx.ResolveFile(filepath.Base(base) + ".txt"); ok {
+				return path, true
+			}
 		}
 		for _, al := range idx.fileAliases(f) {
 			alExt := filepath.Ext(al)

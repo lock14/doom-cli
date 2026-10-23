@@ -215,6 +215,17 @@ func TestDiscoverAndExtract(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(destWads, "custom_addon_v2.wad")); err != nil {
 		t.Errorf("custom_addon_v2.wad was not created from custom_addon.wad: %v", err)
 	}
+
+	// Verify files already present in extraWadRoots are not re-extracted when !force
+	primaryEmpty := filepath.Join(tmpDir, "primary_empty")
+	out.Reset()
+	count4, err := DiscoverAndExtract(customCat, []string{mockSteam}, primaryEmpty, false, &out, destWads)
+	if err != nil {
+		t.Fatalf("DiscoverAndExtract with extraWadRoots failed: %v", err)
+	}
+	if count4 != 0 {
+		t.Errorf("expected 0 files extracted when already present in extraWadRoots, got %d", count4)
+	}
 }
 
 func TestSynthesizeIDKFAWADAndDiscoverFromExtras(t *testing.T) {

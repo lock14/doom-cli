@@ -58,8 +58,9 @@ func AddEngine(userDir string, curated *Catalog, eng EngineConfig) (string, erro
 	if curated != nil {
 		if existing, ok := curated.FindEngine(eng.ID); ok && existing.Layer == LayerCurated {
 			return "", fmt.Errorf(
-				"engine id %q collides with curated engine %q; pass a different --id or use an override",
-				eng.ID, existing.ID,
+				"engine id %q collides with curated engine %q; "+
+					"pass a different --id or use `doom engines config %s`",
+				eng.ID, existing.ID, existing.ID,
 			)
 		}
 	}
@@ -83,6 +84,125 @@ func AddEngine(userDir string, curated *Catalog, eng EngineConfig) (string, erro
 		return "", err
 	}
 	return targetPath, nil
+}
+
+// EngineOverrideOptions specifies the fields to update on an engine override.
+type EngineOverrideOptions struct {
+	Binary      *string
+	ArgsStyle   *string
+	DefaultArgs *[]string
+	AppendArgs  *[]string
+	PrefixArgs  *[]string
+	Badge       *string
+	DisplayName *string
+}
+
+// ConfigEngine creates or updates <userDir>/override.engine.<id>.json for the
+// target engine, preserving any previously configured override fields not touched
+// by opts.
+func ConfigEngine(userDir string, layered *Catalog, key string, opts EngineOverrideOptions) (string, error) {
+	if strings.TrimSpace(userDir) == "" {
+		return "", errors.New("empty user catalog directory")
+	}
+	if layered == nil {
+		return "", errors.New("nil catalog")
+	}
+	eng, ok := layered.FindEngine(key)
+	if !ok {
+		return "", fmt.Errorf("unknown engine %q (register it first with `doom engines add`)", key)
+	}
+
+	if opts.ArgsStyle != nil {
+		style := strings.ToLower(strings.TrimSpace(*opts.ArgsStyle))
+		if style != "boom" && style != "zdoom" {
+			return "", fmt.Errorf("invalid args_style %q (must be \"boom\" or \"zdoom\")", *opts.ArgsStyle)
+		}
+		opts.ArgsStyle = &style
+	}
+
+	overridePath := filepath.Join(userDir, fmt.Sprintf("override.engine.%s.json", eng.ID))
+	ov := Override{
+		SchemaVersion: SchemaVersion,
+		Kind:          KindOverride,
+		Target: OverrideTarget{
+			Kind: KindEngine,
+			ID:   eng.ID,
+		},
+	}
+
+	if existingRaw, readErr := os.ReadFile(overridePath); readErr == nil {
+		if existingEnt, decErr := DecodeEntity(existingRaw); decErr == nil && existingEnt.Override != nil {
+			ov = *existingEnt.Override
+			ov.SchemaVersion = SchemaVersion
+			ov.Kind = KindOverride
+			ov.Target = OverrideTarget{Kind: KindEngine, ID: eng.ID}
+		}
+	}
+
+	if opts.Binary != nil ||
+		opts.ArgsStyle != nil ||
+		opts.DefaultArgs != nil ||
+		opts.PrefixArgs != nil ||
+		opts.Badge != nil ||
+		opts.DisplayName != nil {
+		if ov.Set == nil {
+			ov.Set = &OverrideSet{}
+		}
+		if opts.Binary != nil {
+			ov.Set.Binary = opts.Binary
+		}
+		if opts.ArgsStyle != nil {
+			ov.Set.ArgsStyle = opts.ArgsStyle
+		}
+		if opts.DefaultArgs != nil {
+			s := make([]string, len(*opts.DefaultArgs))
+			copy(s, *opts.DefaultArgs)
+			ov.Set.DefaultArgs = &s
+		}
+		if opts.PrefixArgs != nil {
+			s := make([]string, len(*opts.PrefixArgs))
+			copy(s, *opts.PrefixArgs)
+			ov.Set.PrefixArgs = &s
+		}
+		if opts.Badge != nil {
+			ov.Set.Badge = opts.Badge
+		}
+		if opts.DisplayName != nil {
+			ov.Set.DisplayName = opts.DisplayName
+		}
+	}
+	if opts.AppendArgs != nil {
+		ov.AppendArgs = append([]string(nil), (*opts.AppendArgs)...)
+	}
+
+	data, err := MarshalEntity(ov)
+	if err != nil {
+		return "", err
+	}
+	if _, err := fsutil.WriteFileAtomic(overridePath, data, 0o644); err != nil {
+		return "", err
+	}
+	return overridePath, nil
+}
+
+// ResetEngineOverride removes <userDir>/override.engine.<id>.json for the given engine.
+func ResetEngineOverride(userDir string, layered *Catalog, key string) error {
+	if strings.TrimSpace(userDir) == "" {
+		return errors.New("empty user catalog directory")
+	}
+	if layered == nil {
+		return errors.New("nil catalog")
+	}
+	eng, ok := layered.FindEngine(key)
+	if !ok {
+		return fmt.Errorf("unknown engine %q", key)
+	}
+	overridePath := filepath.Join(userDir, fmt.Sprintf("override.engine.%s.json", eng.ID))
+	if err := os.Remove(overridePath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	fsutil.RemoveBackups(overridePath)
+	return nil
 }
 
 // RemoveEngine deletes a user engine entity from userDir by ID or alias.
@@ -123,6 +243,11 @@ func RemoveEngine(userDir string, curated, layered *Catalog, key string) (string
 		}
 		return "", nil, err
 	}
+	fsutil.RemoveBackups(userFile)
+
+	overrideFile := filepath.Join(userDir, fmt.Sprintf("override.engine.%s.json", targetID))
+	_ = os.Remove(overrideFile)
+	fsutil.RemoveBackups(overrideFile)
 
 	var dependents []string
 	if layered != nil {
@@ -192,11 +317,6 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 	}
 	if strings.TrimSpace(p.Category) == "" {
 		p.Category = "Custom"
-	}
-	for _, f := range p.Files {
-		if err := ValidateSHA256(f.SHA256); err != nil {
-			return "", fmt.Errorf("file %s: %w", f.Name, err)
-		}
 	}
 	for _, s := range p.Sources {
 		if err := ValidateSHA256(s.SHA256); err != nil {
@@ -309,6 +429,7 @@ func ResetPresetOverride(userDir string, layered *Catalog, key string) (*Preset,
 		}
 		return target, false, err
 	}
+	fsutil.RemoveBackups(overridePath)
 	return target, true, nil
 }
 
@@ -333,11 +454,13 @@ func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Prese
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
+	fsutil.RemoveBackups(presetPath)
 	if err := os.Remove(overridePath); err == nil {
 		removedAny = true
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
+	fsutil.RemoveBackups(overridePath)
 
 	if !removedAny {
 		if curated != nil {

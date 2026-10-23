@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/lock14/doom-cli/internal/preset"
 	"github.com/lock14/doom-cli/internal/steam"
 	"github.com/lock14/doom-cli/internal/wad"
 )
@@ -49,17 +50,37 @@ func newWadsCmd() *cobra.Command {
 		Use:   "list",
 		Short: "List downloadable community megawads",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cat, err := getCatalog()
+			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
+			dirIdx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 			out := cmdOut(cmd)
 			fmt.Fprintln(out, "=== Available Downloadable Community Megawads ===")
 			for _, p := range cat.Presets {
-				if len(p.Sources) > 0 {
-					files := wad.FilterExpectedFiles(p.Files)
-					fmt.Fprintf(out, "  - %-30s [%s]\n", p.Name, strings.Join(files, ", "))
+				if len(p.Sources) == 0 {
+					continue
 				}
+				var fileStatuses []string
+				for _, f := range p.Files {
+					if f.Optional {
+						continue
+					}
+					resolved, ok := dirIdx.ResolveFile(f.Name)
+					if !ok {
+						for _, al := range f.Aliases {
+							if resolved, ok = dirIdx.ResolveFile(al); ok {
+								break
+							}
+						}
+					}
+					if ok {
+						fileStatuses = append(fileStatuses, fmt.Sprintf("%s [✓ Found: %s]", f.Name, resolved))
+					} else {
+						fileStatuses = append(fileStatuses, fmt.Sprintf("%s [✗ Missing]", f.Name))
+					}
+				}
+				fmt.Fprintf(out, "  - %-30s [%s]\n", p.Name, strings.Join(fileStatuses, ", "))
 			}
 			return nil
 		},
@@ -73,7 +94,9 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			_, err = steam.DiscoverAndExtract(cat, nil, paths.WadsDir, flagForce, cmdOut(cmd))
+			_, err = steam.DiscoverAndExtract(
+				cat, nil, paths.WadsDir, flagForce, cmdOut(cmd), paths.WadsDirs...,
+			)
 			return err
 		},
 	}

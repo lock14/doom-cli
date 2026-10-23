@@ -19,6 +19,5 @@
   "description": "John Romero's unofficial 6th episode for Ultimate Doom",
   "author": "John Romero",
   "release_date": "2023",
-  "load_maps_after_mods": true,
   "sort": 220
 }

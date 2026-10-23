@@ -19,7 +19,22 @@ type AppConfig struct {
 	BinDir        string   `json:"bin_dir,omitempty"`
 	SoundFontsDir string   `json:"soundfonts_dir,omitempty"`
 
-	extra map[string]json.RawMessage
+	nerdFontsSet bool
+	extra        map[string]json.RawMessage
+}
+
+// HasNerdFonts reports whether nerd_fonts was explicitly configured in config.json or set via SetNerdFonts.
+func (c *AppConfig) HasNerdFonts() bool {
+	return c != nil && (c.NerdFonts || c.nerdFontsSet)
+}
+
+// SetNerdFonts updates NerdFonts and marks it as explicitly configured for persistence.
+func (c *AppConfig) SetNerdFonts(v bool) {
+	if c == nil {
+		return
+	}
+	c.NerdFonts = v
+	c.nerdFontsSet = true
 }
 
 var knownConfigKeys = map[string]bool{
@@ -56,6 +71,9 @@ func LoadConfig(paths *Paths) (*AppConfig, error) {
 	if err := json.Unmarshal(data, &rawMap); err != nil {
 		return nil, err
 	}
+	if _, ok := rawMap["nerd_fonts"]; ok {
+		cfg.nerdFontsSet = true
+	}
 	for k, v := range rawMap {
 		if !knownConfigKeys[k] {
 			if cfg.extra == nil {
@@ -87,7 +105,7 @@ func SaveConfig(paths *Paths, cfg *AppConfig) error {
 	if cfg.Theme != "" {
 		merged["theme"] = cfg.Theme
 	}
-	if cfg.NerdFonts {
+	if cfg.NerdFonts || cfg.nerdFontsSet {
 		merged["nerd_fonts"] = cfg.NerdFonts
 	}
 	if cfg.WadsDir != "" {

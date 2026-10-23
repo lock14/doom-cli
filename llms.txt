@@ -30,6 +30,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom launch <preset> [args]`: Direct preset execution with optional engine overrides and game flags.
 - `doom engines list`: Lists all configured engines (built-in and custom) and checks binary paths.
 - `doom engines add <name>`: Registers a custom source port engine in `catalog.d/engine.<id>.json`.
+- `doom engines config <name>`: Configures per-engine overrides in `catalog.d/override.engine.<id>.json`.
 - `doom engines remove <name>`: Removes a custom engine from the user catalog.
 - `doom engines install [engine|all]`: Downloads portable engine binaries (`uzdoom`, `dsda-doom`, or custom recipes).
 - `doom soundfont install`: Downloads and installs curated Roland SC-55 SoundFont (`GeneralUser-GS.sf2`).
@@ -41,18 +42,25 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 - `doom presets add <name>`: Adds a custom WAD or preset to `catalog.d/preset.<id>.json`.
 - `doom presets config <name>`: Configures per-preset overrides in `catalog.d/override.preset.<id>.json`.
 - `doom presets remove <name>`: Removes a custom preset or clears overrides for a built-in preset.
-- `doom presets build`: Synchronizes curated `catalog/*.json` preset table into `README.md`.
 - `doom presets lint`: Validates curated and user entity files, schema invariants, and `README.md` parity.
-- `doom config show`: Displays active CLI user settings (`config.json`) and catalog path.
-- `doom config get <key>`: Retrieves a specific configuration value (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`).
-- `doom config set <key> <val>`: Sets a configuration value.
+- `doom presets build`: Hidden maintainer command that synchronizes curated `catalog/*.json` preset table into `README.md`.
+- `doom config show`: Displays effective CLI settings (`flag > env > config > default`) and source annotations.
+- `doom config get <key>`: Retrieves an effective configuration value (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`).
+- `doom config set <key> <val>`: Sets a persistent configuration value in `config.json`.
 - `doom config toggle <key>`: Toggles a boolean configuration setting (such as `nerd-fonts`).
 - `doom config install`: Deploys engine configuration files with native display auto-detection and backups.
 - `doom config diff`: Shows differences between repository templates and live installed configs.
-- `doom config sync`: Pulls in-game tweaks back from the host system into repository templates.
-- `doom themes list`: Lists available color themes with ANSI color swatches.
+- `doom config sync`: Hidden maintainer command that pulls in-game tweaks back from the host system into repository templates.
+- `doom themes list`: Lists built-in and custom JSON color themes with ANSI color swatches.
 - `doom themes set <name>`: Sets persistent launcher color theme.
 - `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
+
+## Global flags and environment variables
+
+Settings resolve in four-tier order (`CLI flags > DOOM_* environment variables > config.json > platform defaults`):
+
+- Global flags: `--engine` (`-e`), `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`, `--presets-file`, `--theme`, `--nerd-fonts`, `--dry-run`.
+- Environment variables: `DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`, `DOOM_SF_DIR`.
 
 ## Architecture and modular packages
 
@@ -64,7 +72,7 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
   - `launch.go`: `doom launch` direct execution.
   - `setup.go`: `doom setup` automated turnkey workflow.
   - `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract`).
-  - `engines.go`: `doom engines` subcommands (`list`, `add`, `remove`, `install`).
+  - `engines.go`: `doom engines` subcommands (`list`, `add`, `config`, `remove`, `install`).
   - `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build`, `lint`).
   - `soundfont.go`: `doom soundfont install`.
   - `config.go`: `doom config` subcommands (`show`, `get`, `set`, `toggle`, `install`, `diff`, `sync`).

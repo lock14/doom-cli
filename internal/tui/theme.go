@@ -219,6 +219,39 @@ func ResolveTheme(flagTheme, envTheme, configTheme, themesDir string) Theme {
 	return ClassicTheme
 }
 
+// ListCustomThemes returns all valid custom JSON themes in themesDir that do not shadow
+// built-in theme names, ordered by filename.
+func ListCustomThemes(themesDir string) []Theme {
+	if strings.TrimSpace(themesDir) == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(themesDir)
+	if err != nil {
+		return nil
+	}
+	var custom []Theme
+	seen := make(map[string]bool)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
+			continue
+		}
+		t, loadErr := LoadThemeFile(filepath.Join(themesDir, entry.Name()))
+		if loadErr != nil {
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(t.Name))
+		if key == "" || seen[key] {
+			continue
+		}
+		if _, isBuiltin := GetBuiltinTheme(key); isBuiltin {
+			continue
+		}
+		seen[key] = true
+		custom = append(custom, t)
+	}
+	return custom
+}
+
 // RenderBrandPill renders the DOOM badge using this theme's brand styles.
 // If nerdFonts is true, it renders Powerlevel10k rounded capsule ends ( and ).
 // Otherwise, it renders a universal solid rectangular badge.

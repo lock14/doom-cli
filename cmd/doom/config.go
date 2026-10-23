@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -9,6 +10,65 @@ import (
 	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/templates"
 )
+
+func resolveThemeWithSource(cfg *config.AppConfig) (string, string) {
+	if v := strings.TrimSpace(flagTheme); v != "" {
+		return v, "flag"
+	}
+	if v := strings.TrimSpace(os.Getenv("DOOM_THEME")); v != "" {
+		return v, "env"
+	}
+	if cfg != nil && strings.TrimSpace(cfg.Theme) != "" {
+		return strings.TrimSpace(cfg.Theme), "config"
+	}
+	return "classic", "default"
+}
+
+func resolveNerdFontsWithSource(cmd *cobra.Command, cfg *config.AppConfig) (bool, string) {
+	if (cmd != nil && cmd.Flags().Changed("nerd-fonts")) || flagNerdFonts {
+		return flagNerdFonts, "flag"
+	}
+	if env := strings.TrimSpace(os.Getenv("DOOM_NERD_FONTS")); env != "" {
+		if parsed, err := parseBool(env); err == nil {
+			return parsed, "env"
+		}
+	}
+	if cfg.HasNerdFonts() {
+		return cfg.NerdFonts, "config"
+	}
+	return false, "default"
+}
+
+func resolveNerdFonts(cmd *cobra.Command, cfg *config.AppConfig) bool {
+	val, _ := resolveNerdFontsWithSource(cmd, cfg)
+	return val
+}
+
+func dirSource(flagVal, envKey, cfgVal string) string {
+	if strings.TrimSpace(flagVal) != "" {
+		return "flag"
+	}
+	if strings.TrimSpace(os.Getenv(envKey)) != "" {
+		return "env"
+	}
+	if strings.TrimSpace(cfgVal) != "" {
+		return "config"
+	}
+	return "default"
+}
+
+func wadsDirsSource(cfg *config.AppConfig) string {
+	if strings.TrimSpace(flagWadsDirs) != "" {
+		return "flag"
+	}
+	if strings.TrimSpace(os.Getenv("DOOM_WADS_DIRS")) != "" {
+		return "env"
+	}
+	if cfg != nil && len(cfg.WadsDirs) > 0 {
+		return "config"
+	}
+	return "default"
+}
 
 // newConfigCmd creates the CLI configuration management command.
 func newConfigCmd() *cobra.Command {
@@ -56,8 +116,9 @@ func newConfigCmd() *cobra.Command {
 		},
 	}
 	configSyncCmd := &cobra.Command{
-		Use:   "sync",
-		Short: "Sync modified in-game settings back into repository templates",
+		Use:    "sync",
+		Short:  "Sync modified in-game settings back into repository templates",
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
 			return templates.SyncConfigs(paths, ".", cmdOut(cmd))
@@ -78,39 +139,28 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	}
 	out := cmdOut(cmd)
 
-	theme := cfg.Theme
-	if theme == "" {
-		theme = "classic"
-	}
-
+	theme, themeSrc := resolveThemeWithSource(cfg)
+	nerdFonts, nerdSrc := resolveNerdFontsWithSource(cmd, cfg)
 	nerdStatus := "disabled (universal rectangular badges)"
-	if cfg.NerdFonts {
+	if nerdFonts {
 		nerdStatus = "enabled (Powerlevel10k rounded capsules)"
 	}
+
+	wadsSrc := dirSource(flagWadsDir, "DOOM_WADS_DIR", cfg.WadsDir)
+	binSrc := dirSource(flagBinDir, "DOOM_BIN_DIR", cfg.BinDir)
+	sfSrc := dirSource(flagSoundFontsDir, "DOOM_SF_DIR", cfg.SoundFontsDir)
 
 	fmt.Fprintln(out, "=== Doom CLI Configuration ===")
 	fmt.Fprintf(out, "  Config File:    %s\n", paths.ConfigFile)
 	fmt.Fprintf(out, "  Catalog Dir:    %s\n", paths.CatalogDir)
-	fmt.Fprintf(out, "  Theme:          %s\n", theme)
-	fmt.Fprintf(out, "  Nerd Fonts:     %s\n", nerdStatus)
-	if cfg.WadsDir != "" {
-		fmt.Fprintf(out, "  WADs Dir:       %s\n", cfg.WadsDir)
-	} else {
-		fmt.Fprintf(out, "  WADs Dir:       %s (default)\n", paths.WadsDir)
-	}
+	fmt.Fprintf(out, "  Theme:          %s (%s)\n", theme, themeSrc)
+	fmt.Fprintf(out, "  Nerd Fonts:     %s (%s)\n", nerdStatus, nerdSrc)
+	fmt.Fprintf(out, "  WADs Dir:       %s (%s)\n", paths.WadsDir, wadsSrc)
 	if len(paths.WadsDirs) > 0 {
-		fmt.Fprintf(out, "  WADs Dirs:      %s\n", strings.Join(paths.WadsDirs, ", "))
+		fmt.Fprintf(out, "  WADs Dirs:      %s (%s)\n", strings.Join(paths.WadsDirs, ", "), wadsDirsSource(cfg))
 	}
-	if cfg.BinDir != "" {
-		fmt.Fprintf(out, "  Bin Dir:        %s\n", cfg.BinDir)
-	} else {
-		fmt.Fprintf(out, "  Bin Dir:        %s (default)\n", paths.BinDir)
-	}
-	if cfg.SoundFontsDir != "" {
-		fmt.Fprintf(out, "  SoundFonts Dir: %s\n", cfg.SoundFontsDir)
-	} else {
-		fmt.Fprintf(out, "  SoundFonts Dir: %s (default)\n", paths.SoundFontsDir)
-	}
+	fmt.Fprintf(out, "  Bin Dir:        %s (%s)\n", paths.BinDir, binSrc)
+	fmt.Fprintf(out, "  SoundFonts Dir: %s (%s)\n", paths.SoundFontsDir, sfSrc)
 	return nil
 }
 
@@ -132,33 +182,18 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 
 	switch canonKey {
 	case "theme":
-		theme := cfg.Theme
-		if theme == "" {
-			theme = "classic"
-		}
+		theme, _ := resolveThemeWithSource(cfg)
 		fmt.Fprintln(out, theme)
 	case "nerd-fonts":
-		fmt.Fprintln(out, cfg.NerdFonts)
+		fmt.Fprintln(out, resolveNerdFonts(cmd, cfg))
 	case "wads-dir":
-		if cfg.WadsDir != "" {
-			fmt.Fprintln(out, cfg.WadsDir)
-		} else {
-			fmt.Fprintln(out, paths.WadsDir)
-		}
+		fmt.Fprintln(out, paths.WadsDir)
 	case "wads-dirs":
 		fmt.Fprintln(out, strings.Join(paths.WadsDirs, ","))
 	case "bin-dir":
-		if cfg.BinDir != "" {
-			fmt.Fprintln(out, cfg.BinDir)
-		} else {
-			fmt.Fprintln(out, paths.BinDir)
-		}
+		fmt.Fprintln(out, paths.BinDir)
 	case "soundfonts-dir":
-		if cfg.SoundFontsDir != "" {
-			fmt.Fprintln(out, cfg.SoundFontsDir)
-		} else {
-			fmt.Fprintln(out, paths.SoundFontsDir)
-		}
+		fmt.Fprintln(out, paths.SoundFontsDir)
 	}
 	return nil
 }
@@ -181,13 +216,13 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return runThemesSet(cmd, []string{val})
 	case "nerd-fonts":
 		if strings.EqualFold(val, "toggle") {
-			cfg.NerdFonts = !cfg.NerdFonts
+			cfg.SetNerdFonts(!cfg.NerdFonts)
 		} else {
 			parsed, err := parseBool(val)
 			if err != nil {
 				return fmt.Errorf("invalid value for %s: %w", canonKey, err)
 			}
-			cfg.NerdFonts = parsed
+			cfg.SetNerdFonts(parsed)
 		}
 		if err := config.SaveConfig(paths, cfg); err != nil {
 			return fmt.Errorf("saving config: %w", err)

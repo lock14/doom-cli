@@ -3,6 +3,7 @@ package preset
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -871,5 +872,150 @@ func TestDirIndex_CachedRelativeSubpath(t *testing.T) {
 	got2, ok2 := idx.ResolveFile("Maps_Sub/episode_one.wad")
 	if !ok2 || got2 != wadPath {
 		t.Fatalf("cached ResolveFile = (%q, %v), want (%q, true)", got2, ok2, wadPath)
+	}
+}
+
+func TestConfigEngineAndResetEngineOverride(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	cat, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	// 1. Configure binary and badge on dsda-doom
+	bin := "/opt/doom/dsda-doom"
+	badge := "DSDA+"
+	ovPath, err := ConfigEngine(userDir, cat, "dsda-doom", EngineOverrideOptions{
+		Binary: &bin,
+		Badge:  &badge,
+	})
+	if err != nil {
+		t.Fatalf("ConfigEngine first call: %v", err)
+	}
+	if !strings.HasSuffix(ovPath, "override.engine.dsda-doom.json") {
+		t.Errorf("unexpected override path: %s", ovPath)
+	}
+
+	// 2. Configure append_args and prefix_args in a second call; prior binary and badge must be preserved
+	appendArgs := []string{"-complevel", "21"}
+	prefixArgs := []string{"flatpak", "run"}
+	if _, err := ConfigEngine(userDir, cat, "dsda", EngineOverrideOptions{
+		AppendArgs: &appendArgs,
+		PrefixArgs: &prefixArgs,
+	}); err != nil {
+		t.Fatalf("ConfigEngine second call: %v", err)
+	}
+
+	merged, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog after override: %v", err)
+	}
+	eng, ok := merged.FindEngine("dsda-doom")
+	if !ok {
+		t.Fatal("dsda-doom not found in merged catalog")
+	}
+	if eng.Binary != bin || eng.Badge != badge {
+		t.Errorf("expected preserved Binary=%q Badge=%q, got Binary=%q Badge=%q", bin, badge, eng.Binary, eng.Badge)
+	}
+	if !reflect.DeepEqual(eng.PrefixArgs, prefixArgs) {
+		t.Errorf("expected PrefixArgs=%v, got %v", prefixArgs, eng.PrefixArgs)
+	}
+	if len(eng.DefaultArgs) < 2 || eng.DefaultArgs[len(eng.DefaultArgs)-1] != "21" {
+		t.Errorf("expected AppendArgs appended to DefaultArgs, got %v", eng.DefaultArgs)
+	}
+
+	// 2b. Clear default_args, prefix_args, and badge back to empty and verify round-trip
+	emptySlice := []string{}
+	emptyStr := ""
+	if _, err := ConfigEngine(userDir, cat, "dsda-doom", EngineOverrideOptions{
+		DefaultArgs: &emptySlice,
+		PrefixArgs:  &emptySlice,
+		AppendArgs:  &emptySlice,
+		Badge:       &emptyStr,
+	}); err != nil {
+		t.Fatalf("ConfigEngine clear fields: %v", err)
+	}
+	mergedCleared, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog after clearing fields: %v", err)
+	}
+	engCleared, ok := mergedCleared.FindEngine("dsda-doom")
+	if !ok {
+		t.Fatal("dsda-doom not found after clearing fields")
+	}
+	if len(engCleared.DefaultArgs) != 0 || len(engCleared.PrefixArgs) != 0 || engCleared.Badge != "" {
+		t.Errorf(
+			"expected cleared DefaultArgs=[], PrefixArgs=[], Badge=\"\", got DefaultArgs=%v PrefixArgs=%v Badge=%q",
+			engCleared.DefaultArgs, engCleared.PrefixArgs, engCleared.Badge,
+		)
+	}
+
+	// 3. Invalid style rejected in ConfigEngine and DecodeEntity
+	badStyle := "quake"
+	if _, err := ConfigEngine(userDir, cat, "dsda-doom", EngineOverrideOptions{ArgsStyle: &badStyle}); err == nil {
+		t.Error("expected error for invalid args_style, got nil")
+	}
+	if _, err := DecodeEntity([]byte(
+		`{"kind":"override","target":{"kind":"engine","id":"dsda-doom"},"set":{"args_style":"quake"}}`,
+	)); err == nil {
+		t.Error("expected DecodeEntity to reject invalid override set.args_style")
+	}
+
+	// 4. ResetEngineOverride removes override file and backups
+	if err := ResetEngineOverride(userDir, merged, "dsda-doom"); err != nil {
+		t.Fatalf("ResetEngineOverride: %v", err)
+	}
+	if _, statErr := os.Stat(ovPath); !os.IsNotExist(statErr) {
+		t.Errorf("expected override file removed, statErr=%v", statErr)
+	}
+	entries, _ := os.ReadDir(userDir)
+	for _, e := range entries {
+		if strings.Contains(e.Name(), "override.engine.dsda-doom.json") {
+			t.Errorf("unexpected leftover override or backup file: %s", e.Name())
+		}
+	}
+}
+
+func TestIsPresetInstalledAndSubpathReadme(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	subDir := filepath.Join(wadsDir, "sub")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(subDir, "Episode.wad"), []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	topTxt := filepath.Join(wadsDir, "Episode.txt")
+	if err := os.WriteFile(topTxt, []byte("README"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := Preset{
+		Name: "Subpath Episode",
+		IWAD: "DOOM2.WAD",
+		Files: []FileSpec{
+			{Name: "sub/Episode.wad"},
+			{Name: "optional_music.wad", Optional: true},
+		},
+	}
+
+	idx := NewDirIndex(wadsDir)
+	if !idx.IsPresetInstalled(p) {
+		t.Errorf("expected IsPresetInstalled(p) = true when IWAD and required subpath WAD exist")
+	}
+	gotReadme, ok := idx.ResolveReadme(p)
+	if !ok || gotReadme != topTxt {
+		t.Errorf("ResolveReadme(p) = (%q, %v), want (%q, true)", gotReadme, ok, topTxt)
+	}
+
+	missingIWAD := p
+	missingIWAD.IWAD = "PLUTONIA.WAD"
+	if idx.IsPresetInstalled(missingIWAD) {
+		t.Errorf("expected IsPresetInstalled = false when required IWAD is missing")
 	}
 }

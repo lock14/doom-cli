@@ -180,7 +180,6 @@ type FileSpec struct {
 	Name     string   `json:"name"`
 	Aliases  []string `json:"aliases,omitempty"`
 	Optional bool     `json:"optional,omitempty"`
-	SHA256   string   `json:"sha256,omitempty"`
 }
 
 // Source describes a downloadable archive or file mirror for a preset.
@@ -584,6 +583,15 @@ func validateDecodedEntity(ent Entity) error {
 		}
 		if err := ValidateID(ent.Override.Target.ID); err != nil {
 			return fmt.Errorf("override target id: %w", err)
+		}
+		if ent.Override.Set != nil && ent.Override.Set.ArgsStyle != nil {
+			style := *ent.Override.Set.ArgsStyle
+			if style != "" && style != "boom" && style != "zdoom" {
+				return fmt.Errorf(
+					"override %s/%s: args_style %q must be \"boom\" or \"zdoom\"",
+					ent.Override.Target.Kind, ent.Override.Target.ID, style,
+				)
+			}
 		}
 	}
 	return nil

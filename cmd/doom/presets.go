@@ -113,7 +113,7 @@ func newPresetsCmd() *cobra.Command {
 		},
 	}
 	presetsAddCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for this preset (defaults to slugified name)")
-	presetsAddCmd.Flags().StringVar(&addEngine, "engine", "uzdoom", "Default engine for this preset")
+	presetsAddCmd.Flags().StringVar(&addEngine, "engine", "dsda-doom", "Default engine for this preset")
 	presetsAddCmd.Flags().StringVar(&addIWAD, "iwad", "DOOM2.WAD", "Base IWAD required by this preset")
 	presetsAddCmd.Flags().StringSliceVar(
 		&addFiles, "files", nil, "Comma-separated list of required PWAD and DeHackEd files",
@@ -248,8 +248,9 @@ func newPresetsCmd() *cobra.Command {
 	}
 
 	presetsBuildCmd := &cobra.Command{
-		Use:   "build [root]",
-		Short: "Synchronize catalog/*.json into README.md",
+		Use:    "build [root]",
+		Short:  "Synchronize catalog/*.json into README.md",
+		Hidden: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := "."
 			if len(args) > 0 {
@@ -300,22 +301,30 @@ func newPresetsCmd() *cobra.Command {
 }
 
 func runPresetsList(cmd *cobra.Command, args []string) error {
-	_, _, cat, err := loadAppState()
+	paths, _, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
+	dirIdx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 	out := cmdOut(cmd)
 
 	fmt.Fprintln(out, "=== Available Doom Presets ===")
 	for i, p := range cat.Presets {
 		tag := fmt.Sprintf("[%-8s]", cat.EngineBadge(p.Engine))
+		installStatus := "[✗ Missing]"
+		if dirIdx.IsPresetInstalled(p) {
+			installStatus = "[✓ Ready]  "
+		}
 		statusFlag := ""
 		if p.IsCustom() {
 			statusFlag = " [Custom]"
 		} else if p.Overridden {
 			statusFlag = " [Overridden]"
 		}
-		fmt.Fprintf(out, "%2d. %-30s %s%s - %s\n", i+1, p.Name, tag, statusFlag, p.Description)
+		fmt.Fprintf(
+			out, "%2d. %-30s %s %s%s - %s\n",
+			i+1, p.Name, tag, installStatus, statusFlag, p.Description,
+		)
 	}
 	return nil
 }
