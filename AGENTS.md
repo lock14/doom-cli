@@ -80,6 +80,11 @@
     *   **Embedded DeHackEd extraction**: When a preset declares both a `.wad` and `.deh` file and its direct `.wad`
         download source embeds a `DEHACKED` lump (such as `DoomZero.wad`), `wad.Downloader` extracts the embedded
         `DEHACKED` lump atomically into the expected `.deh` file.
+    *   **Remaster soundtrack synthesis**: During Steam and GOG discovery, if no standalone `idkfa 2024.wad` is
+        present on disk, `steam.SynthesizeIDKFAWAD` automatically extracts the `H_` prefixed Ogg Vorbis lumps from
+        the *DOOM + DOOM II (2024)* `extras.wad` resource file, maps their lump names to `D_` (including reused Doom I
+        and Doom II map music slots) for classic source port compatibility, and writes a valid `PWAD` atomically to
+        `<WadsDir>/idkfa 2024.wad`.
     *   **Visual aesthetic and frame pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
         (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`,
         and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, keep `dsda_fps_limit 0`
