@@ -81,11 +81,11 @@ func (m model) computeLayout() layoutGeometry {
 	if boxWidth < minBoxWidth {
 		boxWidth = minBoxWidth
 	}
-	availHeight := m.height - 5
+	availHeight := m.height - 6
 	if availHeight < 6 {
 		availHeight = 6
 	}
-	listHeight := availHeight / 2
+	listHeight := (availHeight - 1) / 2
 	if listHeight < minBoxHeight {
 		listHeight = minBoxHeight
 	}

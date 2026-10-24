@@ -191,6 +191,10 @@ func TestModel_View_Layouts(t *testing.T) {
 			}
 
 			// Verify that every line in view fits within the terminal width and has proper borders
+			rawLines := strings.Split(view, "\n")
+			if len(rawLines) > tt.height {
+				t.Errorf("raw view line count %d exceeds terminal height %d", len(rawLines), tt.height)
+			}
 			lines := strings.Split(strings.TrimSuffix(view, "\n"), "\n")
 			if len(lines) > tt.height {
 				t.Errorf("view height %d exceeds terminal height %d", len(lines), tt.height)
@@ -1045,5 +1049,95 @@ func TestModel_80x24_CustomPresetLongFilenamesAndManyFiles(t *testing.T) {
 		if !strings.Contains(viewMany, want) {
 			t.Errorf("expected 80x24 view for custom-many-12 to contain %q, got:\n%s", want, viewMany)
 		}
+	}
+}
+
+func TestModel_View_24RowHeightBudget(t *testing.T) {
+	t.Parallel()
+	cat := mockCatalog()
+	tests := []struct {
+		name  string
+		width int
+	}{
+		{name: "stacked 80x24", width: 80},
+		{name: "side-by-side 100x24", width: 100},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := initialModel(cat, nil, ClassicTheme, false)
+			newM, _ := m.Update(tea.WindowSizeMsg{Width: tt.width, Height: 24})
+			m = newM.(model)
+
+			lines := strings.Split(m.View(), "\n")
+			if len(lines) > 24 {
+				t.Errorf("%s View() produced %d lines, want <= 24", tt.name, len(lines))
+			}
+		})
+	}
+}
+
+func TestRenderFooter_NarrowTruncation(t *testing.T) {
+	t.Parallel()
+	cat := mockCatalog()
+	tests := []struct {
+		name             string
+		width            int
+		wantWithReadme   bool
+		wantNoReadme     bool
+		wantReadmeFooter bool
+	}{
+		{name: "narrow 60 columns", width: 60, wantWithReadme: true, wantNoReadme: false, wantReadmeFooter: false},
+		{name: "compact 50 columns", width: 50, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
+		{name: "compact 40 columns", width: 40, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
+		{name: "standard 80 columns", width: 80, wantWithReadme: false, wantNoReadme: false, wantReadmeFooter: false},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			m := initialModel(cat, nil, ClassicTheme, false)
+			m.width = tt.width
+			m.height = 24
+
+			footerWithReadme := m.renderFooter(true)
+			footerNoReadme := m.renderFooter(false)
+			readmeFooter := m.renderReadmeFooter()
+
+			checks := []struct {
+				label      string
+				rendered   string
+				wantEllips bool
+			}{
+				{label: "renderFooter(true)", rendered: footerWithReadme, wantEllips: tt.wantWithReadme},
+				{label: "renderFooter(false)", rendered: footerNoReadme, wantEllips: tt.wantNoReadme},
+				{label: "renderReadmeFooter()", rendered: readmeFooter, wantEllips: tt.wantReadmeFooter},
+			}
+
+			for _, chk := range checks {
+				if !strings.HasPrefix(chk.rendered, "\n\n") {
+					t.Errorf("%s expected leading \\n\\n, got %q", chk.label, chk.rendered)
+				}
+				line := strings.TrimPrefix(chk.rendered, "\n\n")
+				if strings.Contains(line, "\n") {
+					t.Errorf("%s wrapped onto multiple lines: %q", chk.label, line)
+				}
+				if gotW := lipgloss.Width(line); gotW > tt.width {
+					t.Errorf("%s at width %d has visible width %d > %d: %q",
+						chk.label, tt.width, gotW, tt.width, line)
+				}
+				if chk.wantEllips && !strings.HasSuffix(line, "…") {
+					t.Errorf("%s at width %d expected trailing ellipsis '…', got %q",
+						chk.label, tt.width, line)
+				}
+				if !chk.wantEllips && strings.HasSuffix(line, "…") {
+					t.Errorf("%s at width %d expected no truncation, got %q",
+						chk.label, tt.width, line)
+				}
+			}
+		})
 	}
 }

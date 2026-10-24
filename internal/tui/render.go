@@ -450,6 +450,16 @@ func renderBoxWithTitle(content string, width int, title string, focused bool, s
 		borderFg.Render("╮")
 
 	lines[0] = topLine
+	if borderFg.GetFaint() && len(lines) > 1 {
+		rawVert := lipgloss.NewStyle().Foreground(borderFg.GetForeground()).Render("│")
+		faintVert := borderFg.Render("│")
+		for i := 1; i < len(lines)-1; i++ {
+			if strings.HasPrefix(lines[i], rawVert) && strings.HasSuffix(lines[i], rawVert) {
+				lines[i] = faintVert + lines[i][len(rawVert):len(lines[i])-len(rawVert)] + faintVert
+			}
+		}
+		lines[len(lines)-1] = borderFg.Render("╰" + strings.Repeat("─", width) + "╯")
+	}
 	return strings.Join(lines, "\n")
 }
 
@@ -525,11 +535,15 @@ func (m model) renderReadmeView() string {
 }
 
 func (m model) renderReadmeFooter() string {
-	return m.styles.FormatKeyHelp([]keyHelp{
+	footer := m.styles.FormatKeyHelp([]keyHelp{
 		{"↑/↓/PgUp/PgDn/g/G", "Scroll"},
 		{"Enter", "Launch"},
 		{"Tab/Esc/q", "Back"},
 	})
+	if m.width > 0 {
+		return "\n\n" + truncateANSI(strings.TrimPrefix(footer, "\n\n"), m.width)
+	}
+	return footer
 }
 
 func (m model) renderFooter(hasReadme bool) string {
@@ -543,7 +557,11 @@ func (m model) renderFooter(hasReadme bool) string {
 		keyHelp{"Enter", "Launch"},
 		keyHelp{"Esc/Ctrl+C", "Quit"},
 	)
-	return m.styles.FormatKeyHelp(items)
+	footer := m.styles.FormatKeyHelp(items)
+	if m.width > 0 {
+		return "\n\n" + truncateANSI(strings.TrimPrefix(footer, "\n\n"), m.width)
+	}
+	return footer
 }
 
 func formatBoxContent(lines []string, width, height int) string {

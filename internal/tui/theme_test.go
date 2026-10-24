@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestGetBuiltinTheme(t *testing.T) {
@@ -246,7 +248,11 @@ func TestRenderBrandPill_NerdFonts(t *testing.T) {
 }
 
 func TestMonochromeThemeContrast(t *testing.T) {
-	t.Parallel()
+	origProfile := lipgloss.ColorProfile()
+	// 2 corresponds to termenv.ANSI (16-color profile) so SGR sequences are emitted.
+	lipgloss.SetColorProfile(2)
+	defer lipgloss.SetColorProfile(origProfile)
+
 	styles := CompileStyles(MonochromeTheme)
 	brandPill := styles.RenderBrandPill(false)
 	if !strings.Contains(brandPill, "DOOM") {
@@ -270,6 +276,38 @@ func TestMonochromeThemeContrast(t *testing.T) {
 	}
 	if styles.TitleInactive.GetBold() {
 		t.Errorf("expected styles.TitleInactive.GetBold() == false")
+	}
+	if !styles.BorderFgInactive.GetFaint() {
+		t.Errorf("expected MonochromeTheme styles.BorderFgInactive.GetFaint() == true")
+	}
+	if !styles.TitleInactive.GetFaint() {
+		t.Errorf("expected MonochromeTheme styles.TitleInactive.GetFaint() == true")
+	}
+	if styles.BorderFgActive.GetFaint() {
+		t.Errorf("expected MonochromeTheme styles.BorderFgActive.GetFaint() == false")
+	}
+	if styles.TitleActive.GetFaint() {
+		t.Errorf("expected MonochromeTheme styles.TitleActive.GetFaint() == false")
+	}
+
+	inactiveBox := renderBoxWithTitle("interior line", 24, "Preset Details", false, styles)
+	inactiveLines := strings.Split(inactiveBox, "\n")
+	if len(inactiveLines) != 3 {
+		t.Fatalf("expected 3 lines in rendered box, got %d", len(inactiveLines))
+	}
+	for idx, line := range inactiveLines {
+		if !strings.Contains(line, "\x1b[2;") {
+			t.Errorf("expected inactive box line %d in MonochromeTheme to contain SGR 2 faint sequence, got %q",
+				idx, line)
+		}
+	}
+	if !strings.Contains(inactiveLines[1], " interior line ") {
+		t.Errorf("expected inactive box interior text to remain undimmed, got %q", inactiveLines[1])
+	}
+
+	activeBox := renderBoxWithTitle("interior line", 24, "Presets (32)", true, styles)
+	if strings.Contains(activeBox, "\x1b[2;") {
+		t.Errorf("expected active box in MonochromeTheme not to contain SGR 2 faint sequence, got %q", activeBox)
 	}
 }
 
