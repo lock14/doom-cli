@@ -98,8 +98,8 @@ take precedence over `config.json`, which takes precedence over platform default
 - `internal/steam/`: Multi-library `libraryfolders.vdf` parsing, catalog-driven game file extraction, and
   `idkfa 2024.wad` soundtrack synthesis from `extras.wad`.
 - `internal/templates/`: Embedded configuration templates and backup deployment engine.
-- `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `layout.go`, `render.go`, `menu.go`, `theme.go`,
-  `builtin_themes.go`).
+- `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `options.go`, `config_view.go`, `layout.go`,
+  `render.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
 - `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, embedded `DEHACKED` lump
   extractor, ranked `.txt` README extractor with `<primaryStem>.txt` fallback normalization, and SoundFont installer
   (`downloader.go`, `extract.go`, `soundfont.go`).

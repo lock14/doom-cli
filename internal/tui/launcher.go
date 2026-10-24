@@ -2,7 +2,9 @@
 package tui
 
 import (
+	"bytes"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,31 +15,84 @@ import (
 	"github.com/sahilm/fuzzy"
 	"golang.org/x/term"
 
+	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/steam"
+	"github.com/lock14/doom-cli/internal/wad"
 )
 
 var defaultStyles = CompileStyles(ClassicTheme)
 
+const (
+	helpModeBrowser = iota
+	helpModeLaunchOptions
+	helpModeConfigManager
+	helpModeReadme
+)
+
+// LauncherOptions holds optional runtime context for RunInteractiveLauncherWithOptions.
+type LauncherOptions struct {
+	Paths            *config.Paths
+	AppConfig        *config.AppConfig
+	CatalogDir       string
+	ExtraArgs        []string
+	ThemeSource      string
+	NerdFontsSource  string
+	WadsDirSource    string
+	WadsDirsSource   string
+	BinDirSource     string
+	SoundFontsSource string
+}
+
 type model struct {
-	theme         Theme
-	styles        ThemeStyles
-	nerdFonts     bool
-	catalog       *preset.Catalog
-	dirIndex      *preset.DirIndex
-	readmeCache   map[string]string
-	searchTargets []string
-	input         textinput.Model
-	filtered      []preset.Preset
-	cursor        int
-	selected      *preset.Preset
-	width         int
-	height        int
-	quitting      bool
+	theme            Theme
+	styles           ThemeStyles
+	nerdFonts        bool
+	catalog          *preset.Catalog
+	baseCatalog      *preset.Catalog
+	wadRoots         []string
+	paths            *config.Paths
+	appConfig        *config.AppConfig
+	customCatalogDir string
+	extraArgs        []string
+	themeSource      string
+	nerdFontsSource  string
+	wadsDirSource    string
+	wadsDirsSource   string
+	binDirSource     string
+	soundFontsSource string
+	steamSearchRoots []string
+	httpClient       *http.Client
+	dirIndex         *preset.DirIndex
+	readmeCache      map[string]string
+	searchTargets    []string
+	input            textinput.Model
+	filtered         []preset.Preset
+	cursor           int
+	selected         *preset.Preset
+	width            int
+	height           int
+	quitting         bool
+	statusMsg        string
+	lastFetchOutput  string
 
 	// Readme viewer state
 	viewingReadme bool
 	readmeTitle   string
 	viewport      viewport.Model
+
+	// Launch Options & Per-Preset Config state (Ctrl+O / F4)
+	viewingLaunchOpts bool
+	launchOpts        *launchOptionsState
+
+	// 3-Tab Config Manager state (Ctrl+G / F2)
+	viewingConfigMgr bool
+	cfgMgr           *configManagerState
+
+	// Contextual Help state (F1)
+	viewingHelp  bool
+	helpMode     int
+	helpViewport viewport.Model
 }
 
 func readmeCacheKey(p preset.Preset) string {
@@ -45,6 +100,55 @@ func readmeCacheKey(p preset.Preset) string {
 		return p.ID
 	}
 	return p.Name
+}
+
+func buildSearchTarget(p preset.Preset, dirIndex *preset.DirIndex) string {
+	readiness := "missing"
+	if dirIndex != nil && dirIndex.IsPresetInstalled(p) {
+		readiness = "ready installed"
+	}
+	return strings.TrimSpace(fmt.Sprintf(
+		"%s %s %s %s %s",
+		p.Name, p.Engine, p.Category, p.Compatibility, readiness,
+	))
+}
+
+func (m model) effectiveWadRoots() []string {
+	if m.paths != nil {
+		if roots := m.paths.WadRoots(); len(roots) > 0 {
+			return roots
+		}
+	}
+	return m.wadRoots
+}
+
+func (m model) wadsWriteDir() string {
+	if m.paths != nil && strings.TrimSpace(m.paths.WadsDir) != "" {
+		return m.paths.WadsDir
+	}
+	if len(m.wadRoots) > 0 {
+		return m.wadRoots[0]
+	}
+	return ""
+}
+
+func (m model) extraWadRoots() []string {
+	roots := m.effectiveWadRoots()
+	if len(roots) > 1 {
+		return roots[1:]
+	}
+	return nil
+}
+
+func (m *model) catalogDir() string {
+	if strings.TrimSpace(m.customCatalogDir) != "" {
+		return m.customCatalogDir
+	}
+	m.ensurePathsAndConfig()
+	if m.paths != nil {
+		return m.paths.CatalogDir
+	}
+	return ""
 }
 
 func (m model) resolveFile(name string) (string, bool) {
@@ -64,6 +168,53 @@ func (m model) resolveReadme(p preset.Preset) (string, bool) {
 		return m.dirIndex.ResolveReadme(p)
 	}
 	return "", false
+}
+
+func (m *model) rebuildIndexAndTargets() {
+	if m.catalog == nil {
+		m.catalog = &preset.Catalog{}
+	}
+	var currentID string
+	if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
+		currentID = m.filtered[m.cursor].ID
+	}
+
+	m.dirIndex = preset.NewDirIndex(m.effectiveWadRoots()...).WithCatalog(m.catalog)
+	m.readmeCache = make(map[string]string, len(m.catalog.Presets))
+	m.searchTargets = make([]string, 0, len(m.catalog.Presets))
+	for _, p := range m.catalog.Presets {
+		m.searchTargets = append(m.searchTargets, buildSearchTarget(p, m.dirIndex))
+		if path, ok := m.dirIndex.ResolveReadme(p); ok {
+			m.readmeCache[readmeCacheKey(p)] = path
+		} else {
+			m.readmeCache[readmeCacheKey(p)] = ""
+		}
+	}
+
+	m.updateFiltered(m.input.Value())
+	if currentID != "" {
+		for i, p := range m.filtered {
+			if p.ID == currentID {
+				m.cursor = i
+				break
+			}
+		}
+	}
+	if m.cursor >= len(m.filtered) {
+		if len(m.filtered) > 0 {
+			m.cursor = len(m.filtered) - 1
+		} else {
+			m.cursor = 0
+		}
+	}
+}
+
+func (m *model) reloadCatalogAndIndex() {
+	catDir := m.catalogDir()
+	if cat, err := preset.MergeUserDir(m.baseCatalog, catDir); err == nil && cat != nil {
+		m.catalog = cat
+	}
+	m.rebuildIndexAndTargets()
 }
 
 func initialModel(
@@ -109,7 +260,7 @@ func initialModel(
 	readmeCache := make(map[string]string, len(catalog.Presets))
 	searchTargets := make([]string, 0, len(catalog.Presets))
 	for _, p := range catalog.Presets {
-		searchTargets = append(searchTargets, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+		searchTargets = append(searchTargets, buildSearchTarget(p, dirIndex))
 		if path, ok := dirIndex.ResolveReadme(p); ok {
 			readmeCache[readmeCacheKey(p)] = path
 		} else {
@@ -122,6 +273,8 @@ func initialModel(
 		styles:        styles,
 		nerdFonts:     nerdFonts,
 		catalog:       catalog,
+		baseCatalog:   catalog.Clone(),
+		wadRoots:      append([]string(nil), wadRoots...),
 		dirIndex:      dirIndex,
 		readmeCache:   readmeCache,
 		searchTargets: searchTargets,
@@ -133,11 +286,135 @@ func initialModel(
 	}
 }
 
+func (m *model) openHelp(mode int) {
+	_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
+	m.helpMode = mode
+	m.helpViewport = viewport.New(vpWidth, vpHeight)
+	m.helpViewport.SetContent(m.buildHelpContent(mode))
+	m.viewingHelp = true
+}
+
+func (m model) areAllPresetFilesPresent(p preset.Preset) bool {
+	if _, ok := m.resolveFile(p.IWAD); !ok {
+		return false
+	}
+	for _, f := range p.Files {
+		if _, ok := m.resolveFile(f.Name); !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (m model) needsOptionalSteamFile(p preset.Preset) bool {
+	for _, f := range p.Files {
+		if f.Optional {
+			if _, ok := m.resolveFile(f.Name); !ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (m *model) handleFetchAssets() {
+	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
+		return
+	}
+	cur := m.filtered[m.cursor]
+	if m.areAllPresetFilesPresent(cur) {
+		m.statusMsg = fmt.Sprintf("✓ Ready: %s", cur.Name)
+		return
+	}
+
+	writeDir := m.wadsWriteDir()
+	roots := m.effectiveWadRoots()
+	if writeDir == "" && len(roots) == 0 {
+		m.statusMsg = "✗ Fetch failed: no WAD directory configured"
+		return
+	}
+
+	var buf bytes.Buffer
+	var steamErr error
+	_, iwadFound := m.resolveFile(cur.IWAD)
+	if (!iwadFound || len(cur.Sources) == 0 || m.needsOptionalSteamFile(cur)) && writeDir != "" {
+		searchRoots := m.steamSearchRoots
+		_, steamErr = steam.DiscoverAndExtract(
+			m.catalog, searchRoots, writeDir, false, &buf, m.extraWadRoots()...,
+		)
+	}
+
+	var dlErr error
+	if len(roots) > 0 && len(cur.Sources) > 0 {
+		dl := wad.NewDownloader(roots, false, &buf)
+		if m.httpClient != nil {
+			dl.Client = m.httpClient
+		}
+		dlErr = dl.DownloadPreset(cur)
+	}
+
+	m.rebuildIndexAndTargets()
+	m.lastFetchOutput = buf.String()
+
+	if dlErr != nil {
+		m.statusMsg = fmt.Sprintf("✗ Fetch failed: %v", dlErr)
+		return
+	}
+	if steamErr != nil {
+		m.statusMsg = fmt.Sprintf("✗ Steam/GOG scan failed: %v", steamErr)
+		return
+	}
+	if m.dirIndex != nil && m.dirIndex.IsPresetInstalled(cur) {
+		m.statusMsg = fmt.Sprintf("✓ Ready: %s", cur.Name)
+		return
+	}
+	m.statusMsg = fmt.Sprintf("✗ Missing required files for %s", cur.Name)
+}
+
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.viewingHelp {
+		switch msg := msg.(type) {
+		case tea.WindowSizeMsg:
+			m.width = msg.Width
+			m.height = msg.Height
+			m.input.Width = calculateSearchWidth(m.width)
+			_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
+			m.helpViewport.Width = vpWidth
+			m.helpViewport.Height = vpHeight
+			return m, nil
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "ctrl+c":
+				m.quitting = true
+				return m, tea.Quit
+			case "esc", "f1", "q", "Q":
+				m.viewingHelp = false
+				return m, nil
+			case "g", "home":
+				m.helpViewport.GotoTop()
+				return m, nil
+			case "G", "end":
+				m.helpViewport.GotoBottom()
+				return m, nil
+			}
+		}
+		var cmd tea.Cmd
+		m.helpViewport, cmd = m.helpViewport.Update(msg)
+		return m, cmd
+	}
+
+	if m.viewingLaunchOpts {
+		return m.updateLaunchOptions(msg)
+	}
+
+	if m.viewingConfigMgr {
+		return m.updateConfigManager(msg)
+	}
+
 	if m.viewingReadme {
 		switch msg := msg.(type) {
 		case tea.WindowSizeMsg:
@@ -154,6 +431,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				m.quitting = true
 				return m, tea.Quit
+			case "f1":
+				m.openHelp(helpModeReadme)
+				return m, nil
 			case "esc", "q", "Q", "tab", "ctrl+r":
 				m.viewingReadme = false
 				return m, nil
@@ -189,6 +469,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "esc":
 			m.quitting = true
 			return m, tea.Quit
+
+		case "f1":
+			m.openHelp(helpModeBrowser)
+			return m, nil
+
+		case "ctrl+o", "f4":
+			m.openLaunchOptions()
+			return m, nil
+
+		case "ctrl+g", "f2":
+			m.openConfigManager()
+			return m, nil
+
+		case "ctrl+f":
+			m.handleFetchAssets()
+			return m, nil
 
 		case "enter":
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
@@ -290,7 +586,7 @@ func (m *model) updateFiltered(query string) {
 	if len(targets) != len(m.catalog.Presets) {
 		targets = make([]string, 0, len(m.catalog.Presets))
 		for _, p := range m.catalog.Presets {
-			targets = append(targets, fmt.Sprintf("%s %s %s", p.Name, p.Engine, p.Category))
+			targets = append(targets, buildSearchTarget(p, m.dirIndex))
 		}
 	}
 
@@ -308,6 +604,15 @@ func (m model) View() string {
 	}
 	if m.selected != nil {
 		return fmt.Sprintf("Launching %s...\n", m.selected.Name)
+	}
+	if m.viewingHelp {
+		return m.renderHelpView()
+	}
+	if m.viewingLaunchOpts {
+		return m.renderLaunchOptionsView()
+	}
+	if m.viewingConfigMgr {
+		return m.renderConfigManagerView()
 	}
 	if m.viewingReadme {
 		return m.renderReadmeView()
@@ -332,11 +637,36 @@ func RunInteractiveLauncher(
 	nerdFonts bool,
 	initialPreset ...string,
 ) (*preset.Preset, error) {
+	return RunInteractiveLauncherWithOptions(
+		catalog, wadRoots, theme, nerdFonts, LauncherOptions{}, initialPreset...,
+	)
+}
+
+// RunInteractiveLauncherWithOptions runs the interactive Bubble Tea UI launcher with full CLI context.
+func RunInteractiveLauncherWithOptions(
+	catalog *preset.Catalog,
+	wadRoots []string,
+	theme Theme,
+	nerdFonts bool,
+	opts LauncherOptions,
+	initialPreset ...string,
+) (*preset.Preset, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
 	m := initialModel(catalog, wadRoots, theme, nerdFonts, initialPreset...)
+	m.paths = opts.Paths
+	m.appConfig = opts.AppConfig
+	m.customCatalogDir = opts.CatalogDir
+	m.extraArgs = append([]string(nil), opts.ExtraArgs...)
+	m.themeSource = opts.ThemeSource
+	m.nerdFontsSource = opts.NerdFontsSource
+	m.wadsDirSource = opts.WadsDirSource
+	m.wadsDirsSource = opts.WadsDirsSource
+	m.binDirSource = opts.BinDirSource
+	m.soundFontsSource = opts.SoundFontsSource
+
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {

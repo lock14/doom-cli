@@ -442,3 +442,43 @@ func TestPrepareLaunch_CustomFileSpecAliases(t *testing.T) {
 		t.Fatalf("OrderedFiles = %v, want [%s]", plan.OrderedFiles, aliasWad)
 	}
 }
+
+func TestFormatLaunchPreview(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "av.wad"), []byte("pwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "av.deh"), []byte("deh"), 0o644)
+
+	idx := preset.NewDirIndex(wadsDir)
+	p := preset.Preset{
+		ID:     "alien-vendetta",
+		Name:   "Alien Vendetta",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Args:   []string{"-complevel", "2", "-skill", "4"},
+		Files: []preset.FileSpec{
+			{Name: "av.wad"},
+			{Name: "av.deh"},
+			{Name: "idkfa 2024.wad", Optional: true},
+		},
+	}
+
+	preview := FormatLaunchPreview(p, nil, idx, []string{"-fast"})
+	wantParts := []string{
+		"dsda-doom -iwad " + filepath.Join(wadsDir, "DOOM2.WAD"),
+		"-file " + filepath.Join(wadsDir, "av.wad") + " idkfa 2024.wad",
+		"-deh " + filepath.Join(wadsDir, "av.deh"),
+		"-complevel 2 -skill 4 -fast",
+	}
+	for _, want := range wantParts {
+		if !strings.Contains(preview, want) {
+			t.Errorf("FormatLaunchPreview = %q, missing %q", preview, want)
+		}
+	}
+
+	previewNoIdx := FormatLaunchPreview(p, nil, nil, []string{"-fast"})
+	if !strings.Contains(previewNoIdx, "dsda-doom -iwad DOOM2.WAD -file av.wad idkfa 2024.wad -deh av.deh") {
+		t.Errorf("FormatLaunchPreview(nil idx) = %q", previewNoIdx)
+	}
+}

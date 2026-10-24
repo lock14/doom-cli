@@ -126,9 +126,11 @@ doom-cli/
 │   ├── steam/              # Steam and GOG discovery, catalog target synthesis, and idkfa 2024.wad synthesis
 │   ├── templates/          # Embedded engine configuration templates and backup deployer
 │   ├── tui/                # Terminal user interface components powered by Bubble Tea and Lip Gloss
-│   │   ├── launcher.go     # Bubble Tea state machine, update loop, and message routing
+│   │   ├── launcher.go     # Bubble Tea state machine, update loop, in-TUI asset fetch, and message routing
+│   │   ├── options.go      # Unified launch options and per-preset configuration view (Ctrl+O or F4)
+│   │   ├── config_view.go  # 3-tab in-TUI configuration manager (Ctrl+G or F2)
 │   │   ├── layout.go       # Dynamic viewport and responsive pane geometry calculations
-│   │   ├── render.go       # Split-pane UI rendering, badges, status lines, and key help formatting
+│   │   ├── render.go       # Split-pane UI rendering, badges, contextual help (F1), and key help formatting
 │   │   ├── menu.go         # Fallback numbered terminal menu for basic or non-TTY environments
 │   │   ├── theme.go        # Theme loading, custom JSON theme decoding, and ANSI and TrueColor styles
 │   │   └── builtin_themes.go # Curated color palettes adhering to the 60-30-10 design principle
