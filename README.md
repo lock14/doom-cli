@@ -128,8 +128,8 @@ doom setup
 3. **Deploys MIDI SoundFont**: Downloads and installs the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth
    MIDI playback.
 4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*,
-   *Heretic*, and *Hexen*, importing commercial IWADs and synthesizing the `idkfa 2024.wad` soundtrack from
-   `extras.wad` into your WADs directory.
+   *Heretic*, and *Hexen*, importing commercial IWADs (prioritizing Nightdive `rerelease/` widescreen IWADs over legacy
+   `base/` files) and synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into your WADs directory.
 5. **Downloads community megawads**: Fetches and extracts free community megawads (*Eviternity I & II*,
    *Back to Saturn X*, *Ancient Aliens*, *Doom Zero*, *Sunder*, *Sunlust*, and others) and DeHackEd patches from
    idgames, DSDA, and community mirrors.
@@ -745,9 +745,10 @@ Configured in [`uzdoom/autoexec.cfg`](uzdoom/autoexec.cfg) to reproduce the cris
 
 Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 - **Compatibility**: Default `complevel 21` (MBF21 standard).
-- **Video and display**: OpenGL mode with integer scaling, VSync frame pacing, and uncapped high-refresh support (no
-  artificial 60 FPS cap).
-- **Extended HUD (exHUD)**: In-game level splits, secret counters, and completion times.
+- **Video and lighting**: OpenGL mode with classic Doom software lightmaps (`render_doom_lightmaps 1`), banded sector
+  fading (`gl_fade_mode 1`), VSync frame pacing, and uncapped high-refresh support (no artificial 60 FPS cap).
+- **Widescreen status bar and extended HUD (exHUD)**: Classic textured widescreen status bar borders
+  (`sts_solid_bg_color 0`) alongside in-game level splits, secret counters, and completion times.
 - **Built-in capture**: Ready-to-use `ffmpeg` video recording commands.
 
 ## Source port packaging (Linux)

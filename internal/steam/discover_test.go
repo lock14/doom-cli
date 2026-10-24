@@ -316,3 +316,198 @@ func TestSynthesizeIDKFAWADAndDiscoverFromExtras(t *testing.T) {
 		}
 	}
 }
+
+func TestDiscoverAndExtract_PrefersRereleaseIWADsOverBase(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	mockSteam := filepath.Join(tmpDir, "steam_root")
+	baseDir := filepath.Join(mockSteam, "steamapps", "common", "Ultimate Doom", "base")
+	rereleaseDir := filepath.Join(mockSteam, "steamapps", "common", "Ultimate Doom", "rerelease")
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(rereleaseDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	targets := []struct {
+		name          string
+		baseName      string
+		rereleaseName string
+		destName      string
+		baseData      []byte
+		rereleaseData []byte
+	}{
+		{
+			name:          "DOOM.WAD",
+			baseName:      "DOOM.WAD",
+			rereleaseName: "DOOM.WAD",
+			destName:      "DOOM.WAD",
+			baseData:      []byte("IWAD-legacy-4x3-doom-1995-padding-longer"),
+			rereleaseData: []byte("IWAD-widescreen-doom-2024"),
+		},
+		{
+			name:          "DOOM2.WAD",
+			baseName:      "DOOM2.WAD",
+			rereleaseName: "DOOM2.WAD",
+			destName:      "DOOM2.WAD",
+			baseData:      []byte("IWAD-legacy-4x3-doom2-1994"),
+			rereleaseData: []byte("IWAD-widescreen-doom2-2024"),
+		},
+		{
+			name:          "TNT.WAD",
+			baseName:      "TNT.WAD",
+			rereleaseName: "TNT.WAD",
+			destName:      "TNT.WAD",
+			baseData:      []byte("IWAD-legacy-4x3-tnt-1996"),
+			rereleaseData: []byte("IWAD-widescreen-tnt-2024"),
+		},
+		{
+			name:          "PLUTONIA.WAD",
+			baseName:      "PLUTONIA.WAD",
+			rereleaseName: "PLUTONIA.WAD",
+			destName:      "PLUTONIA.WAD",
+			baseData:      []byte("IWAD-legacy-4x3-plutonia-1996"),
+			rereleaseData: []byte("IWAD-widescreen-plutonia-2024"),
+		},
+		{
+			name:          "rerelease alias sigil.wad beats base canonical SIGIL_V1_23.wad",
+			baseName:      "SIGIL_V1_23.wad",
+			rereleaseName: "sigil.wad",
+			destName:      "SIGIL_V1_23.wad",
+			baseData:      []byte("PWAD-base-canonical-sigil-larger-payload"),
+			rereleaseData: []byte("PWAD-rerelease-alias-sigil"),
+		},
+		{
+			name:          "rerelease normalized idkfa_2024.wad beats base exact idkfa 2024.wad",
+			baseName:      "idkfa 2024.wad",
+			rereleaseName: "idkfa_2024.wad",
+			destName:      "idkfa 2024.wad",
+			baseData:      []byte("PWAD-base-exact-idkfa-larger-payload"),
+			rereleaseData: []byte("PWAD-rerelease-norm-idkfa"),
+		},
+	}
+
+	for _, tc := range targets {
+		if err := os.WriteFile(filepath.Join(baseDir, tc.baseName), tc.baseData, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(rereleaseDir, tc.rereleaseName), tc.rereleaseData, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	destWads := filepath.Join(tmpDir, "target_wads")
+	var out bytes.Buffer
+	count, err := DiscoverAndExtract(nil, []string{mockSteam}, destWads, false, &out)
+	if err != nil {
+		t.Fatalf("DiscoverAndExtract failed: %v", err)
+	}
+	if count != len(targets) {
+		t.Fatalf("expected %d files extracted, got %d\nOutput:\n%s", len(targets), count, out.String())
+	}
+
+	for _, tc := range targets {
+		got, err := os.ReadFile(filepath.Join(destWads, tc.destName))
+		if err != nil {
+			t.Fatalf("reading extracted %s: %v", tc.destName, err)
+		}
+		if !bytes.Equal(got, tc.rereleaseData) {
+			t.Errorf(
+				"%s (%s) content = %q, want rerelease content %q",
+				tc.name, tc.destName, string(got), string(tc.rereleaseData),
+			)
+		}
+	}
+}
+
+func TestRankRereleaseCandidates(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	shortBase := filepath.Join(tmpDir, "a", "base", "DOOM.WAD")
+	longBase := filepath.Join(tmpDir, "longer_prefix", "base", "DOOM.WAD")
+	smallBase := filepath.Join(tmpDir, "small", "base", "DOOM.WAD")
+	largeBase := filepath.Join(tmpDir, "large", "base", "DOOM.WAD")
+	rereleaseUpper := filepath.Join(tmpDir, "very_long_prefix", "ReRelease", "DOOM.WAD")
+	nestedRerelease := filepath.Join(tmpDir, "steam", "rerelease", "id1", "id1.wad")
+	nestedBase := filepath.Join(tmpDir, "steam", "base", "id1", "id1.wad")
+	outerRereleaseInnerBase := filepath.Join(tmpDir, "rerelease_backup", "doom", "base", "DOOM.WAD")
+	neutralGOG := filepath.Join(tmpDir, "gog", "doom", "DOOM.WAD")
+	dosboxLegacy := filepath.Join(tmpDir, "gog", "dosbox", "DOOM.WAD")
+
+	for _, p := range []string{
+		shortBase,
+		longBase,
+		smallBase,
+		largeBase,
+		rereleaseUpper,
+		nestedRerelease,
+		nestedBase,
+		outerRereleaseInnerBase,
+		neutralGOG,
+		dosboxLegacy,
+	} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = os.WriteFile(shortBase, []byte("same-size"), 0o644)
+	_ = os.WriteFile(longBase, []byte("same-size"), 0o644)
+	_ = os.WriteFile(smallBase, []byte("tiny"), 0o644)
+	_ = os.WriteFile(largeBase, []byte("much-larger-payload-bytes"), 0o644)
+	_ = os.WriteFile(rereleaseUpper, []byte("tiny"), 0o644)
+	_ = os.WriteFile(nestedRerelease, []byte("id1-rerelease"), 0o644)
+	_ = os.WriteFile(nestedBase, []byte("id1-base-larger-payload"), 0o644)
+	_ = os.WriteFile(outerRereleaseInnerBase, []byte("much-larger-payload-bytes"), 0o644)
+	_ = os.WriteFile(neutralGOG, []byte("tiny"), 0o644)
+	_ = os.WriteFile(dosboxLegacy, []byte("much-larger-payload-bytes"), 0o644)
+
+	tests := []struct {
+		name      string
+		input     []string
+		wantFirst string
+	}{
+		{
+			name:      "case-insensitive ReRelease beats larger base file",
+			input:     []string{largeBase, rereleaseUpper},
+			wantFirst: rereleaseUpper,
+		},
+		{
+			name:      "nested subdirectory under rerelease beats nested subdirectory under base",
+			input:     []string{nestedBase, nestedRerelease},
+			wantFirst: nestedRerelease,
+		},
+		{
+			name:      "inner base directory is not misclassified by outer rerelease ancestor",
+			input:     []string{outerRereleaseInnerBase, neutralGOG},
+			wantFirst: neutralGOG,
+		},
+		{
+			name:      "neutral GOG directory beats dosbox directory",
+			input:     []string{dosboxLegacy, neutralGOG},
+			wantFirst: neutralGOG,
+		},
+		{
+			name:      "larger file beats smaller file when priority is equal",
+			input:     []string{smallBase, largeBase},
+			wantFirst: largeBase,
+		},
+		{
+			name:      "shorter directory path beats longer directory path when priority and size are equal",
+			input:     []string{longBase, shortBase},
+			wantFirst: shortBase,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := rankRereleaseCandidates(tc.input)
+			if got[0] != tc.wantFirst {
+				t.Errorf("rankRereleaseCandidates(%v)[0] = %q, want %q", tc.input, got[0], tc.wantFirst)
+			}
+		})
+	}
+}

@@ -301,30 +301,39 @@ func DiscoverAndExtract(
 		})
 	}
 
-	var patterns []TargetPattern
-	if cat != nil {
-		patterns = TargetPatternsForCatalog(cat)
-	} else {
-		patterns = DefaultTargetPatterns()
+	if cat == nil {
+		cat, _ = preset.LoadCuratedCatalog()
 	}
+	patterns := TargetPatternsForCatalog(cat)
 	wadRoots := append([]string{wadsDir}, extraWadRoots...)
 	dirIdx := preset.NewDirIndex(wadRoots...).WithCatalog(cat)
 	foundCount := 0
 	installedTargets := make(map[string]bool)
+	processedTargets := make(map[string]bool)
 	var idkfaDestName string
+
+	patternsByDest := make(map[string][]TargetPattern, len(patterns))
+	for _, tp := range patterns {
+		destLower := strings.ToLower(tp.DestName)
+		patternsByDest[destLower] = append(patternsByDest[destLower], tp)
+	}
 
 	for _, tp := range patterns {
 		if idkfaDestName == "" && preset.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
 			idkfaDestName = tp.DestName
 		}
+		destLower := strings.ToLower(tp.DestName)
+		if processedTargets[destLower] {
+			continue
+		}
+		processedTargets[destLower] = true
+
 		destFile, joinErr := fsutil.SafeJoin(wadsDir, tp.DestName)
 		if joinErr != nil {
 			continue
 		}
-		if installedTargets[strings.ToLower(tp.DestName)] {
-			continue
-		}
 
+		destPatterns := patternsByDest[destLower]
 		if !force {
 			if fi, err := os.Stat(destFile); err == nil && fi.Size() > 0 {
 				continue
@@ -332,24 +341,45 @@ func DiscoverAndExtract(
 			if _, ok := dirIdx.ResolveFile(tp.DestName); ok {
 				continue
 			}
-			if _, ok := dirIdx.ResolveFile(tp.SourcePattern); ok {
+			alreadyResolved := false
+			for _, p := range destPatterns {
+				if _, ok := dirIdx.ResolveFile(p.SourcePattern); ok {
+					alreadyResolved = true
+					break
+				}
+			}
+			if alreadyResolved {
 				continue
 			}
 		}
 
-		candidates := indexed[strings.ToLower(tp.SourcePattern)]
-		if len(candidates) == 0 {
-			candidates = indexedNorm[preset.NormalizeFilename(tp.SourcePattern)]
+		var candidates []string
+		seenCand := make(map[string]bool)
+		addCandidate := func(c string) {
+			if !seenCand[c] {
+				seenCand[c] = true
+				candidates = append(candidates, c)
+			}
 		}
-		if strings.EqualFold(tp.DestName, "extras.wad") && len(candidates) > 1 {
-			candidates = rankExtrasCandidates(candidates)
+		for _, p := range destPatterns {
+			for _, c := range indexed[strings.ToLower(p.SourcePattern)] {
+				addCandidate(c)
+			}
 		}
-		if len(candidates) > 0 {
-			src := candidates[0]
+		for _, p := range destPatterns {
+			for _, c := range indexedNorm[preset.NormalizeFilename(p.SourcePattern)] {
+				addCandidate(c)
+			}
+		}
+		if len(candidates) > 1 {
+			candidates = rankRereleaseCandidates(candidates)
+		}
+		for _, src := range candidates {
 			if err := copyFile(src, destFile); err == nil {
 				fmt.Fprintf(out, "✓ Found & Installed: %s\n    Source: %s\n", tp.DestName, src)
 				foundCount++
-				installedTargets[strings.ToLower(tp.DestName)] = true
+				installedTargets[destLower] = true
+				break
 			}
 		}
 	}
@@ -365,7 +395,7 @@ func DiscoverAndExtract(
 				}
 			}
 			if !alreadyExists {
-				extrasCandidates := rankExtrasCandidates(indexed["extras.wad"])
+				extrasCandidates := rankRereleaseCandidates(indexed["extras.wad"])
 				if existingExtras, ok := dirIdx.ResolveFile("extras.wad"); ok {
 					extrasCandidates = append(extrasCandidates, existingExtras)
 				} else if existingExtras, joinErr := fsutil.SafeJoin(wadsDir, "extras.wad"); joinErr == nil {
@@ -403,13 +433,28 @@ func copyFile(src, dst string) error {
 	return err
 }
 
-func rankExtrasCandidates(paths []string) []string {
+func rereleasePriority(path string) int {
+	dir := filepath.ToSlash(filepath.Dir(path))
+	parts := strings.Split(dir, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		seg := parts[i]
+		if strings.EqualFold(seg, "rerelease") {
+			return 1
+		}
+		if strings.EqualFold(seg, "base") || strings.EqualFold(seg, "dosbox") {
+			return -1
+		}
+	}
+	return 0
+}
+
+func rankRereleaseCandidates(paths []string) []string {
 	ranked := append([]string(nil), paths...)
 	sort.SliceStable(ranked, func(i, j int) bool {
-		iRerelease := strings.Contains(strings.ToLower(ranked[i]), "rerelease")
-		jRerelease := strings.Contains(strings.ToLower(ranked[j]), "rerelease")
-		if iRerelease != jRerelease {
-			return iRerelease
+		iPrio := rereleasePriority(ranked[i])
+		jPrio := rereleasePriority(ranked[j])
+		if iPrio != jPrio {
+			return iPrio > jPrio
 		}
 		var iSize, jSize int64
 		if fi, err := os.Stat(ranked[i]); err == nil {
@@ -418,7 +463,10 @@ func rankExtrasCandidates(paths []string) []string {
 		if fj, err := os.Stat(ranked[j]); err == nil {
 			jSize = fj.Size()
 		}
-		return iSize > jSize
+		if iSize != jSize {
+			return iSize > jSize
+		}
+		return len(filepath.Dir(ranked[i])) < len(filepath.Dir(ranked[j]))
 	})
 	return ranked
 }
