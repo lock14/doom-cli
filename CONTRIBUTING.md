@@ -22,10 +22,11 @@ All contributions must respect the core repository invariants:
     *   **Standard directory structures**: Respect platform standard directories (XDG on Linux,
         `~/Library/Application Support/` on macOS, and `%LOCALAPPDATA%` and `%USERPROFILE%\Games\Doom\` on Windows).
 *   **Destructive safety and backup policy**: Any configuration or catalog write (`doom config install`, `doom setup`,
-    `doom engines add`, `doom engines config`, `doom presets add`, `doom presets config`) must write atomically via
-    same-directory temporary rename and generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at
-    most `MaxBackupsPerFile = 3` per file and cleaning up backups on entity or override deletion) before overwriting any
-    existing user file.
+    `doom config set`, `doom config toggle`, `doom themes set`, `doom engines add`, `doom engines config`,
+    `doom presets add`, `doom presets config`) must write atomically via same-directory temporary rename and generate
+    non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file and
+    cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion and on repository templates during
+    `doom config sync`) before overwriting any existing user file.
 *   **Archive security and Zip Slip hardening**: All archive extractions (`archive/zip`) and relative sub-path
     resolutions must sanitize entry paths against `..` traversal sequences via `fsutil.SafeJoin` and verify containment
     before any filesystem write.
@@ -66,7 +67,7 @@ flowchart TD
     end
 
     subgraph External ["External Content Discovery"]
-        Steam["Steam & GOG Libraries\n(Auto-Discover IWADs)"]
+        Steam["Steam & GOG Libraries\n(IWADs, Expansions & idkfa 2024.wad)"]
         Mirrors["Doomworld / idgames Mirrors\n(SHA-256 Verified Community WADs)"]
     end
 
@@ -78,7 +79,7 @@ flowchart TD
 
     Setup -->|Auto-Discover| Steam
     Setup -->|Multi-Mirror Fetch| Mirrors
-    Steam -->|Extract IWADs| WADsDir
+    Steam -->|Extract IWADs & Expansions| WADsDir
     Mirrors -->|Extract PWADs| WADsDir
 
     CatalogDir --> CLI
@@ -104,25 +105,25 @@ doom-cli/
 │   ├── setup.go            # 'doom setup' turnkey installation workflow
 │   ├── wads.go             # 'doom wads' subcommands (list, fetch, extract)
 │   ├── engines.go          # 'doom engines' subcommands (list, add, config, remove, install)
-│   ├── presets.go          # 'doom presets' subcommands (list, show, add, config, remove, build, lint)
+│   ├── presets.go          # 'doom presets' subcommands (list, show, add, config, remove, build (hidden), lint)
 │   ├── soundfont.go        # 'doom soundfont install' subcommand
-│   ├── config.go           # 'doom config' subcommands (show, get, set, toggle, install, diff, sync)
+│   ├── config.go           # 'doom config' subcommands (show, get, set, toggle, install, diff, sync (hidden))
 │   └── themes.go           # 'doom themes' subcommands (list, set)
 ├── internal/
-│   ├── config/             # Cross-platform path resolution and settings-only config.json
+│   ├── config/             # Platform path resolvers (paths.go) and settings-only config.json (settings.go)
 │   ├── display/            # Native display resolution and refresh rate auto-detection
 │   ├── engine/             # Source port runners, argument synthesis, declarative binary installers
-│   │   ├── runner.go       # Synthesizes arguments and executes engine processes
+│   │   ├── runner.go       # Synthesizes arguments (including .deh and .bex ordering) and executes engine processes
 │   │   └── installer.go    # Declarative GitHub release and pinned fallback binary installer
 │   ├── fsutil/             # Atomic file writes (temporary file and rename), backups, and SafeJoin
 │   ├── preset/             # Two-layer entity catalog, store, linter, file resolver, README compiler
 │   │   ├── preset.go       # Entity models, strict decoding, layered catalog loader, quarantine
 │   │   ├── store.go        # User catalog.d write operations (AddEngine, ConfigEngine, AddPreset, ConfigPreset)
-│   │   ├── lint.go         # Schema, invariant, personal-path, and README parity linter
-│   │   ├── resolve.go      # Multi-root DirIndex, relative sub-path and 1-level subdirectory resolution
+│   │   ├── lint.go         # Schema, invariant, personal-path, README parity, and documentation linter
+│   │   ├── resolve.go      # Multi-root DirIndex, relative sub-path, 1-level subdir, readiness, and README resolver
 │   │   ├── decode.go       # Robust text decoding with CP437 and DOS box-drawing character detection
 │   │   └── compiler.go     # Synchronizes curated catalog/*.json into README.md
-│   ├── steam/              # Steam and GOG library discovery (libraryfolders.vdf) and game file extraction
+│   ├── steam/              # Steam and GOG discovery, catalog target synthesis, and idkfa 2024.wad synthesis
 │   ├── templates/          # Embedded engine configuration templates and backup deployer
 │   ├── tui/                # Terminal user interface components powered by Bubble Tea and Lip Gloss
 │   │   ├── launcher.go     # Bubble Tea state machine, update loop, and message routing
@@ -133,8 +134,11 @@ doom-cli/
 │   │   └── builtin_themes.go # Curated color palettes adhering to the 60-30-10 design principle
 │   └── wad/                # WAD downloading, archive extraction, and SoundFont deployment
 │       ├── downloader.go   # Multi-mirror SHA-256 verified downloader for community megawads
-│       ├── extract.go      # Zip Slip hardened archive extraction and DeHackEd and BEX ordering
+│       ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README (.txt) extractor
 │       └── soundfont.go    # Roland SC-55 SoundFont installer
+├── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
+│   ├── rules/              # Project overrides and conventions (monospace-tui.md)
+│   └── skills/             # TUI design and audit skills (mono-tui-design/, mono-tui-audit/)
 ├── dsda-doom/              # DSDA-Doom configuration template with placeholder tokens
 └── uzdoom/                 # UZDoom autoexec configuration template with placeholder tokens
 ```
@@ -143,7 +147,8 @@ doom-cli/
 
 ### Adding or promoting a curated preset
 
-Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exact same schema as curated entities in `catalog/preset.<id>.json`, you can test a new preset locally and promote it directly into the repository:
+Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exact same schema as curated entities in
+`catalog/preset.<id>.json`, you can test a new preset locally and promote it directly into the repository:
 
 1. Add and test the preset locally using the CLI, or create `catalog/preset.<id>.json` directly:
    ```json
@@ -182,9 +187,15 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      ```bash
      cp ~/.config/doom-cli/catalog.d/preset.my-mapset.json catalog/preset.my-mapset.json
      ```
-     Then ensure `author`, `release_date`, `category`, and a unique positive `sort` integer (spaced by 10s in display order) are set.
+     Then ensure `author`, `release_date`, `category`, and a unique positive `sort` integer (spaced by 10s in display
+     order) are set.
    - **IWAD separation**: Do not include the base game IWAD in `files`.
-   - **Source URLs**: Every `sources[].url` must use `https://` and end in `.zip`, `.wad`, or `.pk3`; Doomworld web pages belong in `links[]` with `"rel": "idgames"`.
+   - **Canonical archive filenames and aliases**: `files[].name` must match the exact canonical filename inside the
+     upstream `.zip` archive (`Eviternity II.wad`, `Sunder 2512.wad`, `SODfinal.wad`, `aaliens.wad`, `scythe.wad`,
+     `TNTR.WAD`), while `files[].aliases` is reserved strictly for genuine external distribution or Steam and GOG
+     rerelease filename stems (`sigil.wad`, `sigil2.wad`, `sigil_ii.wad`, `sunder.wad`).
+   - **Source URLs**: Every `sources[].url` must use `https://` and end in `.zip`, `.wad`, or `.pk3`; Doomworld web
+     pages belong in `links[]` with `"rel": "idgames"`.
 2. Synchronize the `README.md` preset table and run the catalog linter:
    ```bash
    go run ./cmd/doom presets build
@@ -197,7 +208,9 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 
 ### Adding or promoting a curated engine
 
-1. Create `catalog/engine.<id>.json` (or copy from `~/.config/doom-cli/catalog.d/engine.<id>.json`) with `kind: "engine"`, `id`, `display_name`, `description`, `family`, `args_style` (`"boom"` or `"zdoom"`), `binary`, `badge`, and optional `install` recipe.
+1. Create `catalog/engine.<id>.json` (or copy from `~/.config/doom-cli/catalog.d/engine.<id>.json`) with
+   `kind: "engine"`, `id`, `display_name`, `description`, `family`, `args_style` (`"boom"` or `"zdoom"`), `binary`,
+   `badge`, and optional `install` recipe.
 2. Run `go run ./cmd/doom presets lint` and `go test -v -race ./...`.
 
 ### Adding a built-in theme
@@ -206,7 +219,8 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 2. Define a new `Theme` entry in `BuiltinThemes` and `ListBuiltinThemes`:
    - **60-30-10 design principle**:
      - **60% canvas neutral**: `Muted`, `KeyDesc`, and background surfaces.
-     - **30% structural framing**: `BorderActive`, `BorderInactive`, `TitleActive`, `TitleInactive`, `Label`, `TagDSDA`, and `TagUZDoom`.
+     - **30% structural framing**: `BorderActive`, `BorderInactive`, `TitleActive`, `TitleInactive`, `Label`,
+       `TagDSDA`, and `TagUZDoom`.
      - **10% focused accent**: `BrandCap`, `BrandText`, `BrandBg`, `Prompt`, `CursorBar`, `CursorText`, and `Keycap`.
    - Ensure high contrast for readability across dark terminal backgrounds.
 3. Update the theme list in `README.md` and `llms.txt`.
@@ -218,13 +232,15 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 
 ### Synchronizing engine configuration templates
 
-When refining the curated engine configurations (`uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg`) after testing in-game settings on a local machine, use the hidden maintainer command `doom config sync`:
+When refining the curated engine configurations (`uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg`) after testing
+in-game settings on a local machine, use the hidden maintainer command `doom config sync`:
 
 1. Inspect differences between the repository templates and your installed system configurations:
    ```bash
    go run ./cmd/doom config diff
    ```
-2. Pull live tweaks back into `uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg` (automatically restoring `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholder tokens):
+2. Pull live tweaks back into `uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg` (automatically restoring
+   `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholder tokens):
    ```bash
    go run ./cmd/doom config sync
    ```
@@ -235,7 +251,9 @@ When refining the curated engine configurations (`uzdoom/autoexec.cfg` and `dsda
 
 ### Archive security (Zip Slip and path containment)
 
-When extracting archives (`archive/zip`) or joining relative paths under a root directory, always use `fsutil.SafeJoin(root, rel)` or verify containment against `filepath.Clean(targetDir) + string(filepath.Separator)` before any filesystem write.
+When extracting archives (`archive/zip`) or joining relative paths under a root directory, always use
+`fsutil.SafeJoin(root, rel)` or verify containment against `filepath.Clean(targetDir) + string(filepath.Separator)`
+before any filesystem write.
 
 ## Development setup and Makefile targets
 

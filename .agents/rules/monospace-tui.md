@@ -66,7 +66,8 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 *   **Original**: Rounded corner characters (`╭╮╰╯`) MAY be used for cosmetic, non-interactive containers (e.g., decorative cards, informational callouts). Rounded corners MUST NOT be used for interactive windows, dialogs, or panels that participate in the elevation system.
 *   **Project rule**: Interactive launcher containers (`Presets`, `Preset Details`, and `README Viewer`) use
     `lipgloss.RoundedBorder()` (`╭╮╰╯`) as their standard frame geometry.
-*   **Reason**: Keeps container framing consistent with the Lipgloss component ecosystem used throughout `internal/tui/`.
+*   **Reason**: Keeps container framing consistent with the Lipgloss component ecosystem used throughout
+    `internal/tui/`.
 
 ### [OVERRIDE] §1.6 90-column side-by-side split breakpoint
 
@@ -160,9 +161,12 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 
 *   **Project rule**: Default all badges (` DOOM `, `[DSDA]`, `[UZDoom]`, `[✓ Found]`, `[✗ Missing]`, `[Optional]`,
     `[✓ Readme]`) and prompts (`  Filter: `, `  README Viewer`) to universal ASCII and standard Unicode glyphs (`•`,
-    `✓`, `✗`, `…`) with zero Unicode Private Use Area (PUA) characters or emojis. `RenderBrandPill`, `RenderStatsPill`,
-    and `RenderScrollPill` (`internal/tui/theme.go`) must only call `renderCapsule` (`internal/tui/render.go`) with
-    rounded Powerlevel10k capsule caps (`U+E0B6` and `U+E0B4`) when `--nerd-fonts` or `nerd_fonts: true` is active
+    `✓`, `✗`, `…`) with zero Unicode Private Use Area (PUA) characters or emojis. `formatEngineTagWithCatalog`
+    (`internal/tui/render.go`) formats custom engine badges (`EngineConfig.BadgeText()`) as 8-column bracketed tags
+    (`"[" + padOrTruncateName(badge, 6) + "]"`) to align with `[DSDA]  ` and `[UZDoom]`, styling `boom` engines with
+    `TagDSDA` and `zdoom` engines with `TagUZDoom`. `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill`
+    (`internal/tui/theme.go`) must only call `renderCapsule` (`internal/tui/render.go`) with rounded Powerlevel10k
+    capsule caps (`U+E0B6` and `U+E0B4`) when `--nerd-fonts`, `DOOM_NERD_FONTS`, or `nerd_fonts: true` is active
     (`m.nerdFonts`).
 *   **Reason**: Guarantees zero tofu (`□` or `?`) in 100% of out-of-the-box system fonts while supporting opt-in
     powerline styling. See [AGENTS.md](../../AGENTS.md).

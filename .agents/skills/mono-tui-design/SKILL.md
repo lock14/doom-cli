@@ -34,9 +34,9 @@ Always resolve rules in this order (higher overrides lower):
      panes (`Preset Details`, `[OVERRIDE] §6.1`, `§6.3`, `§6.6`).
    * Keep default rendering 100% free of emojis and Unicode Private Use Area (PUA) glyphs (`[P1]`). Gate Nerd Font
      powerline capsule caps (`U+E0B6` and `U+E0B4`) in `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill`
-     (`internal/tui/theme.go`) strictly behind `m.nerdFonts` (`--nerd-fonts` or `nerd_fonts: true`).
-   * Use semantic `ThemeStyles` tokens from `internal/tui/theme.go` and `internal/tui/builtin_themes.go` (`[OVERRIDE]
-     §R3.2`). Never hardcode raw ANSI codes or hex colors in view renderers.
+     (`internal/tui/theme.go`) strictly behind `m.nerdFonts` (`--nerd-fonts`, `DOOM_NERD_FONTS`, or `nerd_fonts: true`).
+   * Use semantic `ThemeStyles` tokens from `internal/tui/theme.go` and `internal/tui/builtin_themes.go`
+     (`[OVERRIDE] §R3.2`). Never hardcode raw ANSI codes or hex colors in view renderers.
 3. **Preserve keyboard ergonomics**:
    * In the primary launcher view (`!m.viewingReadme`), all printable characters feed the live fuzzy search input
      (`m.input`) per `[OVERRIDE] §2.2`.
@@ -50,8 +50,8 @@ Always resolve rules in this order (higher overrides lower):
    * Update `computeLayout` (`internal/tui/layout.go`) and `renderPreviewLines` (`internal/tui/render.go`) when pane
      heights or margins change (`[P2]` and `[P3]`), clamping dimensions so small terminals (`80×24` or smaller resize
      events) never trigger negative width or height panics and never clip `IWAD:` or `Files:` rows.
-   * Measure strings with `lipgloss.Width` (`padOrTruncateName`) and truncate with `truncateANSI` (`…`, `[OVERRIDE]
-     §R1.7`).
+   * Measure strings with `lipgloss.Width` (`padOrTruncateName`) and truncate with `truncateANSI` (`…`,
+     `[OVERRIDE] §R1.7`).
    * Query WAD and README availability through `m.dirIndex` (`*preset.DirIndex`) and `m.readmeCache` rather than
      performing uncached filesystem scans inside `View()`.
 5. **Verify with tests and benchmarks**:
