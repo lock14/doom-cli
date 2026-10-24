@@ -30,6 +30,8 @@ Linux, macOS, and Windows.
   - [Shell autocompletion](#shell-autocompletion)
 - [Interactive TUI launcher](#interactive-tui-launcher)
   - [Main preset browser controls](#main-preset-browser-controls)
+  - [Launch options and preset configuration controls](#launch-options-and-preset-configuration-controls)
+  - [Configuration manager controls](#configuration-manager-controls)
   - [README document viewer controls](#readme-document-viewer-controls)
 - [Themes and visual customization](#themes-and-visual-customization)
   - [Built-in themes](#built-in-themes)
@@ -253,16 +255,25 @@ Tea:
 
 ![Interactive preset browser](assets/tui-presets.png)
 
-- **Fuzzy search**: Type characters to filter presets immediately by name, engine, or category, use `Home` and `End` to
-  move the filter text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the selection
-  cursor, page through the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to launch the
-  selected preset.
+- **Fuzzy search**: Type characters to filter presets immediately by name, engine, category, compatibility (`MBF21`,
+  `Boom`, `Vanilla`, `ID24`), or readiness (`ready`, `installed`, `missing`), use `Home` and `End` to move the filter
+  text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the selection cursor, page through
+  the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to launch the selected preset.
 - **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, and
   release metadata.
 - **File readiness indicators**: Displays `[✓ Found]` when required files resolve on disk, `[✗ Missing]` when required
   files are absent, and `[Optional]` when optional files are absent.
+- **Launch options and preset configuration**: Press `Ctrl+O` or `F4` to configure target engine, skill level
+  (`-skill`), map warp (`-warp`), gameplay flags (`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`),
+  compatibility level (`-complevel`), optional WAD toggles (such as `idkfa 2024.wad`), and extra arguments with a live
+  command preview.
+- **In-app configuration manager**: Press `Ctrl+G` or `F2` to open a 3-tab configuration manager for CLI settings,
+  engine overrides, and source port configuration deployment and diffs.
+- **In-app asset acquisition**: Press `Ctrl+F` to extract Steam and GOG IWADs or download community WADs for the
+  selected preset and refresh file readiness in place.
 - **In-app README viewer**: Press `Tab` or `Ctrl+R` on any preset to read its bundled idgames `.txt` documentation in a
   scrollable viewport with automatic CP437 box-drawing decoding.
+- **Contextual help**: Press `F1` from any view to inspect context-aware keybindings and search tokens.
 - **Session memory**: Preserves cursor selection across launches when returning to the browser (or exits after a single
   game with `--once`), and exits cleanly with `Esc` or `Ctrl+C`. Configure color themes and Nerd Fonts badges via
   `--theme`, `--nerd-fonts`, `doom themes set`, or `doom config`.
@@ -271,15 +282,63 @@ Tea:
 
 | Key | Action |
 | :--- | :--- |
-| Character keys | Filter presets immediately by name, engine, or category |
+| Character keys | Filter presets by name, engine, category, compatibility, or readiness |
 | `Home` or `End` | Move text cursor to start or end of filter input |
 | `↑`, `Ctrl+P`, or `Ctrl+K` | Move selection up |
 | `↓`, `Ctrl+N`, or `Ctrl+J` | Move selection down |
 | `PgUp` or `Ctrl+U` | Move selection up one page or half page |
 | `PgDn` or `Ctrl+D` | Move selection down one page or half page |
 | `Enter` | Launch selected preset |
+| `Ctrl+O` or `F4` | Open launch options and per-preset configuration |
+| `Ctrl+G` or `F2` | Open 3-tab configuration manager |
+| `Ctrl+F` | Fetch or extract missing WADs for selected preset |
 | `Tab` or `Ctrl+R` | Open bundled README in document viewer |
+| `F1` | Open contextual help |
 | `Esc` or `Ctrl+C` | Quit launcher |
+
+### Launch options and preset configuration controls
+
+When configuring a preset via `Ctrl+O` or `F4`, move between fields with `↑`, `↓`, `Tab`, `Shift+Tab`, `Ctrl+P`,
+`Ctrl+N`, `Ctrl+K`, or `Ctrl+J`, cycle spin selectors (`Engine`, `Skill`, `Complevel`) with `←` and `→`, toggle
+checkboxes (`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`, and optional WADs) with `Space`, press
+`Enter` for an ephemeral one-shot launch, press `Ctrl+S` to save persistent overrides to
+`catalog.d/override.preset.<id>.json`, press `Ctrl+R` to reset overrides to catalog defaults, or press `Esc` to return
+to the browser:
+
+| Key | Action |
+| :--- | :--- |
+| `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` | Move focus to previous option field |
+| `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` | Move focus to next option field |
+| `←` or `→` | Cycle spin selector values (`Engine`, `Skill`, `Complevel`) |
+| `Space` | Toggle checkbox (`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`, optional WADs) |
+| `Enter` | Launch preset immediately with current options (ephemeral one-shot launch) |
+| `Ctrl+S` | Save current options persistently to `catalog.d/override.preset.<id>.json` |
+| `Ctrl+R` | Reset persistent preset override back to catalog defaults |
+| `F1` | Open contextual help |
+| `Esc` | Cancel and return to preset browser |
+| `Ctrl+C` | Quit launcher |
+
+### Configuration manager controls
+
+When managing settings via `Ctrl+G` or `F2`, switch between `1. CLI Settings`, `2. Engine Overrides`, and
+`3. Port Configs` with `1`, `2`, `3`, `[`, or `]`, navigate fields with `↑`, `↓`, `Tab`, `Shift+Tab`, `Ctrl+P`, or
+`Ctrl+N`, cycle spin selectors (`Theme`, `Engine`, `Args Style`) or action buttons (`< View Diff >`,
+`< Deploy Curated Configs >`) with `←` and `→`, toggle checkboxes or trigger port configuration actions with `Space` or
+`Enter`, save the active tab atomically with `Ctrl+S`, reset engine overrides on Tab 2 with `Ctrl+R`, or press `Esc` to
+close and revert unsaved live theme and Nerd Fonts previews:
+
+| Key | Action |
+| :--- | :--- |
+| `1`, `2`, `3`, `[`, or `]` | Switch between `1. CLI Settings`, `2. Engine Overrides`, and `3. Port Configs` tabs |
+| `↑`, `Ctrl+P`, or `Shift+Tab` | Move focus to previous setting field |
+| `↓`, `Ctrl+N`, or `Tab` | Move focus to next setting field |
+| `←` or `→` | Cycle spin selector values or Tab 3 action buttons |
+| `Space` or `Enter` | Toggle checkbox or trigger Tab 3 `< View Diff >` and `< Deploy Curated Configs >` actions |
+| `Ctrl+S` | Save active tab settings atomically with timestamped backups |
+| `Ctrl+R` | Reset selected engine override on Tab 2 back to base defaults |
+| `F1` | Open contextual help |
+| `Esc` | Close configuration manager and revert unsaved live previews |
+| `Ctrl+C` | Quit launcher |
 
 ### README document viewer controls
 
@@ -287,8 +346,8 @@ Tea:
 
 When viewing a preset's documentation via `Tab` or `Ctrl+R`, scroll line-by-line with `↑` or `k` and `↓` or `j`, page
 through with `PgUp`, `b`, `u`, `Ctrl+U`, `PgDn`, `f`, `d`, `Space`, or `Ctrl+D`, jump to the top or bottom with `g`,
-`Home`, `G`, or `End`, press `Enter` to launch the selected preset, or press `Tab`, `Ctrl+R`, `Esc`, `q`, or `Q` to
-return to the preset list:
+`Home`, `G`, or `End`, press `Enter` to launch the selected preset, press `F1` for help, or press `Tab`, `Ctrl+R`,
+`Esc`, `q`, or `Q` to return to the preset list:
 
 | Key | Action |
 | :--- | :--- |
@@ -299,6 +358,7 @@ return to the preset list:
 | `g` or `Home` | Jump to top of document |
 | `G` or `End` | Jump to bottom of document |
 | `Enter` | Launch selected preset |
+| `F1` | Open contextual help |
 | `Tab`, `Ctrl+R`, `Esc`, `q`, or `Q` | Close document viewer and return to preset list |
 | `Ctrl+C` | Quit launcher |
 
@@ -448,7 +508,9 @@ doom launch "KDiZD"
 
 ### Configure per-WAD launch options
 
-Customize launch preferences for any WAD (`catalog.d/override.preset.<id>.json`) without modifying repository defaults:
+Customize engine (`--engine`), IWAD (`--iwad`), additional files (`--files`), excluded optional files
+(`--exclude-file`), or launch arguments (`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear
+overrides with `--reset`, without modifying repository defaults:
 
 ```bash
 # Always launch Sunlust in Woof! with ultra-violence skill
@@ -456,6 +518,9 @@ doom presets config "Sunlust" --engine woof --args "-skill 4"
 
 # Set Ancient Aliens to always run with Boom complevel 11
 doom presets config "Ancient Aliens" --args "-complevel 11"
+
+# Disable optional soundtrack WAD for a preset
+doom presets config "Doom II" --exclude-file "idkfa 2024.wad"
 
 # Reset custom launch options back to curated defaults
 doom presets config "Sunlust" --reset
@@ -568,6 +633,9 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
     "append_args": [
       "-skill",
       "4"
+    ],
+    "exclude_files": [
+      "idkfa 2024.wad"
     ]
   }
   ```

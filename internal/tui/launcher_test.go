@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
@@ -1139,5 +1140,475 @@ func TestRenderFooter_NarrowTruncation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestModel_LaunchOptionsView_EphemeralAndPersistent(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	cat, err := preset.LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	m := initialModel(cat, nil, ClassicTheme, false, "Doom II")
+	m.customCatalogDir = userDir
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// Open Launch Options via Ctrl+O
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = newM.(model)
+	if !m.viewingLaunchOpts || m.launchOpts == nil {
+		t.Fatal("expected viewingLaunchOpts == true after Ctrl+O")
+	}
+
+	// Verify 80x24 height budget
+	if lines := strings.Split(m.View(), "\n"); len(lines) > 24 {
+		t.Errorf("Launch Options View() at 80x24 produced %d lines, want <= 24", len(lines))
+	}
+
+	// Move to Skill field (cursor 1) and select Ultra-Violence (4 right presses)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = newM.(model)
+	for i := 0; i < 4; i++ {
+		newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+		m = newM.(model)
+	}
+
+	// Move to Warp field (cursor 2) and type "15"
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1', '5'}})
+	m = newM.(model)
+
+	// Move to Pistol Start (cursor 3) and toggle via Space
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = newM.(model)
+
+	// Move to Optional WAD checkbox (focusIdx 9 for DOOM II's idkfa 2024.wad) and uncheck it
+	for m.launchOpts.focusIdx < 9 {
+		newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = newM.(model)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = newM.(model)
+
+	// Save persistent override via Ctrl+S
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	if !strings.Contains(m.launchOpts.statusMsg, "Saved override") {
+		t.Fatalf("expected Saved override status message, got %q", m.launchOpts.statusMsg)
+	}
+
+	// Verify override was persisted to disk with exclude_files and args
+	_, ov, err := preset.LoadPresetBaseAndOverride(userDir, "doom-ii")
+	if err != nil || ov == nil {
+		t.Fatalf("expected saved override on disk, err=%v ov=%v", err, ov)
+	}
+	if len(ov.ExcludeFiles) != 1 {
+		t.Errorf("expected 1 excluded optional file, got %v", ov.ExcludeFiles)
+	}
+
+	// Reset override via Ctrl+R
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = newM.(model)
+	if !strings.Contains(m.launchOpts.statusMsg, "Reset") {
+		t.Fatalf("expected Reset status message, got %q", m.launchOpts.statusMsg)
+	}
+	if _, ovAfter, _ := preset.LoadPresetBaseAndOverride(userDir, "doom-ii"); ovAfter != nil {
+		t.Errorf("expected override removed after Ctrl+R, got %+v", ovAfter)
+	}
+
+	// Ephemeral launch via Enter
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if !m.quitting || m.selected == nil {
+		t.Fatal("expected Enter in Launch Options to select preset and quit")
+	}
+	if !m.selected.EngineOverridden {
+		t.Error("expected selected.EngineOverridden == true from Launch Options")
+	}
+}
+
+func TestModel_ConfigManagerView_TabsSaveAndRevert(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	userCatDir := filepath.Join(tmpDir, "catalog.d")
+	_ = os.MkdirAll(userCatDir, 0o755)
+	paths := &config.Paths{
+		ConfigDir:     tmpDir,
+		ConfigFile:    filepath.Join(tmpDir, "config.json"),
+		ThemesDir:     filepath.Join(tmpDir, "themes"),
+		CatalogDir:    userCatDir,
+		WadsDir:       filepath.Join(tmpDir, "wads"),
+		BinDir:        filepath.Join(tmpDir, "bin"),
+		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
+	}
+	cfg := &config.AppConfig{Theme: "classic"}
+	cat, err := preset.LoadLayeredCatalog(userCatDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	m := initialModel(cat, paths.WadRoots(), ClassicTheme, false)
+	m.paths = paths
+	m.appConfig = cfg
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// Open Config Manager via Ctrl+G
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = newM.(model)
+	if !m.viewingConfigMgr || m.cfgMgr == nil {
+		t.Fatal("expected viewingConfigMgr == true after Ctrl+G")
+	}
+
+	// Verify 80x24 height budget on Tab 1
+	if lines := strings.Split(m.View(), "\n"); len(lines) > 24 {
+		t.Errorf("Config Manager Tab 1 at 80x24 produced %d lines, want <= 24", len(lines))
+	}
+
+	// Cycle Theme on Tab 1 (live preview) and toggle Nerd Fonts, then press Esc to verify revert
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = newM.(model)
+	if m.theme.Name == "classic" {
+		t.Errorf("expected live theme preview to change from classic, got %q", m.theme.Name)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = newM.(model)
+	if !m.nerdFonts {
+		t.Error("expected live Nerd Fonts preview to toggle to true")
+	}
+
+	// Esc reverts unsaved live previews
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = newM.(model)
+	if m.viewingConfigMgr {
+		t.Fatal("expected viewingConfigMgr == false after Esc")
+	}
+	if m.theme.Name != "classic" || m.nerdFonts {
+		t.Errorf("expected Esc to revert theme=classic and nerdFonts=false, got theme=%q nerdFonts=%v",
+			m.theme.Name, m.nerdFonts)
+	}
+
+	// Re-open Config Manager, change Theme, and press Ctrl+S to persist
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = newM.(model)
+	savedTheme := m.theme.Name
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+
+	loadedCfg, err := config.LoadConfig(paths)
+	if err != nil || loadedCfg.Theme != savedTheme {
+		t.Fatalf("expected saved theme %q in config.json, got %+v (err=%v)", savedTheme, loadedCfg, err)
+	}
+
+	// Switch to Tab 2 (Engine Overrides) via ']'
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}})
+	m = newM.(model)
+	if m.cfgMgr.activeTab != configTabEngines {
+		t.Fatalf("expected activeTab == configTabEngines, got %d", m.cfgMgr.activeTab)
+	}
+	if lines := strings.Split(m.View(), "\n"); len(lines) > 24 {
+		t.Errorf("Config Manager Tab 2 at 80x24 produced %d lines, want <= 24", len(lines))
+	}
+
+	// Switch to Tab 3 (Port Configs) via '3'
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	m = newM.(model)
+	if m.cfgMgr.activeTab != configTabPorts {
+		t.Fatalf("expected activeTab == configTabPorts, got %d", m.cfgMgr.activeTab)
+	}
+	if lines := strings.Split(m.View(), "\n"); len(lines) > 24 {
+		t.Errorf("Config Manager Tab 3 at 80x24 produced %d lines, want <= 24", len(lines))
+	}
+
+	// Trigger < Deploy Curated Configs > on Tab 3 (Right arrow then Enter)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if m.cfgMgr.uzdoomStatus != "[✓ In Sync]" || m.cfgMgr.dsdaStatus != "[✓ In Sync]" {
+		t.Errorf("expected both port configs In Sync after deploy, got uzdoom=%q dsda=%q",
+			m.cfgMgr.uzdoomStatus, m.cfgMgr.dsdaStatus)
+	}
+}
+
+func TestModel_SearchTokens_CompatibilityAndReadiness(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "av.wad"), []byte("pwad"), 0o644)
+
+	cat := &preset.Catalog{
+		Presets: []preset.Preset{
+			{
+				ID:            "alien-vendetta",
+				Name:          "Alien Vendetta",
+				Engine:        "dsda-doom",
+				IWAD:          "DOOM2.WAD",
+				Compatibility: "Vanilla",
+				Files:         []preset.FileSpec{{Name: "av.wad"}},
+			},
+			{
+				ID:            "eviternity-ii",
+				Name:          "Eviternity II",
+				Engine:        "uzdoom",
+				IWAD:          "DOOM2.WAD",
+				Compatibility: "MBF21",
+				Files:         []preset.FileSpec{{Name: "Eviternity II.wad"}},
+			},
+		},
+	}
+
+	m := initialModel(cat, []string{wadsDir}, ClassicTheme, false)
+
+	// Filter by compatibility "MBF21"
+	m.updateFiltered("MBF21")
+	if len(m.filtered) != 1 || m.filtered[0].ID != "eviternity-ii" {
+		t.Errorf("expected filter 'MBF21' to match eviternity-ii, got %+v", m.filtered)
+	}
+
+	// Filter by readiness "ready"
+	m.updateFiltered("ready")
+	if len(m.filtered) != 1 || m.filtered[0].ID != "alien-vendetta" {
+		t.Errorf("expected filter 'ready' to match installed alien-vendetta, got %+v", m.filtered)
+	}
+
+	// Filter by readiness "missing"
+	m.updateFiltered("missing")
+	if len(m.filtered) != 1 || m.filtered[0].ID != "eviternity-ii" {
+		t.Errorf("expected filter 'missing' to match uninstalled eviternity-ii, got %+v", m.filtered)
+	}
+}
+
+func TestModel_ContextualHelpView_AndFetchAssets(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "av.wad"), []byte("pwad"), 0o644)
+
+	cat := mockCatalog()
+	m := initialModel(cat, []string{wadsDir}, ClassicTheme, false)
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// Press F1 to open Contextual Help
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyF1})
+	m = newM.(model)
+	if !m.viewingHelp {
+		t.Fatal("expected viewingHelp == true after F1")
+	}
+	helpView := m.View()
+	if lines := strings.Split(helpView, "\n"); len(lines) > 24 {
+		t.Errorf("Help View() at 80x24 produced %d lines, want <= 24", len(lines))
+	}
+	if !strings.Contains(helpView, "Contextual Help") {
+		t.Errorf("expected 'Contextual Help' header in Help view:\n%s", helpView)
+	}
+
+	// Close Help via F1
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyF1})
+	m = newM.(model)
+	if m.viewingHelp {
+		t.Fatal("expected viewingHelp == false after second F1")
+	}
+
+	// Press Ctrl+F on already installed Alien Vendetta
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+	m = newM.(model)
+	if !strings.Contains(m.statusMsg, "Ready") {
+		t.Errorf("expected statusMsg to report Ready, got %q", m.statusMsg)
+	}
+}
+
+func TestLaunchOptions_PreExistingOverride_IdempotentSaveAndReset(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	wadsDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+
+	// Write an override with set.args and exclude_files before starting initialModel
+	ovJSON := `{"kind":"override","target":{"kind":"preset","id":"doom-ii"},` +
+		`"set":{"args":["-skill","3"]},"exclude_files":["idkfa 2024.wad"]}`
+	if err := os.WriteFile(
+		filepath.Join(userDir, "override.preset.doom-ii.json"), []byte(ovJSON), 0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	cat, err := preset.LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	m := initialModel(cat, []string{wadsDir}, ClassicTheme, false, "Doom II")
+	m.customCatalogDir = userDir
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// Open Launch Options via Ctrl+O and verify set.args="-skill 3" loaded into skillIdx
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = newM.(model)
+	if m.launchOpts.skillIdx != 3 {
+		t.Errorf("expected skillIdx=3 from set.args, got %d", m.launchOpts.skillIdx)
+	}
+
+	// Open Contextual Help from Launch Options via F1 and verify Launch Options is first
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyF1})
+	m = newM.(model)
+	if !strings.Contains(m.helpViewport.View(), "Launch Options & Preset Config (Ctrl+O / F4) — Active View") {
+		t.Errorf("expected Launch Options active view heading in F1 help:\n%s", m.helpViewport.View())
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = newM.(model)
+
+	// Save via Ctrl+S and verify args are not duplicated in m.catalog
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	pSaved, err := m.catalog.FindExact("doom-ii")
+	if err != nil {
+		t.Fatalf("FindExact doom-ii after Ctrl+S: %v", err)
+	}
+	if len(pSaved.Args) != 2 || pSaved.Args[0] != "-skill" || pSaved.Args[1] != "3" {
+		t.Errorf("expected non-duplicated Args=[-skill 3] after Ctrl+S, got %v", pSaved.Args)
+	}
+
+	// Reset via Ctrl+R and verify curated defaults are restored in m.catalog
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = newM.(model)
+	pReset, err := m.catalog.FindExact("doom-ii")
+	if err != nil {
+		t.Fatalf("FindExact doom-ii after Ctrl+R: %v", err)
+	}
+	if len(pReset.Args) != 0 || len(pReset.Files) == 0 || pReset.Overridden {
+		t.Errorf("expected curated doom-ii restored after Ctrl+R, got Args=%v Files=%v Overridden=%v",
+			pReset.Args, pReset.Files, pReset.Overridden)
+	}
+}
+
+func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	userCatDir := filepath.Join(tmpDir, "catalog.d")
+	if err := os.MkdirAll(userCatDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pre-populate engine override with append_args
+	engOv := `{"kind":"override","target":{"kind":"engine","id":"dsda-doom"},` +
+		`"append_args":["-complevel","21"]}`
+	if err := os.WriteFile(
+		filepath.Join(userCatDir, "override.engine.dsda-doom.json"), []byte(engOv), 0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	paths := &config.Paths{
+		ConfigDir:     tmpDir,
+		ConfigFile:    filepath.Join(tmpDir, "config.json"),
+		ThemesDir:     filepath.Join(tmpDir, "themes"),
+		CatalogDir:    userCatDir,
+		WadsDir:       "/flag/wads",
+		BinDir:        filepath.Join(tmpDir, "bin"),
+		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
+	}
+	cfg := &config.AppConfig{
+		Theme:   "classic",
+		WadsDir: "/saved/in/config",
+	}
+	cat, err := preset.LoadLayeredCatalog(userCatDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	m := initialModel(cat, paths.WadRoots(), ClassicTheme, false)
+	m.paths = paths
+	m.appConfig = cfg
+	m.wadsDirSource = "flag"
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// Open Config Manager via Ctrl+G
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = newM.(model)
+
+	// Save Tab 1 without modifying WADs Dir; config.json's WadsDir must NOT be overwritten with /flag/wads
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	if m.appConfig.WadsDir != "/saved/in/config" {
+		t.Errorf("expected unmodified WadsDir in config.json to remain '/saved/in/config', got %q",
+			m.appConfig.WadsDir)
+	}
+
+	// Focus Extra WADs Dirs (field 3) and type '1', '2', '3' as the first characters
+	for m.cfgMgr.focusIdx < cliFieldExtraWadsDirs {
+		newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = newM.(model)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1', '2', '3'}})
+	m = newM.(model)
+	if m.cfgMgr.activeTab != configTabCLI {
+		t.Fatalf("typing digits into focused text input switched tabs to %d", m.cfgMgr.activeTab)
+	}
+	if m.cfgMgr.extraDirsInput.Value() != "123" {
+		t.Errorf("expected extraDirsInput='123', got %q", m.cfgMgr.extraDirsInput.Value())
+	}
+
+	// Switch to Tab 2 via ']' and press Ctrl+S; DefaultArgs must not duplicate append_args
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	eng, ok := m.catalog.FindEngine("dsda-doom")
+	if !ok {
+		t.Fatal("dsda-doom not found")
+	}
+	if len(eng.DefaultArgs) != 2 || eng.DefaultArgs[0] != "-complevel" || eng.DefaultArgs[1] != "21" {
+		t.Errorf("expected non-duplicated DefaultArgs=[-complevel 21], got %v", eng.DefaultArgs)
+	}
+
+	// Reset engine override via Ctrl+R and verify DefaultArgs is empty
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = newM.(model)
+	engReset, _ := m.catalog.FindEngine("dsda-doom")
+	if len(engReset.DefaultArgs) != 0 || engReset.Overridden {
+		t.Errorf("expected curated dsda-doom after Ctrl+R, got DefaultArgs=%v Overridden=%v",
+			engReset.DefaultArgs, engReset.Overridden)
+	}
+}
+
+func TestHandleFetchAssets_MissingRequiredAndEmptyRoots(t *testing.T) {
+	t.Parallel()
+	cat := mockCatalog()
+
+	// 1. Empty wadRoots and nil paths
+	mEmpty := initialModel(cat, nil, ClassicTheme, false)
+	newM, _ := mEmpty.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+	mEmpty = newM.(model)
+	if !strings.HasPrefix(mEmpty.statusMsg, "✗") {
+		t.Errorf("expected error statusMsg when no WAD dir configured, got %q", mEmpty.statusMsg)
+	}
+
+	// 2. Missing required files with isolated empty steamSearchRoots
+	emptyWads := t.TempDir()
+	emptySteam := t.TempDir()
+	mMiss := initialModel(cat, []string{emptyWads}, ClassicTheme, false)
+	mMiss.steamSearchRoots = []string{emptySteam}
+	newM, _ = mMiss.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+	mMiss = newM.(model)
+	if !strings.HasPrefix(mMiss.statusMsg, "✗ Missing required files") {
+		t.Errorf("expected '✗ Missing required files' statusMsg, got %q", mMiss.statusMsg)
 	}
 }

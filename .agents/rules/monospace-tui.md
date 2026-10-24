@@ -32,12 +32,17 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 
 *   **Screen archetype**: `§11.5` fuzzy finder (`model` in `internal/tui/launcher.go`) paired with a responsive
     `Master-Detail` split view (`renderPanels` in `internal/tui/render.go` with the `Presets` list pane on the left
-    and the `Preset Details` preview pane on the right) and an `Expand-to-Focus` full-pane CP437 document viewer
-    (`viewingReadme` viewport in `internal/tui/launcher.go` and `renderReadmeView` in `internal/tui/render.go`).
-*   **Workflow archetype**: `§12.4` search-act. Typing filters presets in real time across `Name`, `Engine`, and
-    `Category`; highlighting a preset previews its IWAD, PWADs, DeHackEd patches, and documentation status; pressing
-    `Enter` launches the selected preset, or pressing `Tab` or `Ctrl+R` opens the bundled CP437 README in the full-pane
-    viewer.
+    and the `Preset Details` preview pane on the right) and `Expand-to-Focus` full-pane views for the CP437 document
+    viewer (`viewingReadme` in `internal/tui/render.go`), the `§11.2` settings form for launch options and per-preset
+    configuration (`viewingLaunchOpts` in `internal/tui/options.go`), the 3-tab configuration manager
+    (`viewingConfigMgr` in `internal/tui/config_view.go`), and contextual help (`viewingHelp` in
+    `internal/tui/render.go`).
+*   **Workflow archetype**: `§12.4` search-act and `§12.2` inspect-configure. Typing filters presets in real time across
+    `Name`, `Engine`, `Category`, `Compatibility`, and installation readiness (`ready`, `installed`, `missing`);
+    highlighting a preset previews its IWAD, PWADs, DeHackEd patches, and documentation status; pressing `Enter`
+    launches the selected preset, `Ctrl+O` or `F4` opens launch options, `Ctrl+G` or `F2` opens the 3-tab configuration
+    manager, `Ctrl+F` fetches or extracts missing WADs in place, `Tab` or `Ctrl+R` opens the bundled CP437 README, and
+    `F1` opens contextual help.
 
 ## Project overrides and conventions
 

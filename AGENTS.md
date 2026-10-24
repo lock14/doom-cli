@@ -135,8 +135,8 @@ Linux, macOS, and Windows:
         `nerd_fonts` state tracking, and unknown top-level key preservation.
 *   `internal/display/`: Native display resolution and refresh rate auto-detection.
 *   `internal/engine/`:
-    *   `runner.go`: Engine execution argument synthesis (`PrepareLaunch`, including `.deh` and `.bex` ordering) and
-        process lifecycle management.
+    *   `runner.go`: Engine execution argument synthesis (`PrepareLaunch`, including `.deh` and `.bex` ordering), pure
+        zero-I/O command preview formatting (`FormatLaunchPreview`), and process lifecycle management.
     *   `installer.go`: Declarative source port asset downloading, SHA-256 verification, and portable binary
         installation (Zip Slip hardened).
 *   `internal/fsutil/`:
@@ -159,9 +159,11 @@ Linux, macOS, and Windows:
     (`SynthesizeIDKFAWAD`).
 *   `internal/templates/`: Embedded engine configuration templates and timestamped backup deployer.
 *   `internal/tui/`: Interactive Bubble Tea fuzzy launcher:
-    *   `launcher.go`: State machine, update loop, and message routing.
+    *   `launcher.go`: State machine, update loop, in-TUI asset acquisition (`Ctrl+F`), and message routing.
+    *   `options.go`: Unified launch options and per-preset configuration view (`Ctrl+O` or `F4`).
+    *   `config_view.go`: 3-tab in-TUI configuration manager (`Ctrl+G` or `F2`).
     *   `layout.go`: Dynamic responsive layout geometry and dimension clamping.
-    *   `render.go`: UI view rendering, badges, status lines, and key help formatting.
+    *   `render.go`: UI view rendering, badges, status lines, contextual help (`F1`), and key help formatting.
     *   `menu.go`: Fallback numbered terminal menu for basic or non-TTY environments.
     *   `theme.go`: Theme loader, custom JSON theme parser, and style builders.
     *   `builtin_themes.go`: Curated 60-30-10 color palettes.

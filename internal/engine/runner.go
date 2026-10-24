@@ -284,3 +284,126 @@ func ResolveBinary(engine, binDir string) (string, error) {
 		binDir,
 	)
 }
+
+// FormatLaunchPreview synthesizes a pure, zero-I/O command-line preview string for p
+// using the pre-constructed idx and catalog, falling back to raw filenames when files
+// are not resolved in idx.
+func FormatLaunchPreview(
+	p preset.Preset,
+	cat *preset.Catalog,
+	idx *preset.DirIndex,
+	extraArgs []string,
+) string {
+	targetEngine := strings.TrimSpace(p.Engine)
+	if targetEngine == "" {
+		targetEngine = "dsda-doom"
+	}
+
+	engCfg, ok := cat.FindEngine(targetEngine)
+	if !ok {
+		engCfg = preset.EngineConfig{
+			ID:        targetEngine,
+			Binary:    targetEngine,
+			ArgsStyle: preset.GuessArgsStyle(targetEngine, ""),
+		}
+	}
+
+	binTarget := engCfg.EffectiveBinary()
+	iwadPath := strings.TrimSpace(p.IWAD)
+	if idx != nil && iwadPath != "" {
+		if resolved, found := idx.ResolveFile(iwadPath); found {
+			iwadPath = resolved
+		}
+	}
+
+	type resolvedEntry struct {
+		path     string
+		optional bool
+		isDeh    bool
+	}
+	var resolved []resolvedEntry
+	for _, f := range p.Files {
+		clean := strings.TrimSpace(f.Name)
+		if clean == "" {
+			continue
+		}
+		fpath := clean
+		if idx != nil {
+			if rpath, found := idx.ResolveFile(clean); found {
+				fpath = rpath
+			} else {
+				for _, al := range f.Aliases {
+					if rpath, alFound := idx.ResolveFile(al); alFound {
+						fpath = rpath
+						break
+					}
+				}
+			}
+		}
+		lower := strings.ToLower(fpath)
+		isDeh := strings.HasSuffix(lower, ".deh") || strings.HasSuffix(lower, ".bex")
+		resolved = append(resolved, resolvedEntry{
+			path:     fpath,
+			optional: f.Optional,
+			isDeh:    isDeh,
+		})
+	}
+
+	if p.LoadMapsAfterMods && len(resolved) > 1 {
+		var mods []resolvedEntry
+		var maps []resolvedEntry
+		for _, r := range resolved {
+			if r.optional {
+				mods = append(mods, r)
+			} else {
+				maps = append(maps, r)
+			}
+		}
+		resolved = append(mods, maps...)
+	}
+
+	var orderedFiles []string
+	var wads []string
+	var dehs []string
+	for _, r := range resolved {
+		orderedFiles = append(orderedFiles, r.path)
+		if r.isDeh {
+			dehs = append(dehs, r.path)
+		} else {
+			wads = append(wads, r.path)
+		}
+	}
+
+	tokens := []string{binTarget}
+	if len(engCfg.PrefixArgs) > 0 {
+		tokens = append(tokens, engCfg.PrefixArgs...)
+	}
+	if iwadPath != "" {
+		tokens = append(tokens, "-iwad", iwadPath)
+	}
+	if engCfg.EffectiveArgsStyle() == "boom" {
+		if len(wads) > 0 {
+			tokens = append(tokens, "-file")
+			tokens = append(tokens, wads...)
+		}
+		if len(dehs) > 0 {
+			tokens = append(tokens, "-deh")
+			tokens = append(tokens, dehs...)
+		}
+	} else {
+		if len(orderedFiles) > 0 {
+			tokens = append(tokens, "-file")
+			tokens = append(tokens, orderedFiles...)
+		}
+	}
+	if len(engCfg.DefaultArgs) > 0 {
+		tokens = append(tokens, engCfg.DefaultArgs...)
+	}
+	if len(p.Args) > 0 {
+		tokens = append(tokens, p.Args...)
+	}
+	if len(extraArgs) > 0 {
+		tokens = append(tokens, extraArgs...)
+	}
+	return strings.Join(tokens, " ")
+}

@@ -1019,3 +1019,161 @@ func TestIsPresetInstalledAndSubpathReadme(t *testing.T) {
 		t.Errorf("expected IsPresetInstalled = false when required IWAD is missing")
 	}
 }
+
+func TestConfigPreset_ExcludeFilesAndBaseAndOverride(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	cat, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	// Exclude idkfa 2024.wad on doom-ii via ConfigPreset
+	excluded := []string{"IDKFA_2024.WAD"}
+	extra := []string{"-skill", "4"}
+	if _, _, err := ConfigPreset(userDir, cat, "doom-ii", OverridePatchRequest{
+		ExcludeFiles: &excluded,
+		AppendArgs:   &extra,
+	}); err != nil {
+		t.Fatalf("ConfigPreset: %v", err)
+	}
+
+	// Verify LoadPresetBaseAndOverride returns unfiltered base files and stored override
+	basePreset, ov, err := LoadPresetBaseAndOverride(userDir, "doom-ii")
+	if err != nil {
+		t.Fatalf("LoadPresetBaseAndOverride: %v", err)
+	}
+	if basePreset == nil || len(basePreset.Files) == 0 {
+		t.Fatalf("expected basePreset.Files to contain idkfa 2024.wad, got %+v", basePreset)
+	}
+	if ov == nil || len(ov.ExcludeFiles) != 1 || ov.ExcludeFiles[0] != "IDKFA_2024.WAD" {
+		t.Fatalf("expected ov.ExcludeFiles=[IDKFA_2024.WAD], got %+v", ov)
+	}
+
+	// Verify MergeUserDir and LoadLayeredCatalog filter out idkfa 2024.wad
+	merged, err := MergeUserDir(cat, userDir)
+	if err != nil {
+		t.Fatalf("MergeUserDir: %v", err)
+	}
+	p, err := merged.FindExact("doom-ii")
+	if err != nil {
+		t.Fatalf("doom-ii not found in merged catalog: %v", err)
+	}
+	for _, f := range p.Files {
+		if NormalizeFilename(f.Name) == NormalizeFilename("idkfa 2024.wad") {
+			t.Errorf("expected idkfa 2024.wad to be excluded from merged preset files, got %+v", p.Files)
+		}
+	}
+	if !reflect.DeepEqual(p.Args, []string{"-skill", "4"}) {
+		t.Errorf("expected p.Args=[-skill 4], got %v", p.Args)
+	}
+
+	// Verify empty exclude_files clears the exclusion while preserving AppendArgs
+	emptyExcluded := []string{}
+	if _, _, err := ConfigPreset(userDir, merged, "doom-ii", OverridePatchRequest{
+		ExcludeFiles: &emptyExcluded,
+	}); err != nil {
+		t.Fatalf("ConfigPreset clear exclude_files: %v", err)
+	}
+	reloaded, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog after clearing exclude_files: %v", err)
+	}
+	pReloaded, err := reloaded.FindExact("doom-ii")
+	if err != nil {
+		t.Fatalf("doom-ii not found in reloaded catalog: %v", err)
+	}
+	if len(pReloaded.Files) == 0 {
+		t.Errorf("expected idkfa 2024.wad restored after clearing exclude_files, got %+v", pReloaded.Files)
+	}
+	if !reflect.DeepEqual(pReloaded.Args, []string{"-skill", "4"}) {
+		t.Errorf("expected AppendArgs preserved when clearing exclude_files, got %v", pReloaded.Args)
+	}
+}
+
+func TestMergeUserDir_IdempotentOnAlreadyMergedCatalog(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	cat, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	excluded := []string{"idkfa 2024.wad"}
+	appendArgs := []string{"-skill", "4"}
+	if _, _, err := ConfigPreset(userDir, cat, "doom-ii", OverridePatchRequest{
+		ExcludeFiles: &excluded,
+		AppendArgs:   &appendArgs,
+	}); err != nil {
+		t.Fatalf("ConfigPreset: %v", err)
+	}
+
+	engAppend := []string{"-complevel", "21"}
+	if _, err := ConfigEngine(userDir, cat, "dsda-doom", EngineOverrideOptions{
+		AppendArgs: &engAppend,
+	}); err != nil {
+		t.Fatalf("ConfigEngine: %v", err)
+	}
+
+	// Simulate starting TUI with an already-merged catalog from LoadLayeredCatalog
+	alreadyMerged, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog with overrides: %v", err)
+	}
+
+	// Merging userDir again onto alreadyMerged must not duplicate append_args
+	reMerged, err := MergeUserDir(alreadyMerged, userDir)
+	if err != nil {
+		t.Fatalf("MergeUserDir on alreadyMerged: %v", err)
+	}
+	p, err := reMerged.FindExact("doom-ii")
+	if err != nil {
+		t.Fatalf("FindExact doom-ii: %v", err)
+	}
+	if !reflect.DeepEqual(p.Args, []string{"-skill", "4"}) {
+		t.Errorf("expected idempotent p.Args=[-skill 4], got %v", p.Args)
+	}
+	eng, ok := reMerged.FindEngine("dsda-doom")
+	if !ok {
+		t.Fatal("dsda-doom not found")
+	}
+	if !reflect.DeepEqual(eng.DefaultArgs, []string{"-complevel", "21"}) {
+		t.Errorf("expected idempotent eng.DefaultArgs=[-complevel 21], got %v", eng.DefaultArgs)
+	}
+
+	// Resetting overrides and calling MergeUserDir(alreadyMerged, userDir) must restore curated defaults
+	if _, _, err := ResetPresetOverride(userDir, reMerged, "doom-ii"); err != nil {
+		t.Fatalf("ResetPresetOverride: %v", err)
+	}
+	if err := ResetEngineOverride(userDir, reMerged, "dsda-doom"); err != nil {
+		t.Fatalf("ResetEngineOverride: %v", err)
+	}
+	afterReset, err := MergeUserDir(alreadyMerged, userDir)
+	if err != nil {
+		t.Fatalf("MergeUserDir after reset: %v", err)
+	}
+	pReset, err := afterReset.FindExact("doom-ii")
+	if err != nil {
+		t.Fatalf("FindExact doom-ii after reset: %v", err)
+	}
+	if len(pReset.Args) != 0 || len(pReset.Files) == 0 || pReset.Overridden {
+		t.Errorf("expected curated doom-ii restored after reset, got Args=%v Files=%v Overridden=%v",
+			pReset.Args, pReset.Files, pReset.Overridden)
+	}
+	engReset, _ := afterReset.FindEngine("dsda-doom")
+	if len(engReset.DefaultArgs) != 0 || engReset.Overridden {
+		t.Errorf("expected curated dsda-doom restored after reset, got DefaultArgs=%v Overridden=%v",
+			engReset.DefaultArgs, engReset.Overridden)
+	}
+
+	// Single-file catalog path must be rejected on store writes with a clear error
+	singleFile := filepath.Join(userDir, "custom.json")
+	if err := os.WriteFile(singleFile, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ConfigPreset(singleFile, cat, "doom-ii", OverridePatchRequest{
+		AppendArgs: &appendArgs,
+	}); err == nil || !strings.Contains(err.Error(), "single file") {
+		t.Errorf("expected single file error for single-file ConfigPreset, got %v", err)
+	}
+}

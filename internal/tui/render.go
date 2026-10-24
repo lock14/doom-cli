@@ -237,8 +237,16 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	}
 
 	var previewLines []string
+	presetDisplay := m.styles.ValueBold.Render(cur.Name)
+	if m.statusMsg != "" {
+		statusStyle := m.styles.StatusReady
+		if strings.HasPrefix(m.statusMsg, "✗") {
+			statusStyle = m.styles.StatusMissing
+		}
+		presetDisplay += "  " + statusStyle.Render("["+m.statusMsg+"]")
+	}
 	previewLines = append(previewLines,
-		fmt.Sprintf("%s%s", m.styles.Label.Render("Preset:        "), m.styles.ValueBold.Render(cur.Name)),
+		fmt.Sprintf("%s%s", m.styles.Label.Render("Preset:        "), presetDisplay),
 	)
 	if cur.IsCustom() {
 		previewLines = append(previewLines,
@@ -320,6 +328,13 @@ func (m model) condensePreviewLines(
 		presetVal += " " + m.styles.TagUZDoom.Render("[Custom WAD]")
 	} else if cur.Overridden {
 		presetVal += " " + m.styles.TagUZDoom.Render("[Overridden]")
+	}
+	if m.statusMsg != "" {
+		statusStyle := m.styles.StatusReady
+		if strings.HasPrefix(m.statusMsg, "✗") {
+			statusStyle = m.styles.StatusMissing
+		}
+		presetVal += " " + statusStyle.Render("["+m.statusMsg+"]")
 	}
 
 	headLines := []string{
@@ -547,21 +562,161 @@ func (m model) renderReadmeFooter() string {
 }
 
 func (m model) renderFooter(hasReadme bool) string {
-	items := []keyHelp{
-		{"↑/↓/PgUp/PgDn", "Navigate"},
+	var items []keyHelp
+	if m.width > 90 {
+		items = []keyHelp{
+			{"↑/↓", "Navigate"},
+		}
+		if hasReadme {
+			items = append(items, keyHelp{"Tab", "README"})
+		}
+		items = append(items,
+			keyHelp{"Ctrl+O", "Opts"},
+			keyHelp{"Ctrl+G", "Cfg"},
+			keyHelp{"Ctrl+F", "Fetch"},
+			keyHelp{"F1", "Help"},
+			keyHelp{"Enter", "Launch"},
+			keyHelp{"Esc", "Quit"},
+		)
+	} else {
+		items = []keyHelp{
+			{"↑/↓/PgUp/PgDn", "Navigate"},
+		}
+		if hasReadme {
+			items = append(items, keyHelp{"Tab", "View README"})
+		}
+		items = append(items,
+			keyHelp{"Enter", "Launch"},
+			keyHelp{"Esc/Ctrl+C", "Quit"},
+		)
 	}
-	if hasReadme {
-		items = append(items, keyHelp{"Tab", "View README"})
-	}
-	items = append(items,
-		keyHelp{"Enter", "Launch"},
-		keyHelp{"Esc/Ctrl+C", "Quit"},
-	)
 	footer := m.styles.FormatKeyHelp(items)
 	if m.width > 0 {
 		return "\n\n" + truncateANSI(strings.TrimPrefix(footer, "\n\n"), m.width)
 	}
 	return footer
+}
+
+func (m model) renderHelpHeader() string {
+	leftPart := m.styles.RenderBrandPill(m.nerdFonts) +
+		m.styles.FilterPrompt.Render("  Contextual Help")
+	rightPart := m.styles.RenderScrollPill(m.helpViewport.ScrollPercent(), m.nerdFonts)
+	return renderHeaderBar(leftPart, rightPart, m.width)
+}
+
+func (m model) renderHelpFooter() string {
+	footer := m.styles.FormatKeyHelp([]keyHelp{
+		{"↑/↓/PgUp/PgDn/g/G", "Scroll"},
+		{"F1/Esc/q", "Back"},
+	})
+	if m.width > 0 {
+		return "\n\n" + truncateANSI(strings.TrimPrefix(footer, "\n\n"), m.width)
+	}
+	return footer
+}
+
+func (m model) renderHelpView() string {
+	boxWidth, _, _ := calculateReadmeDimensions(m.width, m.height)
+	header := m.renderHelpHeader()
+	box := renderBoxWithTitle(
+		m.helpViewport.View(),
+		boxWidth,
+		"Keybindings & Features",
+		true,
+		m.styles,
+	)
+	footer := m.renderHelpFooter()
+	return "\n" + header + box + footer + "\n"
+}
+
+func (m model) buildHelpContent(fromMode int) string {
+	h := m.styles.TitleActive.Render
+	k := m.styles.KeyHelpKey.Render
+
+	browserTitle := "Preset Browser (Default View)"
+	if fromMode == helpModeBrowser {
+		browserTitle += " — Active View"
+	}
+	browserSection := []string{
+		h(browserTitle),
+		fmt.Sprintf("  %-22s  Move selection up or down", k("↑/↓, Ctrl+P/Ctrl+N")),
+		fmt.Sprintf("  %-22s  Page up or down", k("PgUp/PgDn, Ctrl+U/D")),
+		fmt.Sprintf("  %-22s  Move filter text cursor to start or end", k("Home/End")),
+		fmt.Sprintf("  %-22s  Open README Viewer for selected preset", k("Tab, Ctrl+R")),
+		fmt.Sprintf("  %-22s  Open Launch Options & Preset Config", k("Ctrl+O, F4")),
+		fmt.Sprintf("  %-22s  Open 3-Tab Config Manager", k("Ctrl+G, F2")),
+		fmt.Sprintf("  %-22s  Fetch or extract missing WADs for selected preset", k("Ctrl+F")),
+		fmt.Sprintf("  %-22s  Open Contextual Help", k("F1")),
+		fmt.Sprintf("  %-22s  Launch selected preset", k("Enter")),
+		fmt.Sprintf("  %-22s  Quit launcher", k("Esc, Ctrl+C")),
+		"",
+		h("Fuzzy Search Tokens"),
+		"  Filter by title, engine (dsda-doom, uzdoom), category (Doom II, Heretic),",
+		"  compatibility (MBF21, Boom, Vanilla, ID24), or readiness (ready, installed, missing).",
+	}
+
+	launchTitle := "Launch Options & Preset Config (Ctrl+O / F4)"
+	if fromMode == helpModeLaunchOptions {
+		launchTitle += " — Active View"
+	}
+	launchSection := []string{
+		h(launchTitle),
+		fmt.Sprintf("  %-22s  Move between option fields", k("↑/↓, Tab/Shift+Tab")),
+		fmt.Sprintf("  %-22s  Cycle spin selector values (Engine, Skill, Complevel)", k("←/→")),
+		fmt.Sprintf("  %-22s  Toggle checkboxes (-pistolstart, -fast, Optional WADs)", k("Space")),
+		fmt.Sprintf("  %-22s  Ephemeral one-shot launch with current options", k("Enter")),
+		fmt.Sprintf("  %-22s  Save persistent preset override to catalog.d", k("Ctrl+S")),
+		fmt.Sprintf("  %-22s  Reset persistent preset override to catalog defaults", k("Ctrl+R")),
+		fmt.Sprintf("  %-22s  Return to Preset Browser without launching", k("Esc")),
+	}
+
+	cfgTitle := "3-Tab Config Manager (Ctrl+G / F2)"
+	if fromMode == helpModeConfigManager {
+		cfgTitle += " — Active View"
+	}
+	cfgSection := []string{
+		h(cfgTitle),
+		fmt.Sprintf("  %-22s  Switch between tabs (1. CLI, 2. Engines, 3. Ports)", k("1/2/3, [/]")),
+		fmt.Sprintf("  %-22s  Move between settings fields", k("↑/↓, Tab/Shift+Tab")),
+		fmt.Sprintf("  %-22s  Cycle spin selectors or action buttons", k("←/→")),
+		fmt.Sprintf("  %-22s  Toggle checkboxes or trigger Port Config action", k("Space, Enter")),
+		fmt.Sprintf("  %-22s  Save active tab changes atomically with backup", k("Ctrl+S")),
+		fmt.Sprintf("  %-22s  Reset selected engine override (Tab 2)", k("Ctrl+R")),
+		fmt.Sprintf("  %-22s  Close Config Manager and revert unsaved previews", k("Esc")),
+	}
+
+	readmeTitle := "README Viewer (Tab / Ctrl+R)"
+	if fromMode == helpModeReadme {
+		readmeTitle += " — Active View"
+	}
+	readmeSection := []string{
+		h(readmeTitle),
+		fmt.Sprintf("  %-22s  Scroll document up or down", k("↑/↓, PgUp/PgDn")),
+		fmt.Sprintf("  %-22s  Jump to top or bottom of document", k("g/G, Home/End")),
+		fmt.Sprintf("  %-22s  Launch selected preset", k("Enter")),
+		fmt.Sprintf("  %-22s  Return to Preset Browser", k("Esc, q, Tab, Ctrl+R")),
+	}
+
+	var sections [][]string
+	switch fromMode {
+	case helpModeLaunchOptions:
+		sections = [][]string{launchSection, browserSection, cfgSection, readmeSection}
+	case helpModeConfigManager:
+		sections = [][]string{cfgSection, browserSection, launchSection, readmeSection}
+	case helpModeReadme:
+		sections = [][]string{readmeSection, browserSection, launchSection, cfgSection}
+	default:
+		sections = [][]string{browserSection, launchSection, cfgSection, readmeSection}
+	}
+
+	var lines []string
+	for i, sec := range sections {
+		if i > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, sec...)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func formatBoxContent(lines []string, width, height int) string {

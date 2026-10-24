@@ -132,11 +132,11 @@ func newPresetsCmd() *cobra.Command {
 	)
 
 	var cfgEngine, cfgIWAD, cfgArgs string
-	var cfgFiles []string
+	var cfgFiles, cfgExcludeFiles []string
 	var cfgReset bool
 	presetsConfigCmd := &cobra.Command{
 		Use:   "config <preset_name>",
-		Short: "Configure per-preset overrides (engine, iwad, extra args, extra files)",
+		Short: "Configure per-preset overrides (engine, iwad, extra args, extra files, excluded files)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
@@ -190,8 +190,20 @@ func newPresetsCmd() *cobra.Command {
 				req.AppendFiles = &specs
 				changed = true
 			}
+			if cmd.Flags().Changed("exclude-file") || len(cfgExcludeFiles) > 0 {
+				var excluded []string
+				for _, f := range cfgExcludeFiles {
+					if trimmed := strings.TrimSpace(f); trimmed != "" {
+						excluded = append(excluded, trimmed)
+					}
+				}
+				req.ExcludeFiles = &excluded
+				changed = true
+			}
 			if !changed {
-				return fmt.Errorf("no option flags provided (use --engine, --args, --iwad, --files, or --reset)")
+				return fmt.Errorf(
+					"no option flags provided (use --engine, --args, --iwad, --files, --exclude-file, or --reset)",
+				)
 			}
 
 			outPath, target, err := preset.ConfigPreset(writeDir, cat, name, req)
@@ -207,6 +219,9 @@ func newPresetsCmd() *cobra.Command {
 	presetsConfigCmd.Flags().StringVar(&cfgIWAD, "iwad", "", "Custom IWAD override")
 	presetsConfigCmd.Flags().StringVar(&cfgArgs, "args", "", "Additional launch arguments (such as -skill 4 -warp 01)")
 	presetsConfigCmd.Flags().StringSliceVar(&cfgFiles, "files", nil, "Extra PWAD files to load with this preset")
+	presetsConfigCmd.Flags().StringSliceVar(
+		&cfgExcludeFiles, "exclude-file", nil, "Optional or default PWAD files to exclude from this preset",
+	)
 	presetsConfigCmd.Flags().BoolVar(&cfgReset, "reset", false, "Clear all custom launch options for this preset")
 
 	presetsRemoveCmd := &cobra.Command{

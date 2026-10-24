@@ -32,8 +32,6 @@ func runPlay(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
-	nerdFonts := resolveNerdFonts(cmd, cfg)
 	extraArgs := extractEngineArgs("play", os.Args)
 
 	isInteractive := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
@@ -41,8 +39,40 @@ func runPlay(cmd *cobra.Command, args []string) error {
 
 	var lastPreset string
 	for {
-		selected, err := tui.RunInteractiveLauncher(
-			cat, paths.WadRoots(), theme, nerdFonts, lastPreset,
+		theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
+		_, themeSrc := resolveThemeWithSource(cfg)
+		nerdFonts, nfSrc := resolveNerdFontsWithSource(cmd, cfg)
+
+		var cfgWads, cfgBin, cfgSF string
+		if cfg != nil {
+			cfgWads = cfg.WadsDir
+			cfgBin = cfg.BinDir
+			cfgSF = cfg.SoundFontsDir
+		}
+
+		catalogDir := paths.CatalogDir
+		if flagPresetsFile != "" {
+			catalogDir = flagPresetsFile
+		}
+
+		selected, err := tui.RunInteractiveLauncherWithOptions(
+			cat,
+			paths.WadRoots(),
+			theme,
+			nerdFonts,
+			tui.LauncherOptions{
+				Paths:            paths,
+				AppConfig:        cfg,
+				CatalogDir:       catalogDir,
+				ExtraArgs:        extraArgs,
+				ThemeSource:      themeSrc,
+				NerdFontsSource:  nfSrc,
+				WadsDirSource:    dirSource(flagWadsDir, "DOOM_WADS_DIR", cfgWads),
+				WadsDirsSource:   wadsDirsSource(cfg),
+				BinDirSource:     dirSource(flagBinDir, "DOOM_BIN_DIR", cfgBin),
+				SoundFontsSource: dirSource(flagSoundFontsDir, "DOOM_SF_DIR", cfgSF),
+			},
+			lastPreset,
 		)
 		if err != nil {
 			return err
@@ -51,9 +81,19 @@ func runPlay(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
+		if refreshedPaths, refreshedCfg, refreshedCat, reloadErr := loadAppState(); reloadErr == nil {
+			paths = refreshedPaths
+			cfg = refreshedCfg
+			cat = refreshedCat
+		}
+
 		lastPreset = selected.Name
+		engOverride := flagEngineOverride
+		if selected.EngineOverridden && engOverride == "" {
+			engOverride = selected.Engine
+		}
 		opts := engine.LaunchOptions{
-			EngineOverride: flagEngineOverride,
+			EngineOverride: engOverride,
 			WadRoots:       paths.WadRoots(),
 			BinDir:         paths.BinDir,
 			DryRun:         flagDryRun,

@@ -40,11 +40,21 @@ func ValidateSHA256(digest string) error {
 	return nil
 }
 
+func validateCatalogDirPath(userDir string) error {
+	if strings.TrimSpace(userDir) == "" {
+		return errors.New("empty user catalog directory")
+	}
+	if info, err := os.Stat(userDir); err == nil && !info.IsDir() {
+		return fmt.Errorf("catalog path %q is a single file; pass a directory to write entities", userDir)
+	}
+	return nil
+}
+
 // AddEngine writes or updates a user engine entity file in userDir (<userDir>/engine.<id>.json).
 // It refuses to shadow a curated engine ID or alias.
 func AddEngine(userDir string, curated *Catalog, eng EngineConfig) (string, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return "", errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return "", err
 	}
 	if eng.ID == "" {
 		eng.ID = Slug(eng.DisplayName)
@@ -101,8 +111,8 @@ type EngineOverrideOptions struct {
 // target engine, preserving any previously configured override fields not touched
 // by opts.
 func ConfigEngine(userDir string, layered *Catalog, key string, opts EngineOverrideOptions) (string, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return "", errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return "", err
 	}
 	if layered == nil {
 		return "", errors.New("nil catalog")
@@ -187,8 +197,8 @@ func ConfigEngine(userDir string, layered *Catalog, key string, opts EngineOverr
 
 // ResetEngineOverride removes <userDir>/override.engine.<id>.json for the given engine.
 func ResetEngineOverride(userDir string, layered *Catalog, key string) error {
-	if strings.TrimSpace(userDir) == "" {
-		return errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return err
 	}
 	if layered == nil {
 		return errors.New("nil catalog")
@@ -209,8 +219,8 @@ func ResetEngineOverride(userDir string, layered *Catalog, key string) error {
 // Built-in curated engines cannot be removed. Returns the removed file path and
 // any preset names in layered that still reference the removed engine.
 func RemoveEngine(userDir string, curated, layered *Catalog, key string) (string, []string, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return "", nil, errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return "", nil, err
 	}
 	clean := strings.TrimSpace(key)
 	if clean == "" {
@@ -263,8 +273,8 @@ func RemoveEngine(userDir string, curated, layered *Catalog, key string) (string
 // AddPreset writes or updates a user preset entity file in userDir (<userDir>/preset.<id>.json).
 // It refuses to collide with a curated preset ID or a user preset that has a different display name.
 func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return "", errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return "", err
 	}
 	p.Name = strings.TrimSpace(p.Name)
 	if p.Name == "" {
@@ -339,18 +349,19 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 
 // OverridePatchRequest specifies the fields to update on a preset override.
 type OverridePatchRequest struct {
-	Engine      *string
-	IWAD        *string
-	AppendArgs  *[]string
-	AppendFiles *[]FileSpec
+	Engine       *string
+	IWAD         *string
+	AppendArgs   *[]string
+	AppendFiles  *[]FileSpec
+	ExcludeFiles *[]string
 }
 
 // ConfigPreset creates or updates <userDir>/override.preset.<id>.json for the
 // target preset, preserving any previously configured override fields not touched
 // by req.
 func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatchRequest) (string, *Preset, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return "", nil, errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return "", nil, err
 	}
 	target, err := layered.FindExact(key)
 	if err != nil {
@@ -398,9 +409,21 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 	}
 	if req.AppendArgs != nil {
 		ov.AppendArgs = append([]string(nil), (*req.AppendArgs)...)
+		if ov.Set != nil {
+			ov.Set.Args = nil
+		}
 	}
 	if req.AppendFiles != nil {
 		ov.AppendFiles = cloneFileSpecs(*req.AppendFiles)
+	}
+	if req.ExcludeFiles != nil {
+		var cleaned []string
+		for _, f := range *req.ExcludeFiles {
+			if trimmed := strings.TrimSpace(f); trimmed != "" {
+				cleaned = append(cleaned, trimmed)
+			}
+		}
+		ov.ExcludeFiles = cleaned
 	}
 
 	data, err := MarshalEntity(ov)
@@ -415,8 +438,8 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 
 // ResetPresetOverride removes <userDir>/override.preset.<id>.json for the given preset.
 func ResetPresetOverride(userDir string, layered *Catalog, key string) (*Preset, bool, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return nil, false, errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return nil, false, err
 	}
 	target, err := layered.FindExact(key)
 	if err != nil {
@@ -437,8 +460,8 @@ func ResetPresetOverride(userDir string, layered *Catalog, key string) (*Preset,
 // user override (<userDir>/override.preset.<id>.json) for the matching preset.
 // If the target is a built-in curated preset with no user files, RemovePreset returns an error.
 func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Preset, error) {
-	if strings.TrimSpace(userDir) == "" {
-		return nil, errors.New("empty user catalog directory")
+	if err := validateCatalogDirPath(userDir); err != nil {
+		return nil, err
 	}
 	target, err := layered.FindExact(key)
 	if err != nil {

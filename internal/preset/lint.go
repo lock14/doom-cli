@@ -341,6 +341,11 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 			if len(ov.AppendFiles) > 0 {
 				validateFiles(where, ov.Target.ID, ovIWAD, ov.AppendFiles)
 			}
+			for _, ex := range ov.ExcludeFiles {
+				if strings.TrimSpace(ex) == "" {
+					addErr(where, "preset %s has an empty exclude_files entry", ov.Target.ID)
+				}
+			}
 		case KindEngine:
 			if _, ok := engineIDs[ov.Target.ID]; !ok {
 				addErr(where, "override target engine/%s does not exist", ov.Target.ID)
