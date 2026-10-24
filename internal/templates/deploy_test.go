@@ -151,10 +151,16 @@ func TestTemplateInvariants(t *testing.T) {
 		requiredTokens []string
 	}{
 		{
-			name:           "dsda-doom.cfg",
-			rootFile:       filepath.Join(rootDir, "dsda-doom", "dsda-doom.cfg"),
-			embeddedData:   embeddedDSDADoom,
-			requiredTokens: []string{"__RESOLUTION__", "__SOUNDFONT__"},
+			name:         "dsda-doom.cfg",
+			rootFile:     filepath.Join(rootDir, "dsda-doom", "dsda-doom.cfg"),
+			embeddedData: embeddedDSDADoom,
+			requiredTokens: []string{
+				"__RESOLUTION__",
+				"__SOUNDFONT__",
+				"sts_solid_bg_color              0",
+				"render_doom_lightmaps           1",
+				"gl_fade_mode                    1",
+			},
 		},
 		{
 			name:           "autoexec.cfg",
