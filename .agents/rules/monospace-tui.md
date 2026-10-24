@@ -44,13 +44,16 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 ### [OVERRIDE] §6.1 single-line rounded Lipgloss borders across panes
 
 *   **Original**: Applications MUST NOT use double-line borders for Level 0–2 elements. Applications MUST NOT use single-line borders for Level 3–4 elements.
-*   **Project rule**: `renderBoxWithTitle` in `internal/tui/render.go` uses `lipgloss.RoundedBorder()` (`╭╮╰╯` with
-    single-line `─│` edges) across all launcher panes (`Presets`, `Preset Details`, and `README Viewer`). Active and
-    inactive focus levels are distinguished through theme border and title tokens (`BorderFgActive` and bold
-    `TitleActive` versus `BorderFgInactive` and normal-weight `TitleInactive`) rather than switching to double-line
-    `╔╗╚╝═║` characters (`§5.5` and `§9.6`).
-*   **Reason**: Lipgloss rounded single-line borders provide a cohesive visual style across modern terminals while
-    letting color tokens and bold title typography communicate active pane focus.
+*   **Project rule**: Non-overlapping Level 1 split and expanded launcher panes (`Presets`, `Preset Details`, and
+    `README Viewer`) use single-line `─│` edges in compliance with `§6.2` and `§5.5`, while `renderBoxWithTitle` in
+    `internal/tui/render.go` overrides the sharp `┌┐└┘` corner set by rendering `lipgloss.RoundedBorder()` (`╭╮╰╯`).
+    Active and inactive focus levels are distinguished through theme border and title tokens (`BorderFgActive` and bold
+    `TitleActive` versus `BorderFgInactive` and normal-weight `TitleInactive`, with `.Faint(true)` `SGR 2` in
+    `MonochromeTheme`) rather than double-line `╔╗╚╝═║` characters (`§5.5` and `§9.6`).
+*   **Reason**: Single-line borders on non-overlapping Level 1 split panels already comply with `§6.2` and `§5.5`; this
+    override specifically covers using `lipgloss.RoundedBorder()` (`╭╮╰╯`) instead of sharp `┌┐└┘` corners across
+    interactive Level 1 launcher panes while color tokens, bold title weight, and `SGR 2` dim attributes communicate
+    active pane focus.
 
 ### [OVERRIDE] §6.3 left-aligned panel titles in top border
 
@@ -64,9 +67,11 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 ### [OVERRIDE] §6.6 rounded corners for interactive launcher panes
 
 *   **Original**: Rounded corner characters (`╭╮╰╯`) MAY be used for cosmetic, non-interactive containers (e.g., decorative cards, informational callouts). Rounded corners MUST NOT be used for interactive windows, dialogs, or panels that participate in the elevation system.
-*   **Project rule**: Interactive launcher containers (`Presets`, `Preset Details`, and `README Viewer`) use
-    `lipgloss.RoundedBorder()` (`╭╮╰╯`) as their standard frame geometry.
-*   **Reason**: Keeps container framing consistent with the Lipgloss component ecosystem used throughout
+*   **Project rule**: Interactive Level 1 launcher panes (`Presets`, `Preset Details`, and `README Viewer`) use
+    `lipgloss.RoundedBorder()` (`╭╮╰╯`) instead of sharp `┌┐└┘` corners (`§6.2`) as their standard frame geometry.
+*   **Reason**: Single-line borders on non-overlapping Level 1 split panels already comply with `§6.2` and `§5.5`; this
+    override specifically covers using `lipgloss.RoundedBorder()` (`╭╮╰╯`) instead of sharp `┌┐└┘` corners across
+    interactive Level 1 launcher panes to keep framing consistent with the Lipgloss component ecosystem used throughout
     `internal/tui/`.
 
 ### [OVERRIDE] §1.6 90-column side-by-side split breakpoint
