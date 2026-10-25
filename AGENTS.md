@@ -6,8 +6,8 @@
     *   **Single root embed**: All embedded assets (`catalog/*.json`, `dsda-doom/dsda-doom.cfg`, `uzdoom/autoexec.cfg`)
         are embedded once at the repository root in `embed.go` (`doomcli.FS`). Do not create duplicate asset copies
         under `internal/*/data/`.
-    *   **Synchronize and lint**: Run `doom presets build` to synchronize `catalog/*.json` into `README.md`, and run
-        `doom presets lint` to validate strict schema rules, engine references, SHA-256 digests, personal path checks,
+    *   **Synchronize and lint**: Run `doom wads build` to synchronize `catalog/*.json` into `README.md`, and run
+        `doom wads lint` to validate strict schema rules, engine references, SHA-256 digests, personal path checks,
         and `README.md` table parity.
     *   **Parity verification**: Run `make check` (or `go test -v ./internal/preset ./internal/templates`) to verify
         that `README.md` matches `catalog/*.json` and all files comply with path invariants.
@@ -20,8 +20,8 @@
             use `__SOUNDFONT__`.
         *   In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use
             `__REFRESH_RATE__`.
-        *   Deployment tooling (`doom config install`, `doom setup`) dynamically substitutes
-            `__RESOLUTION__` (via native display detection), `__REFRESH_RATE__`, and `__SOUNDFONT__` at
+        *   Deployment tooling (`doom engines cfg install`, `doom engines install`, `doom setup`) dynamically
+            substitutes `__RESOLUTION__` (via native display detection), `__REFRESH_RATE__`, and `__SOUNDFONT__` at
             installation time.
     *   **Respect platform standard directories**:
         *   **UZDoom configuration**: `~/.config/uzdoom/autoexec.cfg` on Linux,
@@ -40,18 +40,18 @@
             via `DOOM_CONFIG_DIR`), with user entity files in `<ConfigDir>/catalog.d/*.json`.
 *   **Destructive safety and backup policy**:
     *   **Mandatory atomic writes and non-destructive backups**: Any configuration or catalog write
-        (`doom config install`, `doom setup`, `doom config set`, `doom config toggle`, `doom themes set`,
-        `doom engines add`, `doom engines config`, `doom presets add`, `doom presets config`) must use
+        (`doom engines cfg install`, `doom engines install`, `doom setup`, `doom config set`, `doom config toggle`,
+        `doom engines add`, `doom engines set`, `doom wads add`, `doom wads set`) must use
         `fsutil.WriteFileAtomic` (temporary file in the same directory followed by `os.Rename`) and `fsutil.BackupFile`
         to create non-clobbering timestamped backups (`.bak.<timestamp>`, appending `-1` and `-2` on same-second
         collisions and retaining at most `MaxBackupsPerFile = 3` per file) before overwriting any existing user file.
-        When deleting user entities or resetting overrides (`doom engines remove`, `doom engines config --reset`,
-        `doom presets remove`, `doom presets config --reset`), clean up `.bak.*` files via `fsutil.RemoveBackups`.
-        `doom config sync` (`templates.SyncConfigs`) also calls `fsutil.RemoveBackups` on repository template files so
-        `.bak.*` files never dirty the Git working tree.
+        When deleting user entities or resetting overrides (`doom engines remove`, `doom engines reset`,
+        `doom wads remove`, `doom wads reset`), clean up `.bak.*` files via `fsutil.RemoveBackups`.
+        `doom engines cfg sync` (`templates.SyncConfigs`) also calls `fsutil.RemoveBackups` on repository template files
+        so `.bak.*` files never dirty the Git working tree.
     *   **Preserve unrelated configuration**: When adding new engine variables, aliases, or keybindings, avoid
         modifying or removing unrelated settings unless explicitly requested. `config.json` preserves unknown top-level
-        keys across round-trips, and `doom presets config` and `doom engines config` preserve untouched override fields
+        keys across round-trips, and `doom wads set` and `doom engines set` preserve untouched override fields
         across successive calls.
     *   **Archive security and path containment**: All archive extractions (`archive/zip`), direct file downloads, and
         relative sub-path resolutions must sanitize paths against `..` traversal, drive-letter, and absolute path
@@ -101,9 +101,9 @@
         bar borders (`sts_solid_bg_color 0`), alongside `dsda_fps_limit 0`, `render_vsync 1`, and
         `uncapped_framerate 1` so high-refresh monitors pace frames smoothly to native monitor refresh rates.
 *   **TUI styling and font glyph hygiene**:
-    *   **Monospace TUI specification and overrides**: Terminal UI work in `internal/tui/`, `cmd/doom/play.go`, and
-        `cmd/doom/themes.go` is governed by `.agents/rules/monospace-tui.md` and the embedded Monospace Design TUI
-        (`mono-tui v0.2.5`) reference library under `.agents/skills/mono-tui-design/` and
+    *   **Monospace TUI specification and overrides**: Terminal UI work in `internal/tui/`, `cmd/doom/wads.go`,
+        `cmd/doom/engines.go`, and `cmd/doom/config.go` is governed by `.agents/rules/monospace-tui.md` and the embedded
+        Monospace Design TUI (`mono-tui v0.2.5`) reference library under `.agents/skills/mono-tui-design/` and
         `.agents/skills/mono-tui-audit/`.
     *   **Clean typography over emojis**: Emojis render with fixed vendor bitmaps and colors regardless of
         ANSI foreground escapes. They clash with light backgrounds (such as monochrome white pills). Use clean
@@ -122,16 +122,15 @@ Linux, macOS, and Windows:
     `uzdoom/autoexec.cfg`.
 *   `catalog/`: Curated one-entity-per-file JSON catalog (`engine.<id>.json`, `preset.<id>.json`).
 *   `cmd/doom/`: Modular Cobra CLI command implementations:
-    *   `main.go`: Entrypoint, root command, global flags, and path and catalog helpers.
-    *   `play.go`: `doom play` interactive launcher command.
-    *   `launch.go`: `doom launch` direct preset execution command.
+    *   `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), global flags, and path and catalog
+        helpers.
+    *   `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `scan`, `add`, `set`,
+        `reset`, `remove`, `lint`, `build` (hidden)).
+    *   `engines.go`: `doom engines` interactive TUI engine manager and subcommands (`list`, `install`, `add`, `set`,
+        `reset`, `remove`, `cfg` (`install`, `diff`, `sync` (hidden))).
+    *   `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `toggle`,
+        `themes`).
     *   `setup.go`: `doom setup` automated turnkey workflow command.
-    *   `wads.go`: `doom wads` subcommands (`list`, `fetch`, `extract`).
-    *   `engines.go`: `doom engines` subcommands (`list`, `add`, `config`, `remove`, `install`).
-    *   `presets.go`: `doom presets` subcommands (`list`, `show`, `add`, `config`, `remove`, `build` (hidden), `lint`).
-    *   `soundfont.go`: `doom soundfont install` subcommand.
-    *   `config.go`: `doom config` subcommands (`show`, `get`, `set`, `toggle`, `install`, `diff`, `sync` (hidden)).
-    *   `themes.go`: `doom themes` subcommands (`list`, `set`).
 *   `internal/config/`:
     *   `paths.go`: Platform path resolvers (`ResolveFor`, `WadRoots`, `ParsePathList`) adhering strictly to XDG
         (Linux), Library (macOS), and AppData (Windows).
@@ -157,7 +156,7 @@ Linux, macOS, and Windows:
         relative sub-paths, 1-level child directory scan, catalog alias matching, preset readiness checking
         (`IsPresetInstalled`), and version-aware README resolution (`ResolveReadme`, `IsReadmeSuffix`).
     *   `decode.go`: Document decoding with DOS Code Page 437 (CP437) box-drawing detection.
-    *   `compiler.go`: `README.md` preset table generator and synchronizer (`doom presets build`).
+    *   `compiler.go`: `README.md` preset table generator and synchronizer (`doom wads build`).
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing, catalog-driven target synthesis
     (`TargetPatternsForCatalog`), game file extraction, and `idkfa 2024.wad` synthesis from `extras.wad`
     (`SynthesizeIDKFAWAD`).
@@ -258,10 +257,10 @@ Linux, macOS, and Windows:
 # Documentation roles and boundaries
 
 *   **User-facing documentation**: `README.md` is reserved strictly for players and end-users of the `doom` CLI and
-    source ports. Focuses on installation, `doom setup`, gameplay (`doom play`), preset catalogs, directory layouts,
-    and game file acquisition. Must not contain internal developer commands, agent instructions, or compiler details.
-    Repository-maintainer subcommands (`doom presets build`, `doom config sync`) must set `Hidden: true` on their Cobra
-    commands so player-facing `--help` output matches `README.md`.
+    source ports. Focuses on installation, `doom setup`, gameplay (`doom` and `doom wads`), preset catalogs, directory
+    layouts, and game file acquisition. Must not contain internal developer commands, agent instructions, or compiler
+    details. Repository-maintainer subcommands (`doom wads build`, `doom engines cfg sync`) must set `Hidden: true` on
+    their Cobra commands so player-facing `--help` output matches `README.md`.
 *   **Contributor-facing documentation**: `CONTRIBUTING.md` is the dedicated guide for human open-source developers.
     Details prerequisites, Makefile targets, Go code style, testing requirements, and pull request guidelines.
 *   **Agent and architectural invariants**: `AGENTS.md` is the single canonical, authoritative reference at the
@@ -299,10 +298,11 @@ Linux, macOS, and Windows:
     strictly respects global CLI flags (`--theme`, `--nerd-fonts`, `--wads-dir`), which take precedence over environment
     variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`,
     `DOOM_SF_DIR`), which take precedence over user configuration (`config.json`), which takes precedence over platform
-    defaults. Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on `doom launch`; `--engine` or `-e` on
-    `doom presets add` and `doom presets config`; `--force` on install, fetch, extract, and setup commands) are scoped
-    locally to their respective Cobra subcommands rather than registered globally on `rootCmd`. Engine launch synthesis,
-    configuration deployment, and `doom config show` and `doom config get` always adhere to this resolved hierarchy.
+    defaults. Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on root `doom`; `--engine` or `-e` on
+    `doom wads add` and `doom wads set`; `--force` on `doom engines install`, `doom wads fetch`, `doom wads scan`, and
+    `doom setup`) are scoped locally to their respective Cobra commands rather than registered globally as persistent
+    flags. Engine launch synthesis, configuration deployment, and `doom config show` and `doom config get` always adhere
+    to this resolved hierarchy.
 *   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.

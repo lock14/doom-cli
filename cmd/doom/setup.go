@@ -88,7 +88,7 @@ func newSetupCmd() *cobra.Command {
 			fmt.Fprintln(out, "============================================================")
 			fmt.Fprintln(out, "  ✓ Doom setup complete!")
 			fmt.Fprintln(out, "  Engines, configs, soundfonts, and megawads are ready.")
-			fmt.Fprintln(out, "  Run 'doom play' or 'doom' to start playing!")
+			fmt.Fprintln(out, "  Run 'doom' or 'doom wads' to start playing!")
 			fmt.Fprintln(out, "============================================================")
 			return nil
 		},

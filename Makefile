@@ -23,7 +23,8 @@ help:
 	@echo ""
 	@echo "For Doom management and playing, use the CLI:"
 	@echo "  doom setup    - Full automated setup (engines, configs, soundfonts, IWADs, WADs)"
-	@echo "  doom play     - Interactive terminal launcher with fuzzy search and preview"
+	@echo "  doom          - Launch The Ultimate Doom directly (or 'doom <wad>')"
+	@echo "  doom wads     - Interactive terminal WAD browser with fuzzy search and preview"
 	@echo "  doom --help   - View all available commands and flags"
 
 build:

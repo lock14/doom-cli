@@ -69,7 +69,7 @@ func AddEngine(userDir string, curated *Catalog, eng EngineConfig) (string, erro
 		if existing, ok := curated.FindEngine(eng.ID); ok && existing.Layer == LayerCurated {
 			return "", fmt.Errorf(
 				"engine id %q collides with curated engine %q; "+
-					"pass a different --id or use `doom engines config %s`",
+					"pass a different --id or use `doom engines set %s`",
 				eng.ID, existing.ID, existing.ID,
 			)
 		}
@@ -293,7 +293,7 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 		for _, cp := range curated.Presets {
 			if cp.ID == p.ID || strings.EqualFold(cp.Name, p.Name) {
 				return "", fmt.Errorf(
-					"preset %q collides with curated preset %q (id %q); pass --id <slug> or use `doom presets config`",
+					"preset %q collides with curated preset %q (id %q); pass --id <slug> or use `doom wads set`",
 					p.Name, cp.Name, cp.ID,
 				)
 			}

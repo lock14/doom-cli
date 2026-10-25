@@ -1686,3 +1686,40 @@ func TestHandleFetchAssets_MissingRequiredAndEmptyRoots(t *testing.T) {
 		t.Errorf("expected '✗ Missing required files' statusMsg, got %q", mMiss.statusMsg)
 	}
 }
+
+func TestInitialModeConfigAndEngines(t *testing.T) {
+	t.Parallel()
+	cat := mockCatalog()
+
+	// 1. InitialModeConfig starts in Config Manager Tab 1 (CLI Settings) and exits silently on Esc
+	mCfg := initialModel(cat, nil, ClassicTheme, false)
+	mCfg.applyOptions(LauncherOptions{InitialMode: InitialModeConfig})
+	if !mCfg.viewingConfigMgr || mCfg.cfgMgr == nil || mCfg.cfgMgr.activeTab != configTabCLI {
+		t.Fatalf("expected InitialModeConfig to open Config Manager on Tab 1, got viewing=%v cfgMgr=%v",
+			mCfg.viewingConfigMgr, mCfg.cfgMgr)
+	}
+	newM, cmd := mCfg.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mCfg = newM.(model)
+	if !mCfg.quitting || cmd == nil {
+		t.Errorf("expected Esc in InitialModeConfig to quit, got quitting=%v cmd=%v", mCfg.quitting, cmd)
+	}
+	if got := mCfg.View(); got != "" {
+		t.Errorf("expected empty View() when quitting from InitialModeConfig, got %q", got)
+	}
+
+	// 2. InitialModeEngines starts in Config Manager Tab 2 (Engine Overrides) and exits silently on Esc
+	mEng := initialModel(cat, nil, ClassicTheme, false)
+	mEng.applyOptions(LauncherOptions{InitialMode: InitialModeEngines})
+	if !mEng.viewingConfigMgr || mEng.cfgMgr == nil || mEng.cfgMgr.activeTab != configTabEngines {
+		t.Fatalf("expected InitialModeEngines to open Config Manager on Tab 2, got viewing=%v cfgMgr=%v",
+			mEng.viewingConfigMgr, mEng.cfgMgr)
+	}
+	newM, cmd = mEng.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mEng = newM.(model)
+	if !mEng.quitting || cmd == nil {
+		t.Errorf("expected Esc in InitialModeEngines to quit, got quitting=%v cmd=%v", mEng.quitting, cmd)
+	}
+	if got := mEng.View(); got != "" {
+		t.Errorf("expected empty View() when quitting from InitialModeEngines, got %q", got)
+	}
+}

@@ -130,9 +130,9 @@ jobs:
           ./bin/doom --version
           ./bin/doom --help
           ./bin/doom engines list
-          ./bin/doom presets list
-          ./bin/doom presets lint
           ./bin/doom wads list
+          ./bin/doom wads lint
+          ./bin/doom config show
           ./bin/doom setup --help
 
   # CI Gatekeeper Aggregator Job

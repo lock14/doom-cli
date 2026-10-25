@@ -381,7 +381,7 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 			} else if strings.TrimSpace(matches[2]) != strings.TrimSpace(wantTable) {
 				addErr(
 					filepath.ToSlash(readmePath),
-					"README.md preset table is out of sync with catalog/; run 'doom presets build'",
+					"README.md preset table is out of sync with catalog/; run 'doom wads build'",
 				)
 			}
 		}

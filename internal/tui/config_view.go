@@ -454,6 +454,10 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.nerdFonts = s.savedNerdFonts
 			m.viewingConfigMgr = false
 			m.cfgMgr = nil
+			if m.initialMode == InitialModeConfig || m.initialMode == InitialModeEngines {
+				m.quitting = true
+				return m, tea.Quit
+			}
 			return m, nil
 
 		case "f1":

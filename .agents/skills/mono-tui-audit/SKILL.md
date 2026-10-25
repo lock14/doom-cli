@@ -5,8 +5,8 @@ description: Audit doom-cli terminal UI code against the Monospace Design TUI (m
 
 # Monospace TUI audit skill
 
-Use this skill when auditing or reviewing `internal/tui/`, `cmd/doom/play.go`, or `cmd/doom/themes.go` against the
-Monospace Design TUI (`mono-tui v0.2.5`) specification and `doom-cli`'s project rules.
+Use this skill when auditing or reviewing `internal/tui/`, `cmd/doom/wads.go`, `cmd/doom/engines.go`, or
+`cmd/doom/config.go` against the Monospace Design TUI (`mono-tui v0.2.5`) specification and `doom-cli`'s project rules.
 
 ## Audit reference order
 
