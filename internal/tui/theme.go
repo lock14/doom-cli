@@ -194,29 +194,27 @@ func assignColor(target *lipgloss.TerminalColor, val string) {
 	}
 }
 
-// ResolveTheme resolves a Theme from the first matching candidate across built-in themes and custom JSON files.
-func ResolveTheme(flagTheme, envTheme, configTheme, themesDir string) Theme {
-	for _, candidate := range []string{flagTheme, envTheme, configTheme} {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "" {
-			continue
-		}
+// ResolveTheme resolves a Theme from configTheme across built-in themes and custom JSON files.
+func ResolveTheme(configTheme, themesDir string) Theme {
+	candidate := strings.TrimSpace(configTheme)
+	if candidate == "" {
+		return ClassicTheme
+	}
 
-		if t, ok := GetBuiltinTheme(candidate); ok {
+	if t, ok := GetBuiltinTheme(candidate); ok {
+		return t
+	}
+
+	if strings.HasSuffix(strings.ToLower(candidate), ".json") {
+		if t, err := LoadThemeFile(candidate); err == nil {
 			return t
 		}
+	}
 
-		if strings.HasSuffix(strings.ToLower(candidate), ".json") {
-			if t, err := LoadThemeFile(candidate); err == nil {
-				return t
-			}
-		}
-
-		if themesDir != "" {
-			themePath := filepath.Join(themesDir, candidate+".json")
-			if t, err := LoadThemeFile(themePath); err == nil {
-				return t
-			}
+	if themesDir != "" {
+		themePath := filepath.Join(themesDir, candidate+".json")
+		if t, err := LoadThemeFile(themePath); err == nil {
+			return t
 		}
 	}
 

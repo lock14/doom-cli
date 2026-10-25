@@ -2,8 +2,6 @@ package engine
 
 import (
 	"archive/zip"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,7 +120,7 @@ func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformReci
 	if apiURL != "" && len(recipe.Assets) > 0 {
 		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 		if err == nil {
-			req.Header.Set("User-Agent", "doom-cli/2.0")
+			req.Header.Set("User-Agent", fsutil.UserAgent)
 			resp, doErr := ins.Client.Do(req)
 			if doErr == nil {
 				defer resp.Body.Close()
@@ -157,51 +155,8 @@ func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformReci
 
 // DownloadFileVerified downloads a file from url to targetPath and checks expectedSHA256 when provided.
 func (ins *Installer) DownloadFileVerified(url, targetPath, expectedSHA256 string) error {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("User-Agent", "doom-cli/2.0")
-
-	resp, err := ins.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
-	if err != nil {
-		return err
-	}
-
-	hasher := sha256.New()
-	_, copyErr := io.Copy(io.MultiWriter(out, hasher), resp.Body)
-	closeErr := out.Close()
-	if copyErr != nil {
-		_ = os.Remove(targetPath)
-		return copyErr
-	}
-	if closeErr != nil {
-		_ = os.Remove(targetPath)
-		return closeErr
-	}
-
-	if cleanSum := strings.TrimSpace(expectedSHA256); cleanSum != "" {
-		actualSum := hex.EncodeToString(hasher.Sum(nil))
-		if !strings.EqualFold(actualSum, cleanSum) {
-			_ = os.Remove(targetPath)
-			return fmt.Errorf("sha256 mismatch for %s: got %s, want %s", url, actualSum, cleanSum)
-		}
-	}
-	return nil
+	_, err := fsutil.DownloadVerified(ins.Client, url, targetPath, expectedSHA256, 0o755)
+	return err
 }
 
 // InstallEngine downloads and installs a single engine using its declarative InstallRecipe.
@@ -482,19 +437,11 @@ func extractZipEntry(zf *zip.File, destDir, destPath string) error {
 	}
 	defer rc.Close()
 
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return err
-	}
-	_, err = fsutil.WriteFileAtomic(cleanDest, data, 0o644)
+	_, _, err = fsutil.WriteReaderAtomic(cleanDest, rc, 0o644)
 	return err
 }
 
 func copyBinaryFile(src, dst string) error {
-	data, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	_, err = fsutil.WriteFileAtomic(dst, data, 0o755)
+	_, err := fsutil.CopyFileAtomic(src, dst, 0o755)
 	return err
 }

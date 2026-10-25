@@ -281,7 +281,7 @@ func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
 	if diskData, err := os.ReadFile(autoDest); err != nil {
 		s.uzdoomStatus = "[✗ Not Installed]"
 	} else {
-		expected := templates.RenderAutoexec(paths)
+		expected := templates.RenderAutoexecWithRate(paths, s.detectedRate)
 		if strings.TrimSpace(string(diskData)) == strings.TrimSpace(expected) {
 			s.uzdoomStatus = "[✓ In Sync]"
 		} else {
@@ -293,7 +293,7 @@ func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
 	if diskData, err := os.ReadFile(dsdaDest); err != nil {
 		s.dsdaStatus = "[✗ Not Installed]"
 	} else {
-		expected := templates.RenderDSDADoom(paths)
+		expected := templates.RenderDSDADoomWithRes(paths, s.detectedRes)
 		if strings.TrimSpace(string(diskData)) == strings.TrimSpace(expected) {
 			s.dsdaStatus = "[✓ In Sync]"
 		} else {
@@ -409,6 +409,9 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				m.quitting = true
 				return m, tea.Quit
+			case "f1":
+				m.openHelp(helpModeConfigManager)
+				return m, nil
 			case "esc", "q", "Q", "enter":
 				s.viewingDiff = false
 				return m, nil
@@ -488,13 +491,13 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "up", "ctrl+p", "shift+tab":
+		case "up", "ctrl+p", "ctrl+k", "shift+tab":
 			count := s.fieldCountForTab()
 			s.focusIdx = (s.focusIdx - 1 + count) % count
 			s.syncFocus()
 			return m, nil
 
-		case "down", "ctrl+n", "tab":
+		case "down", "ctrl+n", "ctrl+j", "tab":
 			count := s.fieldCountForTab()
 			s.focusIdx = (s.focusIdx + 1) % count
 			s.syncFocus()
@@ -803,6 +806,7 @@ func (m model) renderConfigManagerView() string {
 		box := renderBoxWithTitle(s.diffViewport.View(), boxWidth, "Configuration Diff", true, m.styles)
 		footer := m.styles.FormatKeyHelp([]keyHelp{
 			{"↑/↓/PgUp/PgDn/g/G", "Scroll"},
+			{"F1", "Help"},
 			{"Esc/q", "Back to Port Configs"},
 		})
 		if m.width > 0 {
@@ -1111,6 +1115,7 @@ func (m model) renderConfigManagerFooter() string {
 	if s != nil && s.activeTab == configTabPorts {
 		items = append(items,
 			keyHelp{"Enter/Space", "Run Action"},
+			keyHelp{"F1", "Help"},
 			keyHelp{"Esc", "Close"},
 		)
 	} else {
@@ -1121,7 +1126,10 @@ func (m model) renderConfigManagerFooter() string {
 		if s != nil && s.activeTab == configTabEngines {
 			items = append(items, keyHelp{"Ctrl+R", "Reset"})
 		}
-		items = append(items, keyHelp{"Esc", "Cancel"})
+		items = append(items,
+			keyHelp{"F1", "Help"},
+			keyHelp{"Esc", "Cancel"},
+		)
 	}
 	footer := m.styles.FormatKeyHelp(items)
 	if m.width > 0 {

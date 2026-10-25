@@ -142,9 +142,10 @@ Linux, macOS, and Windows:
     *   `installer.go`: Declarative source port asset downloading, SHA-256 verification, and portable binary
         installation (Zip Slip hardened).
 *   `internal/fsutil/`:
-    *   `fsutil.go`: Atomic file writing (`WriteFileAtomic`), non-clobbering timestamped backups (`BackupFile`,
-        retaining at most `MaxBackupsPerFile = 3` per file, and `RemoveBackups`), and path-containment validation
-        (`CleanRel`, `SafeJoin`).
+    *   `fsutil.go`: Atomic file writing (`WriteFileAtomic`, `WriteReaderAtomic`, `CopyFileAtomic`), SHA-256 verified
+        HTTP downloading (`DownloadVerified`), non-clobbering timestamped backups (`BackupFile`, retaining at most
+        `MaxBackupsPerFile = 3` per file, and `RemoveBackups`), and path-containment validation (`CleanRel`,
+        `SafeJoin`).
 *   `internal/preset/`:
     *   `preset.go`: Declarative entity types, strict JSON decoder, and two-layer catalog loader with quarantine.
     *   `store.go`: User `catalog.d` write operations (`AddEngine`, `ConfigEngine`, `ResetEngineOverride`,
@@ -152,8 +153,9 @@ Linux, macOS, and Windows:
     *   `lint.go`: Catalog schema, reference, digest, personal-path, `README.md` parity, and documentation typography,
         link, anchor, and JSON code block linter (`LintCatalog`, `lintDocumentation`).
     *   `resolve.go`: Multi-root cached `DirIndex`, case-insensitive and whitespace-tolerant file resolution, safe
-        relative sub-paths, 1-level child directory scan, catalog alias matching, preset readiness checking
-        (`IsPresetInstalled`), and version-aware README resolution (`ResolveReadme`, `IsReadmeSuffix`).
+        relative sub-paths, 1-level child directory scan, catalog alias matching (`ResolveFileSpec`), preset readiness
+        checking (`IsPresetInstalled`, `ArePresetFilesInstalled`, `NeedsSteamDiscovery`), and version-aware README
+        resolution (`ResolveReadme`, `IsReadmeSuffix`).
     *   `decode.go`: Document decoding with DOS Code Page 437 (CP437) box-drawing detection.
     *   `compiler.go`: `README.md` preset table generator and synchronizer (`doom wads build`).
 *   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing, catalog-driven target synthesis

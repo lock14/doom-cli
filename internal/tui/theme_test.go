@@ -168,51 +168,34 @@ func TestResolveTheme(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		flagTheme   string
-		envTheme    string
 		configTheme string
 		themesDir   string
 		expected    string
 	}{
 		{
-			name:      "flag precedence over env and config",
-			flagTheme: "plasma",
-			envTheme:  "blood",
-			expected:  "plasma",
-		},
-		{
-			name:        "env precedence over config",
-			flagTheme:   "",
-			envTheme:    "blood",
-			configTheme: "amber",
-			expected:    "blood",
-		},
-		{
-			name:        "config fallback when flag and env empty",
-			flagTheme:   "",
-			envTheme:    "",
+			name:        "built-in theme from config",
 			configTheme: "amber",
 			expected:    "amber",
 		},
 		{
-			name:        "custom file path via flag",
-			flagTheme:   customFile,
-			envTheme:    "",
-			configTheme: "",
+			name:        "custom file path from config",
+			configTheme: customFile,
 			expected:    "violet",
 		},
 		{
 			name:        "custom theme from themesDir",
-			flagTheme:   "violet",
-			envTheme:    "",
-			configTheme: "",
+			configTheme: "violet",
 			themesDir:   tmpDir,
 			expected:    "violet",
 		},
 		{
-			name:        "all empty falls back to classic",
-			flagTheme:   "",
-			envTheme:    "",
+			name:        "unknown theme falls back to classic",
+			configTheme: "nonexistent",
+			themesDir:   tmpDir,
+			expected:    "classic",
+		},
+		{
+			name:        "empty falls back to classic",
 			configTheme: "",
 			expected:    "classic",
 		},
@@ -222,7 +205,7 @@ func TestResolveTheme(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			res := ResolveTheme(tt.flagTheme, tt.envTheme, tt.configTheme, tt.themesDir)
+			res := ResolveTheme(tt.configTheme, tt.themesDir)
 			if res.Name != tt.expected {
 				t.Errorf("ResolveTheme() = %q, expected %q", res.Name, tt.expected)
 			}

@@ -1,6 +1,11 @@
 package fsutil
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,5 +195,72 @@ func TestBackupRetentionAndRemoveBackups(t *testing.T) {
 		if strings.HasPrefix(entry.Name(), "entity.json.bak.") {
 			t.Errorf("leftover backup after RemoveBackups: %s", entry.Name())
 		}
+	}
+}
+
+type failingReader struct{}
+
+func (failingReader) Read([]byte) (int, error) {
+	return 0, errors.New("simulated read error")
+}
+
+func TestDownloadVerifiedAndFailedReaderNoSpuriousBackup(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	target := filepath.Join(dir, "payload.bin")
+
+	// 1. Seed initial target file
+	if _, err := WriteFileAtomic(target, []byte("original"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. WriteReaderAtomic with failing reader must not overwrite target or create a spurious backup
+	if _, bak, err := WriteReaderAtomic(target, failingReader{}, 0o644); err == nil || bak != "" {
+		t.Fatalf("expected WriteReaderAtomic error and empty backup on failingReader, got bak=%q err=%v", bak, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "payload.bin" {
+		t.Fatalf("unexpected files after failed WriteReaderAtomic: %v", entries)
+	}
+
+	// 3. DownloadVerified verifies User-Agent, SHA-256 mismatch cleanup, and valid overwrite
+	payload := []byte("verified-doom-payload")
+	sum := sha256.Sum256(payload)
+	validHex := hex.EncodeToString(sum[:])
+
+	var gotUA string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUA = r.Header.Get("User-Agent")
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+
+	// SHA-256 mismatch must leave original file untouched and create no backup or leftover temp file
+	if _, err := DownloadVerified(srv.Client(), srv.URL, target, "000000", 0o644); err == nil ||
+		!strings.Contains(err.Error(), "sha256 mismatch") {
+		t.Fatalf("expected sha256 mismatch error, got %v", err)
+	}
+	if gotUA != UserAgent {
+		t.Errorf("User-Agent = %q, want %q", gotUA, UserAgent)
+	}
+	entriesAfterMismatch, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entriesAfterMismatch) != 1 || entriesAfterMismatch[0].Name() != "payload.bin" {
+		t.Fatalf("expected only payload.bin after sha256 mismatch, got %v", entriesAfterMismatch)
+	}
+
+	// Valid SHA-256 overwrites target and creates a backup of "original"
+	n, err := DownloadVerified(srv.Client(), srv.URL, target, validHex, 0o644)
+	if err != nil || n != int64(len(payload)) {
+		t.Fatalf("DownloadVerified valid: n=%d err=%v", n, err)
+	}
+	gotData, err := os.ReadFile(target)
+	if err != nil || string(gotData) != string(payload) {
+		t.Fatalf("target content = %q (%v), want %q", string(gotData), err, string(payload))
 	}
 }

@@ -42,19 +42,9 @@ func InstallSoundFontURL(url, destDir string, force bool, out io.Writer) (string
 
 	fmt.Fprintf(out, "Downloading GeneralUser-GS SoundFont (Roland SC-55 Balanced GM)...\n")
 	client := &http.Client{Timeout: 3 * time.Minute}
-	resp, err := client.Get(url)
+	written, err := fsutil.DownloadVerified(client, url, targetPath, "", 0o644)
 	if err != nil {
 		return "", fmt.Errorf("failed to download soundfont from %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("soundfont download failed with HTTP status %d", resp.StatusCode)
-	}
-
-	written, _, err := fsutil.WriteReaderAtomic(targetPath, resp.Body, 0o644)
-	if err != nil {
-		return "", fmt.Errorf("failed writing soundfont: %w", err)
 	}
 
 	fmt.Fprintf(out, "✓ Successfully installed GeneralUser-GS.sf2 (%d bytes) to:\n  %s\n", written, targetPath)

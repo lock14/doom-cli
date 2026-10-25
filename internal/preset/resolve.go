@@ -373,6 +373,22 @@ func (idx *DirIndex) resolveRelativeSubpath(targetName string) (string, bool) {
 	return "", false
 }
 
+// ResolveFileSpec resolves f.Name or any of its declared or catalog aliases across indexed WAD roots.
+func (idx *DirIndex) ResolveFileSpec(f FileSpec) (string, bool) {
+	if idx == nil {
+		return "", false
+	}
+	if p, ok := idx.ResolveFile(f.Name); ok {
+		return p, true
+	}
+	for _, al := range idx.fileAliases(f) {
+		if p, ok := idx.ResolveFile(al); ok {
+			return p, true
+		}
+	}
+	return "", false
+}
+
 // IsPresetInstalled reports whether the preset's base IWAD (when specified) and all
 // non-optional PWAD, PK3, and DeHackEd files resolve in the indexed WAD directories.
 func (idx *DirIndex) IsPresetInstalled(p Preset) bool {
@@ -384,25 +400,46 @@ func (idx *DirIndex) IsPresetInstalled(p Preset) bool {
 			return false
 		}
 	}
+	return idx.ArePresetFilesInstalled(p)
+}
+
+// ArePresetFilesInstalled reports whether all non-optional PWAD, PK3, and DeHackEd
+// files declared in p.Files resolve in the indexed WAD directories.
+func (idx *DirIndex) ArePresetFilesInstalled(p Preset) bool {
+	if idx == nil {
+		return false
+	}
 	for _, f := range p.Files {
 		if f.Optional {
 			continue
 		}
-		if _, ok := idx.ResolveFile(f.Name); ok {
-			continue
-		}
-		foundAlias := false
-		for _, al := range idx.fileAliases(f) {
-			if _, ok := idx.ResolveFile(al); ok {
-				foundAlias = true
-				break
-			}
-		}
-		if !foundAlias {
+		if _, ok := idx.ResolveFileSpec(f); !ok {
 			return false
 		}
 	}
 	return true
+}
+
+// NeedsSteamDiscovery reports whether fetching p may require Steam or GOG discovery
+// because p has no download sources, its base IWAD is missing, or any optional
+// companion file (such as idkfa 2024.wad) is missing from the indexed directories.
+func (idx *DirIndex) NeedsSteamDiscovery(p Preset) bool {
+	if idx == nil || len(p.Sources) == 0 {
+		return true
+	}
+	if strings.TrimSpace(p.IWAD) != "" {
+		if _, ok := idx.ResolveFile(p.IWAD); !ok {
+			return true
+		}
+	}
+	for _, f := range p.Files {
+		if f.Optional {
+			if _, ok := idx.ResolveFileSpec(f); !ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ResolveReadme locates an accompanying documentation or text file for the preset.

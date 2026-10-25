@@ -11,33 +11,11 @@ import (
 	"github.com/lock14/doom-cli/internal/config"
 )
 
-func TestBackupFile(t *testing.T) {
-	t.Parallel()
-	tmpDir := t.TempDir()
-
-	targetFile := filepath.Join(tmpDir, "test.cfg")
-	_ = os.WriteFile(targetFile, []byte("original-content"), 0o644)
-
-	bkp, err := BackupFile(targetFile)
-	if err != nil {
-		t.Fatalf("BackupFile failed: %v", err)
-	}
-	if bkp == "" || !strings.Contains(bkp, ".bak.") {
-		t.Errorf("unexpected backup filename: %s", bkp)
-	}
-
-	bkpData, err := os.ReadFile(bkp)
-	if err != nil || string(bkpData) != "original-content" {
-		t.Errorf("backup content mismatch: %s", string(bkpData))
-	}
-}
-
 func TestDeployConfigs_And_Diff(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 
 	paths := &config.Paths{
-		DataDir:       tmpDir,
 		BinDir:        filepath.Join(tmpDir, "bin"),
 		WadsDir:       filepath.Join(tmpDir, "wads"),
 		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
@@ -195,7 +173,6 @@ func TestDeployConfigsTo(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	paths := &config.Paths{
-		DataDir:       tmpDir,
 		BinDir:        filepath.Join(tmpDir, "bin"),
 		WadsDir:       filepath.Join(tmpDir, "wads"),
 		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
@@ -225,7 +202,6 @@ func TestDeployConfigsWithOptions_PreservesExistingWhenNotForced(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	paths := &config.Paths{
-		DataDir:       tmpDir,
 		BinDir:        filepath.Join(tmpDir, "bin"),
 		WadsDir:       filepath.Join(tmpDir, "wads"),
 		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),

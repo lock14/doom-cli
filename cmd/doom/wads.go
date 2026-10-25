@@ -78,19 +78,7 @@ func newWadsCmd() *cobra.Command {
 			idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 			alreadyInstalled := strings.TrimSpace(p.IWAD) != "" && idx.IsPresetInstalled(*p)
 			if !alreadyInstalled || fetchForce {
-				_, iwadFound := idx.ResolveFile(p.IWAD)
-				needsSteam := !iwadFound || len(p.Sources) == 0 || fetchForce
-				if !needsSteam {
-					for _, f := range p.Files {
-						if f.Optional {
-							if _, ok := idx.ResolveFile(f.Name); !ok {
-								needsSteam = true
-								break
-							}
-						}
-					}
-				}
-				if needsSteam {
+				if fetchForce || idx.NeedsSteamDiscovery(*p) {
 					if _, err := steam.DiscoverAndExtract(
 						cat, nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
 					); err != nil {
@@ -141,10 +129,7 @@ func newWadsCmd() *cobra.Command {
 		&scanForce, "force", false, "Overwrite existing WAD files in destination directory",
 	)
 
-	var (
-		addID, addEngine, addIWAD, addDesc, addArgs string
-		addFiles                                    []string
-	)
+	var addFlags wadOptionFlags
 	addCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a custom WAD or preset to your personal catalog",
@@ -164,26 +149,19 @@ func newWadsCmd() *cobra.Command {
 				return err
 			}
 
-			var files []preset.FileSpec
-			for _, f := range addFiles {
-				if trimmed := strings.TrimSpace(f); trimmed != "" {
-					files = append(files, preset.FileSpec{Name: trimmed})
-				}
-			}
-
 			var extraArgs []string
-			if strings.TrimSpace(addArgs) != "" {
-				extraArgs = strings.Fields(addArgs)
+			if strings.TrimSpace(addFlags.args) != "" {
+				extraArgs = strings.Fields(addFlags.args)
 			}
 
 			p := preset.Preset{
-				ID:          addID,
+				ID:          addFlags.id,
 				Name:        name,
-				Engine:      addEngine,
-				IWAD:        addIWAD,
-				Files:       files,
+				Engine:      addFlags.engine,
+				IWAD:        addFlags.iwad,
+				Files:       parseFileSpecs(addFlags.files),
 				Args:        extraArgs,
-				Description: addDesc,
+				Description: addFlags.description,
 			}
 
 			outPath, err := preset.AddPreset(paths.CatalogDir, curated, cat, p)
@@ -195,19 +173,13 @@ func newWadsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	addCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for this preset (defaults to slugified name)")
-	addCmd.Flags().StringVarP(&addEngine, "engine", "e", "dsda-doom", "Default engine for this preset")
-	addCmd.Flags().StringVar(&addIWAD, "iwad", "DOOM2.WAD", "Base IWAD required by this preset")
-	addCmd.Flags().StringSliceVar(
-		&addFiles, "files", nil, "Comma-separated list of required PWAD and DeHackEd files",
+	bindWadCommonFlags(addCmd, &addFlags, "dsda-doom", "DOOM2.WAD")
+	addCmd.Flags().StringVar(
+		&addFlags.id, "id", "", "Explicit slug ID for this preset (defaults to slugified name)",
 	)
-	addCmd.Flags().StringVar(&addDesc, "description", "", "Short description of the mapset")
-	addCmd.Flags().StringVar(&addArgs, "args", "", "Default extra launch arguments")
+	addCmd.Flags().StringVar(&addFlags.description, "description", "", "Short description of the mapset")
 
-	var (
-		setEngine, setIWAD, setArgs string
-		setFiles, setExcludeFiles   []string
-	)
+	var setFlags wadOptionFlags
 	setCmd := &cobra.Command{
 		Use:   "set <name>",
 		Short: "Configure per-preset overrides (engine, iwad, extra args, extra files, excluded files)",
@@ -221,34 +193,29 @@ func newWadsCmd() *cobra.Command {
 
 			var req preset.OverridePatchRequest
 			changed := false
-			if cmd.Flags().Changed("engine") || setEngine != "" {
-				v := setEngine
+			if cmd.Flags().Changed("engine") || setFlags.engine != "" {
+				v := setFlags.engine
 				req.Engine = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("iwad") || setIWAD != "" {
-				v := setIWAD
+			if cmd.Flags().Changed("iwad") || setFlags.iwad != "" {
+				v := setFlags.iwad
 				req.IWAD = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("args") || setArgs != "" {
-				v := strings.Fields(setArgs)
+			if cmd.Flags().Changed("args") || setFlags.args != "" {
+				v := strings.Fields(setFlags.args)
 				req.AppendArgs = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("files") || len(setFiles) > 0 {
-				var specs []preset.FileSpec
-				for _, f := range setFiles {
-					if trimmed := strings.TrimSpace(f); trimmed != "" {
-						specs = append(specs, preset.FileSpec{Name: trimmed})
-					}
-				}
+			if cmd.Flags().Changed("files") || len(setFlags.files) > 0 {
+				specs := parseFileSpecs(setFlags.files)
 				req.AppendFiles = &specs
 				changed = true
 			}
-			if cmd.Flags().Changed("exclude-file") || len(setExcludeFiles) > 0 {
+			if cmd.Flags().Changed("exclude-file") || len(setFlags.excludeFiles) > 0 {
 				var excluded []string
-				for _, f := range setExcludeFiles {
+				for _, f := range setFlags.excludeFiles {
 					if trimmed := strings.TrimSpace(f); trimmed != "" {
 						excluded = append(excluded, trimmed)
 					}
@@ -277,12 +244,9 @@ func newWadsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	setCmd.Flags().StringVarP(&setEngine, "engine", "e", "", "Preferred engine override for this preset")
-	setCmd.Flags().StringVar(&setIWAD, "iwad", "", "Custom IWAD override")
-	setCmd.Flags().StringVar(&setArgs, "args", "", "Additional launch arguments (such as -skill 4 -warp 01)")
-	setCmd.Flags().StringSliceVar(&setFiles, "files", nil, "Extra PWAD files to load with this preset")
+	bindWadCommonFlags(setCmd, &setFlags, "", "")
 	setCmd.Flags().StringSliceVar(
-		&setExcludeFiles, "exclude-file", nil, "Optional or default PWAD files to exclude from this preset",
+		&setFlags.excludeFiles, "exclude-file", nil, "Optional or default PWAD files to exclude from this preset",
 	)
 
 	resetCmd := &cobra.Command{
@@ -352,7 +316,7 @@ func newWadsCmd() *cobra.Command {
 			} else if info, err := os.Stat(filepath.Join(".", "catalog")); err == nil && info.IsDir() {
 				root = "."
 			}
-			paths := getPaths()
+			paths := resolveAppPaths()
 			diags, err := preset.LintCatalog(root, paths.CatalogDir)
 			if err != nil {
 				return err
@@ -402,6 +366,35 @@ func newWadsCmd() *cobra.Command {
 	return wadsCmd
 }
 
+type wadOptionFlags struct {
+	id           string
+	engine       string
+	iwad         string
+	args         string
+	description  string
+	files        []string
+	excludeFiles []string
+}
+
+func bindWadCommonFlags(cmd *cobra.Command, f *wadOptionFlags, defaultEngine, defaultIWAD string) {
+	cmd.Flags().StringVarP(&f.engine, "engine", "e", defaultEngine, "Engine for this preset")
+	cmd.Flags().StringVar(&f.iwad, "iwad", defaultIWAD, "Base IWAD required by this preset")
+	cmd.Flags().StringSliceVar(
+		&f.files, "files", nil, "Comma-separated list of PWAD and DeHackEd files",
+	)
+	cmd.Flags().StringVar(&f.args, "args", "", "Additional launch arguments")
+}
+
+func parseFileSpecs(raw []string) []preset.FileSpec {
+	var specs []preset.FileSpec
+	for _, f := range raw {
+		if trimmed := strings.TrimSpace(f); trimmed != "" {
+			specs = append(specs, preset.FileSpec{Name: trimmed})
+		}
+	}
+	return specs
+}
+
 func runWadsTUI(cmd *cobra.Command, _ []string) error {
 	paths, cfg, cat, err := loadAppState()
 	if err != nil {
@@ -418,7 +411,6 @@ func runWadsTUI(cmd *cobra.Command, _ []string) error {
 		theme,
 		nerdFonts,
 		launcherOpts,
-		"",
 	)
 	if err != nil {
 		return err
@@ -530,7 +522,7 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(out, "  Engine:        %s%s\n", engStr, engineOverridden)
 
-	idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat).WithPresets(*p)
+	idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 	iwadPath, iwadFound := idx.ResolveFile(p.IWAD)
 	iwadStatus := "[✗ Missing]"
 	if iwadFound {
@@ -541,7 +533,7 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	if len(p.Files) > 0 {
 		fmt.Fprintln(out, "  Files:")
 		for _, f := range p.Files {
-			fpath, fFound := idx.ResolveFile(f.Name)
+			fpath, fFound := idx.ResolveFileSpec(f)
 			fStatus := "[✗ Missing]"
 			if fFound {
 				fStatus = fmt.Sprintf("[✓ Found: %s]", fpath)

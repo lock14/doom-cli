@@ -95,15 +95,7 @@ func newEnginesCmd() *cobra.Command {
 		&installForce, "force", false, "Re-download and reinstall even if already installed",
 	)
 
-	var (
-		addID          string
-		addBinary      string
-		addStyle       string
-		addArgs        string
-		addPrefixArgs  string
-		addBadge       string
-		addDescription string
-	)
+	var addFlags engineOptionFlags
 	addCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Register a custom Doom source port in catalog.d",
@@ -124,15 +116,15 @@ func newEnginesCmd() *cobra.Command {
 			}
 
 			var defaultArgs []string
-			if strings.TrimSpace(addArgs) != "" {
-				defaultArgs = strings.Fields(addArgs)
+			if strings.TrimSpace(addFlags.args) != "" {
+				defaultArgs = strings.Fields(addFlags.args)
 			}
 			var prefixArgs []string
-			if strings.TrimSpace(addPrefixArgs) != "" {
-				prefixArgs = strings.Fields(addPrefixArgs)
+			if strings.TrimSpace(addFlags.prefixArgs) != "" {
+				prefixArgs = strings.Fields(addFlags.prefixArgs)
 			}
 
-			id := addID
+			id := addFlags.id
 			if id == "" {
 				id = preset.Slug(name)
 			}
@@ -140,12 +132,12 @@ func newEnginesCmd() *cobra.Command {
 			eng := preset.EngineConfig{
 				ID:          id,
 				DisplayName: name,
-				Description: addDescription,
-				ArgsStyle:   strings.ToLower(strings.TrimSpace(addStyle)),
-				Binary:      addBinary,
+				Description: addFlags.description,
+				ArgsStyle:   strings.ToLower(strings.TrimSpace(addFlags.style)),
+				Binary:      addFlags.binary,
 				DefaultArgs: defaultArgs,
 				PrefixArgs:  prefixArgs,
-				Badge:       addBadge,
+				Badge:       addFlags.badge,
 			}
 
 			outPath, err := preset.AddEngine(paths.CatalogDir, curated, eng)
@@ -163,27 +155,13 @@ func newEnginesCmd() *cobra.Command {
 			return nil
 		},
 	}
-	addCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for the engine (defaults to slugified name)")
-	addCmd.Flags().StringVar(&addBinary, "binary", "", "Executable name or absolute path (defaults to id)")
+	bindEngineCommonFlags(addCmd, &addFlags)
 	addCmd.Flags().StringVar(
-		&addStyle, "style", "", "Argument format: boom (-file and -deh) or zdoom (-file)",
+		&addFlags.id, "id", "", "Explicit slug ID for the engine (defaults to slugified name)",
 	)
-	addCmd.Flags().StringVar(&addArgs, "args", "", "Default flags always passed to this engine")
-	addCmd.Flags().StringVar(
-		&addPrefixArgs, "prefix-args", "",
-		"Arguments passed after the engine binary and before -iwad (such as -config /path/to/port.cfg)",
-	)
-	addCmd.Flags().StringVar(&addBadge, "badge", "", "Short badge label for the launcher")
-	addCmd.Flags().StringVar(&addDescription, "description", "", "Description of the engine")
+	addCmd.Flags().StringVar(&addFlags.description, "description", "", "Description of the engine")
 
-	var (
-		setBinary      string
-		setStyle       string
-		setArgs        string
-		setPrefixArgs  string
-		setBadge       string
-		setDisplayName string
-	)
+	var setFlags engineOptionFlags
 	setCmd := &cobra.Command{
 		Use:   "set <name>",
 		Short: "Configure binary path, arguments, or metadata overrides for an engine",
@@ -198,35 +176,35 @@ func newEnginesCmd() *cobra.Command {
 
 			var opts preset.EngineOverrideOptions
 			changed := false
-			if cmd.Flags().Changed("binary") || setBinary != "" {
-				v := setBinary
+			if cmd.Flags().Changed("binary") || setFlags.binary != "" {
+				v := setFlags.binary
 				opts.Binary = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("style") || setStyle != "" {
-				v := setStyle
+			if cmd.Flags().Changed("style") || setFlags.style != "" {
+				v := setFlags.style
 				opts.ArgsStyle = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("args") || setArgs != "" {
-				v := strings.Fields(setArgs)
+			if cmd.Flags().Changed("args") || setFlags.args != "" {
+				v := strings.Fields(setFlags.args)
 				opts.DefaultArgs = &v
 				empty := []string{}
 				opts.AppendArgs = &empty
 				changed = true
 			}
-			if cmd.Flags().Changed("prefix-args") || setPrefixArgs != "" {
-				v := strings.Fields(setPrefixArgs)
+			if cmd.Flags().Changed("prefix-args") || setFlags.prefixArgs != "" {
+				v := strings.Fields(setFlags.prefixArgs)
 				opts.PrefixArgs = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("badge") || setBadge != "" {
-				v := setBadge
+			if cmd.Flags().Changed("badge") || setFlags.badge != "" {
+				v := setFlags.badge
 				opts.Badge = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("display-name") || setDisplayName != "" {
-				v := setDisplayName
+			if cmd.Flags().Changed("display-name") || setFlags.displayName != "" {
+				v := setFlags.displayName
 				opts.DisplayName = &v
 				changed = true
 			}
@@ -246,17 +224,10 @@ func newEnginesCmd() *cobra.Command {
 			return nil
 		},
 	}
-	setCmd.Flags().StringVar(&setBinary, "binary", "", "Override executable binary name or path")
+	bindEngineCommonFlags(setCmd, &setFlags)
 	setCmd.Flags().StringVar(
-		&setStyle, "style", "", "Override argument format: boom (-file and -deh) or zdoom (-file)",
+		&setFlags.displayName, "display-name", "", "Override display name for the engine",
 	)
-	setCmd.Flags().StringVar(&setArgs, "args", "", "Override default flags always passed to this engine")
-	setCmd.Flags().StringVar(
-		&setPrefixArgs, "prefix-args", "",
-		"Arguments passed after the engine binary and before -iwad (such as -config /path/to/port.cfg)",
-	)
-	setCmd.Flags().StringVar(&setBadge, "badge", "", "Override short badge label for the launcher")
-	setCmd.Flags().StringVar(&setDisplayName, "display-name", "", "Override display name for the engine")
 
 	resetCmd := &cobra.Command{
 		Use:   "reset <name>",
@@ -314,13 +285,37 @@ func newEnginesCmd() *cobra.Command {
 	return enginesCmd
 }
 
+type engineOptionFlags struct {
+	id          string
+	binary      string
+	style       string
+	args        string
+	prefixArgs  string
+	badge       string
+	description string
+	displayName string
+}
+
+func bindEngineCommonFlags(cmd *cobra.Command, f *engineOptionFlags) {
+	cmd.Flags().StringVar(&f.binary, "binary", "", "Executable binary name or path")
+	cmd.Flags().StringVar(
+		&f.style, "style", "", "Argument format: boom (-file and -deh) or zdoom (-file)",
+	)
+	cmd.Flags().StringVar(&f.args, "args", "", "Default flags always passed to this engine")
+	cmd.Flags().StringVar(
+		&f.prefixArgs, "prefix-args", "",
+		"Arguments passed after the engine binary and before -iwad (such as -config /path/to/port.cfg)",
+	)
+	cmd.Flags().StringVar(&f.badge, "badge", "", "Short badge label for the launcher")
+}
+
 func newEnginesCfgCmd() *cobra.Command {
 	cfgCmd := &cobra.Command{
 		Use:   "cfg",
 		Short: "Inspect, deploy, or synchronize source port configuration files",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return templates.DiffConfigs(getPaths(), cmdOut(cmd))
+			return templates.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
 		},
 	}
 
@@ -329,7 +324,7 @@ func newEnginesCfgCmd() *cobra.Command {
 		Short: "Deploy curated autoexec.cfg and dsda-doom.cfg to system directories",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return templates.DeployConfigsTo(getPaths(), cmdOut(cmd))
+			return templates.DeployConfigsTo(resolveAppPaths(), cmdOut(cmd))
 		},
 	}
 
@@ -338,7 +333,7 @@ func newEnginesCfgCmd() *cobra.Command {
 		Short: "Compare embedded engine templates against live system configurations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return templates.DiffConfigs(getPaths(), cmdOut(cmd))
+			return templates.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
 		},
 	}
 
@@ -352,19 +347,12 @@ func newEnginesCfgCmd() *cobra.Command {
 			if len(args) > 0 {
 				rootDir = args[0]
 			}
-			return templates.SyncConfigs(getPaths(), rootDir, cmdOut(cmd))
+			return templates.SyncConfigs(resolveAppPaths(), rootDir, cmdOut(cmd))
 		},
 	}
 
 	cfgCmd.AddCommand(installCmd, diffCmd, syncCmd)
 	return cfgCmd
-}
-
-func checkEngineBinary(binary, binDir string) (string, bool) {
-	if resolved, err := engine.ResolveBinary(binary, binDir); err == nil {
-		return resolved, true
-	}
-	return binary, false
 }
 
 func runEnginesList(cmd *cobra.Command, _ []string) error {
@@ -384,9 +372,8 @@ func runEnginesList(cmd *cobra.Command, _ []string) error {
 	for _, k := range keys {
 		eng := cat.Engines[k]
 		binTarget := eng.EffectiveBinary()
-		resolvedPath, found := checkEngineBinary(binTarget, paths.BinDir)
 		status := "[✗ Missing]"
-		if found {
+		if resolvedPath, resolveErr := engine.ResolveBinary(binTarget, paths.BinDir); resolveErr == nil {
 			status = fmt.Sprintf("[✓ Installed: %s]", resolvedPath)
 		}
 		style := eng.EffectiveArgsStyle()

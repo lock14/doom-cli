@@ -255,11 +255,6 @@ func isKnownDoomEFlag(arg string) bool {
 	}
 }
 
-func parseRootLaunchArgs(rawArgs []string) (string, []string) {
-	targetPreset, extraArgs, _, _, _, _ := parseRootInvocation(rawArgs)
-	return targetPreset, extraArgs
-}
-
 func parseRootInvocation(rawArgs []string) (string, []string, string, bool, bool, error) {
 	knownFlagsWithValue := map[string]bool{
 		"--engine": true,
@@ -429,10 +424,6 @@ func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 	return p, cfg, cat, nil
 }
 
-func getPaths() *config.Paths {
-	return resolveAppPaths()
-}
-
 func wadsDirsSource(cfg *config.AppConfig) string {
 	if cfg != nil && len(cfg.WadsDirs) > 0 {
 		return "config"
@@ -453,7 +444,7 @@ func buildLauncherOptions(
 	extraArgs []string,
 	initialMode int,
 ) (tui.Theme, bool, tui.LauncherOptions) {
-	theme := tui.ResolveTheme("", "", cfg.Theme, paths.ThemesDir)
+	theme := tui.ResolveTheme(cfg.Theme, paths.ThemesDir)
 	_, themeSrc := resolveThemeWithSource(cfg)
 	nerdFonts, nfSrc := resolveNerdFontsWithSource(cfg)
 

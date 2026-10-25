@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+func BenchmarkLoadCuratedCatalog(b *testing.B) {
+	b.ReportAllocs()
+	for b.Loop() {
+		cat, err := LoadCuratedCatalog()
+		if err != nil || len(cat.Presets) == 0 {
+			b.Fatalf("LoadCuratedCatalog failed: %v", err)
+		}
+	}
+}
+
 func BenchmarkDecodeText_ASCII(b *testing.B) {
 	sample := []byte("Title: Ancient Aliens\nAuthor: Skillsaw\nEngine: Boom\nDescription: 32 levels of alien megawad.")
 	b.ReportAllocs()

@@ -803,6 +803,7 @@ func (m model) renderLaunchOptionsFooter() string {
 		{"Enter", "Launch"},
 		{"Ctrl+S", "Save"},
 		{"Ctrl+R", "Reset"},
+		{"F1", "Help"},
 		{"Esc", "Back"},
 	}
 	footer := m.styles.FormatKeyHelp(items)

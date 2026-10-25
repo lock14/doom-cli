@@ -188,32 +188,33 @@ func GetSearchRoots() []string {
 	}
 
 	// For any existing Steam directories, look for libraryfolders.vdf
-	var expanded []string
-	seen := make(map[string]bool)
+	var candidates []string
+	for _, r := range roots {
+		candidates = append(candidates, r)
+		vdf := filepath.Join(r, "steamapps", "libraryfolders.vdf")
+		candidates = append(candidates, ParseLibraryFolders(vdf)...)
+	}
 
-	addRoot := func(r string) {
+	return normalizeExistingDirs(candidates)
+}
+
+func normalizeExistingDirs(candidates []string) []string {
+	var existing []string
+	seen := make(map[string]bool)
+	for _, r := range candidates {
 		clean := filepath.Clean(r)
 		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
 			clean = filepath.Clean(resolved)
 		}
 		if seen[clean] {
-			return
+			continue
 		}
 		seen[clean] = true
 		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
-			expanded = append(expanded, clean)
+			existing = append(existing, clean)
 		}
 	}
-
-	for _, r := range roots {
-		addRoot(r)
-		vdf := filepath.Join(r, "steamapps", "libraryfolders.vdf")
-		for _, secondary := range ParseLibraryFolders(vdf) {
-			addRoot(secondary)
-		}
-	}
-
-	return expanded
+	return existing
 }
 
 // DiscoverAndExtract searches for official game files and catalog WADs across search roots
@@ -239,21 +240,7 @@ func DiscoverAndExtract(
 		searchRoots = GetSearchRoots()
 	}
 
-	seenRoots := make(map[string]bool)
-	var existingRoots []string
-	for _, r := range searchRoots {
-		clean := filepath.Clean(r)
-		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
-			clean = filepath.Clean(resolved)
-		}
-		if seenRoots[clean] {
-			continue
-		}
-		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
-			seenRoots[clean] = true
-			existingRoots = append(existingRoots, clean)
-		}
-	}
+	existingRoots := normalizeExistingDirs(searchRoots)
 
 	if len(existingRoots) == 0 {
 		fmt.Fprintf(out, "No Steam or GOG directories found on this system.\n")
