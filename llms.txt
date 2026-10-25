@@ -67,8 +67,10 @@ doom launch "Ancient Aliens" -e dsda-doom -skill 4
 Settings resolve in four-tier precedence order (`CLI flags` take precedence over `DOOM_*` environment variables, which
 take precedence over `config.json`, which takes precedence over platform defaults):
 
-- Global flags: `--engine` (`-e`), `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`, `--presets-file`,
-  `--theme`, `--nerd-fonts`, `--once`, `--dry-run`.
+- Global flags: `--wads-dir`, `--theme`, `--nerd-fonts`.
+- Subcommand flags: `--engine` (`-e`) and `--dry-run` on `doom launch`; `--engine` (`-e`) on `doom presets add` and
+  `doom presets config`; `--force` on `doom setup`, `doom wads fetch`, `doom wads extract`, `doom engines install`, and
+  `doom soundfont install`.
 - Environment variables: `DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`,
   `DOOM_BIN_DIR`, `DOOM_SF_DIR`.
 

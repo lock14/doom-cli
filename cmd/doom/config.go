@@ -58,9 +58,6 @@ func dirSource(flagVal, envKey, cfgVal string) string {
 }
 
 func wadsDirsSource(cfg *config.AppConfig) string {
-	if strings.TrimSpace(flagWadsDirs) != "" {
-		return "flag"
-	}
 	if strings.TrimSpace(os.Getenv("DOOM_WADS_DIRS")) != "" {
 		return "env"
 	}
@@ -147,8 +144,8 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	}
 
 	wadsSrc := dirSource(flagWadsDir, "DOOM_WADS_DIR", cfg.WadsDir)
-	binSrc := dirSource(flagBinDir, "DOOM_BIN_DIR", cfg.BinDir)
-	sfSrc := dirSource(flagSoundFontsDir, "DOOM_SF_DIR", cfg.SoundFontsDir)
+	binSrc := dirSource("", "DOOM_BIN_DIR", cfg.BinDir)
+	sfSrc := dirSource("", "DOOM_SF_DIR", cfg.SoundFontsDir)
 
 	fmt.Fprintln(out, "=== Doom CLI Configuration ===")
 	fmt.Fprintf(out, "  Config File:    %s\n", paths.ConfigFile)

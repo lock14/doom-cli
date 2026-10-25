@@ -445,7 +445,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter":
 				if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
-					m.selected = &m.filtered[m.cursor]
+					cur := m.filtered[m.cursor]
+					if !m.isPresetReady(cur) {
+						m.viewingReadme = false
+						m.statusMsg = fmt.Sprintf("✗ Missing required files for %s (press Ctrl+F to fetch)", cur.Name)
+						return m, nil
+					}
+					m.selected = &cur
 					return m, tea.Quit
 				}
 			}
@@ -488,7 +494,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
-				m.selected = &m.filtered[m.cursor]
+				cur := m.filtered[m.cursor]
+				if !m.isPresetReady(cur) {
+					m.statusMsg = fmt.Sprintf("✗ Missing required files for %s (press Ctrl+F to fetch)", cur.Name)
+					return m, nil
+				}
+				m.selected = &cur
 				return m, tea.Quit
 			}
 
@@ -571,6 +582,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func (m model) isPresetReady(p preset.Preset) bool {
+	return strings.TrimSpace(p.IWAD) != "" && m.dirIndex != nil && m.dirIndex.IsPresetInstalled(p)
+}
+
 func (m *model) updateFiltered(query string) {
 	if m.catalog == nil {
 		m.filtered = nil
@@ -599,11 +614,11 @@ func (m *model) updateFiltered(query string) {
 }
 
 func (m model) View() string {
-	if m.quitting {
-		return "Cancelled.\n"
-	}
 	if m.selected != nil {
 		return fmt.Sprintf("Launching %s...\n", m.selected.Name)
+	}
+	if m.quitting {
+		return "Cancelled.\n"
 	}
 	if m.viewingHelp {
 		return m.renderHelpView()

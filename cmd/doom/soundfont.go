@@ -12,16 +12,17 @@ func newSoundfontCmd() *cobra.Command {
 		Use:   "soundfont",
 		Short: "Manage MIDI SoundFonts for FluidSynth",
 	}
+	var force bool
 	sfInstallCmd := &cobra.Command{
 		Use:   "install",
 		Short: "Download and deploy Roland SC-55 compatible GeneralUser-GS SoundFont",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths := getPaths()
-			_, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, cmdOut(cmd))
+			_, err := wad.InstallSoundFont(paths.SoundFontsDir, force, cmdOut(cmd))
 			return err
 		},
 	}
-	sfInstallCmd.Flags().BoolVar(&flagForce, "force", false, "Re-download and overwrite existing SoundFont")
+	sfInstallCmd.Flags().BoolVar(&force, "force", false, "Re-download and overwrite existing SoundFont")
 	sfCmd.AddCommand(sfInstallCmd)
 	return sfCmd
 }

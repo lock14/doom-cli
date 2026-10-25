@@ -14,6 +14,7 @@ import (
 
 // newSetupCmd creates the turnkey automated setup command.
 func newSetupCmd() *cobra.Command {
+	var force bool
 	setupCmd := &cobra.Command{
 		Use:   "setup",
 		Short: "Complete 1-command setup (engines, soundfont, configs, steam IWADs, and community megawads)",
@@ -42,7 +43,7 @@ func newSetupCmd() *cobra.Command {
 			// 2. Engines
 			fmt.Fprintln(out, ">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
 			installer := engine.NewInstaller(paths.BinDir, out)
-			installer.Force = flagForce
+			installer.Force = force
 			if err := installer.InstallCatalog(cat); err != nil {
 				fmt.Fprintf(errOut, "Warning: engine installer encountered: %v\n", err)
 				failedSteps = append(failedSteps, "engines")
@@ -51,7 +52,7 @@ func newSetupCmd() *cobra.Command {
 
 			// 3. SoundFont
 			fmt.Fprintln(out, ">>> Step 3/5: Installing Roland SC-55 SoundFont...")
-			if _, err := wad.InstallSoundFont(paths.SoundFontsDir, flagForce, out); err != nil {
+			if _, err := wad.InstallSoundFont(paths.SoundFontsDir, force, out); err != nil {
 				fmt.Fprintf(errOut, "Warning: soundfont installer encountered: %v\n", err)
 				failedSteps = append(failedSteps, "soundfont")
 			}
@@ -60,7 +61,7 @@ func newSetupCmd() *cobra.Command {
 			// 4. Steam IWADs
 			fmt.Fprintln(out, ">>> Step 4/5: Auto-discovering official Steam and GOG game files...")
 			if _, err := steam.DiscoverAndExtract(
-				cat, nil, paths.WadsDir, flagForce, out, paths.WadsDirs...,
+				cat, nil, paths.WadsDir, force, out, paths.WadsDirs...,
 			); err != nil {
 				fmt.Fprintf(errOut, "Warning: steam discoverer encountered: %v\n", err)
 				failedSteps = append(failedSteps, "steam extract")
@@ -69,7 +70,7 @@ func newSetupCmd() *cobra.Command {
 
 			// 5. Community megawads
 			fmt.Fprintln(out, ">>> Step 5/5: Downloading community megawads...")
-			dl := wad.NewDownloader(paths.WadRoots(), flagForce, out)
+			dl := wad.NewDownloader(paths.WadRoots(), force, out)
 			if err := dl.DownloadAll(cat); err != nil {
 				fmt.Fprintf(errOut, "Warning: some megawads failed to download: %v\n", err)
 				failedSteps = append(failedSteps, "megawad downloads")
@@ -92,6 +93,6 @@ func newSetupCmd() *cobra.Command {
 			return nil
 		},
 	}
-	setupCmd.Flags().BoolVar(&flagForce, "force", false, "Force re-download and overwrite existing files")
+	setupCmd.Flags().BoolVar(&force, "force", false, "Force re-download and overwrite existing files")
 	return setupCmd
 }

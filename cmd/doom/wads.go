@@ -18,6 +18,7 @@ func newWadsCmd() *cobra.Command {
 		Short: "Manage WADs, megawads, and official expansions",
 	}
 
+	var fetchForce bool
 	wadsFetchCmd := &cobra.Command{
 		Use:   "fetch [preset_name|all]",
 		Short: "Download community megawad files",
@@ -32,7 +33,7 @@ func newWadsCmd() *cobra.Command {
 				target = args[0]
 			}
 
-			dl := wad.NewDownloader(paths.WadRoots(), flagForce, cmdOut(cmd))
+			dl := wad.NewDownloader(paths.WadRoots(), fetchForce, cmdOut(cmd))
 			if strings.EqualFold(target, "all") {
 				return dl.DownloadAll(cat)
 			}
@@ -44,7 +45,7 @@ func newWadsCmd() *cobra.Command {
 			return dl.DownloadPreset(*p)
 		},
 	}
-	wadsFetchCmd.Flags().BoolVar(&flagForce, "force", false, "Re-download and overwrite existing files")
+	wadsFetchCmd.Flags().BoolVar(&fetchForce, "force", false, "Re-download and overwrite existing files")
 
 	wadsListCmd := &cobra.Command{
 		Use:   "list",
@@ -86,6 +87,7 @@ func newWadsCmd() *cobra.Command {
 		},
 	}
 
+	var extractForce bool
 	wadsExtractCmd := &cobra.Command{
 		Use:   "extract",
 		Short: "Auto-discover and copy official IWADs and expansions from Steam and GOG",
@@ -95,12 +97,12 @@ func newWadsCmd() *cobra.Command {
 				return err
 			}
 			_, err = steam.DiscoverAndExtract(
-				cat, nil, paths.WadsDir, flagForce, cmdOut(cmd), paths.WadsDirs...,
+				cat, nil, paths.WadsDir, extractForce, cmdOut(cmd), paths.WadsDirs...,
 			)
 			return err
 		},
 	}
-	wadsExtractCmd.Flags().BoolVar(&flagForce, "force", false, "Overwrite existing files in destination")
+	wadsExtractCmd.Flags().BoolVar(&extractForce, "force", false, "Overwrite existing files in destination")
 
 	wadsCmd.AddCommand(wadsFetchCmd, wadsListCmd, wadsExtractCmd)
 	return wadsCmd

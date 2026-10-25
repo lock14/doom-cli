@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -28,15 +30,15 @@ func TestExtractEngineArgs(t *testing.T) {
 			expected:   []string{"-nomonsters", "-fast"},
 		},
 		{
-			name:       "play with --once and --dry-run flags",
+			name:       "play with trailing dash-dash and no extra args",
 			subcommand: "play",
-			rawArgs:    []string{"doom", "play", "--once", "--dry-run", "-fast"},
-			expected:   []string{"-fast"},
+			rawArgs:    []string{"doom", "play", "--"},
+			expected:   nil,
 		},
 		{
-			name:       "play with known flags and values",
+			name:       "play with --wads-dir flag",
 			subcommand: "play",
-			rawArgs:    []string{"doom", "play", "--engine", "dsda-doom", "--wads-dir", "/tmp/wads", "-skill", "4"},
+			rawArgs:    []string{"doom", "play", "--wads-dir", "/tmp/wads", "-skill", "4"},
 			expected:   []string{"-skill", "4"},
 		},
 		{
@@ -44,6 +46,18 @@ func TestExtractEngineArgs(t *testing.T) {
 			subcommand: "launch",
 			rawArgs:    []string{"doom", "launch", "Eviternity II", "-fast"},
 			expected:   []string{"-fast"},
+		},
+		{
+			name:       "launch with --engine, -e, and --dry-run flags",
+			subcommand: "launch",
+			rawArgs:    []string{"doom", "launch", "--dry-run", "-e", "uzdoom", "Eviternity II", "-skill", "4"},
+			expected:   []string{"-skill", "4"},
+		},
+		{
+			name:       "launch with global --wads-dir value named launch before subcommand",
+			subcommand: "launch",
+			rawArgs:    []string{"doom", "--wads-dir", "launch", "launch", "Eviternity II", "-skill", "4"},
+			expected:   []string{"-skill", "4"},
 		},
 		{
 			name:       "bare doom without extra args",
@@ -76,15 +90,9 @@ func TestExtractEngineArgs(t *testing.T) {
 			expected:   []string{"-fast"},
 		},
 		{
-			name:       "play with --soundfonts-dir= flag syntax",
+			name:       "play with --wads-dir= flag syntax",
 			subcommand: "play",
-			rawArgs:    []string{"doom", "play", "--soundfonts-dir=/tmp/sf", "-fast"},
-			expected:   []string{"-fast"},
-		},
-		{
-			name:       "play with --bin-dir= and --wads-dir= flag syntax",
-			subcommand: "play",
-			rawArgs:    []string{"doom", "play", "--bin-dir=/tmp/bin", "--wads-dir=/tmp/wads", "-skill", "4"},
+			rawArgs:    []string{"doom", "play", "--wads-dir=/tmp/wads", "-skill", "4"},
 			expected:   []string{"-skill", "4"},
 		},
 		{
@@ -92,6 +100,18 @@ func TestExtractEngineArgs(t *testing.T) {
 			subcommand: "play",
 			rawArgs:    []string{"doom", "-fast"},
 			expected:   []string{"-fast"},
+		},
+		{
+			name:       "bare doom with engine arg value named play",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "-record", "play"},
+			expected:   []string{"-record", "play"},
+		},
+		{
+			name:       "bare doom with --wads-dir value named play",
+			subcommand: "play",
+			rawArgs:    []string{"doom", "--wads-dir", "play", "-skill", "4"},
+			expected:   []string{"-skill", "4"},
 		},
 		{
 			name:       "bare doom with known flags and engine args",
@@ -118,36 +138,6 @@ func TestExtractEngineArgs(t *testing.T) {
 				t.Errorf("extractEngineArgs(%q, %v) = %v, expected %v",
 					tt.subcommand, tt.rawArgs, result, tt.expected)
 			}
-		})
-	}
-}
-
-func TestWaitForEnter(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		input string
-	}{
-		{
-			name:  "newline immediately unblocks",
-			input: "\n",
-		},
-		{
-			name:  "text with newline",
-			input: "hello\n",
-		},
-		{
-			name:  "empty input / EOF unblocks without panic",
-			input: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			reader := strings.NewReader(tt.input)
-			waitForEnter(reader)
 		})
 	}
 }
@@ -376,13 +366,13 @@ func TestGetPathsMalformedConfigPreservesFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	customBin := filepath.Join(tempDir, "custom-bin")
-	flagBinDir = customBin
-	defer func() { flagBinDir = "" }()
+	customWads := filepath.Join(tempDir, "custom-wads")
+	flagWadsDir = customWads
+	defer func() { flagWadsDir = "" }()
 
 	got := getPaths()
-	if got.BinDir != customBin {
-		t.Errorf("getPaths().BinDir = %q, want %q even on malformed config", got.BinDir, customBin)
+	if got.WadsDir != customWads {
+		t.Errorf("getPaths().WadsDir = %q, want %q even on malformed config", got.WadsDir, customWads)
 	}
 }
 
@@ -447,11 +437,16 @@ func TestNewRootCmd(t *testing.T) {
 	}
 
 	// Verify persistent flags
-	for _, flag := range []string{
-		"engine", "wads-dir", "wads-dirs", "bin-dir", "dry-run", "presets-file", "theme", "nerd-fonts",
-	} {
+	for _, flag := range []string{"wads-dir", "theme", "nerd-fonts"} {
 		if cmd.PersistentFlags().Lookup(flag) == nil {
 			t.Errorf("expected persistent flag %q on root command", flag)
+		}
+	}
+	for _, removed := range []string{
+		"engine", "wads-dirs", "bin-dir", "soundfonts-dir", "dry-run", "presets-file", "once", "force",
+	} {
+		if cmd.PersistentFlags().Lookup(removed) != nil || cmd.Flags().Lookup(removed) != nil {
+			t.Errorf("expected flag %q to be removed from root command", removed)
 		}
 	}
 	if !cmd.FParseErrWhitelist.UnknownFlags {
@@ -459,20 +454,19 @@ func TestNewRootCmd(t *testing.T) {
 	}
 
 	// Verify bare `doom -skill 4` routes to rootCmd and passes argument validation
-	targetCmd, flags, findErr := cmd.Find([]string{"--dry-run", "-skill", "4"})
+	targetCmd, flags, findErr := cmd.Find([]string{"-skill", "4"})
 	if findErr != nil {
-		t.Fatalf("cmd.Find([--dry-run -skill 4]) unexpected error: %v", findErr)
+		t.Fatalf("cmd.Find([-skill 4]) unexpected error: %v", findErr)
 	}
 	if targetCmd != cmd {
 		t.Fatalf("expected rootCmd to be matched for bare engine flags, got %q", targetCmd.Name())
 	}
 	if err := targetCmd.ParseFlags(flags); err != nil {
-		t.Fatalf("targetCmd.ParseFlags([--dry-run -skill 4]) unexpected error: %v", err)
+		t.Fatalf("targetCmd.ParseFlags([-skill 4]) unexpected error: %v", err)
 	}
 	if err := targetCmd.ValidateArgs(targetCmd.Flags().Args()); err != nil {
 		t.Fatalf("targetCmd.ValidateArgs([4]) unexpected error: %v", err)
 	}
-	flagDryRun = false
 }
 
 func TestEnginesCommands(t *testing.T) {
@@ -494,7 +488,11 @@ func TestEnginesCommands(t *testing.T) {
 	// 2. engines add
 	enginesCmd = newEnginesCmd()
 	enginesCmd.SetArgs([]string{
-		"add", "woof", "--binary", "woof", "--style", "boom", "--description", "Woof MBF21",
+		"add", "woof",
+		"--binary", "woof",
+		"--style", "boom",
+		"--prefix-args", "flatpak run org.doom.Woof",
+		"--description", "Woof MBF21",
 	})
 	if err := enginesCmd.Execute(); err != nil {
 		t.Fatalf("engines add failed: %v", err)
@@ -505,33 +503,29 @@ func TestEnginesCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadAppState failed: %v", err)
 	}
-	if eng, ok := cat.Engines["woof"]; !ok || eng.ID != "woof" {
-		t.Fatalf("expected woof in cat.Engines, got %+v", cat.Engines)
+	if eng, ok := cat.Engines["woof"]; !ok || eng.ID != "woof" ||
+		!reflect.DeepEqual(eng.PrefixArgs, []string{"flatpak", "run", "org.doom.Woof"}) {
+		t.Fatalf("expected woof in cat.Engines with prefix_args, got %+v", cat.Engines)
 	}
 
 	// 2b. engines config on built-in dsda-doom across multiple calls, clearing fields, and reset
 	enginesCmd = newEnginesCmd()
 	enginesCmd.SetArgs([]string{
-		"config", "dsda-doom", "--binary", "/custom/dsda-doom", "--badge", "DSDA+", "--default-args", "-fast",
+		"config", "dsda-doom", "--binary", "/custom/dsda-doom", "--badge", "DSDA+", "--args", "-fast -nomonsters",
 	})
 	if err := enginesCmd.Execute(); err != nil {
 		t.Fatalf("engines config dsda-doom failed: %v", err)
-	}
-	enginesCmd = newEnginesCmd()
-	enginesCmd.SetArgs([]string{"config", "dsda-doom", "--append-arg", "-nomonsters"})
-	if err := enginesCmd.Execute(); err != nil {
-		t.Fatalf("engines config dsda-doom --append-arg failed: %v", err)
 	}
 	_, _, cat, _ = loadAppState()
 	eng, ok := cat.FindEngine("dsda-doom")
 	if !ok || eng.Binary != "/custom/dsda-doom" || eng.Badge != "DSDA+" ||
 		!reflect.DeepEqual(eng.DefaultArgs, []string{"-fast", "-nomonsters"}) {
-		t.Fatalf("expected overridden dsda-doom with combined args, got %+v", eng)
+		t.Fatalf("expected overridden dsda-doom with args, got %+v", eng)
 	}
 
-	// Clear badge and default-args back to empty via CLI flags
+	// Clear badge and args back to empty via CLI flags
 	enginesCmd = newEnginesCmd()
-	enginesCmd.SetArgs([]string{"config", "dsda-doom", "--badge", "", "--default-args", "", "--append-arg", ""})
+	enginesCmd.SetArgs([]string{"config", "dsda-doom", "--badge", "", "--args", ""})
 	if err := enginesCmd.Execute(); err != nil {
 		t.Fatalf("engines config clear flags failed: %v", err)
 	}
@@ -604,7 +598,7 @@ func TestPresetsCommands(t *testing.T) {
 	// 3. presets add custom with a custom engine that has DisplayName but no Description
 	enginesCmd := newEnginesCmd()
 	enginesCmd.SetArgs([]string{
-		"add", "woof", "--binary", "woof", "--style", "boom", "--display-name", "Woof!",
+		"add", "Woof!", "--id", "woof", "--binary", "woof", "--style", "boom",
 	})
 	if err := enginesCmd.Execute(); err != nil {
 		t.Fatalf("engines add woof failed: %v", err)
@@ -613,7 +607,7 @@ func TestPresetsCommands(t *testing.T) {
 	presetsCmd = newPresetsCmd()
 	presetsCmd.SetArgs([]string{
 		"add", "CustomMap",
-		"--engine", "woof",
+		"-e", "woof",
 		"--iwad", "DOOM2.WAD",
 		"--files", "custom.wad",
 		"--description", "My Custom Map",
@@ -636,9 +630,9 @@ func TestPresetsCommands(t *testing.T) {
 
 	// 5. presets config across multiple calls preserves prior fields
 	presetsCmd = newPresetsCmd()
-	presetsCmd.SetArgs([]string{"config", "Sunlust", "--engine", "uzdoom"})
+	presetsCmd.SetArgs([]string{"config", "Sunlust", "-e", "uzdoom"})
 	if err := presetsCmd.Execute(); err != nil {
-		t.Fatalf("presets config --engine failed: %v", err)
+		t.Fatalf("presets config -e failed: %v", err)
 	}
 	presetsCmd = newPresetsCmd()
 	presetsCmd.SetArgs([]string{"config", "Sunlust", "--args", "-skill 4"})
@@ -805,6 +799,7 @@ func TestConfigFourTierHierarchyAndCustomThemesList(t *testing.T) {
 
 	// Override via env vars
 	t.Setenv("DOOM_WADS_DIR", "/env/wads")
+	t.Setenv("DOOM_WADS_DIRS", "/env/extra1,/env/extra2")
 	t.Setenv("DOOM_THEME", "plasma")
 	t.Setenv("DOOM_NERD_FONTS", "true")
 
@@ -832,10 +827,8 @@ func TestConfigFourTierHierarchyAndCustomThemesList(t *testing.T) {
 
 	// Override via flag
 	flagWadsDir = "/flag/wads"
-	flagWadsDirs = "/flag/extra1,/flag/extra2"
 	defer func() {
 		flagWadsDir = ""
-		flagWadsDirs = ""
 	}()
 
 	out.Reset()
@@ -850,7 +843,7 @@ func TestConfigFourTierHierarchyAndCustomThemesList(t *testing.T) {
 		"Theme:          plasma (env)",
 		"Nerd Fonts:     enabled (Powerlevel10k rounded capsules) (env)",
 		"WADs Dir:       /flag/wads (flag)",
-		"WADs Dirs:      /flag/extra1, /flag/extra2 (flag)",
+		"WADs Dirs:      /env/extra1, /env/extra2 (env)",
 	} {
 		if !strings.Contains(showStr, want) {
 			t.Errorf("expected config show to contain %q, got:\n%s", want, showStr)
@@ -940,5 +933,232 @@ func TestSetupCommandPartialFailure(t *testing.T) {
 	}
 	if !strings.Contains(outBuf.String(), "! Doom setup finished with errors in: soundfont") {
 		t.Errorf("expected stdout to contain partial failure summary, got:\n%s", outBuf.String())
+	}
+}
+
+func TestSubcommandFlagScoping(t *testing.T) {
+	t.Parallel()
+
+	// 1. play command has no local --once, --dry-run, or --engine flags
+	playCmd := newPlayCmd()
+	for _, f := range []string{"once", "dry-run", "engine"} {
+		if playCmd.Flags().Lookup(f) != nil {
+			t.Errorf("expected playCmd not to have local flag %q", f)
+		}
+	}
+
+	// 2. launch command has local --engine (-e) and --dry-run flags
+	launchCmd := newLaunchCmd()
+	engFlag := launchCmd.Flags().Lookup("engine")
+	if engFlag == nil || engFlag.Shorthand != "e" {
+		t.Errorf("expected launchCmd to have --engine (-e), got %+v", engFlag)
+	}
+	if launchCmd.Flags().Lookup("dry-run") == nil {
+		t.Error("expected launchCmd to have --dry-run flag")
+	}
+
+	// 3. engines add and engines config flags
+	enginesCmd := newEnginesCmd()
+	addEngCmd, _, err := enginesCmd.Find([]string{"add"})
+	if err != nil {
+		t.Fatalf("enginesCmd.Find(add): %v", err)
+	}
+	for _, want := range []string{"id", "binary", "style", "args", "prefix-args", "badge", "description"} {
+		if addEngCmd.Flags().Lookup(want) == nil {
+			t.Errorf("expected engines add to have flag %q", want)
+		}
+	}
+	for _, removed := range []string{"family", "display-name"} {
+		if addEngCmd.Flags().Lookup(removed) != nil {
+			t.Errorf("expected engines add not to have removed flag %q", removed)
+		}
+	}
+
+	cfgEngCmd, _, err := enginesCmd.Find([]string{"config"})
+	if err != nil {
+		t.Fatalf("enginesCmd.Find(config): %v", err)
+	}
+	for _, want := range []string{"binary", "style", "args", "prefix-args", "badge", "display-name", "reset"} {
+		if cfgEngCmd.Flags().Lookup(want) == nil {
+			t.Errorf("expected engines config to have flag %q", want)
+		}
+	}
+	for _, removed := range []string{"default-args", "append-arg"} {
+		if cfgEngCmd.Flags().Lookup(removed) != nil {
+			t.Errorf("expected engines config not to have removed flag %q", removed)
+		}
+	}
+
+	// 4. presets add and presets config flags
+	presetsCmd := newPresetsCmd()
+	addPreCmd, _, err := presetsCmd.Find([]string{"add"})
+	if err != nil {
+		t.Fatalf("presetsCmd.Find(add): %v", err)
+	}
+	for _, want := range []string{"id", "engine", "iwad", "files", "args", "description"} {
+		if addPreCmd.Flags().Lookup(want) == nil {
+			t.Errorf("expected presets add to have flag %q", want)
+		}
+	}
+	if f := addPreCmd.Flags().Lookup("engine"); f == nil || f.Shorthand != "e" {
+		t.Errorf("expected presets add --engine to have shorthand 'e', got %+v", f)
+	}
+	for _, removed := range []string{
+		"source-url", "source-sha256", "optional-files", "category", "author", "release",
+	} {
+		if addPreCmd.Flags().Lookup(removed) != nil {
+			t.Errorf("expected presets add not to have removed flag %q", removed)
+		}
+	}
+
+	cfgPreCmd, _, err := presetsCmd.Find([]string{"config"})
+	if err != nil {
+		t.Fatalf("presetsCmd.Find(config): %v", err)
+	}
+	if f := cfgPreCmd.Flags().Lookup("engine"); f == nil || f.Shorthand != "e" {
+		t.Errorf("expected presets config --engine to have shorthand 'e', got %+v", f)
+	}
+
+	// 5. --force is scoped locally to setup, wads fetch, wads extract, engines install, and soundfont install
+	setupCmd := newSetupCmd()
+	if setupCmd.Flags().Lookup("force") == nil {
+		t.Error("expected setupCmd to have local --force flag")
+	}
+	wadsCmd := newWadsCmd()
+	for _, sub := range []string{"fetch", "extract"} {
+		subCmd, _, findErr := wadsCmd.Find([]string{sub})
+		if findErr != nil {
+			t.Fatalf("wadsCmd.Find(%s): %v", sub, findErr)
+		}
+		if subCmd.Flags().Lookup("force") == nil {
+			t.Errorf("expected wads %s to have local --force flag", sub)
+		}
+	}
+	instEngCmd, _, err := enginesCmd.Find([]string{"install"})
+	if err != nil {
+		t.Fatalf("enginesCmd.Find(install): %v", err)
+	}
+	if instEngCmd.Flags().Lookup("force") == nil {
+		t.Error("expected engines install to have local --force flag")
+	}
+	sfCmd := newSoundfontCmd()
+	instSfCmd, _, err := sfCmd.Find([]string{"install"})
+	if err != nil {
+		t.Fatalf("sfCmd.Find(install): %v", err)
+	}
+	if instSfCmd.Flags().Lookup("force") == nil {
+		t.Error("expected soundfont install to have local --force flag")
+	}
+	if playCmd.Flags().Lookup("force") != nil || launchCmd.Flags().Lookup("force") != nil {
+		t.Error("expected playCmd and launchCmd not to have --force flag")
+	}
+}
+
+func TestLaunchCommandDryRunAndEngineOverride(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	t.Setenv("DOOM_BIN_DIR", tempDir)
+	t.Setenv("DOOM_WADS_DIR", tempDir)
+
+	if err := os.WriteFile(filepath.Join(tempDir, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, binName := range []string{"uzdoom", "uzdoom.exe"} {
+		if err := os.WriteFile(filepath.Join(tempDir, binName), []byte("bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var out bytes.Buffer
+	launchCmd := newLaunchCmd()
+	launchCmd.SetOut(&out)
+	launchCmd.SetArgs([]string{"--dry-run", "-e", "uzdoom", "Doom II"})
+	if err := launchCmd.Execute(); err != nil {
+		t.Fatalf("launch --dry-run -e uzdoom failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "uzdoom") || !strings.Contains(out.String(), "DOOM2.WAD") {
+		t.Errorf("expected dry-run output to contain uzdoom and DOOM2.WAD, got:\n%s", out.String())
+	}
+}
+
+func TestRunPlaySingleShot(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	t.Setenv("DOOM_BIN_DIR", tempDir)
+	t.Setenv("DOOM_WADS_DIR", tempDir)
+	t.Setenv("PATH", tempDir)
+
+	origArgs := os.Args
+	os.Args = []string{"doom", "play"}
+	defer func() { os.Args = origArgs }()
+
+	origStdin := os.Stdin
+	defer func() { os.Stdin = origStdin }()
+
+	// 1. Quitting immediately via 'q' in non-TTY numbered menu returns nil
+	rQuit, wQuit, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = wQuit.WriteString("q\n")
+	_ = wQuit.Close()
+	os.Stdin = rQuit
+	if err := runPlay(newPlayCmd(), nil); err != nil {
+		t.Fatalf("runPlay on quit returned unexpected error: %v", err)
+	}
+	_ = rQuit.Close()
+
+	if runtime.GOOS == "windows" {
+		return
+	}
+
+	// 2. Selecting a preset executes the engine once and exits immediately without looping
+	if err := os.WriteFile(filepath.Join(tempDir, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(tempDir, "launches.log")
+	script := "#!/bin/sh\necho launched >> \"" + logPath + "\"\nexit 0\n"
+	if err := os.WriteFile(filepath.Join(tempDir, "dsda-doom"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, cat, err := loadAppState()
+	if err != nil {
+		t.Fatalf("loadAppState: %v", err)
+	}
+	doom2Idx := -1
+	for i, p := range cat.Presets {
+		if p.ID == "doom-ii" {
+			doom2Idx = i + 1
+			break
+		}
+	}
+	if doom2Idx == -1 {
+		t.Fatal("doom-ii preset not found in catalog")
+	}
+
+	rPlay, wPlay, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Provide multiple selections on stdin to verify runPlay only consumes one and does not loop
+	_, _ = fmt.Fprintf(wPlay, "%d\n\n%d\n", doom2Idx, doom2Idx)
+	_ = wPlay.Close()
+	os.Stdin = rPlay
+	defer func() { _ = rPlay.Close() }()
+
+	if err := runPlay(newPlayCmd(), nil); err != nil {
+		t.Fatalf("runPlay single-shot execution failed: %v", err)
+	}
+
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("expected fake engine to write %s: %v", logPath, err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) != 1 || lines[0] != "launched" {
+		t.Errorf("expected exactly 1 engine launch in single-shot mode, got %d (%v)", len(lines), lines)
 	}
 }

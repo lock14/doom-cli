@@ -78,11 +78,55 @@ func TestModel_Navigation(t *testing.T) {
 		t.Errorf("expected cursor 1 after Down, got %d", m.cursor)
 	}
 
-	// Enter key
+	// Enter key with missing required WADs stays in TUI and sets status message
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if m.selected != nil {
+		t.Fatalf("expected nil selected when required WADs are missing, got: %v", m.selected)
+	}
+	wantStatus := "✗ Missing required files for Eviternity II (press Ctrl+F to fetch)"
+	if m.statusMsg != wantStatus {
+		t.Errorf("statusMsg = %q, want %q", m.statusMsg, wantStatus)
+	}
+
+	// Enter key in README Viewer with missing required WADs closes README Viewer and sets status message
+	m.viewingReadme = true
+	m.statusMsg = ""
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if m.viewingReadme || m.selected != nil || m.statusMsg != wantStatus {
+		t.Fatalf(
+			"expected README Enter with missing WADs to return to browser with status %q, "+
+				"got viewingReadme=%v selected=%v statusMsg=%q",
+			wantStatus, m.viewingReadme, m.selected, m.statusMsg,
+		)
+	}
+
+	// Provide required WADs on disk; first verify empty IWAD is still blocked by isPresetReady
+	wadsDir := t.TempDir()
+	for _, fname := range []string{"doom2.wad", "eviternityii.wad"} {
+		if err := os.WriteFile(filepath.Join(wadsDir, fname), []byte("WAD"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m.dirIndex = preset.NewDirIndex(wadsDir).WithCatalog(cat)
+
+	savedIWAD := m.filtered[m.cursor].IWAD
+	m.filtered[m.cursor].IWAD = ""
+	m.statusMsg = ""
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if m.selected != nil || m.statusMsg != wantStatus {
+		t.Fatalf("expected empty IWAD preset to be blocked on Enter with status %q, got selected=%v statusMsg=%q",
+			wantStatus, m.selected, m.statusMsg)
+	}
+	m.filtered[m.cursor].IWAD = savedIWAD
+
+	// With valid IWAD and PWADs present, Enter selects the preset
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = newM.(model)
 	if m.selected == nil || m.selected.Name != "Eviternity II" {
-		t.Fatalf("expected 'Eviternity II' selected, got: %v", m.selected)
+		t.Fatalf("expected 'Eviternity II' selected when WADs present, got: %v", m.selected)
 	}
 }
 
@@ -260,8 +304,12 @@ func TestModel_View_QuittingAndSelected(t *testing.T) {
 		t.Errorf("expected 'Cancelled.', got %q", view)
 	}
 
-	m.quitting = false
 	m.selected = &cat.Presets[0]
+	if view := m.View(); !strings.Contains(view, "Launching Alien Vendetta") {
+		t.Errorf("expected 'Launching Alien Vendetta' when selected and quitting, got %q", view)
+	}
+
+	m.quitting = false
 	if view := m.View(); !strings.Contains(view, "Launching Alien Vendetta") {
 		t.Errorf("expected 'Launching Alien Vendetta', got %q", view)
 	}
@@ -1222,14 +1270,40 @@ func TestModel_LaunchOptionsView_EphemeralAndPersistent(t *testing.T) {
 		t.Errorf("expected override removed after Ctrl+R, got %+v", ovAfter)
 	}
 
-	// Ephemeral launch via Enter
+	// Ephemeral launch via Enter when DOOM2.WAD is missing stays in TUI and returns to browser with error status
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if m.quitting || m.selected != nil || m.viewingLaunchOpts {
+		t.Fatalf(
+			"expected Enter in Launch Options with missing IWAD to return to browser without quitting, "+
+				"got quitting=%v selected=%v viewingLaunchOpts=%v",
+			m.quitting, m.selected, m.viewingLaunchOpts,
+		)
+	}
+	wantStatus := "✗ Missing required files for Doom II (press Ctrl+F to fetch)"
+	if m.statusMsg != wantStatus {
+		t.Errorf("statusMsg = %q, want %q", m.statusMsg, wantStatus)
+	}
+
+	// Provide DOOM2.WAD (while optional idkfa 2024.wad remains absent) and launch from Launch Options
+	wadsDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m.dirIndex = preset.NewDirIndex(wadsDir).WithCatalog(cat)
+
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = newM.(model)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = newM.(model)
 	if !m.quitting || m.selected == nil {
-		t.Fatal("expected Enter in Launch Options to select preset and quit")
+		t.Fatal("expected Enter in Launch Options with DOOM2.WAD present to select preset and quit")
 	}
 	if !m.selected.EngineOverridden {
 		t.Error("expected selected.EngineOverridden == true from Launch Options")
+	}
+	if gotView := m.View(); gotView != "Launching Doom II...\n" {
+		t.Errorf("View() after Launch Options Enter = %q, want %q", gotView, "Launching Doom II...\n")
 	}
 }
 
