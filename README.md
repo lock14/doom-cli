@@ -21,12 +21,9 @@ Linux, macOS, and Windows.
 - [CLI command reference](#cli-command-reference)
   - [Core commands](#core-commands)
   - [Global CLI flags](#global-cli-flags)
+  - [WADs and preset management](#wads-and-preset-management)
   - [Engine management](#engine-management)
-  - [Preset and custom WAD management](#preset-and-custom-wad-management)
-  - [WADs and expansion management](#wads-and-expansion-management)
-  - [SoundFont management](#soundfont-management)
-  - [Configuration management](#configuration-management)
-  - [Themes and styling](#themes-and-styling)
+  - [Configuration and theme management](#configuration-and-theme-management)
   - [Shell autocompletion](#shell-autocompletion)
 - [Interactive TUI launcher](#interactive-tui-launcher)
   - [Main preset browser controls](#main-preset-browser-controls)
@@ -70,8 +67,9 @@ make install
 # 2. Run turnkey setup (downloads engines, configs, soundfont, Steam IWADs, and megawads)
 doom setup
 
-# 3. Launch the interactive preset browser
-doom play
+# 3. Play The Ultimate Doom immediately, or open the interactive WAD browser
+doom
+doom wads
 ```
 
 ## Installation
@@ -136,26 +134,28 @@ doom setup
 
 ## CLI command reference
 
-The `doom` CLI provides modular commands for granular management:
+The `doom` CLI is organized around five primary commands:
 
 ### Core commands
 
 | Command | Description |
 | :--- | :--- |
-| `doom [flags]` or `doom play [flags]` | Launches the TUI and forwards engine flags (`doom -skill 4`) to the port |
-| `doom play --theme <name>` | Runs the TUI with a specific color theme for the current session |
-| `doom play --nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
-| `doom launch <preset> [flags]` | Directly launches a preset by ID, name, or prefix with optional engine flags |
-| `doom launch <preset> -e <engine>` | Launches a preset with an explicit engine override (`--engine` or `-e`) |
-| `doom launch <preset> --dry-run` | Prints the synthesized launch command without starting the game |
+| `doom [wad] [flags]` | Directly launches a WAD preset (defaults to *The Ultimate Doom* when `<wad>` is omitted) |
+| `doom [wad] -e <engine>` | Launches a WAD preset with an explicit engine override (`--engine` or `-e`) |
+| `doom [wad] --dry-run` | Prints the synthesized launch command without starting the game |
+| `doom wads [flags]` | Launches the interactive TUI WAD browser and forwards engine flags (`doom wads -skill 4`) |
+| `doom wads --theme <name>` | Runs the interactive TUI browser with a specific color theme for the current session |
+| `doom wads --nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
+| `doom engines` | Opens the interactive TUI engine manager (or lists engines when piped on non-TTY stdout) |
+| `doom config` | Opens the interactive TUI CLI settings editor (or displays settings on non-TTY stdout) |
 | `doom setup` | Runs turnkey installation of engines, configurations, SoundFonts, and game files |
 | `doom setup --force` | Re-downloads and overwrites existing engines, SoundFonts, and game files during setup |
 
 ### Global CLI flags
 
 Global flags (`--wads-dir`, `--theme`, and `--nerd-fonts`) apply across commands and take precedence over `DOOM_*`
-environment variables, `config.json` settings, and platform defaults. Unknown flags passed to `doom`, `doom play`, or
-`doom launch` (such as `-skill 4` or `-warp 15`) are forwarded directly to the target source port engine:
+environment variables, `config.json` settings, and platform defaults. Unknown flags passed to `doom [wad]` or
+`doom wads` (such as `-skill 4` or `-warp 15`) are forwarded directly to the target source port engine:
 
 | Flag | Description |
 | :--- | :--- |
@@ -163,64 +163,48 @@ environment variables, `config.json` settings, and platform defaults. Unknown fl
 | `--theme <name>` | Sets the launcher color theme for the current session |
 | `--nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
 
+### WADs and preset management
+
+| Command | Description |
+| :--- | :--- |
+| `doom wads` | Opens the interactive TUI WAD browser powered by Bubble Tea |
+| `doom wads list` | Lists presets with badges and readiness (`[✓ Ready]` or `[✗ Missing]`) |
+| `doom wads show <name>` | Displays resolved engine, IWAD, PWADs, `Launch Cmd:` preview, sources, links, and status |
+| `doom wads fetch [name\|all]` | Downloads and extracts community megawads from idgames mirrors |
+| `doom wads fetch --force` | Re-downloads and overwrites existing WAD files |
+| `doom wads scan` | Imports Steam and GOG IWADs and expansions, and synthesizes `idkfa 2024.wad` from `extras.wad` |
+| `doom wads scan --force` | Re-extracts and overwrites existing IWADs and expansions in the destination directory |
+| `doom wads add <name> [flags]` | Registers a custom WAD or mapset preset in `catalog.d/preset.<id>.json` |
+| `doom wads set <name> [flags]` | Sets per-WAD overrides in `catalog.d/override.preset.<id>.json` |
+| `doom wads reset <name>` | Clears custom launch overrides, reverting to curated defaults |
+| `doom wads remove <name>` | Removes a custom preset or clears overrides for a built-in preset |
+| `doom wads lint [root]` | Validates curated and user catalog entities and schema invariants |
+
 ### Engine management
 
 | Command | Description |
 | :--- | :--- |
-| `doom engines` or `doom engines list` | Lists all configured engines (built-in and custom) with binary status |
+| `doom engines` | Opens the interactive TUI engine manager (or lists engines on non-TTY stdout) |
+| `doom engines list` | Lists all configured engines (built-in and custom) with binary status |
+| `doom engines install [engine\|all]` | Installs portable binaries (`uzdoom`, `dsda-doom`), `.cfg` templates, and SC-55 SoundFont |
+| `doom engines install --force` | Re-downloads and overwrites existing engine binaries and SoundFont files |
 | `doom engines add <name> [flags]` | Registers a custom source port engine in `catalog.d/engine.<id>.json` |
-| `doom engines config <name> [flags]` | Sets per-engine overrides in `catalog.d/override.engine.<id>.json` |
-| `doom engines config <name> --reset` | Clears custom engine overrides, reverting to base engine defaults |
+| `doom engines set <name> [flags]` | Sets per-engine overrides in `catalog.d/override.engine.<id>.json` |
+| `doom engines reset <name>` | Clears custom engine overrides, reverting to base engine defaults |
 | `doom engines remove <name>` | Removes a custom engine from your user catalog |
-| `doom engines install [engine\|all]` | Downloads and installs portable binaries for `uzdoom` and `dsda-doom` |
-| `doom engines install --force` | Re-downloads and overwrites existing engine binaries |
+| `doom engines cfg [diff]` | Shows differences between repository templates and live installed configurations |
+| `doom engines cfg install` | Deploys source port configuration files with display auto-detection and backups |
 
-### Preset and custom WAD management
-
-| Command | Description |
-| :--- | :--- |
-| `doom presets` or `doom presets list` | Lists presets with badges and readiness (`[✓ Ready]` or `[✗ Missing]`) |
-| `doom presets show <name>` | Displays resolved engine, IWAD, PWADs, sources, links, and file status |
-| `doom presets add <name> [flags]` | Registers a custom WAD or mapset preset in `catalog.d/preset.<id>.json` |
-| `doom presets config <name> [flags]` | Sets per-WAD overrides in `catalog.d/override.preset.<id>.json` |
-| `doom presets config <name> --reset` | Clears custom launch overrides, reverting to curated defaults |
-| `doom presets remove <name>` | Removes a custom preset or clears overrides for a built-in preset |
-| `doom presets lint` | Validates curated and user catalog entities and schema invariants |
-
-### WADs and expansion management
+### Configuration and theme management
 
 | Command | Description |
 | :--- | :--- |
-| `doom wads list` | Lists downloadable megawads and files with readiness (`[✓ Found: ...]` or `[✗ Missing]`) |
-| `doom wads fetch [preset\|all]` | Downloads and extracts community megawads from idgames mirrors |
-| `doom wads fetch --force` | Re-downloads and overwrites existing WAD files |
-| `doom wads extract` | Imports Steam and GOG IWADs and expansions, and synthesizes `idkfa 2024.wad` from `extras.wad` |
-| `doom wads extract --force` | Re-extracts and overwrites existing IWADs and expansions in the destination directory |
-
-### SoundFont management
-
-| Command | Description |
-| :--- | :--- |
-| `doom soundfont install` | Downloads and deploys the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) |
-| `doom soundfont install --force` | Re-downloads and overwrites an existing SoundFont file |
-
-### Configuration management
-
-| Command | Description |
-| :--- | :--- |
+| `doom config` | Opens the interactive TUI CLI settings editor (or shows settings on non-TTY stdout) |
 | `doom config show` | Displays active CLI user configuration and source precedence |
-| `doom config get <key>` | Retrieves an effective configuration value (such as `doom config get theme`) |
-| `doom config set <key> <val>` | Sets a configuration value (such as `doom config set nerd-fonts on`) |
+| `doom config get [key]` | Retrieves an effective configuration value (or shows all settings when `<key>` is omitted) |
+| `doom config set <key> <val>` | Sets a configuration value (such as `doom config set theme blood`) |
 | `doom config toggle <key>` | Toggles a boolean setting (such as `doom config toggle nerd-fonts`) |
-| `doom config install` | Deploys source port configuration files with display auto-detection and backups |
-| `doom config diff` | Shows differences between repository templates and live installed configurations |
-
-### Themes and styling
-
-| Command | Description |
-| :--- | :--- |
-| `doom themes` or `doom themes list` | Lists all built-in and custom themes with live ANSI color swatches |
-| `doom themes set <theme>` | Sets the default launcher theme in user configuration |
+| `doom config themes` | Lists all built-in and custom themes with live ANSI color swatches |
 
 ### Shell autocompletion
 
@@ -242,8 +226,8 @@ doom completion powershell | Out-String | Invoke-Expression
 
 ## Interactive TUI launcher
 
-The interactive launcher (`doom play` or `doom`) provides a responsive, split-pane terminal interface powered by Bubble
-Tea:
+The interactive launcher (`doom wads`, `doom engines`, or `doom config`) provides a responsive, split-pane terminal
+interface powered by Bubble Tea:
 
 ![Interactive preset browser](assets/tui-presets.png)
 
@@ -259,8 +243,8 @@ Tea:
   (`-skill`), map warp (`-warp`), gameplay flags (`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`),
   compatibility level (`-complevel`), optional WAD toggles (such as `idkfa 2024.wad`), and extra arguments with a live
   command preview.
-- **In-app configuration manager**: Press `Ctrl+G` or `F2` to open a 3-tab configuration manager for CLI settings,
-  engine overrides, and source port configuration deployment and diffs.
+- **In-app configuration manager**: Press `Ctrl+G` or `F2` (or run `doom config` or `doom engines` directly) to open a
+  3-tab configuration manager for CLI settings, engine overrides, and source port configuration deployment and diffs.
 - **In-app asset acquisition**: Press `Ctrl+F` to extract Steam and GOG IWADs or download community WADs for the
   selected preset and refresh file readiness in place.
 - **In-app README viewer**: Press `Tab` or `Ctrl+R` on any preset to read its bundled idgames `.txt` documentation in a
@@ -268,8 +252,8 @@ Tea:
 - **Contextual help**: Press `F1` from any view to inspect context-aware keybindings and search tokens.
 - **Single-shot launch and readiness guard**: Launches the selected preset and exits when the game closes, or stays in
   the browser with an actionable prompt (`Ctrl+F`) if required WADs are missing, and exits cleanly with `Esc` or
-  `Ctrl+C`. Configure color themes and Nerd Fonts badges via `--theme`, `--nerd-fonts`, `doom themes set`, or
-  `doom config`.
+  `Ctrl+C`. Configure color themes and Nerd Fonts badges via `--theme`, `--nerd-fonts`, `doom config set theme <name>`,
+  or `doom config`.
 
 ### Main preset browser controls
 
@@ -362,13 +346,13 @@ neutral, 30% structural framing, 10% focused accent) for contrast across dark an
 
 ```bash
 # List all themes with live terminal color swatches
-doom themes list
+doom config themes
 
 # Persistently set default theme
-doom themes set blood
+doom config set theme blood
 
 # Temporarily test a theme for a single run
-doom play --theme toxic
+doom wads --theme toxic
 ```
 
 ### Built-in themes
@@ -436,7 +420,7 @@ enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `--nerd-f
 
 ```bash
 # Enable temporarily for one session
-doom play --nerd-fonts
+doom wads --nerd-fonts
 
 # Permanently toggle in user configuration
 doom config toggle nerd-fonts
@@ -468,58 +452,58 @@ doom engines list
 
 Customize binary paths (`--binary`), argument styles (`--style`), wrapper prefixes (`--prefix-args`), badges
 (`--badge`), display names (`--display-name`), or default flags (`--args`) for any built-in or custom engine
-(`catalog.d/override.engine.<id>.json`), or clear overrides with `--reset`, without modifying curated engine
-definitions:
+(`catalog.d/override.engine.<id>.json`), or clear overrides with `doom engines reset`, without modifying
+curated engine definitions:
 
 ```bash
 # Override DSDA-Doom binary path and launcher badge
-doom engines config dsda-doom --binary /opt/doom/dsda-doom --badge "DSDA+"
+doom engines set dsda-doom --binary /opt/doom/dsda-doom --badge "DSDA+"
 
 # Set default flags for DSDA-Doom
-doom engines config dsda-doom --args "-complevel 21"
+doom engines set dsda-doom --args "-complevel 21"
 
 # Prepend wrapper command tokens before the engine executable
-doom engines config uzdoom --prefix-args "mangohud --dlsym"
+doom engines set uzdoom --prefix-args "mangohud --dlsym"
 
 # Reset custom engine overrides back to base defaults
-doom engines config dsda-doom --reset
+doom engines reset dsda-doom
 ```
 
 ### Add custom WADs and presets
 
 Add custom mapsets or community mods to your personal catalog (`catalog.d/preset.<id>.json`) with `--id`, `-e` or
-`--engine`, `--iwad`, `--files`, `--args`, and `--description`. They integrate into `doom play` fuzzy search and direct
-execution (`doom launch`):
+`--engine`, `--iwad`, `--files`, `--args`, and `--description`. They integrate into `doom wads` fuzzy search and direct
+execution (`doom <wad>`):
 
 ```bash
 # Add a custom mapset with required IWAD and PWADs
-doom presets add "KDiZD" -e uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --description "Knee-Deep in ZDoom"
+doom wads add "KDiZD" -e uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --description "Knee-Deep in ZDoom"
 
-# Inspect preset details and missing file status
-doom presets show "KDiZD"
+# Inspect preset details, launch command preview, and missing file status
+doom wads show "KDiZD"
 
-# Launch your custom preset
-doom launch "KDiZD"
+# Launch your custom preset directly
+doom "KDiZD"
 ```
 
 ### Configure per-WAD launch options
 
 Customize engine (`-e` or `--engine`), IWAD (`--iwad`), additional files (`--files`), excluded optional files
 (`--exclude-file`), or launch arguments (`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear
-overrides with `--reset`, without modifying repository defaults:
+overrides with `doom wads reset`, without modifying repository defaults:
 
 ```bash
 # Always launch Sunlust in Woof! with ultra-violence skill
-doom presets config "Sunlust" -e woof --args "-skill 4"
+doom wads set "Sunlust" -e woof --args "-skill 4"
 
 # Set Ancient Aliens to always run with Boom complevel 11
-doom presets config "Ancient Aliens" --args "-complevel 11"
+doom wads set "Ancient Aliens" --args "-complevel 11"
 
 # Disable optional soundtrack WAD for a preset
-doom presets config "Doom II" --exclude-file "idkfa 2024.wad"
+doom wads set "Doom II" --exclude-file "idkfa 2024.wad"
 
 # Reset custom launch options back to curated defaults
-doom presets config "Sunlust" --reset
+doom wads reset "Sunlust"
 ```
 
 ## Configuration and user catalog schema
@@ -672,7 +656,7 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 > Commercial game files are not tracked in Git. This repository contains configuration files, launcher presets, and
 > automated fetch tools. You must provide your own legally acquired game files:
 > - **Commercial IWADs and official expansions**: Acquire `DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`,
->   `HERETIC.WAD`, and `HEXEN.WAD` from digital storefronts, and run `doom wads extract` to auto-discover and import
+>   `HERETIC.WAD`, and `HEXEN.WAD` from digital storefronts, and run `doom wads scan` to auto-discover and import
 >   commercial IWADs, official expansions (*Legacy of Rust*, *No Rest for the Living*, *Master Levels*, *Sigil*, and
 >   *Sigil II*), and the synthesized `idkfa 2024.wad` soundtrack (extracted from `extras.wad`) directly from your Steam
 >   and GOG libraries:
@@ -751,9 +735,9 @@ Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
 When running Doom source ports on Linux, standalone native binaries or AppImages in `~/.local/bin/` are recommended over
 sandboxed Flatpaks.
 
-Flatpaks isolate applications from the rest of the filesystem, preventing the launcher (`doom play`) from discovering
-game engines or accessing WADs across custom paths without manual permission overrides. Running `doom setup` or
-`doom engines install` automatically manages standalone binaries in your user path.
+Flatpaks isolate applications from the rest of the filesystem, preventing the launcher (`doom` or `doom wads`) from
+discovering game engines or accessing WADs across custom paths without manual permission overrides. Running `doom setup`
+or `doom engines install` automatically manages standalone binaries in your user path.
 
 ## Troubleshooting and FAQ
 
@@ -761,7 +745,7 @@ game engines or accessing WADs across custom paths without manual permission ove
 Ensure commercial IWADs (`DOOM2.WAD`, `DOOM.WAD`, and others) are in your WAD directory
 (`~/.local/share/games/doom/` on Linux). If you own the game on Steam or GOG, run:
 ```bash
-doom wads extract
+doom wads scan
 ```
 Or specify a custom WAD directory with `--wads-dir <path>` or `export DOOM_WADS_DIR=<path>`.
 
@@ -773,14 +757,14 @@ Run `doom engines install` to download portable binaries for UZDoom and DSDA-Doo
 ### MIDI music is silent or failing to initialize
 Verify FluidSynth SoundFont deployment:
 ```bash
-doom soundfont install
+doom engines install
 ```
 Ensure `GeneralUser-GS.sf2` is present in `~/.local/share/soundfonts/`.
 
 ### Display resolution or refresh rate mismatch
 When switching monitors, re-detect native display resolution and refresh rate by running:
 ```bash
-doom config install
+doom engines cfg install
 ```
 This updates `screen_resolution` in `dsda-doom.cfg` and `vid_maxfps` in `autoexec.cfg` while creating timestamped
 backups of your prior configurations.

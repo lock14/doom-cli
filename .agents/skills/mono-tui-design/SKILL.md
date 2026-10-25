@@ -6,7 +6,7 @@ description: Design and build terminal user interfaces for doom-cli following th
 # Monospace TUI design skill
 
 Use this skill when designing, implementing, or refactoring terminal UI views, layouts, themes, or keyboard interactions
-in `internal/tui/`, `cmd/doom/play.go`, or `cmd/doom/themes.go`.
+in `internal/tui/`, `cmd/doom/wads.go`, `cmd/doom/engines.go`, or `cmd/doom/config.go`.
 
 ## Reference reading order
 
@@ -25,7 +25,7 @@ Always resolve rules in this order (higher overrides lower):
 ## Design and implementation workflow
 
 1. **Identify the screen and workflow archetype**:
-   * Confirm how the change fits into `doom play`'s `§11.5` fuzzy finder and `Master-Detail` split view (`Presets` list
+   * Confirm how the change fits into `doom wads`'s `§11.5` fuzzy finder and `Master-Detail` split view (`Presets` list
      on the left, `Preset Details` preview on the right in `renderPanels`) or `Expand-to-Focus` full-pane
      `README Viewer` (`renderReadmeView`, `§12.4` search-act workflow).
 2. **Apply project overrides and glyph hygiene**:

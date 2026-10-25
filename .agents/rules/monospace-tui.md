@@ -1,13 +1,13 @@
 ---
 trigger: glob
-globs: internal/tui/**/*.go, cmd/doom/play.go, cmd/doom/themes.go
+globs: internal/tui/**/*.go, cmd/doom/wads.go, cmd/doom/engines.go, cmd/doom/config.go
 ---
 
 # Monospace TUI design standard and project rules
 
-When designing, implementing, refactoring, or reviewing terminal UI components in `internal/tui/`, `cmd/doom/play.go`,
-or `cmd/doom/themes.go`, follow the embedded Monospace Design TUI (`mono-tui v0.2.5`) specification alongside the
-project overrides and conventions declared in this file.
+When designing, implementing, refactoring, or reviewing terminal UI components in `internal/tui/`, `cmd/doom/wads.go`,
+`cmd/doom/engines.go`, or `cmd/doom/config.go`, follow the embedded Monospace Design TUI (`mono-tui v0.2.5`)
+specification alongside the project overrides and conventions declared in this file.
 
 ## Reference hierarchy
 
@@ -28,7 +28,8 @@ Consult these documents in precedence order (higher overrides lower when rules c
 
 ## Screen and workflow archetype mapping
 
-The `doom play` interactive launcher (`internal/tui/`) maps to the following `mono-tui` archetypes:
+The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`internal/tui/`) map to the following
+`mono-tui` archetypes:
 
 *   **Screen archetype**: `§11.5` fuzzy finder (`model` in `internal/tui/launcher.go`) paired with a responsive
     `Master-Detail` split view (`renderPanels` in `internal/tui/render.go` with the `Presets` list pane on the left
@@ -203,4 +204,4 @@ The `doom play` interactive launcher (`internal/tui/`) maps to the following `mo
 *   **Project rule**: When standard input or output is not an interactive terminal or when the fallback menu is
     invoked, `RunNumberedMenu` in `internal/tui/menu.go` provides a clean numbered selection prompt with graceful
     `EOF` and interrupt handling.
-*   **Reason**: Ensures `doom play` remains usable in basic terminals, serial consoles, and non-fullscreen environments.
+*   **Reason**: Ensures `doom wads` remains usable in basic terminals, serial consoles, and non-fullscreen environments.

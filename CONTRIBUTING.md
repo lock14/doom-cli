@@ -10,7 +10,7 @@ All contributions must respect the core repository invariants:
 *   **Declarative entity catalog and single source of truth**: All curated engine and preset definitions, IWAD
     mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs are defined one entity per file in
     [`catalog/`](catalog/) (`engine.<id>.json` and `preset.<id>.json`) and embedded directly via the root
-    [`embed.go`](embed.go). Use `doom presets lint` to validate schema and invariants, and `doom presets build` to
+    [`embed.go`](embed.go). Use `doom wads lint` to validate schema and invariants, and `doom wads build` to
     synchronize `README.md`.
 *   **Portability and path invariants**:
     *   **Never commit personal user paths, display resolutions, or refresh rates**: Do not commit paths like
@@ -21,12 +21,12 @@ All contributions must respect the core repository invariants:
         dynamically substitutes these based on runtime display and filesystem detection.
     *   **Standard directory structures**: Respect platform standard directories (XDG on Linux,
         `~/Library/Application Support/` on macOS, and `%LOCALAPPDATA%` and `%USERPROFILE%\Games\Doom\` on Windows).
-*   **Destructive safety and backup policy**: Any configuration or catalog write (`doom config install`, `doom setup`,
-    `doom config set`, `doom config toggle`, `doom themes set`, `doom engines add`, `doom engines config`,
-    `doom presets add`, `doom presets config`) must write atomically via same-directory temporary rename and generate
-    non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file and
-    cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion and on repository templates during
-    `doom config sync`) before overwriting any existing user file.
+*   **Destructive safety and backup policy**: Any configuration or catalog write (`doom engines cfg install`,
+    `doom engines install`, `doom setup`, `doom config set`, `doom config toggle`, `doom engines add`,
+    `doom engines set`, `doom wads add`, `doom wads set`) must write atomically via same-directory temporary rename and
+    generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file
+    and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion and on repository templates during
+    `doom engines cfg sync`) before overwriting any existing user file.
 *   **Archive security and Zip Slip hardening**: All archive extractions (`archive/zip`) and relative sub-path
     resolutions must sanitize entry paths against `..` traversal sequences via `fsutil.SafeJoin` and verify containment
     before any filesystem write.
@@ -51,11 +51,11 @@ All contributions must respect the core repository invariants:
 ```mermaid
 flowchart TD
     subgraph CLI ["doom CLI (Single Static Binary)"]
-        TUI["Interactive TUI Launcher\n(Bubble Tea / Lip Gloss)"]
+        TUI["Interactive TUI Browser\n(doom wads / Bubble Tea)"]
         Setup["Turnkey Automated Setup\n(doom setup)"]
-        Launch["Direct Launcher\n(doom launch)"]
-        ConfigMgr["Config & Theme Manager\n(doom config / themes)"]
-        PresetMgr["Preset & Engine Manager\n(doom presets / engines)"]
+        Launch["Direct Game Launcher\n(doom [wad] [flags])"]
+        ConfigMgr["CLI Settings & Themes\n(doom config)"]
+        EngineMgr["Engine & Port Config Manager\n(doom engines)"]
     end
 
     subgraph Data ["Two-Layer Catalog & Storage"]
@@ -99,16 +99,11 @@ doom-cli/
 ├── embed.go                # Single root embed.FS (catalog/*.json, dsda-doom/*.cfg, uzdoom/*.cfg)
 ├── catalog/                # One-entity-per-file curated catalog (engine.<id>.json, preset.<id>.json)
 ├── cmd/doom/               # Command-line interface definitions using Cobra
-│   ├── main.go             # Entrypoint, root command, global flags, path and catalog helpers
-│   ├── play.go             # 'doom play' interactive launcher with Bubble Tea
-│   ├── launch.go           # 'doom launch' direct preset execution command
-│   ├── setup.go            # 'doom setup' turnkey installation workflow
-│   ├── wads.go             # 'doom wads' subcommands (list, fetch, extract)
-│   ├── engines.go          # 'doom engines' subcommands (list, add, config, remove, install)
-│   ├── presets.go          # 'doom presets' subcommands (list, show, add, config, remove, build (hidden), lint)
-│   ├── soundfont.go        # 'doom soundfont install' subcommand
-│   ├── config.go           # 'doom config' subcommands (show, get, set, toggle, install, diff, sync (hidden))
-│   └── themes.go           # 'doom themes' subcommands (list, set)
+│   ├── main.go             # Entrypoint, root direct game launcher, global flags, path and catalog helpers
+│   ├── wads.go             # 'doom wads' interactive TUI browser and subcommands (list, show, fetch, scan, add, set, reset, remove, lint, build)
+│   ├── engines.go          # 'doom engines' interactive TUI manager and subcommands (list, install, add, set, reset, remove, cfg)
+│   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, toggle, themes)
+│   └── setup.go            # 'doom setup' turnkey installation workflow
 ├── internal/
 │   ├── config/             # Platform path resolvers (paths.go) and settings-only config.json (settings.go)
 │   ├── display/            # Native display resolution and refresh rate auto-detection
@@ -200,8 +195,8 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      pages belong in `links[]` with `"rel": "idgames"`.
 2. Synchronize the `README.md` preset table and run the catalog linter:
    ```bash
-   go run ./cmd/doom presets build
-   go run ./cmd/doom presets lint
+   go run ./cmd/doom wads build
+   go run ./cmd/doom wads lint
    ```
 3. Verify catalog invariant tests pass:
    ```bash
@@ -213,7 +208,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 1. Create `catalog/engine.<id>.json` (or copy from `~/.config/doom-cli/catalog.d/engine.<id>.json`) with
    `kind: "engine"`, `id`, `display_name`, `description`, `family`, `args_style` (`"boom"` or `"zdoom"`), `binary`,
    `badge`, and optional `install` recipe.
-2. Run `go run ./cmd/doom presets lint` and `go test -v -race ./...`.
+2. Run `go run ./cmd/doom wads lint` and `go test -v -race ./...`.
 
 ### Adding a built-in theme
 
@@ -228,27 +223,27 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 3. Update the theme list in `README.md` and `llms.txt`.
 4. Test with:
    ```bash
-   go run ./cmd/doom themes list
-   go run ./cmd/doom play --theme <new_theme>
+   go run ./cmd/doom config themes
+   go run ./cmd/doom wads --theme <new_theme>
    ```
 
 ### Synchronizing engine configuration templates
 
 When refining the curated engine configurations (`uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg`) after testing
-in-game settings on a local machine, use the hidden maintainer command `doom config sync`:
+in-game settings on a local machine, use the hidden maintainer command `doom engines cfg sync`:
 
 1. Inspect differences between the repository templates and your installed system configurations:
    ```bash
-   go run ./cmd/doom config diff
+   go run ./cmd/doom engines cfg diff
    ```
 2. Pull live tweaks back into `uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg` (automatically restoring
    `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholder tokens):
    ```bash
-   go run ./cmd/doom config sync
+   go run ./cmd/doom engines cfg sync
    ```
 3. Verify no personal paths were introduced:
    ```bash
-   go run ./cmd/doom presets lint
+   go run ./cmd/doom wads lint
    ```
 
 ### Archive security (Zip Slip and path containment)
@@ -319,7 +314,7 @@ The repository includes a `Makefile` for developer verification and local builds
     rules, technical writing and typography conventions, and automated verification checklists.
 *   **Mandatory synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
     mechanics are modified, all relevant documentation (Go doc comments, `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
-    and `llms.txt`) must be updated within the same pull request, and `doom presets lint` validates documentation
+    and `llms.txt`) must be updated within the same pull request, and `doom wads lint` validates documentation
     typography, links, anchors, and JSON blocks.
 
 ## Pre-completion verification checklist

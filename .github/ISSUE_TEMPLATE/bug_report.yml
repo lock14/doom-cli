@@ -9,12 +9,11 @@ body:
       label: Affected component
       description: Subsystem experiencing the issue.
       options:
+        - "CLI: doom [wad] (direct launcher)"
+        - "CLI: doom wads (interactive TUI and WAD manager)"
+        - "CLI: doom engines (engine binaries, overrides, and cfg)"
+        - "CLI: doom config (CLI settings and themes)"
         - "CLI: doom setup"
-        - "CLI: doom play (interactive TUI)"
-        - "CLI: doom launch"
-        - "CLI: doom wads (extract and fetch)"
-        - "CLI: doom engines"
-        - "CLI: doom config (install, diff, and sync)"
         - "Source port config: DSDA-Doom"
         - "Source port config: UZDoom"
         - "Catalog: presets and overrides (catalog/ and catalog.d/)"
@@ -47,7 +46,7 @@ body:
       description: Numbered commands or steps executed to reproduce the issue.
       placeholder: |
         1. Run `doom setup`
-        2. Launch preset "Eviternity II" with `doom launch "Eviternity II"`
+        2. Launch preset "Eviternity II" with `doom "Eviternity II"`
         3. Observe error output
     validations:
       required: true

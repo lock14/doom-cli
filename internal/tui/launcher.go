@@ -30,6 +30,15 @@ const (
 	helpModeReadme
 )
 
+// InitialModeWads opens the TUI in the interactive WAD browser (default).
+const InitialModeWads = 0
+
+// InitialModeConfig opens the TUI directly on the CLI settings tab of the configuration manager.
+const InitialModeConfig = 1
+
+// InitialModeEngines opens the TUI directly on the engine overrides tab of the configuration manager.
+const InitialModeEngines = 2
+
 // LauncherOptions holds optional runtime context for RunInteractiveLauncherWithOptions.
 type LauncherOptions struct {
 	Paths            *config.Paths
@@ -42,6 +51,7 @@ type LauncherOptions struct {
 	WadsDirsSource   string
 	BinDirSource     string
 	SoundFontsSource string
+	InitialMode      int
 }
 
 type model struct {
@@ -61,6 +71,7 @@ type model struct {
 	wadsDirsSource   string
 	binDirSource     string
 	soundFontsSource string
+	initialMode      int
 	steamSearchRoots []string
 	httpClient       *http.Client
 	dirIndex         *preset.DirIndex
@@ -613,11 +624,45 @@ func (m *model) updateFiltered(query string) {
 	m.filtered = result
 }
 
+func (m *model) applyOptions(opts LauncherOptions) {
+	m.paths = opts.Paths
+	m.appConfig = opts.AppConfig
+	m.customCatalogDir = opts.CatalogDir
+	m.extraArgs = append([]string(nil), opts.ExtraArgs...)
+	m.themeSource = opts.ThemeSource
+	m.nerdFontsSource = opts.NerdFontsSource
+	m.wadsDirSource = opts.WadsDirSource
+	m.wadsDirsSource = opts.WadsDirsSource
+	m.binDirSource = opts.BinDirSource
+	m.soundFontsSource = opts.SoundFontsSource
+	m.initialMode = opts.InitialMode
+
+	switch opts.InitialMode {
+	case InitialModeConfig:
+		m.openConfigManager()
+		if m.cfgMgr != nil {
+			m.cfgMgr.activeTab = configTabCLI
+			m.cfgMgr.focusIdx = 0
+			m.cfgMgr.syncFocus()
+		}
+	case InitialModeEngines:
+		m.openConfigManager()
+		if m.cfgMgr != nil {
+			m.cfgMgr.activeTab = configTabEngines
+			m.cfgMgr.focusIdx = 0
+			m.cfgMgr.syncFocus()
+		}
+	}
+}
+
 func (m model) View() string {
 	if m.selected != nil {
 		return fmt.Sprintf("Launching %s...\n", m.selected.Name)
 	}
 	if m.quitting {
+		if m.initialMode != InitialModeWads {
+			return ""
+		}
 		return "Cancelled.\n"
 	}
 	if m.viewingHelp {
@@ -667,20 +712,14 @@ func RunInteractiveLauncherWithOptions(
 	initialPreset ...string,
 ) (*preset.Preset, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+		if opts.InitialMode != InitialModeWads {
+			return nil, nil
+		}
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
 	m := initialModel(catalog, wadRoots, theme, nerdFonts, initialPreset...)
-	m.paths = opts.Paths
-	m.appConfig = opts.AppConfig
-	m.customCatalogDir = opts.CatalogDir
-	m.extraArgs = append([]string(nil), opts.ExtraArgs...)
-	m.themeSource = opts.ThemeSource
-	m.nerdFontsSource = opts.NerdFontsSource
-	m.wadsDirSource = opts.WadsDirSource
-	m.wadsDirsSource = opts.WadsDirsSource
-	m.binDirSource = opts.BinDirSource
-	m.soundFontsSource = opts.SoundFontsSource
+	m.applyOptions(opts)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
