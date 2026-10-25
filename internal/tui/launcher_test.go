@@ -512,9 +512,9 @@ func TestCalculateInteriorHeight(t *testing.T) {
 }
 
 func TestCapsuleAndKeyHelpRenderers(t *testing.T) {
-	brand := renderBrandPill()
+	brand := defaultStyles.RenderBrandPill(false)
 	if !strings.Contains(brand, "DOOM") {
-		t.Errorf("renderBrandPill() = %q, expected 'DOOM'", brand)
+		t.Errorf("RenderBrandPill(false) = %q, expected 'DOOM'", brand)
 	}
 
 	nerdBrand := defaultStyles.RenderBrandPill(true)
@@ -522,30 +522,30 @@ func TestCapsuleAndKeyHelpRenderers(t *testing.T) {
 		t.Errorf("RenderBrandPill(true) = %q, expected DOOM with capsule caps", nerdBrand)
 	}
 
-	stats := renderStatsPill(10, 32)
+	stats := defaultStyles.RenderStatsPill(10, 32, false)
 	if !strings.Contains(stats, "10 / 32 presets") {
-		t.Errorf("renderStatsPill(10, 32) = %q, expected '10 / 32 presets'", stats)
+		t.Errorf("RenderStatsPill(10, 32, false) = %q, expected '10 / 32 presets'", stats)
 	}
 
-	topPill := renderScrollPill(0.0)
+	topPill := defaultStyles.RenderScrollPill(0.0, false)
 	if !strings.Contains(topPill, "Top") {
-		t.Errorf("renderScrollPill(0.0) = %q, expected 'Top'", topPill)
+		t.Errorf("RenderScrollPill(0.0, false) = %q, expected 'Top'", topPill)
 	}
-	midPill := renderScrollPill(0.5)
+	midPill := defaultStyles.RenderScrollPill(0.5, false)
 	if !strings.Contains(midPill, "50%") {
-		t.Errorf("renderScrollPill(0.5) = %q, expected '50%%'", midPill)
+		t.Errorf("RenderScrollPill(0.5, false) = %q, expected '50%%'", midPill)
 	}
-	endPill := renderScrollPill(1.0)
+	endPill := defaultStyles.RenderScrollPill(1.0, false)
 	if !strings.Contains(endPill, "End") {
-		t.Errorf("renderScrollPill(1.0) = %q, expected 'End'", endPill)
+		t.Errorf("RenderScrollPill(1.0, false) = %q, expected 'End'", endPill)
 	}
 
-	help := formatKeyHelp([]keyHelp{
+	help := defaultStyles.FormatKeyHelp([]keyHelp{
 		{"Enter", "Launch"},
 		{"Esc", "Quit"},
 	})
 	if !strings.Contains(help, "Enter") || !strings.Contains(help, "Launch") || !strings.Contains(help, "•") {
-		t.Errorf("formatKeyHelp() = %q, expected keys and separator", help)
+		t.Errorf("FormatKeyHelp() = %q, expected keys and separator", help)
 	}
 }
 
@@ -623,7 +623,7 @@ func TestFormatEngineTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.engine, func(t *testing.T) {
-			rendered := formatEngineTag(tt.engine, styles)
+			rendered := formatEngineTagWithCatalog(nil, tt.engine, styles)
 			if !strings.Contains(rendered, tt.contains) {
 				t.Errorf("expected tag for %s to contain %q, got %q", tt.engine, tt.contains, rendered)
 			}
@@ -1138,7 +1138,7 @@ func TestRenderFooter_NarrowTruncation(t *testing.T) {
 		wantNoReadme     bool
 		wantReadmeFooter bool
 	}{
-		{name: "narrow 60 columns", width: 60, wantWithReadme: true, wantNoReadme: false, wantReadmeFooter: false},
+		{name: "narrow 60 columns", width: 60, wantWithReadme: true, wantNoReadme: false, wantReadmeFooter: true},
 		{name: "compact 50 columns", width: 50, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
 		{name: "compact 40 columns", width: 40, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
 		{name: "standard 80 columns", width: 80, wantWithReadme: false, wantNoReadme: false, wantReadmeFooter: false},
@@ -1738,5 +1738,49 @@ func TestInitialModeConfigAndEngines(t *testing.T) {
 	}
 	if got := mEng.View(); got != "" {
 		t.Errorf("expected empty View() when quitting from InitialModeEngines, got %q", got)
+	}
+}
+
+func TestConfigManager_CtrlJKAndDiffHelpAndWidth90Footer(t *testing.T) {
+	t.Parallel()
+	cat := mockCatalog()
+	m := initialModel(cat, nil, ClassicTheme, false)
+	m.width = 90
+	m.height = 24
+
+	// At width 90 (== sideBySideMinWidth), renderFooter should use the full side-by-side footer strip
+	footer90 := m.renderFooter(true)
+	if !strings.Contains(footer90, "Ctrl+O") || !strings.Contains(footer90, "F1") {
+		t.Errorf("expected width=90 footer to include Ctrl+O and F1, got %q", footer90)
+	}
+
+	m.openConfigManager()
+	if m.cfgMgr.focusIdx != 0 {
+		t.Fatalf("expected initial focusIdx=0, got %d", m.cfgMgr.focusIdx)
+	}
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
+	m = newM.(model)
+	if m.cfgMgr.focusIdx != 1 {
+		t.Errorf("expected ctrl+j to advance focusIdx to 1, got %d", m.cfgMgr.focusIdx)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlK})
+	m = newM.(model)
+	if m.cfgMgr.focusIdx != 0 {
+		t.Errorf("expected ctrl+k to move focusIdx back to 0, got %d", m.cfgMgr.focusIdx)
+	}
+
+	// Open diff view on Tab 3 and verify F1 opens contextual help
+	m.cfgMgr.activeTab = configTabPorts
+	m.cfgMgr.focusIdx = 0
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = newM.(model)
+	if !m.cfgMgr.viewingDiff {
+		t.Fatalf("expected viewingDiff=true")
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyF1})
+	m = newM.(model)
+	if !m.viewingHelp || m.helpMode != helpModeConfigManager {
+		t.Errorf("expected F1 in diff view to open helpModeConfigManager, got viewingHelp=%v helpMode=%d",
+			m.viewingHelp, m.helpMode)
 	}
 }

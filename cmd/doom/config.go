@@ -256,7 +256,7 @@ func runConfigThemes(cmd *cobra.Command, _ []string) error {
 	}
 	out := cmdOut(cmd)
 
-	activeTheme := tui.ResolveTheme("", "", cfg.Theme, paths.ThemesDir)
+	activeTheme := tui.ResolveTheme(cfg.Theme, paths.ThemesDir)
 	nerdFonts, _ := resolveNerdFontsWithSource(cfg)
 
 	fmt.Fprintln(out, "=== Available Doom Themes ===")

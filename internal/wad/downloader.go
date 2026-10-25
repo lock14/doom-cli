@@ -2,8 +2,6 @@
 package wad
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,25 +66,20 @@ func FilterExpectedFiles(files []preset.FileSpec) []string {
 
 // IsPresetInstalled checks whether all required files for the preset are present across configured WAD roots.
 func (d *Downloader) IsPresetInstalled(p preset.Preset) bool {
-	expected := FilterExpectedFiles(p.Files)
-	if len(expected) == 0 {
-		return true
-	}
-	idx := preset.NewDirIndex(d.roots()...).WithPresets(p)
-	for _, exp := range expected {
-		if _, ok := idx.ResolveFile(exp); !ok {
-			return false
-		}
-	}
-	return true
+	return preset.NewDirIndex(d.roots()...).WithPresets(p).ArePresetFilesInstalled(p)
 }
 
 // DownloadPreset downloads and extracts the required files for a specific preset.
 func (d *Downloader) DownloadPreset(p preset.Preset) error {
+	_, err := d.downloadPresetWithIndex(p, nil)
+	return err
+}
+
+func (d *Downloader) downloadPresetWithIndex(p preset.Preset, idx *preset.DirIndex) (bool, error) {
 	expected := FilterExpectedFiles(p.Files)
 	if len(p.Sources) == 0 {
 		if len(expected) == 0 {
-			return nil
+			return false, nil
 		}
 		if p.Category == "Community Megawad" || p.Category == "Community Episode" {
 			fmt.Fprintf(
@@ -105,32 +98,40 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 				p.Name,
 			)
 		}
-		return nil
+		return false, nil
 	}
 
 	if len(expected) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// Validate all destination paths before performing network I/O
 	for _, exp := range expected {
 		if _, err := fsutil.SafeJoin(d.WadsDir, exp); err != nil {
-			return fmt.Errorf("invalid destination file %q: %w", exp, err)
+			return false, fmt.Errorf("invalid destination file %q: %w", exp, err)
 		}
 	}
 
-	if !d.Force && d.IsPresetInstalled(p) {
-		fmt.Fprintf(
-			d.Out,
-			"✓ [%s] All required files already exist in %s. (Use --force to re-download)\n",
-			p.Name,
-			d.WadsDir,
-		)
-		return nil
+	if !d.Force {
+		installed := false
+		if idx != nil {
+			installed = idx.ArePresetFilesInstalled(p)
+		} else {
+			installed = d.IsPresetInstalled(p)
+		}
+		if installed {
+			fmt.Fprintf(
+				d.Out,
+				"✓ [%s] All required files already exist in %s. (Use --force to re-download)\n",
+				p.Name,
+				d.WadsDir,
+			)
+			return false, nil
+		}
 	}
 
 	if err := os.MkdirAll(d.WadsDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", d.WadsDir, err)
+		return false, fmt.Errorf("failed to create directory %s: %w", d.WadsDir, err)
 	}
 
 	fmt.Fprintf(d.Out, ">>> Downloading: %s\n", p.Name)
@@ -155,16 +156,16 @@ func (d *Downloader) DownloadPreset(p preset.Preset) error {
 		err := d.downloadAndExtract(src, expected, p)
 		if err == nil {
 			fmt.Fprintln(d.Out)
-			return nil
+			return true, nil
 		}
 		lastErr = err
 		fmt.Fprintf(d.Out, "    Failed mirror: %v\n", err)
 	}
 
 	if lastErr != nil {
-		return fmt.Errorf("failed to download %s from available mirrors: %w", p.Name, lastErr)
+		return false, fmt.Errorf("failed to download %s from available mirrors: %w", p.Name, lastErr)
 	}
-	return fmt.Errorf("no valid archive download mirrors available for %s", p.Name)
+	return false, fmt.Errorf("no valid archive download mirrors available for %s", p.Name)
 }
 
 func urlExtension(rawURL string) string {
@@ -176,22 +177,6 @@ func urlExtension(rawURL string) string {
 }
 
 func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []string, p preset.Preset) error {
-	req, err := http.NewRequest(http.MethodGet, src.URL, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("User-Agent", "doom-cli/2.0")
-
-	resp, err := d.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-
 	tmpDir, err := os.MkdirTemp("", "doom_dl_*")
 	if err != nil {
 		return err
@@ -199,23 +184,9 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 	defer os.RemoveAll(tmpDir)
 
 	tmpArchive := filepath.Join(tmpDir, "archive.bin")
-	f, err := os.Create(tmpArchive)
+	size, err := fsutil.DownloadVerified(d.Client, src.URL, tmpArchive, src.SHA256, 0o644)
 	if err != nil {
 		return err
-	}
-
-	hasher := sha256.New()
-	size, err := io.Copy(io.MultiWriter(f, hasher), resp.Body)
-	_ = f.Close()
-	if err != nil {
-		return fmt.Errorf("error saving download: %w", err)
-	}
-
-	if expectedSum := strings.TrimSpace(src.SHA256); expectedSum != "" {
-		actualSum := hex.EncodeToString(hasher.Sum(nil))
-		if !strings.EqualFold(actualSum, expectedSum) {
-			return fmt.Errorf("sha256 mismatch: got %s, want %s", actualSum, expectedSum)
-		}
 	}
 
 	ext := urlExtension(src.URL)
@@ -231,21 +202,21 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 }
 
 func (d *Downloader) installDirectAsset(ext, tmpArchive string, expectedFiles []string) error {
-	data, err := os.ReadFile(tmpArchive)
-	if err != nil {
-		return err
-	}
-
 	if len(expectedFiles) == 1 {
 		dest, err := fsutil.SafeJoin(d.WadsDir, expectedFiles[0])
 		if err != nil {
 			return err
 		}
-		if _, err := fsutil.WriteFileAtomic(dest, data, 0o644); err != nil {
+		if _, err := fsutil.CopyFileAtomic(tmpArchive, dest, 0o644); err != nil {
 			return err
 		}
 		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", expectedFiles[0], dest)
 		return nil
+	}
+
+	data, err := os.ReadFile(tmpArchive)
+	if err != nil {
+		return err
 	}
 
 	if ext == ".wad" {
@@ -295,13 +266,19 @@ func (d *Downloader) DownloadAll(catalog *preset.Catalog) error {
 	fmt.Fprintf(d.Out, "=== Doom Community Megawad Downloader ===\n")
 	fmt.Fprintf(d.Out, "Target directory: %s\n\n", d.WadsDir)
 
+	idx := preset.NewDirIndex(d.roots()...).WithCatalog(catalog)
 	var failures []string
 	for _, p := range catalog.Presets {
 		if len(p.Sources) == 0 {
 			continue
 		}
-		if err := d.DownloadPreset(p); err != nil {
+		downloaded, err := d.downloadPresetWithIndex(p, idx)
+		if err != nil {
 			failures = append(failures, fmt.Sprintf("%s (%v)", p.Name, err))
+			continue
+		}
+		if downloaded {
+			idx = preset.NewDirIndex(d.roots()...).WithCatalog(catalog)
 		}
 	}
 

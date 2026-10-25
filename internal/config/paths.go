@@ -16,7 +16,6 @@ type Paths struct {
 	WadsDirs      []string
 	SoundFontsDir string
 	BinDir        string
-	DataDir       string
 	ConfigDir     string
 	ConfigFile    string
 	CatalogDir    string
@@ -44,7 +43,6 @@ func ResolveFor(targetOS string) *Paths {
 		p.UZDoomDir = filepath.Join(appSupport, "uzdoom")
 		p.DSDADir = filepath.Join(appSupport, "dsda-doom")
 		p.SoundFontsDir = filepath.Join(appSupport, "soundfonts")
-		p.DataDir = filepath.Join(appSupport, "doom-cli")
 		p.ConfigDir = filepath.Join(appSupport, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
 		p.WadsDir = filepath.Join(appSupport, "games", "doom")
@@ -55,7 +53,6 @@ func ResolveFor(targetOS string) *Paths {
 			localAppData = filepath.Join(home, "AppData", "Local")
 		}
 
-		p.DataDir = filepath.Join(localAppData, "doom-cli")
 		p.ConfigDir = filepath.Join(localAppData, "doom-cli")
 
 		gamesDoom := filepath.Join(home, "Games", "Doom")
@@ -78,7 +75,6 @@ func ResolveFor(targetOS string) *Paths {
 		p.UZDoomDir = filepath.Join(xdgConfig, "uzdoom")
 		p.DSDADir = filepath.Join(xdgData, "dsda-doom")
 		p.SoundFontsDir = filepath.Join(xdgData, "soundfonts")
-		p.DataDir = filepath.Join(xdgData, "doom-cli")
 		p.ConfigDir = filepath.Join(xdgConfig, "doom-cli")
 		p.BinDir = filepath.Join(home, ".local", "bin")
 		p.WadsDir = filepath.Join(xdgData, "games", "doom")

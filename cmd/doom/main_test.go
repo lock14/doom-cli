@@ -90,15 +90,18 @@ func TestParseRootLaunchArgs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			gotPreset, gotExtra := parseRootLaunchArgs(tt.rawArgs)
+			gotPreset, gotExtra, _, _, _, err := parseRootInvocation(tt.rawArgs)
+			if err != nil {
+				t.Fatalf("parseRootInvocation(%v) unexpected error: %v", tt.rawArgs, err)
+			}
 			if gotPreset != tt.wantPreset {
-				t.Errorf("parseRootLaunchArgs(%v) preset = %q, want %q", tt.rawArgs, gotPreset, tt.wantPreset)
+				t.Errorf("parseRootInvocation(%v) preset = %q, want %q", tt.rawArgs, gotPreset, tt.wantPreset)
 			}
 			if len(gotExtra) == 0 && len(tt.wantExtra) == 0 {
 				return
 			}
 			if !reflect.DeepEqual(gotExtra, tt.wantExtra) {
-				t.Errorf("parseRootLaunchArgs(%v) extra = %v, want %v", tt.rawArgs, gotExtra, tt.wantExtra)
+				t.Errorf("parseRootInvocation(%v) extra = %v, want %v", tt.rawArgs, gotExtra, tt.wantExtra)
 			}
 		})
 	}
@@ -190,7 +193,7 @@ func TestConfigThemesAndThemeValidation(t *testing.T) {
 		t.Fatalf("runConfigSet(theme, blood) error = %v", err)
 	}
 
-	paths := getPaths()
+	paths := resolveAppPaths()
 	cfg, err := config.LoadConfig(paths)
 	if err != nil {
 		t.Fatalf("LoadConfig() error = %v", err)
@@ -303,7 +306,7 @@ func TestRunConfigCommands(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
 	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
-	paths := getPaths()
+	paths := resolveAppPaths()
 
 	// 1. Naked `doom config` in non-TTY falls back to runConfigShow
 	var showOut bytes.Buffer
@@ -415,9 +418,9 @@ func TestGetPathsMalformedConfigFallsBackToDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := getPaths()
+	got := resolveAppPaths()
 	if got.WadsDir != p0.WadsDir {
-		t.Errorf("getPaths().WadsDir = %q, want default %q on malformed config", got.WadsDir, p0.WadsDir)
+		t.Errorf("resolveAppPaths().WadsDir = %q, want default %q on malformed config", got.WadsDir, p0.WadsDir)
 	}
 }
 
@@ -943,7 +946,7 @@ func TestWadsCommands(t *testing.T) {
 	}
 
 	// Verify lint fails on invalid user entity without double-printing quarantine warning
-	paths := getPaths()
+	paths := resolveAppPaths()
 	if err := os.MkdirAll(paths.CatalogDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1039,7 +1042,7 @@ func TestConfigTwoTierProvenanceAndCustomThemesList(t *testing.T) {
 	}
 
 	// 3. Custom theme in doom config themes
-	paths := getPaths()
+	paths := resolveAppPaths()
 	if err := os.MkdirAll(paths.ThemesDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

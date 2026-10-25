@@ -4,9 +4,12 @@ package fsutil
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,6 +20,9 @@ import (
 
 // MaxBackupsPerFile is the maximum number of timestamped backup files retained per target file.
 const MaxBackupsPerFile = 3
+
+// UserAgent is the HTTP User-Agent header sent on all outbound downloads.
+const UserAgent = "doom-cli/2.0"
 
 // BackupFile creates a non-destructive timestamped backup (.bak.<YYYYMMDDHHMMSS>)
 // if path already exists, pruning older backup siblings so at most MaxBackupsPerFile
@@ -44,7 +50,7 @@ func BackupFile(path string) (string, error) {
 	ts := time.Now().Format("20060102150405")
 	backupPath := nextBackupPath(path, ts)
 
-	if _, err := writeReaderTempAndRename(backupPath, in, info.Mode().Perm()); err != nil {
+	if _, _, err := writeReaderTempAndRename(backupPath, in, info.Mode().Perm(), false, nil); err != nil {
 		return "", fmt.Errorf("writing backup %s: %w", backupPath, err)
 	}
 	pruneBackups(path, MaxBackupsPerFile)
@@ -166,21 +172,7 @@ func WriteReaderAtomic(path string, r io.Reader, perm os.FileMode) (int64, strin
 	if path == "" {
 		return 0, "", errors.New("empty file path")
 	}
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return 0, "", fmt.Errorf("creating directory %s: %w", dir, err)
-	}
-
-	backupPath, err := BackupFile(path)
-	if err != nil {
-		return 0, "", err
-	}
-
-	written, err := writeReaderTempAndRename(path, r, perm)
-	if err != nil {
-		return written, backupPath, err
-	}
-	return written, backupPath, nil
+	return writeReaderTempAndRename(path, r, perm, true, nil)
 }
 
 // CopyFileAtomic copies src to dst atomically via WriteReaderAtomic, creating
@@ -196,11 +188,21 @@ func CopyFileAtomic(src, dst string, perm os.FileMode) (string, error) {
 	return backupPath, err
 }
 
-func writeReaderTempAndRename(path string, r io.Reader, perm os.FileMode) (int64, error) {
+func writeReaderTempAndRename(
+	path string,
+	r io.Reader,
+	perm os.FileMode,
+	createBackup bool,
+	validate func() error,
+) (int64, string, error) {
 	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return 0, "", fmt.Errorf("creating directory %s: %w", dir, err)
+	}
+
 	tmp, err := os.CreateTemp(dir, ".doom-tmp-*")
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	tmpPath := tmp.Name()
 	cleanup := true
@@ -213,25 +215,38 @@ func writeReaderTempAndRename(path string, r io.Reader, perm os.FileMode) (int64
 	written, err := io.Copy(tmp, r)
 	if err != nil {
 		_ = tmp.Close()
-		return written, err
+		return written, "", err
 	}
 	if err := tmp.Chmod(perm); err != nil {
 		_ = tmp.Close()
-		return written, err
+		return written, "", err
 	}
 	if err := tmp.Sync(); err != nil {
 		_ = tmp.Close()
-		return written, err
+		return written, "", err
 	}
 	if err := tmp.Close(); err != nil {
-		return written, err
+		return written, "", err
 	}
 
+	if validate != nil {
+		if err := validate(); err != nil {
+			return written, "", err
+		}
+	}
+
+	var backupPath string
+	if createBackup {
+		backupPath, err = BackupFile(path)
+		if err != nil {
+			return written, "", err
+		}
+	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		return written, err
+		return written, backupPath, err
 	}
 	cleanup = false
-	return written, nil
+	return written, backupPath, nil
 }
 
 // CleanRel validates and normalizes a relative path (converting backslashes to
@@ -282,4 +297,54 @@ func SafeJoin(root, rel string) (string, error) {
 		return "", fmt.Errorf("path %q escapes root %q", rel, root)
 	}
 	return target, nil
+}
+
+// DownloadVerified fetches url using client (or http.DefaultClient if nil) with
+// UserAgent, verifies an HTTP 200 OK status and optional expectedSHA256 hex
+// digest, and atomically writes the verified payload to targetPath with perm.
+func DownloadVerified(
+	client *http.Client,
+	url, targetPath, expectedSHA256 string,
+	perm os.FileMode,
+) (int64, error) {
+	if targetPath == "" {
+		return 0, errors.New("empty target path")
+	}
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("User-Agent", UserAgent)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("HTTP status %d", resp.StatusCode)
+	}
+
+	hasher := sha256.New()
+	cleanSum := strings.TrimSpace(expectedSHA256)
+	written, _, err := writeReaderTempAndRename(
+		targetPath,
+		io.TeeReader(resp.Body, hasher),
+		perm,
+		true,
+		func() error {
+			if cleanSum != "" {
+				actualSum := hex.EncodeToString(hasher.Sum(nil))
+				if !strings.EqualFold(actualSum, cleanSum) {
+					return fmt.Errorf("sha256 mismatch for %s: got %s, want %s", url, actualSum, cleanSum)
+				}
+			}
+			return nil
+		},
+	)
+	return written, err
 }

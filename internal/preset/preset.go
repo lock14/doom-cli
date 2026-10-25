@@ -855,30 +855,18 @@ func LoadLayeredCatalog(userPath string, explicitPath bool) (*Catalog, error) {
 		return nil, statErr
 	}
 
-	var userEnts []Entity
-	var diags []Diagnostic
-	if info.IsDir() {
-		var loadErr error
-		userEnts, diags, loadErr = scanEntityFS(os.DirFS(userPath), dirScanOptions{
-			displayPrefix:    filepath.ToSlash(userPath),
-			strict:           false,
-			severity:         "warn",
-			quarantinePrefix: true,
-		})
-		if loadErr != nil {
-			return nil, loadErr
-		}
-	} else {
-		raw, readErr := os.ReadFile(userPath)
-		if readErr != nil {
-			return nil, readErr
-		}
-		ent, decErr := DecodeEntity(raw)
-		if decErr != nil {
-			return nil, fmt.Errorf("%s: %w", userPath, decErr)
-		}
-		ent.Path = userPath
-		userEnts = []Entity{ent}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("%s is not a directory", userPath)
+	}
+
+	userEnts, diags, loadErr := scanEntityFS(os.DirFS(userPath), dirScanOptions{
+		displayPrefix:    filepath.ToSlash(userPath),
+		strict:           false,
+		severity:         "warn",
+		quarantinePrefix: true,
+	})
+	if loadErr != nil {
+		return nil, loadErr
 	}
 
 	if len(userEnts) == 0 && len(diags) == 0 {
@@ -905,19 +893,15 @@ func MergeUserDir(base *Catalog, userDir string) (*Catalog, error) {
 	var diags []Diagnostic
 	if strings.TrimSpace(userDir) != "" {
 		if info, statErr := os.Stat(userDir); statErr == nil {
-			if info.IsDir() {
-				userEnts, diags, _ = scanEntityFS(os.DirFS(userDir), dirScanOptions{
-					displayPrefix:    filepath.ToSlash(userDir),
-					strict:           false,
-					severity:         "warn",
-					quarantinePrefix: true,
-				})
-			} else if raw, readErr := os.ReadFile(userDir); readErr == nil {
-				if ent, decErr := DecodeEntity(raw); decErr == nil {
-					ent.Path = filepath.ToSlash(userDir)
-					userEnts = []Entity{ent}
-				}
+			if !info.IsDir() {
+				return nil, fmt.Errorf("%s is not a directory", userDir)
 			}
+			userEnts, diags, _ = scanEntityFS(os.DirFS(userDir), dirScanOptions{
+				displayPrefix:    filepath.ToSlash(userDir),
+				strict:           false,
+				severity:         "warn",
+				quarantinePrefix: true,
+			})
 		}
 	}
 
@@ -1236,63 +1220,45 @@ func LoadPresetBaseAndOverride(catalogDir string, id string) (*Preset, *Override
 	dir := strings.TrimSpace(catalogDir)
 	if dir != "" {
 		if info, statErr := os.Stat(dir); statErr == nil {
-			if info.IsDir() {
-				candidateID := Slug(clean)
-				if base != nil {
-					candidateID = base.ID
+			if !info.IsDir() {
+				return nil, nil, fmt.Errorf("%s is not a directory", dir)
+			}
+			candidateID := Slug(clean)
+			if base != nil {
+				candidateID = base.ID
+			}
+			userPresetPath := filepath.Join(dir, fmt.Sprintf("preset.%s.json", candidateID))
+			if raw, readErr := os.ReadFile(userPresetPath); readErr == nil {
+				if ent, decErr := DecodeEntity(raw); decErr == nil && ent.Preset != nil {
+					up := clonePreset(*ent.Preset)
+					up.Layer = LayerUser
+					up.Path = filepath.ToSlash(userPresetPath)
+					base = up
 				}
-				userPresetPath := filepath.Join(dir, fmt.Sprintf("preset.%s.json", candidateID))
-				if raw, readErr := os.ReadFile(userPresetPath); readErr == nil {
-					if ent, decErr := DecodeEntity(raw); decErr == nil && ent.Preset != nil {
-						up := clonePreset(*ent.Preset)
-						up.Layer = LayerUser
-						up.Path = filepath.ToSlash(userPresetPath)
-						base = up
-					}
-				} else if base == nil {
-					ents, _, _ := scanEntityFS(os.DirFS(dir), dirScanOptions{
-						displayPrefix: filepath.ToSlash(dir),
-						strict:        false,
-						severity:      "warn",
-					})
-					for _, ent := range ents {
-						if ent.Preset != nil &&
-							(strings.EqualFold(ent.Preset.ID, clean) || strings.EqualFold(ent.Preset.Name, clean)) {
-							up := clonePreset(*ent.Preset)
-							up.Layer = LayerUser
-							up.Path = ent.Path
-							base = up
-							break
-						}
-					}
-				}
-
-				if base != nil {
-					ovPath := filepath.Join(dir, fmt.Sprintf("override.preset.%s.json", base.ID))
-					if raw, readErr := os.ReadFile(ovPath); readErr == nil {
-						if ent, decErr := DecodeEntity(raw); decErr == nil && ent.Override != nil {
-							ov := *ent.Override
-							ov.Path = filepath.ToSlash(ovPath)
-							ov.AppendFiles = cloneFileSpecs(ent.Override.AppendFiles)
-							ov.AppendArgs = append([]string(nil), ent.Override.AppendArgs...)
-							ov.ExcludeFiles = append([]string(nil), ent.Override.ExcludeFiles...)
-							return base, &ov, nil
-						}
-					}
-				}
-			} else if raw, readErr := os.ReadFile(dir); readErr == nil {
-				if ent, decErr := DecodeEntity(raw); decErr == nil {
+			} else if base == nil {
+				ents, _, _ := scanEntityFS(os.DirFS(dir), dirScanOptions{
+					displayPrefix: filepath.ToSlash(dir),
+					strict:        false,
+					severity:      "warn",
+				})
+				for _, ent := range ents {
 					if ent.Preset != nil &&
 						(strings.EqualFold(ent.Preset.ID, clean) || strings.EqualFold(ent.Preset.Name, clean)) {
 						up := clonePreset(*ent.Preset)
 						up.Layer = LayerUser
-						up.Path = filepath.ToSlash(dir)
+						up.Path = ent.Path
 						base = up
-					} else if ent.Override != nil && base != nil &&
-						ent.Override.Target.Kind == KindPreset &&
-						strings.EqualFold(ent.Override.Target.ID, base.ID) {
+						break
+					}
+				}
+			}
+
+			if base != nil {
+				ovPath := filepath.Join(dir, fmt.Sprintf("override.preset.%s.json", base.ID))
+				if raw, readErr := os.ReadFile(ovPath); readErr == nil {
+					if ent, decErr := DecodeEntity(raw); decErr == nil && ent.Override != nil {
 						ov := *ent.Override
-						ov.Path = filepath.ToSlash(dir)
+						ov.Path = filepath.ToSlash(ovPath)
 						ov.AppendFiles = cloneFileSpecs(ent.Override.AppendFiles)
 						ov.AppendArgs = append([]string(nil), ent.Override.AppendArgs...)
 						ov.ExcludeFiles = append([]string(nil), ent.Override.ExcludeFiles...)

@@ -1292,3 +1292,77 @@ func TestLookupNormalization_EngineDisplayName_And_RemovePresetCurated(t *testin
 		t.Errorf("expected 0 diagnostics when <rootDir>/catalog does not exist, got %v", diags)
 	}
 }
+
+func TestNeedsSteamDiscoveryAndNonDirCatalogErrors(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wadsDir, "sigil_shreds_compat.wad"), []byte("music"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	idx := NewDirIndex(wadsDir)
+
+	// 1. Preset with empty IWAD, download sources, and no missing optional files does not need Steam discovery
+	pNoIWAD := Preset{
+		ID:      "standalone",
+		Name:    "Standalone",
+		IWAD:    "",
+		Sources: []Source{{URL: "https://example.com/standalone.zip"}},
+		Files:   []FileSpec{{Name: "standalone.wad"}},
+	}
+	if idx.NeedsSteamDiscovery(pNoIWAD) {
+		t.Errorf("expected NeedsSteamDiscovery=false for preset with empty IWAD and sources")
+	}
+
+	// 2. Preset with present IWAD, download sources, and optional file satisfied via FileSpec.Aliases
+	pOptAlias := Preset{
+		ID:      "sigil-opt",
+		Name:    "Sigil Opt",
+		IWAD:    "DOOM2.WAD",
+		Sources: []Source{{URL: "https://example.com/sigil.zip"}},
+		Files: []FileSpec{
+			{Name: "SIGIL_V1_23.wad"},
+			{Name: "SIGIL_SHREDS.wad", Optional: true, Aliases: []string{"sigil_shreds_compat.wad"}},
+		},
+	}
+	if idx.NeedsSteamDiscovery(pOptAlias) {
+		t.Errorf("expected NeedsSteamDiscovery=false when optional file is present via alias")
+	}
+
+	// 3. Preset with missing optional file needs Steam discovery
+	pMissingOpt := Preset{
+		ID:      "doom2-music",
+		Name:    "Doom II Music",
+		IWAD:    "DOOM2.WAD",
+		Sources: []Source{{URL: "https://example.com/map.zip"}},
+		Files: []FileSpec{
+			{Name: "map.wad"},
+			{Name: "idkfa 2024.wad", Optional: true},
+		},
+	}
+	if !idx.NeedsSteamDiscovery(pMissingOpt) {
+		t.Errorf("expected NeedsSteamDiscovery=true when optional file is missing")
+	}
+
+	// 4. LoadLayeredCatalog, MergeUserDir, and LoadPresetBaseAndOverride reject regular file userDir
+	notADir := filepath.Join(t.TempDir(), "not-a-dir.json")
+	if err := os.WriteFile(notADir, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadLayeredCatalog(notADir, false); err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("expected LoadLayeredCatalog(file) to fail with 'not a directory', got %v", err)
+	}
+	curated, err := LoadCuratedCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := MergeUserDir(curated, notADir); err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("expected MergeUserDir(curated, file) to fail with 'not a directory', got %v", err)
+	}
+	if _, _, err := LoadPresetBaseAndOverride(notADir, "doom2"); err == nil ||
+		!strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("expected LoadPresetBaseAndOverride(file, doom2) to fail with 'not a directory', got %v", err)
+	}
+}

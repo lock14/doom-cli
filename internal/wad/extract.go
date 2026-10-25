@@ -341,10 +341,6 @@ func extractZipFile(zf *zip.File, targetDir, destPath string) error {
 	}
 	defer rc.Close()
 
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return err
-	}
-	_, err = fsutil.WriteFileAtomic(cleanDest, data, 0o644)
+	_, _, err = fsutil.WriteReaderAtomic(cleanDest, rc, 0o644)
 	return err
 }

@@ -89,7 +89,8 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
   settings-only `config.json` (`settings.go`).
 - `internal/display/`: Native display resolution and refresh rate auto-detection.
 - `internal/engine/`: Declarative source port binary installation and argument synthesis (`runner.go`, `installer.go`).
-- `internal/fsutil/`: Atomic file writes with timestamped backups and path-containment helpers (`fsutil.go`).
+- `internal/fsutil/`: Atomic file writes with timestamped backups, SHA-256 verified HTTP downloads, and
+  path-containment helpers (`fsutil.go`).
 - `internal/preset/`: Two-layer entity catalog, store operations, schema and documentation linting, multi-root file and
   alias resolution, CP437 decoding, and README sync (`preset.go`, `store.go`, `lint.go`, `resolve.go`, `decode.go`,
   `compiler.go`).

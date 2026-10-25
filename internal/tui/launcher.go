@@ -306,26 +306,17 @@ func (m *model) openHelp(mode int) {
 }
 
 func (m model) areAllPresetFilesPresent(p preset.Preset) bool {
-	if _, ok := m.resolveFile(p.IWAD); !ok {
-		return false
+	if strings.TrimSpace(p.IWAD) != "" {
+		if _, ok := m.resolveFile(p.IWAD); !ok {
+			return false
+		}
 	}
 	for _, f := range p.Files {
-		if _, ok := m.resolveFile(f.Name); !ok {
+		if _, ok := m.dirIndex.ResolveFileSpec(f); !ok {
 			return false
 		}
 	}
 	return true
-}
-
-func (m model) needsOptionalSteamFile(p preset.Preset) bool {
-	for _, f := range p.Files {
-		if f.Optional {
-			if _, ok := m.resolveFile(f.Name); !ok {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func (m *model) handleFetchAssets() {
@@ -347,8 +338,7 @@ func (m *model) handleFetchAssets() {
 
 	var buf bytes.Buffer
 	var steamErr error
-	_, iwadFound := m.resolveFile(cur.IWAD)
-	if (!iwadFound || len(cur.Sources) == 0 || m.needsOptionalSteamFile(cur)) && writeDir != "" {
+	if m.dirIndex.NeedsSteamDiscovery(cur) && writeDir != "" {
 		searchRoots := m.steamSearchRoots
 		_, steamErr = steam.DiscoverAndExtract(
 			m.catalog, searchRoots, writeDir, false, &buf, m.extraWadRoots()...,
@@ -689,19 +679,6 @@ func (m model) View() string {
 	return "\n" + header + panels + footer + "\n"
 }
 
-// RunInteractiveLauncher runs the interactive Bubble Tea UI launcher across one or more WAD roots.
-func RunInteractiveLauncher(
-	catalog *preset.Catalog,
-	wadRoots []string,
-	theme Theme,
-	nerdFonts bool,
-	initialPreset ...string,
-) (*preset.Preset, error) {
-	return RunInteractiveLauncherWithOptions(
-		catalog, wadRoots, theme, nerdFonts, LauncherOptions{}, initialPreset...,
-	)
-}
-
 // RunInteractiveLauncherWithOptions runs the interactive Bubble Tea UI launcher with full CLI context.
 func RunInteractiveLauncherWithOptions(
 	catalog *preset.Catalog,
@@ -709,7 +686,6 @@ func RunInteractiveLauncherWithOptions(
 	theme Theme,
 	nerdFonts bool,
 	opts LauncherOptions,
-	initialPreset ...string,
 ) (*preset.Preset, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		if opts.InitialMode != InitialModeWads {
@@ -718,7 +694,7 @@ func RunInteractiveLauncherWithOptions(
 		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
 	}
 
-	m := initialModel(catalog, wadRoots, theme, nerdFonts, initialPreset...)
+	m := initialModel(catalog, wadRoots, theme, nerdFonts)
 	m.applyOptions(opts)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

@@ -467,8 +467,7 @@ func TestFormatLaunchPreview(t *testing.T) {
 	preview := FormatLaunchPreview(p, nil, idx, []string{"-fast"})
 	wantParts := []string{
 		"dsda-doom -iwad " + filepath.Join(wadsDir, "DOOM2.WAD"),
-		"-file " + filepath.Join(wadsDir, "av.wad") + " idkfa 2024.wad",
-		"-deh " + filepath.Join(wadsDir, "av.deh"),
+		"-file " + filepath.Join(wadsDir, "av.wad") + " -deh " + filepath.Join(wadsDir, "av.deh"),
 		"-complevel 2 -skill 4 -fast",
 	}
 	for _, want := range wantParts {
@@ -476,9 +475,50 @@ func TestFormatLaunchPreview(t *testing.T) {
 			t.Errorf("FormatLaunchPreview = %q, missing %q", preview, want)
 		}
 	}
+	if strings.Contains(preview, "idkfa") {
+		t.Errorf("FormatLaunchPreview with missing optional file should omit idkfa 2024.wad, got %q", preview)
+	}
+
+	idkfaPath := filepath.Join(wadsDir, "idkfa 2024.wad")
+	_ = os.WriteFile(idkfaPath, []byte("music"), 0o644)
+	idxWithOptional := preset.NewDirIndex(wadsDir)
+	previewWithOptional := FormatLaunchPreview(p, nil, idxWithOptional, []string{"-fast"})
+	wantWithOptional := "-file " + filepath.Join(wadsDir, "av.wad") + " " + idkfaPath
+	if !strings.Contains(previewWithOptional, wantWithOptional) {
+		t.Errorf(
+			"FormatLaunchPreview with present optional file = %q, missing %q",
+			previewWithOptional, wantWithOptional,
+		)
+	}
 
 	previewNoIdx := FormatLaunchPreview(p, nil, nil, []string{"-fast"})
 	if !strings.Contains(previewNoIdx, "dsda-doom -iwad DOOM2.WAD -file av.wad idkfa 2024.wad -deh av.deh") {
 		t.Errorf("FormatLaunchPreview(nil idx) = %q", previewNoIdx)
+	}
+
+	// Multiple .deh and .bex files mixed with present and missing optional .wad files
+	_ = os.WriteFile(filepath.Join(wadsDir, "patch2.bex"), []byte("bex"), 0o644)
+	idxMulti := preset.NewDirIndex(wadsDir)
+	pMulti := preset.Preset{
+		ID:     "multi-patch",
+		Name:   "Multi Patch",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files: []preset.FileSpec{
+			{Name: "av.wad"},
+			{Name: "av.deh"},
+			{Name: "missing_opt.wad", Optional: true},
+			{Name: "patch2.bex"},
+			{Name: "idkfa 2024.wad", Optional: true},
+		},
+	}
+	previewMulti := FormatLaunchPreview(pMulti, nil, idxMulti, nil)
+	wantMulti := "-file " + filepath.Join(wadsDir, "av.wad") + " " + idkfaPath +
+		" -deh " + filepath.Join(wadsDir, "av.deh") + " " + filepath.Join(wadsDir, "patch2.bex")
+	if !strings.Contains(previewMulti, wantMulti) {
+		t.Errorf("FormatLaunchPreview(multi deh/bex + mixed optional) = %q, want %q", previewMulti, wantMulti)
+	}
+	if strings.Contains(previewMulti, "missing_opt.wad") {
+		t.Errorf("FormatLaunchPreview should omit missing_opt.wad, got %q", previewMulti)
 	}
 }

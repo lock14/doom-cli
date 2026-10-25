@@ -30,12 +30,6 @@ func mustReadEmbedded(name string) []byte {
 	return data
 }
 
-// BackupFile copies dest to dest.bak.YYYYMMDDHHMMSS if it exists, never
-// overwriting an existing backup file.
-func BackupFile(dest string) (string, error) {
-	return fsutil.BackupFile(dest)
-}
-
 var (
 	reFluidPatchset = regexp.MustCompile(`fluid_patchset\s+".*"`)
 	reVidMaxFPS     = regexp.MustCompile(`vid_maxfps\s+\d+`)
@@ -43,14 +37,16 @@ var (
 	reSndSoundfont  = regexp.MustCompile(`snd_soundfont\s+".*"`)
 )
 
-func renderAutoexecWithRate(paths *config.Paths, rate int) string {
+// RenderAutoexecWithRate returns expected autoexec.cfg content for a given refresh rate and soundfont path.
+func RenderAutoexecWithRate(paths *config.Paths, rate int) string {
 	content := string(embeddedAutoexec)
 	content = strings.ReplaceAll(content, "__REFRESH_RATE__", strconv.Itoa(rate))
 	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
 	return content
 }
 
-func renderDSDADoomWithRes(paths *config.Paths, res string) string {
+// RenderDSDADoomWithRes returns expected dsda-doom.cfg content for a given resolution and soundfont path.
+func RenderDSDADoomWithRes(paths *config.Paths, res string) string {
 	content := string(embeddedDSDADoom)
 	content = strings.ReplaceAll(content, "__RESOLUTION__", res)
 	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
@@ -79,14 +75,14 @@ func DeployConfigsWithOptions(paths *config.Paths, force bool, out io.Writer) er
 		if _, err := os.Stat(autoexecDest); err == nil {
 			fmt.Fprintf(out, "✓ UZDoom config already installed -> %s\n", autoexecDest)
 		} else {
-			autoexecContent := renderAutoexecWithRate(paths, rate)
+			autoexecContent := RenderAutoexecWithRate(paths, rate)
 			if _, err := fsutil.WriteFileAtomic(autoexecDest, []byte(autoexecContent), 0o644); err != nil {
 				return err
 			}
 			fmt.Fprintf(out, "✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
 		}
 	} else {
-		autoexecContent := renderAutoexecWithRate(paths, rate)
+		autoexecContent := RenderAutoexecWithRate(paths, rate)
 		bkp, err := fsutil.WriteFileAtomic(autoexecDest, []byte(autoexecContent), 0o644)
 		if err != nil {
 			return err
@@ -106,14 +102,14 @@ func DeployConfigsWithOptions(paths *config.Paths, force bool, out io.Writer) er
 		if _, err := os.Stat(dsdaDest); err == nil {
 			fmt.Fprintf(out, "✓ DSDA-Doom config already installed -> %s\n", dsdaDest)
 		} else {
-			dsdaContent := renderDSDADoomWithRes(paths, res)
+			dsdaContent := RenderDSDADoomWithRes(paths, res)
 			if _, err := fsutil.WriteFileAtomic(dsdaDest, []byte(dsdaContent), 0o644); err != nil {
 				return err
 			}
 			fmt.Fprintf(out, "✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
 		}
 	} else {
-		dsdaContent := renderDSDADoomWithRes(paths, res)
+		dsdaContent := RenderDSDADoomWithRes(paths, res)
 		bkp, err := fsutil.WriteFileAtomic(dsdaDest, []byte(dsdaContent), 0o644)
 		if err != nil {
 			return err
@@ -130,13 +126,13 @@ func DeployConfigsWithOptions(paths *config.Paths, force bool, out io.Writer) er
 // RenderAutoexec returns expected autoexec.cfg content with detected display and soundfont.
 func RenderAutoexec(paths *config.Paths) string {
 	rate := display.DetectRefreshRate()
-	return renderAutoexecWithRate(paths, rate)
+	return RenderAutoexecWithRate(paths, rate)
 }
 
 // RenderDSDADoom returns expected dsda-doom.cfg content with detected resolution and soundfont.
 func RenderDSDADoom(paths *config.Paths) string {
 	res := display.DetectResolution()
-	return renderDSDADoomWithRes(paths, res)
+	return RenderDSDADoomWithRes(paths, res)
 }
 
 // DiffConfigs compares installed system configs against embedded templates and prints differences.
@@ -144,14 +140,15 @@ func DiffConfigs(paths *config.Paths, out io.Writer) error {
 	if out == nil {
 		out = os.Stdout
 	}
+	res, rate := display.DetectDisplay()
 
 	fmt.Fprintln(out, "=== UZDoom Diff ===")
 	autoDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
-	printDiff("autoexec.cfg", RenderAutoexec(paths), autoDest, out)
+	printDiff("autoexec.cfg", RenderAutoexecWithRate(paths, rate), autoDest, out)
 
 	fmt.Fprintln(out, "\n=== DSDA-Doom Diff ===")
 	dsdaDest := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
-	printDiff("dsda-doom.cfg", RenderDSDADoom(paths), dsdaDest, out)
+	printDiff("dsda-doom.cfg", RenderDSDADoomWithRes(paths, res), dsdaDest, out)
 
 	return nil
 }

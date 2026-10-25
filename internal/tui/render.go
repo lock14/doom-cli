@@ -16,10 +16,6 @@ type keyHelp struct {
 	desc string
 }
 
-func formatKeyHelp(items []keyHelp) string {
-	return defaultStyles.FormatKeyHelp(items)
-}
-
 func formatEngineTagWithCatalog(catalog *preset.Catalog, engine string, styles ThemeStyles) string {
 	badge := catalog.EngineBadge(engine)
 	argsStyle := preset.GuessArgsStyle(engine, "")
@@ -41,10 +37,6 @@ func formatEngineTagWithCatalog(catalog *preset.Catalog, engine string, styles T
 		formatted := "[" + padOrTruncateName(badge, 6) + "]"
 		return tagStyle.Render(formatted)
 	}
-}
-
-func formatEngineTag(engine string, styles ThemeStyles) string {
-	return formatEngineTagWithCatalog(nil, engine, styles)
 }
 
 func padOrTruncateName(name string, width int) string {
@@ -120,7 +112,7 @@ func (m model) buildFileEntries(cur preset.Preset, readmePath string, hasReadme 
 	var entries []previewFileEntry
 	for _, f := range cur.Files {
 		fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-		if _, ok := m.resolveFile(f.Name); ok {
+		if _, ok := m.dirIndex.ResolveFileSpec(f); ok {
 			fStatus = m.styles.StatusReady.Render("[✓ Found]")
 		} else if f.Optional {
 			fStatus = m.styles.Help.Render("[Optional]")
@@ -482,18 +474,6 @@ func renderCapsule(capStyle, bodyStyle lipgloss.Style, text string) string {
 	return capStyle.Render("") + bodyStyle.Render(text) + capStyle.Render("")
 }
 
-func renderBrandPill() string {
-	return defaultStyles.RenderBrandPill(false)
-}
-
-func renderStatsPill(count, total int) string {
-	return defaultStyles.RenderStatsPill(count, total, false)
-}
-
-func renderScrollPill(percent float64) string {
-	return defaultStyles.RenderScrollPill(percent, false)
-}
-
 func renderHeaderBar(leftPart, rightPart string, width int) string {
 	leftW := lipgloss.Width(leftPart)
 	rightW := lipgloss.Width(rightPart)
@@ -552,6 +532,7 @@ func (m model) renderReadmeView() string {
 func (m model) renderReadmeFooter() string {
 	footer := m.styles.FormatKeyHelp([]keyHelp{
 		{"↑/↓/PgUp/PgDn/g/G", "Scroll"},
+		{"F1", "Help"},
 		{"Enter", "Launch"},
 		{"Tab/Esc/q", "Back"},
 	})
@@ -563,7 +544,7 @@ func (m model) renderReadmeFooter() string {
 
 func (m model) renderFooter(hasReadme bool) string {
 	var items []keyHelp
-	if m.width > 90 {
+	if m.width >= sideBySideMinWidth {
 		items = []keyHelp{
 			{"↑/↓", "Navigate"},
 		}
