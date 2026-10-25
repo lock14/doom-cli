@@ -59,6 +59,12 @@ func renderDSDADoomWithRes(paths *config.Paths, res string) string {
 
 // DeployConfigsTo installs autoexec.cfg and dsda-doom.cfg with backups, reporting output to out.
 func DeployConfigsTo(paths *config.Paths, out io.Writer) error {
+	return DeployConfigsWithOptions(paths, true, out)
+}
+
+// DeployConfigsWithOptions installs autoexec.cfg and dsda-doom.cfg. When force is false,
+// existing configuration files on disk are preserved without being overwritten.
+func DeployConfigsWithOptions(paths *config.Paths, force bool, out io.Writer) error {
 	if out == nil {
 		out = io.Discard
 	}
@@ -69,30 +75,54 @@ func DeployConfigsTo(paths *config.Paths, out io.Writer) error {
 		return err
 	}
 	autoexecDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
-	autoexecContent := renderAutoexecWithRate(paths, rate)
-	bkp, err := fsutil.WriteFileAtomic(autoexecDest, []byte(autoexecContent), 0o644)
-	if err != nil {
-		return err
+	if !force {
+		if _, err := os.Stat(autoexecDest); err == nil {
+			fmt.Fprintf(out, "✓ UZDoom config already installed -> %s\n", autoexecDest)
+		} else {
+			autoexecContent := renderAutoexecWithRate(paths, rate)
+			if _, err := fsutil.WriteFileAtomic(autoexecDest, []byte(autoexecContent), 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
+		}
+	} else {
+		autoexecContent := renderAutoexecWithRate(paths, rate)
+		bkp, err := fsutil.WriteFileAtomic(autoexecDest, []byte(autoexecContent), 0o644)
+		if err != nil {
+			return err
+		}
+		if bkp != "" {
+			fmt.Fprintf(out, "Backing up existing autoexec.cfg -> %s\n", filepath.Base(bkp))
+		}
+		fmt.Fprintf(out, "✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
 	}
-	if bkp != "" {
-		fmt.Fprintf(out, "Backing up existing autoexec.cfg -> %s\n", filepath.Base(bkp))
-	}
-	fmt.Fprintf(out, "✓ Installed UZDoom config -> %s (Refresh: %dHz)\n", autoexecDest, rate)
 
 	// 2. Deploy DSDA-Doom dsda-doom.cfg
 	if err := os.MkdirAll(paths.DSDADir, 0o755); err != nil {
 		return err
 	}
 	dsdaDest := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
-	dsdaContent := renderDSDADoomWithRes(paths, res)
-	bkp, err = fsutil.WriteFileAtomic(dsdaDest, []byte(dsdaContent), 0o644)
-	if err != nil {
-		return err
+	if !force {
+		if _, err := os.Stat(dsdaDest); err == nil {
+			fmt.Fprintf(out, "✓ DSDA-Doom config already installed -> %s\n", dsdaDest)
+		} else {
+			dsdaContent := renderDSDADoomWithRes(paths, res)
+			if _, err := fsutil.WriteFileAtomic(dsdaDest, []byte(dsdaContent), 0o644); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
+		}
+	} else {
+		dsdaContent := renderDSDADoomWithRes(paths, res)
+		bkp, err := fsutil.WriteFileAtomic(dsdaDest, []byte(dsdaContent), 0o644)
+		if err != nil {
+			return err
+		}
+		if bkp != "" {
+			fmt.Fprintf(out, "Backing up existing dsda-doom.cfg -> %s\n", filepath.Base(bkp))
+		}
+		fmt.Fprintf(out, "✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
 	}
-	if bkp != "" {
-		fmt.Fprintf(out, "Backing up existing dsda-doom.cfg -> %s\n", filepath.Base(bkp))
-	}
-	fmt.Fprintf(out, "✓ Installed DSDA-Doom config -> %s (Resolution: %s)\n", dsdaDest, res)
 
 	return nil
 }

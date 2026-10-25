@@ -90,20 +90,7 @@ func ResolveFor(targetOS string) *Paths {
 		p.SetConfigDir(envConfig)
 	}
 
-	if envWads := os.Getenv("DOOM_WADS_DIR"); envWads != "" {
-		p.WadsDir = envWads
-	}
-	if envWadsDirs := os.Getenv("DOOM_WADS_DIRS"); envWadsDirs != "" {
-		p.WadsDirs = ParsePathList(envWadsDirs)
-	}
-	if envBin := os.Getenv("DOOM_BIN_DIR"); envBin != "" {
-		p.SetBinDirForOS(targetOS, envBin)
-	}
-	if envSF := os.Getenv("DOOM_SF_DIR"); envSF != "" {
-		p.SetSoundFontsDir(envSF)
-	} else {
-		p.SoundFontFile = filepath.Join(p.SoundFontsDir, "GeneralUser-GS.sf2")
-	}
+	p.SoundFontFile = filepath.Join(p.SoundFontsDir, "GeneralUser-GS.sf2")
 
 	return p
 }

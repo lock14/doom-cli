@@ -194,7 +194,7 @@ func assignColor(target *lipgloss.TerminalColor, val string) {
 	}
 }
 
-// ResolveTheme resolves a Theme based on CLI flag, DOOM_THEME env, user config, and custom themes directory.
+// ResolveTheme resolves a Theme from the first matching candidate across built-in themes and custom JSON files.
 func ResolveTheme(flagTheme, envTheme, configTheme, themesDir string) Theme {
 	for _, candidate := range []string{flagTheme, envTheme, configTheme} {
 		candidate = strings.TrimSpace(candidate)

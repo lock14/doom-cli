@@ -105,3 +105,38 @@ func TestParsePathList(t *testing.T) {
 		t.Fatalf("ParsePathList got %v", got)
 	}
 }
+
+func TestResolveFor_DOOMConfigDirAndIgnoredEnvVars(t *testing.T) {
+	customCfgDir := filepath.Join(t.TempDir(), "custom-doom-cli")
+	t.Setenv("DOOM_CONFIG_DIR", customCfgDir)
+	t.Setenv("DOOM_WADS_DIR", "/ignored/env/wads")
+	t.Setenv("DOOM_WADS_DIRS", "/ignored/env/extra1,/ignored/env/extra2")
+	t.Setenv("DOOM_BIN_DIR", "/ignored/env/bin")
+	t.Setenv("DOOM_SF_DIR", "/ignored/env/sf")
+
+	p := ResolveFor("linux")
+	if p.ConfigDir != customCfgDir {
+		t.Errorf("expected ConfigDir=%q from DOOM_CONFIG_DIR, got %q", customCfgDir, p.ConfigDir)
+	}
+	if p.ConfigFile != filepath.Join(customCfgDir, "config.json") {
+		t.Errorf("expected ConfigFile under DOOM_CONFIG_DIR, got %q", p.ConfigFile)
+	}
+	if p.CatalogDir != filepath.Join(customCfgDir, "catalog.d") {
+		t.Errorf("expected CatalogDir under DOOM_CONFIG_DIR, got %q", p.CatalogDir)
+	}
+	if p.ThemesDir != filepath.Join(customCfgDir, "themes") {
+		t.Errorf("expected ThemesDir under DOOM_CONFIG_DIR, got %q", p.ThemesDir)
+	}
+	if p.WadsDir == "/ignored/env/wads" {
+		t.Errorf("expected DOOM_WADS_DIR to be ignored, got WadsDir=%q", p.WadsDir)
+	}
+	if len(p.WadsDirs) != 0 {
+		t.Errorf("expected DOOM_WADS_DIRS to be ignored, got WadsDirs=%v", p.WadsDirs)
+	}
+	if p.BinDir == "/ignored/env/bin" {
+		t.Errorf("expected DOOM_BIN_DIR to be ignored, got BinDir=%q", p.BinDir)
+	}
+	if p.SoundFontsDir == "/ignored/env/sf" {
+		t.Errorf("expected DOOM_SF_DIR to be ignored, got SoundFontsDir=%q", p.SoundFontsDir)
+	}
+}

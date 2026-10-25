@@ -20,7 +20,6 @@ Linux, macOS, and Windows.
 - [Automated setup (`doom setup`)](#automated-setup-doom-setup)
 - [CLI command reference](#cli-command-reference)
   - [Core commands](#core-commands)
-  - [Global CLI flags](#global-cli-flags)
   - [WADs and preset management](#wads-and-preset-management)
   - [Engine management](#engine-management)
   - [Configuration and theme management](#configuration-and-theme-management)
@@ -120,8 +119,8 @@ doom setup
 
 `doom setup` performs five automated steps:
 1. **Deploys engine configurations**: Installs curated configurations for UZDoom and DSDA-Doom, auto-detecting your
-   display resolution and native monitor refresh rate while creating timestamped backups (`.bak.<timestamp>`) of any
-   existing files.
+   display resolution and native monitor refresh rate while preserving existing configuration files unless `--force` is
+   passed.
 2. **Installs source ports**: Downloads portable binaries for UZDoom and DSDA-Doom into your local binary path.
 3. **Deploys MIDI SoundFont**: Downloads and installs the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth
    MIDI playback.
@@ -134,7 +133,8 @@ doom setup
 
 ## CLI command reference
 
-The `doom` CLI is organized around five primary commands:
+The `doom` CLI is organized around five primary commands. Engine flags and console commands passed to `doom [wad]`
+(such as `-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine:
 
 ### Core commands
 
@@ -143,25 +143,11 @@ The `doom` CLI is organized around five primary commands:
 | `doom [wad] [flags]` | Directly launches a WAD preset (defaults to *The Ultimate Doom* when `<wad>` is omitted) |
 | `doom [wad] -e <engine>` | Launches a WAD preset with an explicit engine override (`--engine` or `-e`) |
 | `doom [wad] --dry-run` | Prints the synthesized launch command without starting the game |
-| `doom wads [flags]` | Launches the interactive TUI WAD browser and forwards engine flags (`doom wads -skill 4`) |
-| `doom wads --theme <name>` | Runs the interactive TUI browser with a specific color theme for the current session |
-| `doom wads --nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
+| `doom wads` | Opens the interactive TUI WAD browser powered by Bubble Tea |
 | `doom engines` | Opens the interactive TUI engine manager (or lists engines when piped on non-TTY stdout) |
 | `doom config` | Opens the interactive TUI CLI settings editor (or displays settings on non-TTY stdout) |
 | `doom setup` | Runs turnkey installation of engines, configurations, SoundFonts, and game files |
-| `doom setup --force` | Re-downloads and overwrites existing engines, SoundFonts, and game files during setup |
-
-### Global CLI flags
-
-Global flags (`--wads-dir`, `--theme`, and `--nerd-fonts`) apply across commands and take precedence over `DOOM_*`
-environment variables, `config.json` settings, and platform defaults. Unknown flags passed to `doom [wad]` or
-`doom wads` (such as `-skill 4` or `-warp 15`) are forwarded directly to the target source port engine:
-
-| Flag | Description |
-| :--- | :--- |
-| `--wads-dir <path>` | Overrides the primary directory containing IWADs, PWADs, and DeHackEd patches |
-| `--theme <name>` | Sets the launcher color theme for the current session |
-| `--nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
+| `doom setup --force` | Re-downloads and overwrites existing engines, configurations, SoundFonts, and game files |
 
 ### WADs and preset management
 
@@ -177,7 +163,7 @@ environment variables, `config.json` settings, and platform defaults. Unknown fl
 | `doom wads add <name> [flags]` | Registers a custom WAD or mapset preset in `catalog.d/preset.<id>.json` |
 | `doom wads set <name> [flags]` | Sets per-WAD overrides in `catalog.d/override.preset.<id>.json` |
 | `doom wads reset <name>` | Clears custom launch overrides, reverting to curated defaults |
-| `doom wads remove <name>` | Removes a custom preset or clears overrides for a built-in preset |
+| `doom wads remove <name>` | Removes a custom preset from the user catalog |
 | `doom wads lint [root]` | Validates curated and user catalog entities and schema invariants |
 
 ### Engine management
@@ -187,7 +173,7 @@ environment variables, `config.json` settings, and platform defaults. Unknown fl
 | `doom engines` | Opens the interactive TUI engine manager (or lists engines on non-TTY stdout) |
 | `doom engines list` | Lists all configured engines (built-in and custom) with binary status |
 | `doom engines install [engine\|all]` | Installs portable binaries (`uzdoom`, `dsda-doom`), `.cfg` templates, and SC-55 SoundFont |
-| `doom engines install --force` | Re-downloads and overwrites existing engine binaries and SoundFont files |
+| `doom engines install --force` | Re-downloads and overwrites existing engine binaries, `.cfg` templates, and SoundFont |
 | `doom engines add <name> [flags]` | Registers a custom source port engine in `catalog.d/engine.<id>.json` |
 | `doom engines set <name> [flags]` | Sets per-engine overrides in `catalog.d/override.engine.<id>.json` |
 | `doom engines reset <name>` | Clears custom engine overrides, reverting to base engine defaults |
@@ -203,7 +189,6 @@ environment variables, `config.json` settings, and platform defaults. Unknown fl
 | `doom config show` | Displays active CLI user configuration and source precedence |
 | `doom config get [key]` | Retrieves an effective configuration value (or shows all settings when `<key>` is omitted) |
 | `doom config set <key> <val>` | Sets a configuration value (such as `doom config set theme blood`) |
-| `doom config toggle <key>` | Toggles a boolean setting (such as `doom config toggle nerd-fonts`) |
 | `doom config themes` | Lists all built-in and custom themes with live ANSI color swatches |
 
 ### Shell autocompletion
@@ -252,8 +237,8 @@ interface powered by Bubble Tea:
 - **Contextual help**: Press `F1` from any view to inspect context-aware keybindings and search tokens.
 - **Single-shot launch and readiness guard**: Launches the selected preset and exits when the game closes, or stays in
   the browser with an actionable prompt (`Ctrl+F`) if required WADs are missing, and exits cleanly with `Esc` or
-  `Ctrl+C`. Configure color themes and Nerd Fonts badges via `--theme`, `--nerd-fonts`, `doom config set theme <name>`,
-  or `doom config`.
+  `Ctrl+C`. Configure color themes and Nerd Fonts badges via `doom config set theme <name>`,
+  `doom config set nerd-fonts on`, or `doom config`.
 
 ### Main preset browser controls
 
@@ -350,9 +335,6 @@ doom config themes
 
 # Persistently set default theme
 doom config set theme blood
-
-# Temporarily test a theme for a single run
-doom wads --theme toxic
 ```
 
 ### Built-in themes
@@ -403,11 +385,9 @@ Create custom themes in `<config_dir>/themes/<theme_name>.json` (for example,
 }
 ```
 
-Theme resolution follows a four-step precedence order:
-1. `--theme <name>` CLI flag
-2. `DOOM_THEME` environment variable
-3. `theme` setting in user configuration (`config.json`)
-4. `classic` built-in theme
+Theme resolution follows a two-step precedence order:
+1. `theme` setting in user configuration (`config.json`)
+2. `classic` built-in theme
 
 ### Nerd Fonts and capsule badges
 
@@ -415,16 +395,12 @@ By default, the launcher uses universal rectangular badges (` DOOM `) and standa
 cleanly in standard terminal emulators without patched fonts.
 
 If your terminal font includes Nerd Fonts glyphs (such as JetBrains Mono NF, MesloLGS NF, or FiraCode NF), you can
-enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `--nerd-fonts`, `DOOM_NERD_FONTS`, or
-`nerd_fonts: true`:
+enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `nerd_fonts: true`:
 
 ```bash
-# Enable temporarily for one session
-doom wads --nerd-fonts
-
-# Permanently toggle in user configuration
-doom config toggle nerd-fonts
+# Enable or disable in user configuration
 doom config set nerd-fonts on
+doom config set nerd-fonts off
 ```
 
 ## Extensibility
@@ -450,7 +426,7 @@ doom engines list
 
 ### Configure engine overrides
 
-Customize binary paths (`--binary`), argument styles (`--style`), wrapper prefixes (`--prefix-args`), badges
+Customize binary paths (`--binary`), argument styles (`--style`), early prefix arguments (`--prefix-args`), badges
 (`--badge`), display names (`--display-name`), or default flags (`--args`) for any built-in or custom engine
 (`catalog.d/override.engine.<id>.json`), or clear overrides with `doom engines reset`, without modifying
 curated engine definitions:
@@ -462,8 +438,8 @@ doom engines set dsda-doom --binary /opt/doom/dsda-doom --badge "DSDA+"
 # Set default flags for DSDA-Doom
 doom engines set dsda-doom --args "-complevel 21"
 
-# Prepend wrapper command tokens before the engine executable
-doom engines set uzdoom --prefix-args "mangohud --dlsym"
+# Pass early prefix arguments after the engine binary and before -iwad
+doom engines set dsda-doom --prefix-args "-config /opt/doom/dsda-doom.cfg"
 
 # Reset custom engine overrides back to base defaults
 doom engines reset dsda-doom
@@ -622,19 +598,14 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 
 ## Environment variables
 
-Environment variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`,
-`DOOM_BIN_DIR`, `DOOM_SF_DIR`) override persistent settings in `config.json` and platform defaults, while explicit CLI
-flags (`--theme`, `--nerd-fonts`, `--wads-dir`) take precedence over environment variables:
+`DOOM_CONFIG_DIR` overrides the directory used for `config.json`, `themes/`, and `catalog.d/`, while standard platform
+variables control base user directories:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
 | `DOOM_CONFIG_DIR` | Directory for `config.json`, `themes/`, and `catalog.d/` | Platform CLI config directory |
-| `DOOM_THEME` | Color theme for the interactive launcher | `classic` (or value in `config.json`) |
-| `DOOM_NERD_FONTS` | Boolean toggle for Powerlevel10k rounded capsule badges | `false` (or value in `config.json`) |
-| `DOOM_WADS_DIR` | Primary directory for game IWADs, PWADs, and DeHackEd patches | Platform standard WAD directory |
-| `DOOM_WADS_DIRS` | Extra read-only WAD directories (comma or path-list separated) | `wads_dirs` in `config.json` |
-| `DOOM_BIN_DIR` | Directory containing source port engine binaries | Platform standard binary directory |
-| `DOOM_SF_DIR` | Directory containing SoundFonts (`GeneralUser-GS.sf2`) | Platform standard SoundFonts directory |
+| `XDG_CONFIG_HOME` | Base configuration directory on Linux | `~/.config` |
+| `XDG_DATA_HOME` | Base data directory on Linux | `~/.local/share` |
 
 ## Directory layouts
 
@@ -747,7 +718,7 @@ Ensure commercial IWADs (`DOOM2.WAD`, `DOOM.WAD`, and others) are in your WAD di
 ```bash
 doom wads scan
 ```
-Or specify a custom WAD directory with `--wads-dir <path>` or `export DOOM_WADS_DIR=<path>`.
+Or configure a custom WAD directory with `doom config set wads-dir <path>`.
 
 ### "Engine binary not found in PATH"
 Run `doom engines install` to download portable binaries for UZDoom and DSDA-Doom into `~/.local/bin/`, or verify

@@ -219,3 +219,54 @@ func TestDeployConfigsTo(t *testing.T) {
 		t.Errorf("expected autoexec.cfg to exist: %v", err)
 	}
 }
+
+func TestDeployConfigsWithOptions_PreservesExistingWhenNotForced(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	paths := &config.Paths{
+		DataDir:       tmpDir,
+		BinDir:        filepath.Join(tmpDir, "bin"),
+		WadsDir:       filepath.Join(tmpDir, "wads"),
+		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
+		SoundFontFile: filepath.Join(tmpDir, "soundfonts", "GeneralUser-GS.sf2"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
+	}
+
+	if err := os.MkdirAll(paths.UZDoomDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	autoexecPath := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
+	if err := os.WriteFile(autoexecPath, []byte("custom-user-autoexec"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if err := DeployConfigsWithOptions(paths, false, &buf); err != nil {
+		t.Fatalf("DeployConfigsWithOptions(force=false) failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "UZDoom config already installed") {
+		t.Errorf("expected UZDoom config already installed message, got:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "Installed DSDA-Doom config") {
+		t.Errorf("expected DSDA-Doom config to be installed when missing, got:\n%s", buf.String())
+	}
+	gotAuto, err := os.ReadFile(autoexecPath)
+	if err != nil || string(gotAuto) != "custom-user-autoexec" {
+		t.Errorf("expected existing autoexec.cfg preserved when force=false, got %q (err=%v)", string(gotAuto), err)
+	}
+
+	// With force=true, existing autoexec.cfg is backed up and overwritten
+	buf.Reset()
+	if err := DeployConfigsWithOptions(paths, true, &buf); err != nil {
+		t.Fatalf("DeployConfigsWithOptions(force=true) failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Backing up existing autoexec.cfg") {
+		t.Errorf("expected backup message when force=true, got:\n%s", buf.String())
+	}
+	gotAutoForced, err := os.ReadFile(autoexecPath)
+	if err != nil || string(gotAutoForced) == "custom-user-autoexec" {
+		t.Errorf("expected autoexec.cfg overwritten when force=true")
+	}
+}

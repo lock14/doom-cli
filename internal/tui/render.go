@@ -221,8 +221,8 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	cur := m.filtered[m.cursor]
 	readmePath, hasReadme := m.resolveReadme(cur)
 	engStr := m.catalog.EngineDisplayName(cur.Engine)
-	if eng, ok := m.catalog.FindEngine(cur.Engine); ok && eng.Description != "" {
-		engStr = eng.Description
+	if eng, ok := m.catalog.FindEngine(cur.Engine); ok {
+		engStr = eng.FormatLabel()
 	}
 
 	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")

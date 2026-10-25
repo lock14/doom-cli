@@ -456,9 +456,9 @@ func ResetPresetOverride(userDir string, layered *Catalog, key string) (*Preset,
 	return target, true, nil
 }
 
-// RemovePreset deletes a user preset (<userDir>/preset.<id>.json) and any
-// user override (<userDir>/override.preset.<id>.json) for the matching preset.
-// If the target is a built-in curated preset with no user files, RemovePreset returns an error.
+// RemovePreset deletes a custom user preset (<userDir>/preset.<id>.json) and any
+// accompanying override (<userDir>/override.preset.<id>.json) for the matching preset.
+// Built-in curated presets cannot be removed; use ResetPresetOverride instead.
 func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Preset, error) {
 	if err := validateCatalogDirPath(userDir); err != nil {
 		return nil, err
@@ -469,29 +469,32 @@ func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Prese
 	}
 
 	presetPath := filepath.Join(userDir, fmt.Sprintf("preset.%s.json", target.ID))
-	overridePath := filepath.Join(userDir, fmt.Sprintf("override.preset.%s.json", target.ID))
+	isCurated := target.Layer == LayerCurated
+	if !isCurated && curated != nil {
+		if cp, _ := curated.FindExact(target.ID); cp != nil {
+			isCurated = true
+		}
+	}
+	if isCurated {
+		if _, statErr := os.Stat(presetPath); os.IsNotExist(statErr) {
+			return nil, fmt.Errorf(
+				"cannot remove built-in curated preset %q (use 'doom wads reset %s' to clear custom overrides)",
+				target.Name, target.ID,
+			)
+		}
+	}
 
-	removedAny := false
-	if err := os.Remove(presetPath); err == nil {
-		removedAny = true
-	} else if !os.IsNotExist(err) {
+	if err := os.Remove(presetPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("custom preset %q not found", key)
+		}
 		return nil, err
 	}
 	fsutil.RemoveBackups(presetPath)
-	if err := os.Remove(overridePath); err == nil {
-		removedAny = true
-	} else if !os.IsNotExist(err) {
-		return nil, err
-	}
+
+	overridePath := filepath.Join(userDir, fmt.Sprintf("override.preset.%s.json", target.ID))
+	_ = os.Remove(overridePath)
 	fsutil.RemoveBackups(overridePath)
 
-	if !removedAny {
-		if curated != nil {
-			if cp, _ := curated.FindExact(target.ID); cp != nil {
-				return nil, fmt.Errorf("cannot remove built-in curated preset %q", target.Name)
-			}
-		}
-		return nil, fmt.Errorf("custom preset %q not found", key)
-	}
 	return target, nil
 }

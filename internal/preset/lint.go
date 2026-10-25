@@ -92,11 +92,13 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 
 	var curatedFS fs.FS
 	curatedPrefix := "catalog"
+	hasDiskCatalog := false
 	if strings.TrimSpace(rootDir) != "" {
 		diskCat := filepath.Join(rootDir, "catalog")
 		if info, err := os.Stat(diskCat); err == nil && info.IsDir() {
 			curatedFS = os.DirFS(diskCat)
 			curatedPrefix = filepath.ToSlash(diskCat)
+			hasDiskCatalog = true
 		}
 	}
 	if curatedFS == nil {
@@ -358,7 +360,7 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 		}
 	}
 
-	if strings.TrimSpace(rootDir) != "" {
+	if hasDiskCatalog {
 		for _, relCfg := range []string{
 			filepath.Join("dsda-doom", "dsda-doom.cfg"),
 			filepath.Join("uzdoom", "autoexec.cfg"),

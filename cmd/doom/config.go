@@ -17,6 +17,7 @@ func newConfigCmd() *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",
 		Short: "Manage doom-cli user settings and TUI color themes",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 				paths, cfg, cat, err := loadAppState()
@@ -24,7 +25,7 @@ func newConfigCmd() *cobra.Command {
 					return err
 				}
 				theme, nerdFonts, launcherOpts := buildLauncherOptions(
-					cmd, paths, cfg, nil, tui.InitialModeConfig,
+					paths, cfg, nil, tui.InitialModeConfig,
 				)
 				_, err = tui.RunInteractiveLauncherWithOptions(
 					cat, paths.WadRoots(), theme, nerdFonts, launcherOpts,
@@ -38,6 +39,7 @@ func newConfigCmd() *cobra.Command {
 	showCmd := &cobra.Command{
 		Use:   "show",
 		Short: "Display effective doom-cli configuration and setting sources",
+		Args:  cobra.NoArgs,
 		RunE:  runConfigShow,
 	}
 
@@ -55,20 +57,14 @@ func newConfigCmd() *cobra.Command {
 		RunE:  runConfigSet,
 	}
 
-	toggleCmd := &cobra.Command{
-		Use:   "toggle <key>",
-		Short: "Toggle a boolean doom-cli setting (such as nerd-fonts)",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runConfigToggle,
-	}
-
 	themesCmd := &cobra.Command{
 		Use:   "themes",
 		Short: "List all available built-in and custom TUI color themes",
+		Args:  cobra.NoArgs,
 		RunE:  runConfigThemes,
 	}
 
-	configCmd.AddCommand(showCmd, getCmd, setCmd, toggleCmd, themesCmd)
+	configCmd.AddCommand(showCmd, getCmd, setCmd, themesCmd)
 	return configCmd
 }
 
@@ -79,11 +75,11 @@ func runConfigShow(cmd *cobra.Command, _ []string) error {
 	}
 
 	effectiveTheme, themeSource := resolveThemeWithSource(cfg)
-	effectiveNerdFonts, nfSource := resolveNerdFontsWithSource(cmd, cfg)
-	wadsDirSrc := dirSource(flagWadsDir, "DOOM_WADS_DIR", cfg.WadsDir)
+	effectiveNerdFonts, nfSource := resolveNerdFontsWithSource(cfg)
+	wadsDirSrc := dirSource(cfg.WadsDir)
 	wadsDirsSrc := wadsDirsSource(cfg)
-	binDirSrc := dirSource("", "DOOM_BIN_DIR", cfg.BinDir)
-	sfDirSrc := dirSource("", "DOOM_SF_DIR", cfg.SoundFontsDir)
+	binDirSrc := dirSource(cfg.BinDir)
+	sfDirSrc := dirSource(cfg.SoundFontsDir)
 
 	nfState := "disabled (universal rectangular badges)"
 	if effectiveNerdFonts {
@@ -117,7 +113,7 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 	}
 
 	effectiveTheme, _ := resolveThemeWithSource(cfg)
-	effectiveNerdFonts, _ := resolveNerdFontsWithSource(cmd, cfg)
+	effectiveNerdFonts, _ := resolveNerdFontsWithSource(cfg)
 	out := cmdOut(cmd)
 
 	if len(args) == 0 {
@@ -159,7 +155,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	}
 	rawVal := args[1]
 
-	paths := getPaths()
+	paths := resolveAppPaths()
 	cfg, err := config.LoadConfig(paths)
 	if err != nil {
 		return err
@@ -184,16 +180,26 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		return nil
 
 	case "theme":
-		val := strings.ToLower(strings.TrimSpace(rawVal))
-		if val == "" {
-			return fmt.Errorf("theme name cannot be empty")
+		trimmed := strings.TrimSpace(rawVal)
+		lower := strings.ToLower(trimmed)
+		if lower == "" || lower == "default" {
+			cfg.Theme = ""
+			if err := config.SaveConfig(paths, cfg); err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "✓ Reset theme to default (%q) in %s\n", tui.ClassicTheme.Name, paths.ConfigFile)
+			return nil
 		}
-		if _, ok := tui.GetBuiltinTheme(val); !ok {
-			customPath := filepath.Join(paths.ThemesDir, val+".json")
-			if _, statErr := os.Stat(customPath); statErr != nil {
-				if _, pathErr := os.Stat(rawVal); pathErr != nil {
-					return fmt.Errorf("unknown theme %q. Run 'doom config themes' to see available themes", val)
-				}
+		val := lower
+		if _, ok := tui.GetBuiltinTheme(lower); !ok {
+			if _, statErr := os.Stat(filepath.Join(paths.ThemesDir, lower+".json")); statErr == nil {
+				val = lower
+			} else if _, statErr := os.Stat(filepath.Join(paths.ThemesDir, trimmed+".json")); statErr == nil {
+				val = trimmed
+			} else if _, pathErr := os.Stat(trimmed); pathErr == nil {
+				val = trimmed
+			} else {
+				return fmt.Errorf("unknown theme %q. Run 'doom config themes' to see available themes", trimmed)
 			}
 		}
 		cfg.Theme = val
@@ -243,38 +249,6 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runConfigToggle(cmd *cobra.Command, args []string) error {
-	key, err := canonicalConfigKey(args[0])
-	if err != nil {
-		return err
-	}
-	if key != "nerd-fonts" {
-		return fmt.Errorf(
-			"setting %q is not a boolean toggle (use 'doom config set %s <value>')",
-			key, key,
-		)
-	}
-
-	paths := getPaths()
-	cfg, err := config.LoadConfig(paths)
-	if err != nil {
-		return err
-	}
-
-	next := !cfg.NerdFonts
-	cfg.SetNerdFonts(next)
-	if err := config.SaveConfig(paths, cfg); err != nil {
-		return err
-	}
-
-	state := "disabled (universal rectangular badges)"
-	if next {
-		state = "enabled (Powerlevel10k rounded capsules)"
-	}
-	fmt.Fprintf(cmdOut(cmd), "✓ Toggled nerd-fonts = %t (%s) in %s\n", next, state, paths.ConfigFile)
-	return nil
-}
-
 func runConfigThemes(cmd *cobra.Command, _ []string) error {
 	paths, cfg, _, err := loadAppState()
 	if err != nil {
@@ -282,8 +256,8 @@ func runConfigThemes(cmd *cobra.Command, _ []string) error {
 	}
 	out := cmdOut(cmd)
 
-	activeTheme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
-	nerdFonts, _ := resolveNerdFontsWithSource(cmd, cfg)
+	activeTheme := tui.ResolveTheme("", "", cfg.Theme, paths.ThemesDir)
+	nerdFonts, _ := resolveNerdFontsWithSource(cfg)
 
 	fmt.Fprintln(out, "=== Available Doom Themes ===")
 	fmt.Fprintln(out)
@@ -346,27 +320,13 @@ func parseBool(raw string) (bool, error) {
 }
 
 func resolveThemeWithSource(cfg *config.AppConfig) (string, string) {
-	if s := strings.TrimSpace(flagTheme); s != "" {
-		return s, "flag"
-	}
-	if s := strings.TrimSpace(os.Getenv("DOOM_THEME")); s != "" {
-		return s, "env"
-	}
 	if cfg != nil && strings.TrimSpace(cfg.Theme) != "" {
 		return strings.TrimSpace(cfg.Theme), "config"
 	}
 	return tui.ClassicTheme.Name, "default"
 }
 
-func resolveNerdFontsWithSource(cmd *cobra.Command, cfg *config.AppConfig) (bool, string) {
-	if flagNerdFonts || (cmd != nil && cmd.Flags().Changed("nerd-fonts")) {
-		return flagNerdFonts, "flag"
-	}
-	if envVal := strings.TrimSpace(os.Getenv("DOOM_NERD_FONTS")); envVal != "" {
-		if b, err := parseBool(envVal); err == nil {
-			return b, "env"
-		}
-	}
+func resolveNerdFontsWithSource(cfg *config.AppConfig) (bool, string) {
 	if cfg != nil && cfg.HasNerdFonts() {
 		return cfg.NerdFonts, "config"
 	}

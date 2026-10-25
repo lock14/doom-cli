@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -16,15 +17,16 @@ import (
 
 func newWadsCmd() *cobra.Command {
 	wadsCmd := &cobra.Command{
-		Use:                "wads",
-		Short:              "Browse, launch, fetch, and configure WAD presets",
-		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
-		RunE:               runWadsTUI,
+		Use:   "wads",
+		Short: "Browse, launch, fetch, and configure WAD presets",
+		Args:  cobra.NoArgs,
+		RunE:  runWadsTUI,
 	}
 
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available WAD presets with readiness and engine badges",
+		Args:  cobra.NoArgs,
 		RunE:  runWadsList,
 	}
 
@@ -74,23 +76,26 @@ func newWadsCmd() *cobra.Command {
 			}
 
 			idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
-			_, iwadFound := idx.ResolveFile(p.IWAD)
-			needsSteam := !iwadFound || len(p.Sources) == 0 || fetchForce
-			if !needsSteam {
-				for _, f := range p.Files {
-					if f.Optional {
-						if _, ok := idx.ResolveFile(f.Name); !ok {
-							needsSteam = true
-							break
+			alreadyInstalled := strings.TrimSpace(p.IWAD) != "" && idx.IsPresetInstalled(*p)
+			if !alreadyInstalled || fetchForce {
+				_, iwadFound := idx.ResolveFile(p.IWAD)
+				needsSteam := !iwadFound || len(p.Sources) == 0 || fetchForce
+				if !needsSteam {
+					for _, f := range p.Files {
+						if f.Optional {
+							if _, ok := idx.ResolveFile(f.Name); !ok {
+								needsSteam = true
+								break
+							}
 						}
 					}
 				}
-			}
-			if needsSteam {
-				if _, err := steam.DiscoverAndExtract(
-					cat, nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
-				); err != nil {
-					return err
+				if needsSteam {
+					if _, err := steam.DiscoverAndExtract(
+						cat, nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+					); err != nil {
+						return err
+					}
 				}
 			}
 
@@ -102,6 +107,8 @@ func newWadsCmd() *cobra.Command {
 						"%s is a commercial game and could not be found in local Steam or GOG libraries.\n",
 						p.Name,
 					)
+				} else if alreadyInstalled && !fetchForce {
+					fmt.Fprintf(out, "✓ %s already installed\n", p.Name)
 				}
 				return nil
 			}
@@ -118,6 +125,7 @@ func newWadsCmd() *cobra.Command {
 	scanCmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Scan local Steam and GOG libraries to extract commercial IWADs and expansions",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			paths, _, cat, err := loadAppState()
 			if err != nil {
@@ -256,7 +264,11 @@ func newWadsCmd() *cobra.Command {
 				)
 			}
 
-			outPath, target, err := preset.ConfigPreset(paths.CatalogDir, cat, name, req)
+			targetKey := name
+			if p := findPreset(cat, name); p != nil {
+				targetKey = p.ID
+			}
+			outPath, target, err := preset.ConfigPreset(paths.CatalogDir, cat, targetKey, req)
 			if err != nil {
 				return err
 			}
@@ -283,8 +295,12 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			targetKey := name
+			if p := findPreset(cat, name); p != nil {
+				targetKey = p.ID
+			}
 			out := cmdOut(cmd)
-			target, removed, err := preset.ResetPresetOverride(paths.CatalogDir, cat, name)
+			target, removed, err := preset.ResetPresetOverride(paths.CatalogDir, cat, targetKey)
 			if err != nil {
 				return err
 			}
@@ -299,7 +315,7 @@ func newWadsCmd() *cobra.Command {
 
 	removeCmd := &cobra.Command{
 		Use:   "remove <name>",
-		Short: "Remove a custom WAD preset or reset overrides for a built-in preset",
+		Short: "Remove a custom WAD preset from your personal catalog",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
@@ -312,21 +328,15 @@ func newWadsCmd() *cobra.Command {
 				return err
 			}
 
-			removed, err := preset.RemovePreset(paths.CatalogDir, curated, cat, name)
+			targetKey := name
+			if p := findPreset(cat, name); p != nil {
+				targetKey = p.ID
+			}
+			removed, err := preset.RemovePreset(paths.CatalogDir, curated, cat, targetKey)
 			if err != nil {
 				return err
 			}
-			out := cmdOut(cmd)
-			if removed.IsCustom() {
-				fmt.Fprintf(out, "✓ Removed custom preset %q (%s)\n", removed.Name, removed.ID)
-				return nil
-			}
-			fmt.Fprintf(
-				out,
-				"✓ Cleared launch option overrides for built-in preset %q (%s)\n",
-				removed.Name,
-				removed.ID,
-			)
+			fmt.Fprintf(cmdOut(cmd), "✓ Removed custom preset %q (%s)\n", removed.Name, removed.ID)
 			return nil
 		},
 	}
@@ -336,9 +346,11 @@ func newWadsCmd() *cobra.Command {
 		Short: "Validate curated and user catalog entities, schema invariants, and README parity",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root := "."
+			root := ""
 			if len(args) > 0 {
 				root = args[0]
+			} else if info, err := os.Stat(filepath.Join(".", "catalog")); err == nil && info.IsDir() {
+				root = "."
 			}
 			paths := getPaths()
 			diags, err := preset.LintCatalog(root, paths.CatalogDir)
@@ -387,19 +399,17 @@ func newWadsCmd() *cobra.Command {
 		lintCmd,
 		buildCmd,
 	)
-	attachStrictHelpAndVersionFlags(wadsCmd, false)
 	return wadsCmd
 }
 
-func runWadsTUI(cmd *cobra.Command, args []string) error {
+func runWadsTUI(cmd *cobra.Command, _ []string) error {
 	paths, cfg, cat, err := loadAppState()
 	if err != nil {
 		return err
 	}
 
-	extraArgs := extractEngineArgs("wads", cmdRawArgs(cmd, args))
 	theme, nerdFonts, launcherOpts := buildLauncherOptions(
-		cmd, paths, cfg, extraArgs, tui.InitialModeWads,
+		paths, cfg, nil, tui.InitialModeWads,
 	)
 
 	selected, err := tui.RunInteractiveLauncherWithOptions(
@@ -426,12 +436,13 @@ func runWadsTUI(cmd *cobra.Command, args []string) error {
 	if selected.EngineOverridden {
 		engOverride = selected.Engine
 	}
+	out := cmdOut(cmd)
+	errOut := cmdErr(cmd)
 	opts := engine.LaunchOptions{
 		EngineOverride: engOverride,
 		WadRoots:       paths.WadRoots(),
 		BinDir:         paths.BinDir,
-		ExtraArgs:      extraArgs,
-		Out:            os.Stdout,
+		Out:            out,
 		Catalog:        cat,
 	}
 
@@ -440,7 +451,7 @@ func runWadsTUI(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return engine.Execute(plan, os.Stdout, os.Stderr)
+	return engine.Execute(plan, out, errOut)
 }
 
 func runWadsList(cmd *cobra.Command, _ []string) error {
@@ -511,11 +522,7 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 
 	engStr := p.Engine
 	if engCfg, ok := cat.FindEngine(p.Engine); ok {
-		if engCfg.Description != "" {
-			engStr = engCfg.Description
-		} else {
-			engStr = engCfg.EffectiveDisplayName()
-		}
+		engStr = engCfg.FormatLabel()
 	}
 	engineOverridden := ""
 	if p.EngineOverridden {
@@ -576,32 +583,18 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func normalizePresetQuery(s string) string {
-	norm := preset.NormalizeFilename(s)
-	if strings.HasSuffix(norm, "ii") {
-		return strings.TrimSuffix(norm, "ii") + "2"
-	}
-	return norm
-}
-
 func findPreset(cat *preset.Catalog, query string) *preset.Preset {
 	if p := cat.Find(query); p != nil {
 		return p
 	}
 	normQuery := preset.NormalizeFilename(query)
-	romanQuery := normalizePresetQuery(query)
-	for i := range cat.Presets {
-		normName := preset.NormalizeFilename(cat.Presets[i].Name)
-		normID := preset.NormalizeFilename(cat.Presets[i].ID)
-		if normName == normQuery || normID == normQuery ||
-			normalizePresetQuery(cat.Presets[i].Name) == romanQuery ||
-			normalizePresetQuery(cat.Presets[i].ID) == romanQuery {
-			return &cat.Presets[i]
-		}
+	romanQuery := preset.NormalizePresetQuery(query)
+	if normQuery == "" {
+		return nil
 	}
 	for i := range cat.Presets {
 		if strings.Contains(preset.NormalizeFilename(cat.Presets[i].Name), normQuery) ||
-			strings.Contains(normalizePresetQuery(cat.Presets[i].Name), romanQuery) {
+			strings.Contains(preset.NormalizePresetQuery(cat.Presets[i].Name), romanQuery) {
 			return &cat.Presets[i]
 		}
 	}

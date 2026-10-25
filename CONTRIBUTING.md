@@ -22,7 +22,7 @@ All contributions must respect the core repository invariants:
     *   **Standard directory structures**: Respect platform standard directories (XDG on Linux,
         `~/Library/Application Support/` on macOS, and `%LOCALAPPDATA%` and `%USERPROFILE%\Games\Doom\` on Windows).
 *   **Destructive safety and backup policy**: Any configuration or catalog write (`doom engines cfg install`,
-    `doom engines install`, `doom setup`, `doom config set`, `doom config toggle`, `doom engines add`,
+    `doom engines install`, `doom setup`, `doom config set`, `doom engines add`,
     `doom engines set`, `doom wads add`, `doom wads set`) must write atomically via same-directory temporary rename and
     generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file
     and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion and on repository templates during
@@ -99,10 +99,10 @@ doom-cli/
 ├── embed.go                # Single root embed.FS (catalog/*.json, dsda-doom/*.cfg, uzdoom/*.cfg)
 ├── catalog/                # One-entity-per-file curated catalog (engine.<id>.json, preset.<id>.json)
 ├── cmd/doom/               # Command-line interface definitions using Cobra
-│   ├── main.go             # Entrypoint, root direct game launcher, global flags, path and catalog helpers
+│   ├── main.go             # Entrypoint, root direct game launcher, path and catalog helpers
 │   ├── wads.go             # 'doom wads' interactive TUI browser and subcommands (list, show, fetch, scan, add, set, reset, remove, lint, build)
 │   ├── engines.go          # 'doom engines' interactive TUI manager and subcommands (list, install, add, set, reset, remove, cfg)
-│   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, toggle, themes)
+│   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, themes)
 │   └── setup.go            # 'doom setup' turnkey installation workflow
 ├── internal/
 │   ├── config/             # Platform path resolvers (paths.go) and settings-only config.json (settings.go)
@@ -224,7 +224,8 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 4. Test with:
    ```bash
    go run ./cmd/doom config themes
-   go run ./cmd/doom wads --theme <new_theme>
+   go run ./cmd/doom config set theme <new_theme>
+   go run ./cmd/doom wads
    ```
 
 ### Synchronizing engine configuration templates
