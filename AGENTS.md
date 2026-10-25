@@ -295,14 +295,14 @@ Linux, macOS, and Windows:
     intended configurations.
 *   **Persistent asset directory hierarchy**: Users can override and persist all asset and execution directories
     (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json` (located
-    inside `DOOM_CONFIG_DIR` when set). The resolution hierarchy strictly respects CLI flags (`--theme`,
-    `--nerd-fonts`, `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`, `--presets-file`), which take
-    precedence over environment variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`,
-    `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`, `DOOM_SF_DIR`), which take precedence over user configuration (`config.json`),
-    which takes precedence over platform defaults. `--presets-file` accepts a custom `catalog.d` directory or single
-    entity JSON file for read commands, and requires a directory via `userCatalogWriteDir` for write commands. Engine
-    launch synthesis, configuration deployment, and `doom config show` and `doom config get` always adhere to this
-    resolved hierarchy.
+    inside `DOOM_CONFIG_DIR` when set) or via the in-TUI `Ctrl+G` configuration manager. The resolution hierarchy
+    strictly respects global CLI flags (`--theme`, `--nerd-fonts`, `--wads-dir`), which take precedence over environment
+    variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`,
+    `DOOM_SF_DIR`), which take precedence over user configuration (`config.json`), which takes precedence over platform
+    defaults. Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on `doom launch`; `--engine` or `-e` on
+    `doom presets add` and `doom presets config`; `--force` on install, fetch, extract, and setup commands) are scoped
+    locally to their respective Cobra subcommands rather than registered globally on `rootCmd`. Engine launch synthesis,
+    configuration deployment, and `doom config show` and `doom config get` always adhere to this resolved hierarchy.
 *   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.

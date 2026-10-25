@@ -476,6 +476,12 @@ func (m model) updateLaunchOptions(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			launched := s.buildLaunchPreset()
+			if !m.isPresetReady(launched) {
+				m.viewingLaunchOpts = false
+				m.launchOpts = nil
+				m.statusMsg = fmt.Sprintf("✗ Missing required files for %s (press Ctrl+F to fetch)", launched.Name)
+				return m, nil
+			}
 			m.selected = &launched
 			m.viewingLaunchOpts = false
 			m.quitting = true

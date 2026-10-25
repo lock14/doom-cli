@@ -17,17 +17,9 @@ var (
 	commit  = "none"
 	date    = "unknown"
 
-	flagEngineOverride string
-	flagWadsDir        string
-	flagWadsDirs       string
-	flagBinDir         string
-	flagSoundFontsDir  string
-	flagDryRun         bool
-	flagForce          bool
-	flagOnce           bool
-	flagPresetsFile    string
-	flagTheme          string
-	flagNerdFonts      bool
+	flagWadsDir   string
+	flagTheme     string
+	flagNerdFonts bool
 )
 
 func cmdOut(cmd *cobra.Command) io.Writer {
@@ -47,15 +39,6 @@ func cmdErr(cmd *cobra.Command) io.Writer {
 func applyFlagOverrides(paths *config.Paths) {
 	if flagWadsDir != "" {
 		paths.WadsDir = flagWadsDir
-	}
-	if flagWadsDirs != "" {
-		paths.WadsDirs = config.ParsePathList(flagWadsDirs)
-	}
-	if flagBinDir != "" {
-		paths.SetBinDir(flagBinDir)
-	}
-	if flagSoundFontsDir != "" {
-		paths.SetSoundFontsDir(flagSoundFontsDir)
 	}
 }
 
@@ -89,14 +72,7 @@ func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 		return nil, nil, nil, err
 	}
 
-	userCatalogPath := paths.CatalogDir
-	explicitPath := false
-	if flagPresetsFile != "" {
-		userCatalogPath = flagPresetsFile
-		explicitPath = true
-	}
-
-	cat, err := preset.LoadLayeredCatalog(userCatalogPath, explicitPath)
+	cat, err := preset.LoadLayeredCatalog(paths.CatalogDir, false)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -140,21 +116,7 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 		},
 	}
 
-	rootCmd.PersistentFlags().StringVarP(
-		&flagEngineOverride, "engine", "e", "", "Override source port engine (uzdoom or dsda-doom)",
-	)
 	rootCmd.PersistentFlags().StringVar(&flagWadsDir, "wads-dir", "", "Custom path to WADs directory")
-	rootCmd.PersistentFlags().StringVar(
-		&flagWadsDirs, "wads-dirs", "", "Additional WAD search directories (comma or path-list separated)",
-	)
-	rootCmd.PersistentFlags().StringVar(&flagBinDir, "bin-dir", "", "Custom path to engines binary directory")
-	rootCmd.PersistentFlags().StringVar(
-		&flagSoundFontsDir, "soundfonts-dir", "", "Custom path to SoundFonts directory",
-	)
-	rootCmd.PersistentFlags().BoolVar(&flagDryRun, "dry-run", false, "Print launch command without executing")
-	rootCmd.PersistentFlags().StringVar(
-		&flagPresetsFile, "presets-file", "", "Custom user catalog directory or entity JSON file",
-	)
 	rootCmd.PersistentFlags().StringVar(
 		&flagTheme, "theme", "",
 		"Color theme for launcher (classic, blood, toxic, inferno, frost, plasma, heretic, amber, sigil, monochrome)",
@@ -162,7 +124,6 @@ Roland SC-55 SoundFonts, curated community megawads, and platform-native configu
 	rootCmd.PersistentFlags().BoolVar(
 		&flagNerdFonts, "nerd-fonts", false, "Use Powerlevel10k rounded capsule ends (requires a Nerd Font)",
 	)
-	rootCmd.Flags().BoolVar(&flagOnce, "once", false, "Exit after playing a single preset")
 
 	rootCmd.AddCommand(
 		newPlayCmd(),

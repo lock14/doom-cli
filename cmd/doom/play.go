@@ -1,14 +1,10 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"io"
 	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 
 	"github.com/lock14/doom-cli/internal/engine"
 	"github.com/lock14/doom-cli/internal/tui"
@@ -16,14 +12,12 @@ import (
 
 // newPlayCmd creates the interactive terminal launcher command.
 func newPlayCmd() *cobra.Command {
-	playCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:                "play [flags] [-- extra_engine_args...]",
 		Short:              "Interactive terminal launcher with fuzzy search and live preview",
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE:               runPlay,
 	}
-	playCmd.Flags().BoolVar(&flagOnce, "once", false, "Exit after playing a single preset")
-	return playCmd
 }
 
 func runPlay(cmd *cobra.Command, args []string) error {
@@ -34,106 +28,68 @@ func runPlay(cmd *cobra.Command, args []string) error {
 
 	extraArgs := extractEngineArgs("play", os.Args)
 
-	isInteractive := term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
-	singleShot := flagOnce || flagDryRun || !isInteractive
+	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
+	_, themeSrc := resolveThemeWithSource(cfg)
+	nerdFonts, nfSrc := resolveNerdFontsWithSource(cmd, cfg)
 
-	var lastPreset string
-	for {
-		theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
-		_, themeSrc := resolveThemeWithSource(cfg)
-		nerdFonts, nfSrc := resolveNerdFontsWithSource(cmd, cfg)
-
-		var cfgWads, cfgBin, cfgSF string
-		if cfg != nil {
-			cfgWads = cfg.WadsDir
-			cfgBin = cfg.BinDir
-			cfgSF = cfg.SoundFontsDir
-		}
-
-		catalogDir := paths.CatalogDir
-		if flagPresetsFile != "" {
-			catalogDir = flagPresetsFile
-		}
-
-		selected, err := tui.RunInteractiveLauncherWithOptions(
-			cat,
-			paths.WadRoots(),
-			theme,
-			nerdFonts,
-			tui.LauncherOptions{
-				Paths:            paths,
-				AppConfig:        cfg,
-				CatalogDir:       catalogDir,
-				ExtraArgs:        extraArgs,
-				ThemeSource:      themeSrc,
-				NerdFontsSource:  nfSrc,
-				WadsDirSource:    dirSource(flagWadsDir, "DOOM_WADS_DIR", cfgWads),
-				WadsDirsSource:   wadsDirsSource(cfg),
-				BinDirSource:     dirSource(flagBinDir, "DOOM_BIN_DIR", cfgBin),
-				SoundFontsSource: dirSource(flagSoundFontsDir, "DOOM_SF_DIR", cfgSF),
-			},
-			lastPreset,
-		)
-		if err != nil {
-			return err
-		}
-		if selected == nil {
-			return nil
-		}
-
-		if refreshedPaths, refreshedCfg, refreshedCat, reloadErr := loadAppState(); reloadErr == nil {
-			paths = refreshedPaths
-			cfg = refreshedCfg
-			cat = refreshedCat
-		}
-
-		lastPreset = selected.Name
-		engOverride := flagEngineOverride
-		if selected.EngineOverridden && engOverride == "" {
-			engOverride = selected.Engine
-		}
-		opts := engine.LaunchOptions{
-			EngineOverride: engOverride,
-			WadRoots:       paths.WadRoots(),
-			BinDir:         paths.BinDir,
-			DryRun:         flagDryRun,
-			ExtraArgs:      extraArgs,
-			Out:            os.Stdout,
-			Catalog:        cat,
-		}
-
-		plan, err := engine.PrepareLaunch(*selected, opts)
-		if err != nil {
-			if singleShot {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "\nLaunch error: %v\nPress Enter to return to launcher...", err)
-			waitForEnter(os.Stdin)
-			continue
-		}
-
-		if flagDryRun {
-			return engine.Execute(plan, os.Stdout, os.Stderr)
-		}
-
-		if err := engine.Execute(plan, os.Stdout, os.Stderr); err != nil {
-			if singleShot {
-				return err
-			}
-			fmt.Fprintf(os.Stderr, "\nEngine exited with error: %v\nPress Enter to return to launcher...", err)
-			waitForEnter(os.Stdin)
-		}
-
-		if singleShot {
-			return nil
-		}
+	var cfgWads, cfgBin, cfgSF string
+	if cfg != nil {
+		cfgWads = cfg.WadsDir
+		cfgBin = cfg.BinDir
+		cfgSF = cfg.SoundFontsDir
 	}
-}
 
-// waitForEnter pauses execution until the user presses Enter on the provided reader.
-func waitForEnter(r io.Reader) {
-	reader := bufio.NewReader(r)
-	_, _ = reader.ReadString('\n')
+	selected, err := tui.RunInteractiveLauncherWithOptions(
+		cat,
+		paths.WadRoots(),
+		theme,
+		nerdFonts,
+		tui.LauncherOptions{
+			Paths:            paths,
+			AppConfig:        cfg,
+			CatalogDir:       paths.CatalogDir,
+			ExtraArgs:        extraArgs,
+			ThemeSource:      themeSrc,
+			NerdFontsSource:  nfSrc,
+			WadsDirSource:    dirSource(flagWadsDir, "DOOM_WADS_DIR", cfgWads),
+			WadsDirsSource:   wadsDirsSource(cfg),
+			BinDirSource:     dirSource("", "DOOM_BIN_DIR", cfgBin),
+			SoundFontsSource: dirSource("", "DOOM_SF_DIR", cfgSF),
+		},
+		"",
+	)
+	if err != nil {
+		return err
+	}
+	if selected == nil {
+		return nil
+	}
+
+	if refreshedPaths, refreshedCfg, refreshedCat, reloadErr := loadAppState(); reloadErr == nil {
+		paths = refreshedPaths
+		cfg = refreshedCfg
+		cat = refreshedCat
+	}
+
+	var engOverride string
+	if selected.EngineOverridden {
+		engOverride = selected.Engine
+	}
+	opts := engine.LaunchOptions{
+		EngineOverride: engOverride,
+		WadRoots:       paths.WadRoots(),
+		BinDir:         paths.BinDir,
+		ExtraArgs:      extraArgs,
+		Out:            os.Stdout,
+		Catalog:        cat,
+	}
+
+	plan, err := engine.PrepareLaunch(*selected, opts)
+	if err != nil {
+		return err
+	}
+
+	return engine.Execute(plan, os.Stdout, os.Stderr)
 }
 
 func extractEngineArgs(subcommand string, rawArgs []string) []string {
@@ -144,52 +100,34 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 			break
 		}
 	}
-	if dashDashIdx != -1 && dashDashIdx+1 < len(rawArgs) {
-		return rawArgs[dashDashIdx+1:]
+	if dashDashIdx != -1 {
+		if dashDashIdx+1 < len(rawArgs) {
+			return rawArgs[dashDashIdx+1:]
+		}
+		return nil
 	}
 
 	knownFlagsWithValue := map[string]bool{
-		"--engine": true, "-e": true,
-		"--wads-dir":       true,
-		"--wads-dirs":      true,
-		"--bin-dir":        true,
-		"--soundfonts-dir": true,
-		"--presets-file":   true,
-		"--theme":          true,
+		"--wads-dir": true,
+		"--theme":    true,
 	}
 	knownBoolFlags := map[string]bool{
-		"--dry-run":    true,
-		"--force":      true,
-		"--once":       true,
 		"--nerd-fonts": true,
 		"-h":           true, "--help": true,
 		"--version": true, "-v": true,
 	}
+	if subcommand == "launch" {
+		knownFlagsWithValue["--engine"] = true
+		knownFlagsWithValue["-e"] = true
+		knownBoolFlags["--dry-run"] = true
+	}
 
 	var engineArgs []string
 	pastSubcommand := false
-	if subcommand == "play" {
-		hasSub := false
-		for _, a := range rawArgs[1:] {
-			if a == "play" {
-				hasSub = true
-				break
-			}
-		}
-		if !hasSub {
-			pastSubcommand = true
-		}
-	}
 	presetSkipped := (subcommand != "launch") // Only skip preset argument on "launch"
 
 	for i := 1; i < len(rawArgs); i++ {
 		arg := rawArgs[i]
-		if !pastSubcommand {
-			if arg == subcommand {
-				pastSubcommand = true
-			}
-			continue
-		}
 
 		if knownBoolFlags[arg] {
 			continue
@@ -200,6 +138,18 @@ func extractEngineArgs(subcommand string, rawArgs []string) []string {
 		}
 		if flagName, _, hasEq := strings.Cut(arg, "="); hasEq {
 			if knownFlagsWithValue[flagName] || knownBoolFlags[flagName] {
+				continue
+			}
+		}
+
+		if !pastSubcommand {
+			if arg == subcommand {
+				pastSubcommand = true
+				continue
+			}
+			if subcommand == "play" {
+				pastSubcommand = true
+			} else {
 				continue
 			}
 		}

@@ -143,33 +143,25 @@ The `doom` CLI provides modular commands for granular management:
 | Command | Description |
 | :--- | :--- |
 | `doom [flags]` or `doom play [flags]` | Launches the TUI and forwards engine flags (`doom -skill 4`) to the port |
-| `doom play --once` | Launches the TUI, runs the selected preset, and exits without returning to the launcher |
 | `doom play --theme <name>` | Runs the TUI with a specific color theme for the current session |
 | `doom play --nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
 | `doom launch <preset> [flags]` | Directly launches a preset by ID, name, or prefix with optional engine flags |
+| `doom launch <preset> -e <engine>` | Launches a preset with an explicit engine override (`--engine` or `-e`) |
 | `doom launch <preset> --dry-run` | Prints the synthesized launch command without starting the game |
 | `doom setup` | Runs turnkey installation of engines, configurations, SoundFonts, and game files |
 | `doom setup --force` | Re-downloads and overwrites existing engines, SoundFonts, and game files during setup |
 
 ### Global CLI flags
 
-Global flags (`--engine` or `-e`, `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`, `--presets-file`,
-`--theme`, `--nerd-fonts`, `--once`, and `--dry-run`) apply across commands and take precedence over `DOOM_*`
+Global flags (`--wads-dir`, `--theme`, and `--nerd-fonts`) apply across commands and take precedence over `DOOM_*`
 environment variables, `config.json` settings, and platform defaults. Unknown flags passed to `doom`, `doom play`, or
 `doom launch` (such as `-skill 4` or `-warp 15`) are forwarded directly to the target source port engine:
 
 | Flag | Description |
 | :--- | :--- |
-| `--engine <id>` or `-e <id>` | Overrides the target source port engine (`uzdoom`, `dsda-doom`, or custom engine ID) |
 | `--wads-dir <path>` | Overrides the primary directory containing IWADs, PWADs, and DeHackEd patches |
-| `--wads-dirs <paths>` | Specifies additional read-only WAD search directories (comma or path-list separated) |
-| `--bin-dir <path>` | Overrides the directory containing source port engine binaries |
-| `--soundfonts-dir <path>` | Overrides the directory containing SoundFonts (`GeneralUser-GS.sf2`) |
-| `--presets-file <path>` | Specifies a custom user catalog directory (`catalog.d`) or single entity JSON file |
 | `--theme <name>` | Sets the launcher color theme for the current session |
 | `--nerd-fonts` | Enables Powerlevel10k rounded capsule badges for the current session |
-| `--once` | Exits the interactive launcher after playing a single preset |
-| `--dry-run` | Prints the synthesized launch command without executing the engine |
 
 ### Engine management
 
@@ -274,9 +266,10 @@ Tea:
 - **In-app README viewer**: Press `Tab` or `Ctrl+R` on any preset to read its bundled idgames `.txt` documentation in a
   scrollable viewport with automatic CP437 box-drawing decoding.
 - **Contextual help**: Press `F1` from any view to inspect context-aware keybindings and search tokens.
-- **Session memory**: Preserves cursor selection across launches when returning to the browser (or exits after a single
-  game with `--once`), and exits cleanly with `Esc` or `Ctrl+C`. Configure color themes and Nerd Fonts badges via
-  `--theme`, `--nerd-fonts`, `doom themes set`, or `doom config`.
+- **Single-shot launch and readiness guard**: Launches the selected preset and exits when the game closes, or stays in
+  the browser with an actionable prompt (`Ctrl+F`) if required WADs are missing, and exits cleanly with `Esc` or
+  `Ctrl+C`. Configure color themes and Nerd Fonts badges via `--theme`, `--nerd-fonts`, `doom themes set`, or
+  `doom config`.
 
 ### Main preset browser controls
 
@@ -457,7 +450,8 @@ user drop-in files in `<config_dir>/catalog.d/*.json`.
 
 ### Add custom engines
 
-Register any source port installed on your system (such as Woof!, Crispy Doom, GZDoom, or PrBoom+):
+Register any source port installed on your system (such as Woof!, Crispy Doom, GZDoom, or PrBoom+) with `--id`,
+`--binary`, `--style`, `--args`, `--prefix-args`, `--badge`, or `--description`:
 
 ```bash
 # Add Woof! source port (Boom argument style with -file and -deh)
@@ -472,16 +466,17 @@ doom engines list
 
 ### Configure engine overrides
 
-Customize binary paths (`--binary`), wrapper prefixes (`--prefix-args`), badges (`--badge`), or default flags
-(`--append-arg`) for any built-in or custom engine (`catalog.d/override.engine.<id>.json`), or clear overrides with
-`--reset`, without modifying curated engine definitions:
+Customize binary paths (`--binary`), argument styles (`--style`), wrapper prefixes (`--prefix-args`), badges
+(`--badge`), display names (`--display-name`), or default flags (`--args`) for any built-in or custom engine
+(`catalog.d/override.engine.<id>.json`), or clear overrides with `--reset`, without modifying curated engine
+definitions:
 
 ```bash
 # Override DSDA-Doom binary path and launcher badge
 doom engines config dsda-doom --binary /opt/doom/dsda-doom --badge "DSDA+"
 
-# Append default flags to DSDA-Doom (repeatable)
-doom engines config dsda-doom --append-arg "-complevel" --append-arg "21"
+# Set default flags for DSDA-Doom
+doom engines config dsda-doom --args "-complevel 21"
 
 # Prepend wrapper command tokens before the engine executable
 doom engines config uzdoom --prefix-args "mangohud --dlsym"
@@ -492,12 +487,13 @@ doom engines config dsda-doom --reset
 
 ### Add custom WADs and presets
 
-Add custom mapsets or community mods to your personal catalog (`catalog.d/preset.<id>.json`). They integrate into
-`doom play` fuzzy search and direct execution (`doom launch`):
+Add custom mapsets or community mods to your personal catalog (`catalog.d/preset.<id>.json`) with `--id`, `-e` or
+`--engine`, `--iwad`, `--files`, `--args`, and `--description`. They integrate into `doom play` fuzzy search and direct
+execution (`doom launch`):
 
 ```bash
 # Add a custom mapset with required IWAD and PWADs
-doom presets add "KDiZD" --engine uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --description "Knee-Deep in ZDoom"
+doom presets add "KDiZD" -e uzdoom --iwad DOOM.WAD --files "kdizd_12.pk3" --description "Knee-Deep in ZDoom"
 
 # Inspect preset details and missing file status
 doom presets show "KDiZD"
@@ -508,13 +504,13 @@ doom launch "KDiZD"
 
 ### Configure per-WAD launch options
 
-Customize engine (`--engine`), IWAD (`--iwad`), additional files (`--files`), excluded optional files
+Customize engine (`-e` or `--engine`), IWAD (`--iwad`), additional files (`--files`), excluded optional files
 (`--exclude-file`), or launch arguments (`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear
 overrides with `--reset`, without modifying repository defaults:
 
 ```bash
 # Always launch Sunlust in Woof! with ultra-violence skill
-doom presets config "Sunlust" --engine woof --args "-skill 4"
+doom presets config "Sunlust" -e woof --args "-skill 4"
 
 # Set Ancient Aliens to always run with Boom complevel 11
 doom presets config "Ancient Aliens" --args "-complevel 11"
@@ -594,12 +590,12 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
     },
     "set": {
       "binary": "/opt/doom/dsda-doom",
-      "badge": "DSDA+"
-    },
-    "append_args": [
-      "-complevel",
-      "21"
-    ]
+      "badge": "DSDA+",
+      "default_args": [
+        "-complevel",
+        "21"
+      ]
+    }
   }
   ```
 - `catalog.d/preset.kdizd.json`:
@@ -644,8 +640,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 
 Environment variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`,
 `DOOM_BIN_DIR`, `DOOM_SF_DIR`) override persistent settings in `config.json` and platform defaults, while explicit CLI
-flags (`--theme`, `--nerd-fonts`, `--wads-dir`, `--wads-dirs`, `--bin-dir`, `--soundfonts-dir`, `--presets-file`) take
-precedence over environment variables:
+flags (`--theme`, `--nerd-fonts`, `--wads-dir`) take precedence over environment variables:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |

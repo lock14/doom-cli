@@ -2,27 +2,14 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
 
-	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/engine"
 	"github.com/lock14/doom-cli/internal/preset"
 )
-
-func userCatalogWriteDir(paths *config.Paths) (string, error) {
-	if flagPresetsFile == "" {
-		return paths.CatalogDir, nil
-	}
-	info, err := os.Stat(flagPresetsFile)
-	if err == nil && !info.IsDir() {
-		return "", fmt.Errorf("--presets-file %q is a single file; pass a directory to write entities", flagPresetsFile)
-	}
-	return flagPresetsFile, nil
-}
 
 // newEnginesCmd creates the source port engine management command.
 func newEnginesCmd() *cobra.Command {
@@ -40,7 +27,7 @@ func newEnginesCmd() *cobra.Command {
 		RunE:  runEnginesList,
 	}
 
-	var addID, addBinary, addStyle, addFamily, addArgs, addBadge, addDisplayName, addDescription string
+	var addID, addBinary, addStyle, addArgs, addPrefixArgs, addBadge, addDescription string
 	enginesAddCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Register or update a custom source port engine",
@@ -55,10 +42,6 @@ func newEnginesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			writeDir, err := userCatalogWriteDir(paths)
-			if err != nil {
-				return err
-			}
 			curated, err := preset.LoadCuratedCatalog()
 			if err != nil {
 				return err
@@ -68,11 +51,11 @@ func newEnginesCmd() *cobra.Command {
 			if strings.TrimSpace(addArgs) != "" {
 				defaultArgs = strings.Fields(addArgs)
 			}
-
-			displayName := addDisplayName
-			if displayName == "" {
-				displayName = name
+			var prefixArgs []string
+			if strings.TrimSpace(addPrefixArgs) != "" {
+				prefixArgs = strings.Fields(addPrefixArgs)
 			}
+
 			id := addID
 			if id == "" {
 				id = preset.Slug(name)
@@ -80,16 +63,16 @@ func newEnginesCmd() *cobra.Command {
 
 			eng := preset.EngineConfig{
 				ID:          id,
-				DisplayName: displayName,
+				DisplayName: name,
 				Description: addDescription,
-				Family:      addFamily,
 				ArgsStyle:   strings.ToLower(strings.TrimSpace(addStyle)),
 				Binary:      addBinary,
 				DefaultArgs: defaultArgs,
+				PrefixArgs:  prefixArgs,
 				Badge:       addBadge,
 			}
 
-			outPath, err := preset.AddEngine(writeDir, curated, eng)
+			outPath, err := preset.AddEngine(paths.CatalogDir, curated, eng)
 			if err != nil {
 				return err
 			}
@@ -109,14 +92,15 @@ func newEnginesCmd() *cobra.Command {
 	enginesAddCmd.Flags().StringVar(
 		&addStyle, "style", "", "Argument format: boom (-file and -deh) or zdoom (-file)",
 	)
-	enginesAddCmd.Flags().StringVar(&addFamily, "family", "", "Engine family (such as boom, mbf21, zdoom)")
 	enginesAddCmd.Flags().StringVar(&addArgs, "args", "", "Default flags always passed to this engine")
+	enginesAddCmd.Flags().StringVar(
+		&addPrefixArgs, "prefix-args", "",
+		"Wrapper command tokens prepended before the binary (such as flatpak run ...)",
+	)
 	enginesAddCmd.Flags().StringVar(&addBadge, "badge", "", "Short badge label for the launcher")
-	enginesAddCmd.Flags().StringVar(&addDisplayName, "display-name", "", "Display name for the engine")
 	enginesAddCmd.Flags().StringVar(&addDescription, "description", "", "Description of the engine")
 
-	var cfgBinary, cfgStyle, cfgDefaultArgs, cfgPrefixArgs, cfgBadge, cfgDisplayName string
-	var cfgAppendArgs []string
+	var cfgBinary, cfgStyle, cfgArgs, cfgPrefixArgs, cfgBadge, cfgDisplayName string
 	var cfgReset bool
 	enginesConfigCmd := &cobra.Command{
 		Use:   "config <name>",
@@ -128,14 +112,10 @@ func newEnginesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			writeDir, err := userCatalogWriteDir(paths)
-			if err != nil {
-				return err
-			}
 			out := cmdOut(cmd)
 
 			if cfgReset {
-				if err := preset.ResetEngineOverride(writeDir, cat, name); err != nil {
+				if err := preset.ResetEngineOverride(paths.CatalogDir, cat, name); err != nil {
 					return err
 				}
 				fmt.Fprintf(out, "✓ Reset custom engine overrides for %q\n", name)
@@ -154,14 +134,11 @@ func newEnginesCmd() *cobra.Command {
 				opts.ArgsStyle = &v
 				changed = true
 			}
-			if cmd.Flags().Changed("default-args") || cfgDefaultArgs != "" {
-				v := strings.Fields(cfgDefaultArgs)
+			if cmd.Flags().Changed("args") || cfgArgs != "" {
+				v := strings.Fields(cfgArgs)
 				opts.DefaultArgs = &v
-				changed = true
-			}
-			if cmd.Flags().Changed("append-arg") || len(cfgAppendArgs) > 0 {
-				v := append([]string(nil), cfgAppendArgs...)
-				opts.AppendArgs = &v
+				empty := []string{}
+				opts.AppendArgs = &empty
 				changed = true
 			}
 			if cmd.Flags().Changed("prefix-args") || cfgPrefixArgs != "" {
@@ -181,12 +158,12 @@ func newEnginesCmd() *cobra.Command {
 			}
 			if !changed {
 				return fmt.Errorf(
-					"no option flags provided (use --binary, --style, --default-args, " +
-						"--append-arg, --prefix-args, --badge, --display-name, or --reset)",
+					"no option flags provided (use --binary, --style, --args, " +
+						"--prefix-args, --badge, --display-name, or --reset)",
 				)
 			}
 
-			outPath, err := preset.ConfigEngine(writeDir, cat, name, opts)
+			outPath, err := preset.ConfigEngine(paths.CatalogDir, cat, name, opts)
 			if err != nil {
 				return err
 			}
@@ -199,10 +176,7 @@ func newEnginesCmd() *cobra.Command {
 		&cfgStyle, "style", "", "Override argument format: boom (-file and -deh) or zdoom (-file)",
 	)
 	enginesConfigCmd.Flags().StringVar(
-		&cfgDefaultArgs, "default-args", "", "Replace default flags always passed to this engine",
-	)
-	enginesConfigCmd.Flags().StringSliceVar(
-		&cfgAppendArgs, "append-arg", nil, "Additional flag to append to default engine args (repeatable)",
+		&cfgArgs, "args", "", "Override default flags always passed to this engine",
 	)
 	enginesConfigCmd.Flags().StringVar(
 		&cfgPrefixArgs, "prefix-args", "",
@@ -222,16 +196,12 @@ func newEnginesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			writeDir, err := userCatalogWriteDir(paths)
-			if err != nil {
-				return err
-			}
 			curated, err := preset.LoadCuratedCatalog()
 			if err != nil {
 				return err
 			}
 
-			removedPath, referencedBy, err := preset.RemoveEngine(writeDir, curated, cat, name)
+			removedPath, referencedBy, err := preset.RemoveEngine(paths.CatalogDir, curated, cat, name)
 			if err != nil {
 				return err
 			}
@@ -248,6 +218,7 @@ func newEnginesCmd() *cobra.Command {
 		},
 	}
 
+	var force bool
 	enginesInstallCmd := &cobra.Command{
 		Use:   "install [<engine>|all]",
 		Short: "Download and deploy portable engine binaries",
@@ -257,7 +228,7 @@ func newEnginesCmd() *cobra.Command {
 				return err
 			}
 			ins := engine.NewInstaller(paths.BinDir, cmdOut(cmd))
-			ins.Force = flagForce
+			ins.Force = force
 			target := "all"
 			if len(args) > 0 {
 				target = strings.TrimSpace(args[0])
@@ -282,7 +253,7 @@ func newEnginesCmd() *cobra.Command {
 			return ins.InstallEngine(eng)
 		},
 	}
-	enginesInstallCmd.Flags().BoolVar(&flagForce, "force", false, "Force re-download and overwrite existing files")
+	enginesInstallCmd.Flags().BoolVar(&force, "force", false, "Force re-download and overwrite existing files")
 
 	enginesCmd.AddCommand(enginesListCmd, enginesAddCmd, enginesConfigCmd, enginesRemoveCmd, enginesInstallCmd)
 	return enginesCmd

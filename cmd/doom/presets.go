@@ -33,10 +33,8 @@ func newPresetsCmd() *cobra.Command {
 	}
 
 	var (
-		addID, addEngine, addIWAD, addCategory  string
-		addDesc, addAuthor, addRelease, addArgs string
-		addSourceURL, addSourceSHA256           string
-		addFiles, addOptionalFiles              []string
+		addID, addEngine, addIWAD, addDesc, addArgs string
+		addFiles                                    []string
 	)
 	presetsAddCmd := &cobra.Command{
 		Use:   "add <name>",
@@ -47,15 +45,8 @@ func newPresetsCmd() *cobra.Command {
 			if name == "" {
 				return fmt.Errorf("preset name cannot be empty")
 			}
-			if addSourceSHA256 != "" && addSourceURL == "" {
-				return fmt.Errorf("--source-sha256 requires --source-url")
-			}
 
 			paths, _, cat, err := loadAppState()
-			if err != nil {
-				return err
-			}
-			writeDir, err := userCatalogWriteDir(paths)
 			if err != nil {
 				return err
 			}
@@ -70,23 +61,10 @@ func newPresetsCmd() *cobra.Command {
 					files = append(files, preset.FileSpec{Name: trimmed})
 				}
 			}
-			for _, f := range addOptionalFiles {
-				if trimmed := strings.TrimSpace(f); trimmed != "" {
-					files = append(files, preset.FileSpec{Name: trimmed, Optional: true})
-				}
-			}
 
 			var extraArgs []string
 			if strings.TrimSpace(addArgs) != "" {
 				extraArgs = strings.Fields(addArgs)
-			}
-
-			var sources []preset.Source
-			if strings.TrimSpace(addSourceURL) != "" {
-				sources = append(sources, preset.Source{
-					URL:    strings.TrimSpace(addSourceURL),
-					SHA256: strings.TrimSpace(addSourceSHA256),
-				})
 			}
 
 			p := preset.Preset{
@@ -96,14 +74,10 @@ func newPresetsCmd() *cobra.Command {
 				IWAD:        addIWAD,
 				Files:       files,
 				Args:        extraArgs,
-				Category:    addCategory,
 				Description: addDesc,
-				Author:      addAuthor,
-				ReleaseDate: addRelease,
-				Sources:     sources,
 			}
 
-			outPath, err := preset.AddPreset(writeDir, curated, cat, p)
+			outPath, err := preset.AddPreset(paths.CatalogDir, curated, cat, p)
 			if err != nil {
 				return err
 			}
@@ -113,23 +87,13 @@ func newPresetsCmd() *cobra.Command {
 		},
 	}
 	presetsAddCmd.Flags().StringVar(&addID, "id", "", "Explicit slug ID for this preset (defaults to slugified name)")
-	presetsAddCmd.Flags().StringVar(&addEngine, "engine", "dsda-doom", "Default engine for this preset")
+	presetsAddCmd.Flags().StringVarP(&addEngine, "engine", "e", "dsda-doom", "Default engine for this preset")
 	presetsAddCmd.Flags().StringVar(&addIWAD, "iwad", "DOOM2.WAD", "Base IWAD required by this preset")
 	presetsAddCmd.Flags().StringSliceVar(
 		&addFiles, "files", nil, "Comma-separated list of required PWAD and DeHackEd files",
 	)
-	presetsAddCmd.Flags().StringSliceVar(
-		&addOptionalFiles, "optional-files", nil, "Comma-separated list of optional PWAD files",
-	)
-	presetsAddCmd.Flags().StringVar(&addCategory, "category", "Custom", "Category or collection name")
 	presetsAddCmd.Flags().StringVar(&addDesc, "description", "", "Short description of the mapset")
-	presetsAddCmd.Flags().StringVar(&addAuthor, "author", "", "Map author or team")
-	presetsAddCmd.Flags().StringVar(&addRelease, "release", "", "Release year or date")
 	presetsAddCmd.Flags().StringVar(&addArgs, "args", "", "Default extra launch arguments")
-	presetsAddCmd.Flags().StringVar(&addSourceURL, "source-url", "", "HTTPS download URL for the WAD archive")
-	presetsAddCmd.Flags().StringVar(
-		&addSourceSHA256, "source-sha256", "", "Expected SHA-256 hex digest for --source-url",
-	)
 
 	var cfgEngine, cfgIWAD, cfgArgs string
 	var cfgFiles, cfgExcludeFiles []string
@@ -144,14 +108,10 @@ func newPresetsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			writeDir, err := userCatalogWriteDir(paths)
-			if err != nil {
-				return err
-			}
 
 			out := cmdOut(cmd)
 			if cfgReset {
-				target, removed, err := preset.ResetPresetOverride(writeDir, cat, name)
+				target, removed, err := preset.ResetPresetOverride(paths.CatalogDir, cat, name)
 				if err != nil {
 					return err
 				}
@@ -206,7 +166,7 @@ func newPresetsCmd() *cobra.Command {
 				)
 			}
 
-			outPath, target, err := preset.ConfigPreset(writeDir, cat, name, req)
+			outPath, target, err := preset.ConfigPreset(paths.CatalogDir, cat, name, req)
 			if err != nil {
 				return err
 			}
@@ -215,7 +175,7 @@ func newPresetsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	presetsConfigCmd.Flags().StringVar(&cfgEngine, "engine", "", "Preferred engine override for this preset")
+	presetsConfigCmd.Flags().StringVarP(&cfgEngine, "engine", "e", "", "Preferred engine override for this preset")
 	presetsConfigCmd.Flags().StringVar(&cfgIWAD, "iwad", "", "Custom IWAD override")
 	presetsConfigCmd.Flags().StringVar(&cfgArgs, "args", "", "Additional launch arguments (such as -skill 4 -warp 01)")
 	presetsConfigCmd.Flags().StringSliceVar(&cfgFiles, "files", nil, "Extra PWAD files to load with this preset")
@@ -234,16 +194,12 @@ func newPresetsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			writeDir, err := userCatalogWriteDir(paths)
-			if err != nil {
-				return err
-			}
 			curated, err := preset.LoadCuratedCatalog()
 			if err != nil {
 				return err
 			}
 
-			removed, err := preset.RemovePreset(writeDir, curated, cat, name)
+			removed, err := preset.RemovePreset(paths.CatalogDir, curated, cat, name)
 			if err != nil {
 				return err
 			}
@@ -288,11 +244,7 @@ func newPresetsCmd() *cobra.Command {
 				root = args[0]
 			}
 			paths := getPaths()
-			userDir := paths.CatalogDir
-			if flagPresetsFile != "" {
-				userDir = flagPresetsFile
-			}
-			diags, err := preset.LintCatalog(root, userDir)
+			diags, err := preset.LintCatalog(root, paths.CatalogDir)
 			if err != nil {
 				return err
 			}
