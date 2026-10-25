@@ -177,7 +177,7 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
     (`"[" + padOrTruncateName(badge, 6) + "]"`) to align with `[DSDA]  ` and `[UZDoom]`, styling `boom` engines with
     `TagDSDA` and `zdoom` engines with `TagUZDoom`. `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill`
     (`internal/tui/theme.go`) must only call `renderCapsule` (`internal/tui/render.go`) with rounded Powerlevel10k
-    capsule caps (`U+E0B6` and `U+E0B4`) when `--nerd-fonts`, `DOOM_NERD_FONTS`, or `nerd_fonts: true` is active
+    capsule caps (`U+E0B6` and `U+E0B4`) when `nerd_fonts: true` (`doom config set nerd-fonts on`) is active
     (`m.nerdFonts`).
 *   **Reason**: Guarantees zero tofu (`□` or `?`) in 100% of out-of-the-box system fonts while supporting opt-in
     powerline styling. See [AGENTS.md](../../AGENTS.md).

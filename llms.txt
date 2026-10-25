@@ -39,7 +39,7 @@ doom wads
 - `doom wads add <name>`: Adds a custom WAD or preset to `catalog.d/preset.<id>.json`.
 - `doom wads set <name>`: Configures per-WAD overrides in `catalog.d/override.preset.<id>.json`.
 - `doom wads reset <name>`: Clears persistent launch overrides for a WAD.
-- `doom wads remove <name>`: Removes a custom preset or clears overrides for a built-in preset.
+- `doom wads remove <name>`: Removes a custom preset from the user catalog.
 - `doom wads lint [root]`: Validates curated and user entity files, schema invariants, and `README.md` parity.
 - `doom wads build [root]`: Hidden maintainer command that synchronizes curated `catalog/*.json` preset table into
   `README.md`.
@@ -55,38 +55,35 @@ doom wads
   auto-detection and timestamped backups (`sync` is a hidden maintainer command).
 - `doom config`: Opens the interactive TUI CLI settings editor on TTY terminals (or displays active settings on
   non-TTY stdout).
-- `doom config show`: Displays effective CLI settings (`flag`, `env`, `config`, or `default`) and source annotations.
+- `doom config show`: Displays effective CLI settings (`config` or `default`) and source annotations.
 - `doom config get [key]`: Retrieves an effective configuration value (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`,
   `bin-dir`, `soundfonts-dir`), or shows all settings when no key is specified.
 - `doom config set <key> <val>`: Sets a persistent configuration value in `config.json`.
-- `doom config toggle <key>`: Toggles a boolean configuration setting (such as `nerd-fonts`).
 - `doom config themes`: Lists built-in and custom JSON color themes with ANSI color swatches.
 - `doom setup`: Full automated turnkey setup in a single step.
 - `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
 
-## Global flags and environment variables
+## CLI flags and environment variables
 
-Settings resolve in four-tier precedence order (`CLI flags` take precedence over `DOOM_*` environment variables, which
-take precedence over `config.json`, which takes precedence over platform defaults):
+Settings resolve in two-tier precedence order (`config.json` takes precedence over platform defaults):
 
-- Global flags: `--wads-dir`, `--theme`, `--nerd-fonts`.
 - Subcommand flags: `--engine` (`-e`) and `--dry-run` on root `doom`; `--engine` (`-e`) on `doom wads add` and
   `doom wads set`; `--force` on `doom setup`, `doom wads fetch`, `doom wads scan`, and `doom engines install`.
-- Environment variables: `DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`,
-  `DOOM_BIN_DIR`, `DOOM_SF_DIR`.
+- Environment variables: `DOOM_CONFIG_DIR` overrides the `doom-cli` configuration directory (which holds `config.json`,
+  `catalog.d/`, and `themes/`), alongside standard OS directory variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `HOME`,
+  `LOCALAPPDATA`, `USERPROFILE`).
 
 ## Architecture and modular packages
 
 - `embed.go`: Single root `embed.FS` embedding `catalog/*.json`, `dsda-doom/dsda-doom.cfg`, and `uzdoom/autoexec.cfg`.
 - `catalog/`: Per-entity curated JSON files (`engine.<id>.json`, `preset.<id>.json`).
 - `cmd/doom/`: Modular Cobra CLI commands:
-  - `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), global flags, and path helpers.
+  - `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path helpers.
   - `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `scan`, `add`, `set`,
     `reset`, `remove`, `lint`, `build` (hidden)).
   - `engines.go`: `doom engines` interactive TUI engine manager and subcommands (`list`, `install`, `add`, `set`,
     `reset`, `remove`, `cfg` (`install`, `diff`, `sync` (hidden))).
-  - `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `toggle`,
-    `themes`).
+  - `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
   - `setup.go`: `doom setup` automated turnkey workflow.
 - `internal/config/`: Cross-platform path resolution adhering to XDG, Library, and AppData (`paths.go`), plus
   settings-only `config.json` (`settings.go`).

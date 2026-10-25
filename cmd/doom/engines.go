@@ -20,6 +20,7 @@ func newEnginesCmd() *cobra.Command {
 	enginesCmd := &cobra.Command{
 		Use:   "engines",
 		Short: "Manage Doom source port binaries, engine overrides, configs, and SoundFonts",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 				paths, cfg, cat, err := loadAppState()
@@ -27,7 +28,7 @@ func newEnginesCmd() *cobra.Command {
 					return err
 				}
 				theme, nerdFonts, launcherOpts := buildLauncherOptions(
-					cmd, paths, cfg, nil, tui.InitialModeEngines,
+					paths, cfg, nil, tui.InitialModeEngines,
 				)
 				_, err = tui.RunInteractiveLauncherWithOptions(
 					cat, paths.WadRoots(), theme, nerdFonts, launcherOpts,
@@ -41,6 +42,7 @@ func newEnginesCmd() *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available source port engines and installation status",
+		Args:  cobra.NoArgs,
 		RunE:  runEnginesList,
 	}
 
@@ -67,7 +69,7 @@ func newEnginesCmd() *cobra.Command {
 				if err := ins.InstallCatalog(cat); err != nil {
 					return err
 				}
-				if err := templates.DeployConfigsTo(paths, out); err != nil {
+				if err := templates.DeployConfigsWithOptions(paths, installForce, out); err != nil {
 					return err
 				}
 				_, err := wad.InstallSoundFont(paths.SoundFontsDir, installForce, out)
@@ -169,7 +171,7 @@ func newEnginesCmd() *cobra.Command {
 	addCmd.Flags().StringVar(&addArgs, "args", "", "Default flags always passed to this engine")
 	addCmd.Flags().StringVar(
 		&addPrefixArgs, "prefix-args", "",
-		"Wrapper command tokens prepended before the binary (such as flatpak run ...)",
+		"Arguments passed after the engine binary and before -iwad (such as -config /path/to/port.cfg)",
 	)
 	addCmd.Flags().StringVar(&addBadge, "badge", "", "Short badge label for the launcher")
 	addCmd.Flags().StringVar(&addDescription, "description", "", "Description of the engine")
@@ -251,7 +253,7 @@ func newEnginesCmd() *cobra.Command {
 	setCmd.Flags().StringVar(&setArgs, "args", "", "Override default flags always passed to this engine")
 	setCmd.Flags().StringVar(
 		&setPrefixArgs, "prefix-args", "",
-		"Wrapper command tokens prepended before the binary (such as flatpak run ...)",
+		"Arguments passed after the engine binary and before -iwad (such as -config /path/to/port.cfg)",
 	)
 	setCmd.Flags().StringVar(&setBadge, "badge", "", "Override short badge label for the launcher")
 	setCmd.Flags().StringVar(&setDisplayName, "display-name", "", "Override display name for the engine")
@@ -316,6 +318,7 @@ func newEnginesCfgCmd() *cobra.Command {
 	cfgCmd := &cobra.Command{
 		Use:   "cfg",
 		Short: "Inspect, deploy, or synchronize source port configuration files",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return templates.DiffConfigs(getPaths(), cmdOut(cmd))
 		},
@@ -324,6 +327,7 @@ func newEnginesCfgCmd() *cobra.Command {
 	installCmd := &cobra.Command{
 		Use:   "install",
 		Short: "Deploy curated autoexec.cfg and dsda-doom.cfg to system directories",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return templates.DeployConfigsTo(getPaths(), cmdOut(cmd))
 		},
@@ -332,6 +336,7 @@ func newEnginesCfgCmd() *cobra.Command {
 	diffCmd := &cobra.Command{
 		Use:   "diff",
 		Short: "Compare embedded engine templates against live system configurations",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return templates.DiffConfigs(getPaths(), cmdOut(cmd))
 		},

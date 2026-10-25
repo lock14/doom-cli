@@ -34,7 +34,7 @@ Always resolve rules in this order (higher overrides lower):
      panes (`Preset Details`, `[OVERRIDE] §6.1`, `§6.3`, `§6.6`).
    * Keep default rendering 100% free of emojis and Unicode Private Use Area (PUA) glyphs (`[P1]`). Gate Nerd Font
      powerline capsule caps (`U+E0B6` and `U+E0B4`) in `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill`
-     (`internal/tui/theme.go`) strictly behind `m.nerdFonts` (`--nerd-fonts`, `DOOM_NERD_FONTS`, or `nerd_fonts: true`).
+     (`internal/tui/theme.go`) strictly behind `m.nerdFonts` (`nerd_fonts: true` via `doom config set nerd-fonts on`).
    * Use semantic `ThemeStyles` tokens from `internal/tui/theme.go` and `internal/tui/builtin_themes.go`
      (`[OVERRIDE] §R3.2`). Never hardcode raw ANSI codes or hex colors in view renderers.
 3. **Preserve keyboard ergonomics**:

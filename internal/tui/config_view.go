@@ -147,13 +147,7 @@ func (m *model) ensurePathsAndConfig() {
 	}
 }
 
-func detectSourceBadge(flagActive bool, envKey string, cfgSet bool) string {
-	if flagActive {
-		return "flag"
-	}
-	if envKey != "" && strings.TrimSpace(os.Getenv(envKey)) != "" {
-		return "env"
-	}
+func detectSourceBadge(cfgSet bool) string {
 	if cfgSet {
 		return "config"
 	}
@@ -182,27 +176,27 @@ func (m *model) openConfigManager() {
 
 	themeSrc := m.themeSource
 	if themeSrc == "" {
-		themeSrc = detectSourceBadge(false, "DOOM_THEME", strings.TrimSpace(m.appConfig.Theme) != "")
+		themeSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.Theme) != "")
 	}
 	nerdSrc := m.nerdFontsSource
 	if nerdSrc == "" {
-		nerdSrc = detectSourceBadge(false, "DOOM_NERD_FONTS", m.appConfig.HasNerdFonts())
+		nerdSrc = detectSourceBadge(m.appConfig.HasNerdFonts())
 	}
 	wadsSrc := m.wadsDirSource
 	if wadsSrc == "" {
-		wadsSrc = detectSourceBadge(false, "DOOM_WADS_DIR", strings.TrimSpace(m.appConfig.WadsDir) != "")
+		wadsSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.WadsDir) != "")
 	}
 	extraSrc := m.wadsDirsSource
 	if extraSrc == "" {
-		extraSrc = detectSourceBadge(false, "DOOM_WADS_DIRS", len(m.appConfig.WadsDirs) > 0)
+		extraSrc = detectSourceBadge(len(m.appConfig.WadsDirs) > 0)
 	}
 	binSrc := m.binDirSource
 	if binSrc == "" {
-		binSrc = detectSourceBadge(false, "DOOM_BIN_DIR", strings.TrimSpace(m.appConfig.BinDir) != "")
+		binSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.BinDir) != "")
 	}
 	sfSrc := m.soundFontsSource
 	if sfSrc == "" {
-		sfSrc = detectSourceBadge(false, "DOOM_SF_DIR", strings.TrimSpace(m.appConfig.SoundFontsDir) != "")
+		sfSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.SoundFontsDir) != "")
 	}
 
 	engines := m.availableEngines()
@@ -726,6 +720,13 @@ func (m *model) saveActiveConfigTab() {
 		if s.nerdFontsSource == "default" {
 			s.nerdFontsSource = "config"
 		}
+
+		m.themeSource = s.themeSource
+		m.nerdFontsSource = s.nerdFontsSource
+		m.wadsDirSource = s.wadsDirSource
+		m.wadsDirsSource = s.extraDirsSource
+		m.binDirSource = s.binDirSource
+		m.soundFontsSource = s.sfDirSource
 
 		m.wadRoots = m.paths.WadRoots()
 		m.rebuildIndexAndTargets()

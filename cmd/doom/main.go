@@ -19,10 +19,6 @@ import (
 )
 
 var (
-	flagWadsDir   string
-	flagTheme     string
-	flagNerdFonts bool
-
 	// Build-time metadata injected via -ldflags
 	version = "dev"
 	commit  = "none"
@@ -54,13 +50,24 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 		Args:               cobra.ArbitraryArgs,
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			rawArgs := cmdRawArgs(cmd, args)
+			if hasStandaloneFlag(rawArgs, "-h", "--help") {
+				return cmd.Help()
+			}
+			if hasStandaloneFlag(rawArgs, "-v", "--version") {
+				fmt.Fprintf(cmdOut(cmd), "%s version %s\n", cmd.DisplayName(), cmd.Version)
+				return nil
+			}
+			targetName, extraArgs, parsedEngine, hasParsedEngine, parsedDryRun, parseErr := parseRootInvocation(rawArgs)
+			if parseErr != nil {
+				return parseErr
+			}
+
 			paths, _, cat, err := loadAppState()
 			if err != nil {
 				return err
 			}
 
-			rawArgs := cmdRawArgs(cmd, args)
-			targetName, extraArgs, parsedEngine, hasParsedEngine, parsedDryRun := parseRootInvocation(rawArgs)
 			p := findPreset(cat, targetName)
 			if p == nil {
 				return fmt.Errorf(
@@ -95,23 +102,6 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 			return engine.Execute(plan, out, errOut)
 		},
 	}
-
-	rootCmd.PersistentFlags().StringVar(
-		&flagWadsDir, "wads-dir", "", "Directory containing WAD files (overrides config and DOOM_WADS_DIR)",
-	)
-	rootCmd.PersistentFlags().StringVar(
-		&flagTheme,
-		"theme",
-		"",
-		"Color theme (classic, blood, toxic, inferno, frost, plasma, heretic, amber, sigil, "+
-			"monochrome, or custom theme name)",
-	)
-	rootCmd.PersistentFlags().BoolVar(
-		&flagNerdFonts,
-		"nerd-fonts",
-		false,
-		"Enable Nerd Font glyphs (Powerlevel10k rounded capsules; default: universal rectangular badges)",
-	)
 
 	rootCmd.Flags().StringVarP(
 		&engineOverride, "engine", "e", "", "Override source port engine (uzdoom, dsda-doom, or custom engine ID)",
@@ -256,28 +246,34 @@ func rootRawArgs(cobraArgs []string) []string {
 	return append([]string{"doom"}, cobraArgs...)
 }
 
+func isKnownDoomEFlag(arg string) bool {
+	switch strings.ToLower(strings.TrimSpace(arg)) {
+	case "-episode", "-extratics", "-endoom", "-emulate", "-export", "-exe", "-ef1", "-ef2":
+		return true
+	default:
+		return false
+	}
+}
+
 func parseRootLaunchArgs(rawArgs []string) (string, []string) {
-	targetPreset, extraArgs, _, _, _ := parseRootInvocation(rawArgs)
+	targetPreset, extraArgs, _, _, _, _ := parseRootInvocation(rawArgs)
 	return targetPreset, extraArgs
 }
 
-func parseRootInvocation(rawArgs []string) (string, []string, string, bool, bool) {
+func parseRootInvocation(rawArgs []string) (string, []string, string, bool, bool, error) {
 	knownFlagsWithValue := map[string]bool{
-		"--wads-dir": true,
-		"--theme":    true,
-		"--engine":   true,
-		"-e":         true,
+		"--engine": true,
+		"-e":       true,
 	}
 	knownBoolFlags := map[string]bool{
-		"--nerd-fonts": true,
-		"--dry-run":    true,
-		"-h":           true,
-		"--help":       true,
-		"-v":           true,
-		"--version":    true,
+		"--dry-run": true,
+		"-h":        true,
+		"--help":    true,
+		"-v":        true,
+		"--version": true,
 	}
 
-	targetPreset := ""
+	var presetTokens []string
 	seenEngineArg := false
 	var extraArgs []string
 	var engineVal string
@@ -301,30 +297,57 @@ func parseRootInvocation(rawArgs []string) (string, []string, string, bool, bool
 			continue
 		}
 		if knownFlagsWithValue[arg] {
-			if (arg == "-e" || arg == "--engine") && i+1 < len(rawArgs) {
-				engineVal = rawArgs[i+1]
-				hasEngine = true
+			if i+1 >= len(rawArgs) {
+				return "", nil, "", false, false, fmt.Errorf("flag needs an argument: %s", arg)
 			}
+			engineVal = strings.TrimSpace(rawArgs[i+1])
+			if engineVal == "" {
+				return "", nil, "", false, false, fmt.Errorf("engine name cannot be empty")
+			}
+			hasEngine = true
 			i++ // skip flag value
 			continue
 		}
 		if flagName, val, hasEq := strings.Cut(arg, "="); hasEq {
-			if knownFlagsWithValue[flagName] || knownBoolFlags[flagName] {
-				if flagName == "-e" || flagName == "--engine" {
-					engineVal = val
-					hasEngine = true
-				} else if flagName == "--dry-run" {
-					if b, err := strconv.ParseBool(val); err == nil {
-						dryRunVal = b
-					}
+			if knownFlagsWithValue[flagName] {
+				engineVal = strings.TrimSpace(val)
+				if engineVal == "" {
+					return "", nil, "", false, false, fmt.Errorf("engine name cannot be empty")
+				}
+				hasEngine = true
+				continue
+			}
+			if knownBoolFlags[flagName] {
+				b, err := strconv.ParseBool(val)
+				if err != nil {
+					return "", nil, "", false, false, fmt.Errorf(
+						"invalid argument %q for %q flag: %w", val, flagName, err,
+					)
+				}
+				if flagName == "--dry-run" {
+					dryRunVal = b
 				}
 				continue
 			}
+			if strings.HasPrefix(flagName, "--") {
+				return "", nil, "", false, false, fmt.Errorf("unknown flag: %s", flagName)
+			}
+		}
+		if strings.HasPrefix(arg, "--") {
+			return "", nil, "", false, false, fmt.Errorf("unknown flag: %s", arg)
+		}
+		if strings.HasPrefix(arg, "-e") && len(arg) > 2 && !isKnownDoomEFlag(arg) {
+			engineVal = strings.TrimSpace(arg[2:])
+			if engineVal == "" {
+				return "", nil, "", false, false, fmt.Errorf("engine name cannot be empty")
+			}
+			hasEngine = true
+			continue
 		}
 
-		if targetPreset == "" && !seenEngineArg {
-			if !strings.HasPrefix(arg, "-") {
-				targetPreset = arg
+		if !seenEngineArg {
+			if !strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "+") {
+				presetTokens = append(presetTokens, arg)
 				continue
 			}
 			seenEngineArg = true
@@ -336,74 +359,11 @@ func parseRootInvocation(rawArgs []string) (string, []string, string, bool, bool
 		extraArgs = append(extraArgs, arg)
 	}
 
+	targetPreset := strings.Join(presetTokens, " ")
 	if targetPreset == "" {
 		targetPreset = "doom"
 	}
-	return targetPreset, extraArgs, engineVal, hasEngine, dryRunVal
-}
-
-func extractEngineArgs(subcommand string, rawArgs []string) []string {
-	if subcommand == "" || subcommand == "root" {
-		_, extra := parseRootLaunchArgs(rawArgs)
-		return extra
-	}
-
-	dashDashIdx := -1
-	for i, a := range rawArgs {
-		if a == "--" {
-			dashDashIdx = i
-			break
-		}
-	}
-	if dashDashIdx != -1 {
-		if dashDashIdx+1 < len(rawArgs) {
-			return rawArgs[dashDashIdx+1:]
-		}
-		return nil
-	}
-
-	knownFlagsWithValue := map[string]bool{
-		"--wads-dir": true,
-		"--theme":    true,
-	}
-	knownBoolFlags := map[string]bool{
-		"--nerd-fonts": true,
-		"-h":           true,
-		"--help":       true,
-		"--version":    true,
-		"-v":           true,
-	}
-
-	var engineArgs []string
-	pastSubcommand := false
-
-	for i := 1; i < len(rawArgs); i++ {
-		arg := rawArgs[i]
-
-		if knownBoolFlags[arg] {
-			continue
-		}
-		if knownFlagsWithValue[arg] {
-			i++
-			continue
-		}
-		if flagName, _, hasEq := strings.Cut(arg, "="); hasEq {
-			if knownFlagsWithValue[flagName] || knownBoolFlags[flagName] {
-				continue
-			}
-		}
-
-		if !pastSubcommand {
-			if arg == subcommand {
-				pastSubcommand = true
-			}
-			continue
-		}
-
-		engineArgs = append(engineArgs, arg)
-	}
-
-	return engineArgs
+	return targetPreset, extraArgs, engineVal, hasEngine, dryRunVal, nil
 }
 
 func cmdOut(cmd *cobra.Command) io.Writer {
@@ -420,6 +380,34 @@ func cmdErr(cmd *cobra.Command) io.Writer {
 	return os.Stderr
 }
 
+func applyConfigPaths(p *config.Paths, cfg *config.AppConfig) {
+	if cfg == nil {
+		return
+	}
+	if s := strings.TrimSpace(cfg.WadsDir); s != "" {
+		p.WadsDir = s
+	}
+	if len(cfg.WadsDirs) > 0 {
+		p.WadsDirs = append([]string(nil), cfg.WadsDirs...)
+	}
+	if s := strings.TrimSpace(cfg.BinDir); s != "" {
+		p.SetBinDir(s)
+	}
+	if s := strings.TrimSpace(cfg.SoundFontsDir); s != "" {
+		p.SetSoundFontsDir(s)
+	}
+}
+
+func resolveAppPaths() *config.Paths {
+	p := config.GetPaths()
+	cfg, cfgErr := config.LoadConfig(p)
+	if cfgErr != nil {
+		cfg = &config.AppConfig{}
+	}
+	applyConfigPaths(p, cfg)
+	return p
+}
+
 func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 	p := config.GetPaths()
 	cfg, cfgErr := config.LoadConfig(p)
@@ -428,10 +416,7 @@ func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 		cfg = &config.AppConfig{}
 	}
 
-	p.WadsDir = resolveStringValue(flagWadsDir, "DOOM_WADS_DIR", cfg.WadsDir, p.WadsDir)
-	p.WadsDirs = resolveWadsDirs(cfg)
-	p.SetBinDir(resolveStringValue("", "DOOM_BIN_DIR", cfg.BinDir, p.BinDir))
-	p.SetSoundFontsDir(resolveStringValue("", "DOOM_SF_DIR", cfg.SoundFontsDir, p.SoundFontsDir))
+	applyConfigPaths(p, cfg)
 
 	cat, err := preset.LoadLayeredCatalog(p.CatalogDir, false)
 	if err != nil {
@@ -445,52 +430,17 @@ func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 }
 
 func getPaths() *config.Paths {
-	p, _, _, _ := loadAppState()
-	return p
-}
-
-func resolveStringValue(flagVal, envKey, cfgVal, defVal string) string {
-	if s := strings.TrimSpace(flagVal); s != "" {
-		return s
-	}
-	if envKey != "" {
-		if s := strings.TrimSpace(os.Getenv(envKey)); s != "" {
-			return s
-		}
-	}
-	if s := strings.TrimSpace(cfgVal); s != "" {
-		return s
-	}
-	return defVal
-}
-
-func resolveWadsDirs(cfg *config.AppConfig) []string {
-	if envVal := strings.TrimSpace(os.Getenv("DOOM_WADS_DIRS")); envVal != "" {
-		return config.ParsePathList(envVal)
-	}
-	if cfg != nil && len(cfg.WadsDirs) > 0 {
-		return append([]string(nil), cfg.WadsDirs...)
-	}
-	return nil
+	return resolveAppPaths()
 }
 
 func wadsDirsSource(cfg *config.AppConfig) string {
-	if strings.TrimSpace(os.Getenv("DOOM_WADS_DIRS")) != "" {
-		return "env"
-	}
 	if cfg != nil && len(cfg.WadsDirs) > 0 {
 		return "config"
 	}
 	return "default"
 }
 
-func dirSource(flagVal, envKey, cfgVal string) string {
-	if strings.TrimSpace(flagVal) != "" {
-		return "flag"
-	}
-	if envKey != "" && strings.TrimSpace(os.Getenv(envKey)) != "" {
-		return "env"
-	}
+func dirSource(cfgVal string) string {
 	if strings.TrimSpace(cfgVal) != "" {
 		return "config"
 	}
@@ -498,15 +448,14 @@ func dirSource(flagVal, envKey, cfgVal string) string {
 }
 
 func buildLauncherOptions(
-	cmd *cobra.Command,
 	paths *config.Paths,
 	cfg *config.AppConfig,
 	extraArgs []string,
 	initialMode int,
 ) (tui.Theme, bool, tui.LauncherOptions) {
-	theme := tui.ResolveTheme(flagTheme, os.Getenv("DOOM_THEME"), cfg.Theme, paths.ThemesDir)
+	theme := tui.ResolveTheme("", "", cfg.Theme, paths.ThemesDir)
 	_, themeSrc := resolveThemeWithSource(cfg)
-	nerdFonts, nfSrc := resolveNerdFontsWithSource(cmd, cfg)
+	nerdFonts, nfSrc := resolveNerdFontsWithSource(cfg)
 
 	var cfgWads, cfgBin, cfgSF string
 	if cfg != nil {
@@ -522,10 +471,10 @@ func buildLauncherOptions(
 		ExtraArgs:        extraArgs,
 		ThemeSource:      themeSrc,
 		NerdFontsSource:  nfSrc,
-		WadsDirSource:    dirSource(flagWadsDir, "DOOM_WADS_DIR", cfgWads),
+		WadsDirSource:    dirSource(cfgWads),
 		WadsDirsSource:   wadsDirsSource(cfg),
-		BinDirSource:     dirSource("", "DOOM_BIN_DIR", cfgBin),
-		SoundFontsSource: dirSource("", "DOOM_SF_DIR", cfgSF),
+		BinDirSource:     dirSource(cfgBin),
+		SoundFontsSource: dirSource(cfgSF),
 		InitialMode:      initialMode,
 	}
 	return theme, nerdFonts, opts

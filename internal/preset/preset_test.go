@@ -518,6 +518,9 @@ func TestDecodeTextCP437(t *testing.T) {
 func TestLintDocumentation_ViolationsDetected(t *testing.T) {
 	t.Parallel()
 	tmpRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpRoot, "catalog"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	sampleUserPath := "/Users/" + "johndoe"
 
 	badContributing := strings.Join([]string{
@@ -596,6 +599,9 @@ func TestLintDocumentation_ViolationsDetected(t *testing.T) {
 func TestLintDocumentation_EdgeCasesAndStackedFormatting(t *testing.T) {
 	t.Parallel()
 	tmpRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpRoot, "catalog"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 
 	parenFile := filepath.Join(tmpRoot, "file(1).md")
 	if err := os.WriteFile(parenFile, []byte("# Paren file\n"), 0o644); err != nil {
@@ -1175,5 +1181,114 @@ func TestMergeUserDir_IdempotentOnAlreadyMergedCatalog(t *testing.T) {
 		AppendArgs: &appendArgs,
 	}); err == nil || !strings.Contains(err.Error(), "single file") {
 		t.Errorf("expected single file error for single-file ConfigPreset, got %v", err)
+	}
+}
+
+func TestLookupNormalization_EngineDisplayName_And_RemovePresetCurated(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	curated, err := LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+
+	// 1. Find and FindExact resolve Roman numeral and normalized filename queries
+	for _, tc := range []struct {
+		query  string
+		wantID string
+	}{
+		{query: "doom2", wantID: "doom-ii"},
+		{query: "doom_ii", wantID: "doom-ii"},
+		{query: "doom2.wad", wantID: "doom-ii"},
+		{query: "sigil2", wantID: "sigil-ii"},
+		{query: "eviternity2", wantID: "eviternity-ii"},
+		{query: "sunlust.wad", wantID: "sunlust"},
+	} {
+		p := curated.Find(tc.query)
+		if p == nil || p.ID != tc.wantID {
+			t.Errorf("curated.Find(%q) = %+v, want ID %q", tc.query, p, tc.wantID)
+		}
+		pExact, exactErr := curated.FindExact(tc.query)
+		if exactErr != nil || pExact == nil || pExact.ID != tc.wantID {
+			t.Errorf("curated.FindExact(%q) = (%+v, %v), want ID %q", tc.query, pExact, exactErr, tc.wantID)
+		}
+	}
+
+	// 2. Add custom engine "Woof!" and verify FindEngine matches DisplayName "Woof!" and FormatLabel
+	if _, err := AddEngine(userDir, curated, EngineConfig{
+		ID:          "woof",
+		DisplayName: "Woof!",
+		Binary:      "woof",
+		ArgsStyle:   "boom",
+		Description: "MBF21 port",
+	}); err != nil {
+		t.Fatalf("AddEngine(Woof!): %v", err)
+	}
+	cat, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+	woof, ok := cat.FindEngine("Woof!")
+	if !ok || woof.ID != "woof" {
+		t.Fatalf("cat.FindEngine(\"Woof!\") = (%+v, %v), want woof", woof, ok)
+	}
+	if got := woof.FormatLabel(); got != "Woof! (MBF21 port)" {
+		t.Errorf("woof.FormatLabel() = %q, want %q", got, "Woof! (MBF21 port)")
+	}
+	dsda, ok := cat.FindEngine("DSDA-Doom")
+	if !ok || dsda.ID != "dsda-doom" {
+		t.Fatalf("cat.FindEngine(\"DSDA-Doom\") = (%+v, %v), want dsda-doom", dsda, ok)
+	}
+	if got := dsda.FormatLabel(); got != "DSDA-Doom (MBF21 and speedrunning)" {
+		t.Errorf("dsda.FormatLabel() = %q, want %q", got, "DSDA-Doom (MBF21 and speedrunning)")
+	}
+	for _, tc := range []struct {
+		disp string
+		want string
+	}{
+		{disp: "DSDA", want: "DSDA (MBF21 and speedrunning)"},
+		{disp: "DSDA-DOOM", want: "DSDA-DOOM (MBF21 and speedrunning)"},
+		{disp: "Custom DSDA", want: "Custom DSDA (MBF21 and speedrunning)"},
+	} {
+		customDSDA := dsda
+		customDSDA.DisplayName = tc.disp
+		if got := customDSDA.FormatLabel(); got != tc.want {
+			t.Errorf("dsda with DisplayName=%q FormatLabel() = %q, want %q", tc.disp, got, tc.want)
+		}
+	}
+
+	// 3. RemovePreset rejects built-in curated presets even when an override exists or curated is nil
+	engChoice := "uzdoom"
+	if _, _, err := ConfigPreset(userDir, cat, "doom2", OverridePatchRequest{Engine: &engChoice}); err != nil {
+		t.Fatalf("ConfigPreset(doom2): %v", err)
+	}
+	catWithOv, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+	if _, err := RemovePreset(userDir, curated, catWithOv, "doom2"); err == nil ||
+		!strings.Contains(err.Error(), "cannot remove built-in curated preset") {
+		t.Errorf("expected RemovePreset on curated preset to fail with clear error, got %v", err)
+	}
+	if _, err := RemovePreset(userDir, nil, catWithOv, "doom2"); err == nil ||
+		!strings.Contains(err.Error(), "cannot remove built-in curated preset") {
+		t.Errorf("expected RemovePreset with nil curated catalog to reject LayerCurated preset, got %v", err)
+	}
+
+	// 4. LintCatalog skips repo-level checks (README table parity, lintDocumentation) when <rootDir>/catalog is absent
+	nonRepoDir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(nonRepoDir, "README.md"),
+		[]byte("# External project\n\n---\n\nEmoji: \U0001f41b and step A -> step B\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	diags, err := LintCatalog(nonRepoDir, "")
+	if err != nil {
+		t.Fatalf("LintCatalog on nonRepoDir: %v", err)
+	}
+	if len(diags) != 0 {
+		t.Errorf("expected 0 diagnostics when <rootDir>/catalog does not exist, got %v", diags)
 	}
 }

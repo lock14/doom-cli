@@ -40,7 +40,7 @@
             via `DOOM_CONFIG_DIR`), with user entity files in `<ConfigDir>/catalog.d/*.json`.
 *   **Destructive safety and backup policy**:
     *   **Mandatory atomic writes and non-destructive backups**: Any configuration or catalog write
-        (`doom engines cfg install`, `doom engines install`, `doom setup`, `doom config set`, `doom config toggle`,
+        (`doom engines cfg install`, `doom engines install`, `doom setup`, `doom config set`,
         `doom engines add`, `doom engines set`, `doom wads add`, `doom wads set`) must use
         `fsutil.WriteFileAtomic` (temporary file in the same directory followed by `os.Rename`) and `fsutil.BackupFile`
         to create non-clobbering timestamped backups (`.bak.<timestamp>`, appending `-1` and `-2` on same-second
@@ -111,7 +111,7 @@
     *   **Universal fallback by default**: Avoid Unicode Private Use Area (PUA) glyphs (such as ``, ``, ``, ``)
         in standard rendering. Default to universal rectangular badges and plain text prompts (`Filter: `,
         `README Viewer`) that render flawlessly in 100% of standard system fonts. Keep Powerlevel10k rounded
-        capsule ends opt-in via `--nerd-fonts`, `DOOM_NERD_FONTS`, or `nerd_fonts: true`.
+        capsule ends opt-in via `nerd_fonts: true` (`doom config set nerd-fonts on`).
 
 # Package structure and architecture conventions
 
@@ -122,14 +122,13 @@ Linux, macOS, and Windows:
     `uzdoom/autoexec.cfg`.
 *   `catalog/`: Curated one-entity-per-file JSON catalog (`engine.<id>.json`, `preset.<id>.json`).
 *   `cmd/doom/`: Modular Cobra CLI command implementations:
-    *   `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), global flags, and path and catalog
+    *   `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path and catalog
         helpers.
     *   `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `scan`, `add`, `set`,
         `reset`, `remove`, `lint`, `build` (hidden)).
     *   `engines.go`: `doom engines` interactive TUI engine manager and subcommands (`list`, `install`, `add`, `set`,
         `reset`, `remove`, `cfg` (`install`, `diff`, `sync` (hidden))).
-    *   `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `toggle`,
-        `themes`).
+    *   `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
     *   `setup.go`: `doom setup` automated turnkey workflow command.
 *   `internal/config/`:
     *   `paths.go`: Platform path resolvers (`ResolveFor`, `WadRoots`, `ParsePathList`) adhering strictly to XDG
@@ -293,22 +292,20 @@ Linux, macOS, and Windows:
     `%USERPROFILE%\Games\Doom\bin\`) ensures both launcher-mediated and direct executable invocations load the
     intended configurations.
 *   **Persistent asset directory hierarchy**: Users can override and persist all asset and execution directories
-    (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) via `doom config set <key> <val>` in `config.json` (located
-    inside `DOOM_CONFIG_DIR` when set) or via the in-TUI `Ctrl+G` configuration manager. The resolution hierarchy
-    strictly respects global CLI flags (`--theme`, `--nerd-fonts`, `--wads-dir`), which take precedence over environment
-    variables (`DOOM_CONFIG_DIR`, `DOOM_THEME`, `DOOM_NERD_FONTS`, `DOOM_WADS_DIR`, `DOOM_WADS_DIRS`, `DOOM_BIN_DIR`,
-    `DOOM_SF_DIR`), which take precedence over user configuration (`config.json`), which takes precedence over platform
-    defaults. Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on root `doom`; `--engine` or `-e` on
-    `doom wads add` and `doom wads set`; `--force` on `doom engines install`, `doom wads fetch`, `doom wads scan`, and
-    `doom setup`) are scoped locally to their respective Cobra commands rather than registered globally as persistent
-    flags. Engine launch synthesis, configuration deployment, and `doom config show` and `doom config get` always adhere
-    to this resolved hierarchy.
+    (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) and UI preferences (`theme`, `nerd-fonts`) via
+    `doom config set <key> <val>` in `config.json` (located inside `DOOM_CONFIG_DIR` when set) or via the in-TUI
+    `Ctrl+G` configuration manager. Settings resolve in a two-tier hierarchy (`config.json` takes precedence over
+    platform defaults). Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on root `doom`; `--engine` or
+    `-e` on `doom wads add` and `doom wads set`; `--force` on `doom engines install`, `doom wads fetch`,
+    `doom wads scan`, and `doom setup`) are scoped locally to their respective Cobra commands rather than registered
+    globally as persistent flags. Engine launch synthesis, configuration deployment, and `doom config show` and
+    `doom config get` always adhere to this resolved hierarchy.
 *   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
     definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
     curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.
 *   **Engine installer idempotency, multi-root WAD discovery, and setup failure reporting**: `doom setup` and
-    `doom engines install` must check for existing executable binaries in `BinDir` and skip redundant asset downloads
-    unless `--force` is specified. Both `wad.NewDownloader` and `steam.DiscoverAndExtract` check all configured
+    `doom engines install` must check for existing executable binaries in `BinDir` and existing `.cfg` files on disk
+    and skip redundant asset downloads or config overwrites unless `--force` is specified. Both `wad.NewDownloader` and `steam.DiscoverAndExtract` check all configured
     `WadRoots` (`WadsDir` and secondary read-only `WadsDirs`) before downloading, extracting, or synthesizing files into
     primary `WadsDir`. `steam.GetSearchRoots` and `steam.DiscoverAndExtract` resolve symlinks via
     `filepath.EvalSymlinks` so Linux Steam symlinks (`~/.steam/steam`, `~/.steam/root`) are deduplicated and traversed

@@ -158,6 +158,24 @@ func (e EngineConfig) EffectiveArgsStyle() string {
 	return GuessArgsStyle(e.ID, e.Family)
 }
 
+// FormatLabel returns a human-readable engine label combining EffectiveDisplayName
+// and Description when present.
+func (e EngineConfig) FormatLabel() string {
+	disp := e.EffectiveDisplayName()
+	desc := strings.TrimSpace(e.Description)
+	if desc == "" || strings.EqualFold(desc, disp) {
+		return disp
+	}
+	if openIdx := strings.Index(desc, " ("); openIdx >= 0 && strings.HasSuffix(desc, ")") {
+		subtitle := strings.TrimSpace(desc[openIdx+2 : len(desc)-1])
+		if subtitle == "" || strings.EqualFold(subtitle, disp) {
+			return disp
+		}
+		return fmt.Sprintf("%s (%s)", disp, subtitle)
+	}
+	return fmt.Sprintf("%s (%s)", disp, desc)
+}
+
 // GuessArgsStyle infers "boom" or "zdoom" from an engine identifier and family string.
 func GuessArgsStyle(idOrName, family string) string {
 	name := strings.ToLower(idOrName)
@@ -383,12 +401,16 @@ func findEngineInMap(engines map[string]EngineConfig, clean string) (EngineConfi
 	if eng, ok := engines[clean]; ok {
 		return eng, true
 	}
+	slug := Slug(clean)
 	for k, eng := range engines {
-		if strings.EqualFold(k, clean) || strings.EqualFold(eng.ID, clean) {
+		if strings.EqualFold(k, clean) ||
+			strings.EqualFold(eng.ID, clean) ||
+			strings.EqualFold(eng.DisplayName, clean) ||
+			(slug != "" && (strings.EqualFold(eng.ID, slug) || strings.EqualFold(Slug(eng.DisplayName), slug))) {
 			return eng, true
 		}
 		for _, alias := range eng.Aliases {
-			if strings.EqualFold(alias, clean) {
+			if strings.EqualFold(alias, clean) || (slug != "" && strings.EqualFold(Slug(alias), slug)) {
 				return eng, true
 			}
 		}
@@ -415,7 +437,29 @@ func (c *Catalog) EngineBadge(engineKey string) string {
 	return (EngineConfig{ID: engineKey}).BadgeText()
 }
 
-// Find searches for a preset by exact ID, exact case-insensitive name, or name or ID prefix.
+// NormalizePresetQuery normalizes a preset query string by stripping optional
+// .wad or .pk3 extensions, stripping punctuation and spaces, and converting a
+// trailing Roman numeral ("iii" or "ii") to Arabic ("3" or "2").
+func NormalizePresetQuery(s string) string {
+	lower := strings.TrimSpace(strings.ToLower(s))
+	for _, ext := range []string{".wad", ".pk3"} {
+		if strings.HasSuffix(lower, ext) && len(lower) > len(ext) {
+			lower = strings.TrimSuffix(lower, ext)
+			break
+		}
+	}
+	norm := NormalizeFilename(lower)
+	switch {
+	case strings.HasSuffix(norm, "iii"):
+		return strings.TrimSuffix(norm, "iii") + "3"
+	case strings.HasSuffix(norm, "ii"):
+		return strings.TrimSuffix(norm, "ii") + "2"
+	}
+	return norm
+}
+
+// Find searches for a preset by exact ID, exact case-insensitive name, normalized or
+// Roman-numeral match, or name or ID prefix.
 func (c *Catalog) Find(target string) *Preset {
 	if c == nil {
 		return nil
@@ -435,6 +479,19 @@ func (c *Catalog) Find(target string) *Preset {
 			return &c.Presets[i]
 		}
 	}
+	normQuery := NormalizeFilename(target)
+	romanQuery := NormalizePresetQuery(target)
+	if normQuery != "" {
+		for i := range c.Presets {
+			normName := NormalizeFilename(c.Presets[i].Name)
+			normID := NormalizeFilename(c.Presets[i].ID)
+			if normName == normQuery || normID == normQuery ||
+				NormalizePresetQuery(c.Presets[i].Name) == romanQuery ||
+				NormalizePresetQuery(c.Presets[i].ID) == romanQuery {
+				return &c.Presets[i]
+			}
+		}
+	}
 	for i := range c.Presets {
 		if strings.HasPrefix(strings.ToLower(c.Presets[i].Name), clean) ||
 			strings.HasPrefix(strings.ToLower(c.Presets[i].ID), clean) {
@@ -444,7 +501,8 @@ func (c *Catalog) Find(target string) *Preset {
 	return nil
 }
 
-// FindExact resolves a preset by exact ID or unambiguous case-insensitive Name.
+// FindExact resolves a preset by exact ID, unambiguous case-insensitive Name,
+// or unambiguous normalized/Roman-numeral Name or ID.
 // Prefix matches are not accepted, making FindExact safe for mutating commands.
 func (c *Catalog) FindExact(target string) (*Preset, error) {
 	if c == nil {
@@ -465,6 +523,21 @@ func (c *Catalog) FindExact(target string) (*Preset, error) {
 	for i := range c.Presets {
 		if strings.ToLower(c.Presets[i].Name) == clean {
 			matches = append(matches, i)
+		}
+	}
+	if len(matches) == 0 {
+		normTarget := NormalizeFilename(target)
+		romanTarget := NormalizePresetQuery(target)
+		if normTarget != "" {
+			for i := range c.Presets {
+				normName := NormalizeFilename(c.Presets[i].Name)
+				normID := NormalizeFilename(c.Presets[i].ID)
+				if normName == normTarget || normID == normTarget ||
+					NormalizePresetQuery(c.Presets[i].Name) == romanTarget ||
+					NormalizePresetQuery(c.Presets[i].ID) == romanTarget {
+					matches = append(matches, i)
+				}
+			}
 		}
 	}
 	if len(matches) == 1 {

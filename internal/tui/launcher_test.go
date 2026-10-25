@@ -1578,9 +1578,9 @@ func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testi
 		t.Fatal(err)
 	}
 
-	// Pre-populate engine override with append_args
+	// Pre-populate engine override with display_name and append_args
 	engOv := `{"kind":"override","target":{"kind":"engine","id":"dsda-doom"},` +
-		`"append_args":["-complevel","21"]}`
+		`"set":{"display_name":"Custom DSDA"},"append_args":["-complevel","21"]}`
 	if err := os.WriteFile(
 		filepath.Join(userCatDir, "override.engine.dsda-doom.json"), []byte(engOv), 0o644,
 	); err != nil {
@@ -1592,7 +1592,7 @@ func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testi
 		ConfigFile:    filepath.Join(tmpDir, "config.json"),
 		ThemesDir:     filepath.Join(tmpDir, "themes"),
 		CatalogDir:    userCatDir,
-		WadsDir:       "/flag/wads",
+		WadsDir:       "/saved/in/config",
 		BinDir:        filepath.Join(tmpDir, "bin"),
 		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
 		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
@@ -1610,15 +1610,20 @@ func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testi
 	m := initialModel(cat, paths.WadRoots(), ClassicTheme, false)
 	m.paths = paths
 	m.appConfig = cfg
-	m.wadsDirSource = "flag"
+	m.wadsDirSource = "config"
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m = newM.(model)
+
+	// Verify preview pane renders overridden engine DisplayName ("Custom DSDA")
+	if view := m.View(); !strings.Contains(view, "Custom DSDA") {
+		t.Errorf("expected launcher preview pane to display overridden engine name 'Custom DSDA', got:\n%s", view)
+	}
 
 	// Open Config Manager via Ctrl+G
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
 	m = newM.(model)
 
-	// Save Tab 1 without modifying WADs Dir; config.json's WadsDir must NOT be overwritten with /flag/wads
+	// Save Tab 1 without modifying WADs Dir; config.json's WadsDir must remain '/saved/in/config'
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	m = newM.(model)
 	if m.appConfig.WadsDir != "/saved/in/config" {
@@ -1638,6 +1643,18 @@ func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testi
 	}
 	if m.cfgMgr.extraDirsInput.Value() != "123" {
 		t.Errorf("expected extraDirsInput='123', got %q", m.cfgMgr.extraDirsInput.Value())
+	}
+
+	// Save Tab 1, close Config Manager via Esc, and reopen via Ctrl+G; updated provenance must persist on model
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = newM.(model)
+	if m.cfgMgr.extraDirsSource != "config" {
+		t.Errorf("expected extraDirsSource='config' after saving and reopening Config Manager, got %q",
+			m.cfgMgr.extraDirsSource)
 	}
 
 	// Switch to Tab 2 via ']' and press Ctrl+S; DefaultArgs must not duplicate append_args
