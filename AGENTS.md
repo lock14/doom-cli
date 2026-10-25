@@ -40,22 +40,28 @@
             via `DOOM_CONFIG_DIR`), with user entity files in `<ConfigDir>/catalog.d/*.json`.
 *   **Destructive safety and backup policy**:
     *   **Mandatory atomic writes and non-destructive backups**: Any configuration or catalog write
-        (`doom engines cfg install`, `doom engines install`, `doom setup`, `doom config set`,
-        `doom engines add`, `doom engines set`, `doom wads add`, `doom wads set`) must use
-        `fsutil.WriteFileAtomic` (temporary file in the same directory followed by `os.Rename`) and `fsutil.BackupFile`
-        to create non-clobbering timestamped backups (`.bak.<timestamp>`, appending `-1` and `-2` on same-second
-        collisions and retaining at most `MaxBackupsPerFile = 3` per file) before overwriting any existing user file.
-        When deleting user entities or resetting overrides (`doom engines remove`, `doom engines reset`,
-        `doom wads remove`, `doom wads reset`), clean up `.bak.*` files via `fsutil.RemoveBackups`.
-        `doom engines cfg sync` (`templates.SyncConfigs`) also calls `fsutil.RemoveBackups` on repository template files
-        so `.bak.*` files never dirty the Git working tree.
+        (`doom engines cfg install`, `doom engines install`, `doom setup`, `doom config set`, `doom engines add`,
+        `doom engines set`, `doom wads add`, `doom wads set`, and `Ctrl+S` in the TUI `Launch Options` and
+        `Configuration Manager` views) must write atomically and create non-clobbering timestamped backups
+        (`.bak.<timestamp>`, appending `-1` and `-2` on same-second collisions and retaining at most
+        `MaxBackupsPerFile = 3` per file) before overwriting any existing user file. `fsutil.WriteFileAtomic`,
+        `fsutil.WriteReaderAtomic`, `fsutil.CopyFileAtomic`, and `fsutil.DownloadVerified` share
+        `writeReaderTempAndRename`, which streams to a same-directory `.doom-tmp-*` file, applies `Chmod`, `Sync`, and
+        `Close`, and runs any validation callback (including SHA-256 verification) before calling `fsutil.BackupFile`
+        and `os.Rename`, so failed or corrupt writes never create spurious `.bak.*` files. When deleting user entities
+        or resetting overrides (`doom engines remove`, `doom engines reset`, `doom wads remove`, `doom wads reset`, and
+        `Ctrl+R` in the TUI `Launch Options` and `Configuration Manager` views), clean up `.bak.*` files via
+        `fsutil.RemoveBackups`. `doom engines cfg sync` (`templates.SyncConfigs`) also calls `fsutil.RemoveBackups` on
+        repository template files so `.bak.*` files never dirty the Git working tree.
     *   **Preserve unrelated configuration**: When adding new engine variables, aliases, or keybindings, avoid
         modifying or removing unrelated settings unless explicitly requested. `config.json` preserves unknown top-level
         keys across round-trips, and `doom wads set` and `doom engines set` preserve untouched override fields
         across successive calls.
-    *   **Archive security and path containment**: All archive extractions (`archive/zip`), direct file downloads, and
-        relative sub-path resolutions must sanitize paths against `..` traversal, drive-letter, and absolute path
-        sequences using `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
+    *   **Verified HTTP downloads and archive security**: All outbound HTTP downloads (`engine.Installer`,
+        `wad.Downloader`, and `wad.InstallSoundFontURL`) must use `fsutil.DownloadVerified` and `fsutil.UserAgent`
+        (`"doom-cli/2.0"`). All archive extractions (`archive/zip`), direct file downloads, and relative sub-path
+        resolutions must sanitize paths against `..` traversal, drive-letter, and absolute path sequences using
+        `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
 *   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
         and speedrunning precision are desired (such as *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*,
@@ -74,6 +80,19 @@
     *   **Optional asset degradation**: Optional files (`"optional": true`, such as `idkfa 2024.wad`) must not prevent
         presets from running when absent. Missing required files must cleanly abort execution with a descriptive error
         before engine invocation.
+    *   **Unified engine launch synthesis and zero-I/O preview parity**: `PrepareLaunch` and `FormatLaunchPreview` share
+        `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
+        `DefaultArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods` sorting, and missing optional file omission
+        (when `idx != nil`) never diverge between live execution, `doom wads show`, and the TUI `Launch Options`
+        command preview.
+    *   **Four-tier preset readiness and acquisition predicates**: `DirIndex.IsPresetInstalled` checks the base IWAD
+        plus required files for launch readiness and search indexing; `DirIndex.ArePresetFilesInstalled` checks
+        required files only for `wad.Downloader` (reusing a single `DirIndex` across `DownloadAll` and rebuilding only
+        when an archive downloads); `DirIndex.NeedsSteamDiscovery` checks for no download sources, a missing IWAD, or
+        missing optional files to gate Steam and GOG extraction during `doom wads fetch <name>` and TUI `Ctrl+F`; and
+        `areAllPresetFilesPresent` checks the IWAD plus all required and optional files so TUI `Ctrl+F` runs when only
+        optional assets like `idkfa 2024.wad` are missing, with all `FileSpec` lookups routed through
+        `DirIndex.ResolveFileSpec`.
     *   **Filename normalization and declarative catalog aliases**: Case-insensitive and whitespace-, dash-, and
         underscore-normalized matching (`preset.NormalizeFilename`) across configured WAD roots (`wads_dir` and
         `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
@@ -125,9 +144,9 @@ Linux, macOS, and Windows:
     *   `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path and catalog
         helpers.
     *   `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `scan`, `add`, `set`,
-        `reset`, `remove`, `lint`, `build` (hidden)).
+        `reset`, `remove`, `lint`, and hidden `build`).
     *   `engines.go`: `doom engines` interactive TUI engine manager and subcommands (`list`, `install`, `add`, `set`,
-        `reset`, `remove`, `cfg` (`install`, `diff`, `sync` (hidden))).
+        `reset`, `remove`, and `cfg` with `install`, `diff`, and hidden `sync`).
     *   `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
     *   `setup.go`: `doom setup` automated turnkey workflow command.
 *   `internal/config/`:
@@ -147,7 +166,9 @@ Linux, macOS, and Windows:
         `MaxBackupsPerFile = 3` per file, and `RemoveBackups`), and path-containment validation (`CleanRel`,
         `SafeJoin`).
 *   `internal/preset/`:
-    *   `preset.go`: Declarative entity types, strict JSON decoder, and two-layer catalog loader with quarantine.
+    *   `preset.go`: Declarative entity types, strict JSON decoder, two-layer catalog loader with quarantine
+        (`LoadLayeredCatalog`, `MergeUserDir`, `LoadPresetBaseAndOverride`), and query normalization
+        (`NormalizePresetQuery`).
     *   `store.go`: User `catalog.d` write operations (`AddEngine`, `ConfigEngine`, `ResetEngineOverride`,
         `RemoveEngine`, `AddPreset`, `ConfigPreset`, `ResetPresetOverride`, `RemovePreset`).
     *   `lint.go`: Catalog schema, reference, digest, personal-path, `README.md` parity, and documentation typography,
@@ -293,27 +314,47 @@ Linux, macOS, and Windows:
     subdirectories. Deploying `dsda-doom.cfg` and `autoexec.cfg` directly to `BinDir` (defaulting to
     `%USERPROFILE%\Games\Doom\bin\`) ensures both launcher-mediated and direct executable invocations load the
     intended configurations.
-*   **Persistent asset directory hierarchy**: Users can override and persist all asset and execution directories
-    (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) and UI preferences (`theme`, `nerd-fonts`) via
-    `doom config set <key> <val>` in `config.json` (located inside `DOOM_CONFIG_DIR` when set) or via the in-TUI
-    `Ctrl+G` configuration manager. Settings resolve in a two-tier hierarchy (`config.json` takes precedence over
-    platform defaults). Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on root `doom`; `--engine` or
-    `-e` on `doom wads add` and `doom wads set`; `--force` on `doom engines install`, `doom wads fetch`,
-    `doom wads scan`, and `doom setup`) are scoped locally to their respective Cobra commands rather than registered
-    globally as persistent flags. Engine launch synthesis, configuration deployment, and `doom config show` and
-    `doom config get` always adhere to this resolved hierarchy.
-*   **Symmetric two-layer entity catalog**: Keep user preferences (`config.json`) strictly separated from entity
-    definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`). User entities share the identical JSON schema as
-    curated repository entities so user presets and engines can be promoted to `catalog/` by copying a single file.
+*   **Five-pillar CLI dispatch, TUI entry modes, and root argument parsing**: The CLI is organized around five primary
+    commands (`doom [wad] [flags]`, `doom wads`, `doom engines`, `doom config`, and `doom setup`). `doom wads`,
+    `doom engines`, and `doom config` enter `RunInteractiveLauncherWithOptions` using `InitialModeWads`,
+    `InitialModeEngines`, and `InitialModeConfig` on interactive terminals and fall back to `RunNumberedMenu`,
+    `runEnginesList`, and `runConfigShow` on non-TTY streams. Pressing `Enter` in the TUI enforces an in-TUI
+    missing-files guard (`!m.isPresetReady(cur)`) or exits for a single-shot launch, where `runWadsTUI` reloads disk
+    state via `loadAppState()` and forwards `selected.EngineOverridden` to `PrepareLaunch`. All 12 non-positional
+    commands enforce `Args: cobra.NoArgs`, while `UnknownFlags: true` is restricted strictly to root
+    `doom [wad] [flags]`, where `parseRootInvocation` joins unquoted multi-word WAD names (`doom Doom II`) and forwards
+    native Doom single-dash flags (`-episode`, `-extratics`, `-endoom`, `-height`, `-viddump`) and `+` console
+    commands.
+*   **Persistent asset directory hierarchy and two-tier settings precedence**: Users can override and persist all asset
+    and execution directories (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) and UI preferences (`theme`,
+    `nerd-fonts`) via `doom config set <key> <val>` in `config.json` or via the in-TUI `Ctrl+G` configuration manager.
+    Settings resolve in a strict two-tier hierarchy (`config` in `config.json` takes precedence over platform `default`
+    values), with `DOOM_CONFIG_DIR` as the sole application environment variable and zero global persistent flags or
+    per-setting `DOOM_*` environment variables. Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on root
+    `doom`; `--engine` or `-e` on `doom wads add` and `doom wads set`; `--force` on `doom engines install`,
+    `doom wads fetch`, `doom wads scan`, and `doom setup`) are scoped locally to their respective Cobra commands.
+    Engine launch synthesis, configuration deployment, `doom config show`, and `doom config get` always adhere to this
+    resolved hierarchy.
+*   **Symmetric two-layer entity catalog, re-merge idempotency, and query normalization**: Keep user preferences
+    (`config.json`) strictly separated from entity definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`).
+    User entities share the identical JSON schema as curated repository entities so user presets and engines can be
+    promoted to `catalog/` by copying a single file. `MergeUserDir` resets curated entities to their
+    `loadEmbeddedCurated()` baselines before applying `catalog.d` so repeated in-TUI reloads and override resets are
+    idempotent, `LoadPresetBaseAndOverride` loads unmerged base presets and `exclude_files` overrides for
+    `Launch Options`, `NormalizePresetQuery` normalizes `.wad` and `.pk3` extensions and Roman numerals across `Find`
+    and `FindExact`, `RemovePreset` and `RemoveEngine` protect `LayerCurated` entities from deletion, `LintCatalog`
+    gates repository-only template, `README.md`, and documentation checks behind `hasDiskCatalog`, and each
+    configuration diff, deploy, or TUI `Configuration Manager` session probes `display.DetectDisplay()` once and passes
+    the result to `RenderAutoexecWithRate` and `RenderDSDADoomWithRes`.
 *   **Engine installer idempotency, multi-root WAD discovery, and setup failure reporting**: `doom setup` and
     `doom engines install` must check for existing executable binaries in `BinDir` and existing `.cfg` files on disk
-    and skip redundant asset downloads or config overwrites unless `--force` is specified. Both `wad.NewDownloader` and `steam.DiscoverAndExtract` check all configured
-    `WadRoots` (`WadsDir` and secondary read-only `WadsDirs`) before downloading, extracting, or synthesizing files into
-    primary `WadsDir`. `steam.GetSearchRoots` and `steam.DiscoverAndExtract` resolve symlinks via
-    `filepath.EvalSymlinks` so Linux Steam symlinks (`~/.steam/steam`, `~/.steam/root`) are deduplicated and traversed
-    by `filepath.WalkDir`, traversing up to depth 15 to discover game files inside Steam Proton prefixes
-    (`compatdata/<id>/pfx/...`). `doom setup` emits step warnings to `stderr` (`cmdErr(cmd)`) and exits non-zero if any
-    step fails.
+    and skip redundant asset downloads or config overwrites unless `--force` is specified. Both `wad.NewDownloader` and
+    `steam.DiscoverAndExtract` check all configured `WadRoots` (`WadsDir` and secondary read-only `WadsDirs`) before
+    downloading, extracting, or synthesizing files into primary `WadsDir`. `steam.GetSearchRoots` and
+    `steam.DiscoverAndExtract` resolve symlinks via `filepath.EvalSymlinks` so Linux Steam symlinks (`~/.steam/steam`,
+    `~/.steam/root`) are deduplicated and traversed by `filepath.WalkDir`, traversing up to depth 15 to discover game
+    files inside Steam Proton prefixes (`compatdata/<id>/pfx/...`). `doom setup` emits step warnings to `stderr`
+    (`cmdErr(cmd)`) and exits non-zero if any step fails.
 *   **Catalog-driven WAD aliases and Steam target synthesis**: Never duplicate WAD filenames or alias tables across
     `internal/preset/resolve.go` and `internal/steam/discover.go`, and never add aliases that only differ by case,
     spaces, dashes, or underscores (which `preset.NormalizeFilename` matches automatically and `LintCatalog` rejects).

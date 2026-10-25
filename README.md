@@ -133,8 +133,10 @@ doom setup
 
 ## CLI command reference
 
-The `doom` CLI is organized around five primary commands. Engine flags and console commands passed to `doom [wad]`
-(such as `-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine:
+The `doom` CLI is organized around five primary commands. `doom [wad]` accepts preset IDs, unquoted multi-word WAD
+names (`doom Doom II`, `doom Ancient Aliens -skill 4`), Roman or Arabic numerals (`doom doom2`, `doom sigil2`), and
+`.wad` or `.pk3` extensions (`doom sunlust.wad`). Engine flags and console commands passed to `doom [wad]` (such as
+`-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine:
 
 ### Core commands
 
@@ -283,17 +285,17 @@ to the browser:
 ### Configuration manager controls
 
 When managing settings via `Ctrl+G` or `F2`, switch between `1. CLI Settings`, `2. Engine Overrides`, and
-`3. Port Configs` with `1`, `2`, `3`, `[`, or `]`, navigate fields with `↑`, `↓`, `Tab`, `Shift+Tab`, `Ctrl+P`, or
-`Ctrl+N`, cycle spin selectors (`Theme`, `Engine`, `Args Style`) or action buttons (`< View Diff >`,
-`< Deploy Curated Configs >`) with `←` and `→`, toggle checkboxes or trigger port configuration actions with `Space` or
-`Enter`, save the active tab atomically with `Ctrl+S`, reset engine overrides on Tab 2 with `Ctrl+R`, or press `Esc` to
-close and revert unsaved live theme and Nerd Fonts previews:
+`3. Port Configs` with `1`, `2`, `3`, `[`, or `]`, navigate fields with `↑`, `↓`, `Tab`, `Shift+Tab`, `Ctrl+P`,
+`Ctrl+N`, `Ctrl+K`, or `Ctrl+J`, cycle spin selectors (`Theme`, `Engine`, `Args Style`) or action buttons
+(`< View Diff >`, `< Deploy Curated Configs >`) with `←` and `→`, toggle checkboxes or trigger port configuration
+actions with `Space` or `Enter`, save the active tab atomically with `Ctrl+S`, reset engine overrides on Tab 2 with
+`Ctrl+R`, or press `Esc` to close and revert unsaved live theme and Nerd Fonts previews:
 
 | Key | Action |
 | :--- | :--- |
 | `1`, `2`, `3`, `[`, or `]` | Switch between `1. CLI Settings`, `2. Engine Overrides`, and `3. Port Configs` tabs |
-| `↑`, `Ctrl+P`, or `Shift+Tab` | Move focus to previous setting field |
-| `↓`, `Ctrl+N`, or `Tab` | Move focus to next setting field |
+| `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` | Move focus to previous setting field |
+| `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` | Move focus to next setting field |
 | `←` or `→` | Cycle spin selector values or Tab 3 action buttons |
 | `Space` or `Enter` | Toggle checkbox or trigger Tab 3 `< View Diff >` and `< Deploy Curated Configs >` actions |
 | `Ctrl+S` | Save active tab settings atomically with timestamped backups |

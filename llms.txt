@@ -27,7 +27,9 @@ doom wads
 ## CLI command tree
 
 - `doom [wad] [flags]`: Direct game launcher (defaults to *The Ultimate Doom* when no `<wad>` argument is given),
-  supporting `--engine` (`-e`), `--dry-run`, and pass-through engine arguments (such as `doom -skill 4 -warp 1 1`).
+  accepting preset IDs, unquoted multi-word WAD names (`doom Doom II`), Roman or Arabic numerals (`doom doom2`,
+  `doom sigil2`), and `.wad` or `.pk3` extensions (`doom sunlust.wad`), and supporting `--engine` (`-e`), `--dry-run`,
+  and pass-through engine arguments (such as `doom -skill 4 -warp 1 1` and `+map E1M1`).
 - `doom wads`: Opens the interactive TUI WAD browser powered by Bubble Tea.
 - `doom wads list`: Lists all presets (built-in and custom), engine assignments, and on-disk readiness
   (`[✓ Ready]` or `[✗ Missing]`).
@@ -80,17 +82,18 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
 - `cmd/doom/`: Modular Cobra CLI commands:
   - `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path helpers.
   - `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `scan`, `add`, `set`,
-    `reset`, `remove`, `lint`, `build` (hidden)).
+    `reset`, `remove`, `lint`, and hidden `build`).
   - `engines.go`: `doom engines` interactive TUI engine manager and subcommands (`list`, `install`, `add`, `set`,
-    `reset`, `remove`, `cfg` (`install`, `diff`, `sync` (hidden))).
+    `reset`, `remove`, and `cfg` with `install`, `diff`, and hidden `sync`).
   - `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
   - `setup.go`: `doom setup` automated turnkey workflow.
 - `internal/config/`: Cross-platform path resolution adhering to XDG, Library, and AppData (`paths.go`), plus
   settings-only `config.json` (`settings.go`).
 - `internal/display/`: Native display resolution and refresh rate auto-detection.
-- `internal/engine/`: Declarative source port binary installation and argument synthesis (`runner.go`, `installer.go`).
-- `internal/fsutil/`: Atomic file writes with timestamped backups, SHA-256 verified HTTP downloads, and
-  path-containment helpers (`fsutil.go`).
+- `internal/engine/`: Declarative source port binary installation (`installer.go`), launch argument synthesis
+  (`PrepareLaunch`), and zero-I/O command preview formatting (`FormatLaunchPreview` in `runner.go`).
+- `internal/fsutil/`: Atomic file writes with timestamped backups, SHA-256 verified HTTP downloads (`DownloadVerified`
+  and `UserAgent`), and path-containment helpers (`fsutil.go`).
 - `internal/preset/`: Two-layer entity catalog, store operations, schema and documentation linting, multi-root file and
   alias resolution, CP437 decoding, and README sync (`preset.go`, `store.go`, `lint.go`, `resolve.go`, `decode.go`,
   `compiler.go`).
@@ -112,12 +115,14 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
 - **Catalog-driven WAD aliases and Steam synthesis**: Alternate filename stems (`files[].aliases`) are declared once in
   `catalog/preset.<id>.json` and `<ConfigDir>/catalog.d/*.json`; `preset.DirIndex` and `steam.DefaultTargetPatterns()`
   synthesize their lookup tables directly from the catalog alongside normalized filename matching
-  (`preset.NormalizeFilename`).
+  (`preset.NormalizeFilename`) and preset query normalization (`preset.NormalizePresetQuery`).
 - **Portability**: Configuration templates use `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholders.
-- **Destructive safety**: Atomic writes and non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most
-  `MaxBackupsPerFile = 3` per file and cleaning up orphaned `.bak.*` files via `fsutil.RemoveBackups` on entity or
-  override deletion and `doom engines cfg sync`) are created before modifying existing user files.
-- **Archive security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and SHA-256 verification.
+- **Destructive safety**: Atomic writes (`writeReaderTempAndRename`) and non-clobbering timestamped backups
+  (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file and cleaning up orphaned `.bak.*` files via
+  `fsutil.RemoveBackups` on entity or override deletion and `doom engines cfg sync`) are created across all CLI and
+  in-TUI (`Ctrl+S` and `Ctrl+R`) configuration writes before modifying existing user files.
+- **Archive and download security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and streaming SHA-256
+  verification via `fsutil.DownloadVerified` (`fsutil.UserAgent` `"doom-cli/2.0"`).
 - **Strict line length (120 columns)**: Code enforced at 120 columns via `revive.toml` and `.editorconfig`.
 
 ## References
