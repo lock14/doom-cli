@@ -22,14 +22,24 @@ All contributions must respect the core repository invariants:
     *   **Standard directory structures**: Respect platform standard directories (XDG on Linux,
         `~/Library/Application Support/` on macOS, and `%LOCALAPPDATA%` and `%USERPROFILE%\Games\Doom\` on Windows).
 *   **Destructive safety and backup policy**: Any configuration or catalog write (`doom engines cfg install`,
-    `doom engines install`, `doom setup`, `doom config set`, `doom engines add`,
-    `doom engines set`, `doom wads add`, `doom wads set`) must write atomically via same-directory temporary rename and
-    generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file
-    and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion and on repository templates during
-    `doom engines cfg sync`) before overwriting any existing user file.
-*   **Archive security and Zip Slip hardening**: All archive extractions (`archive/zip`) and relative sub-path
-    resolutions must sanitize entry paths against `..` traversal sequences via `fsutil.SafeJoin` and verify containment
-    before any filesystem write.
+    `doom engines install`, `doom setup`, `doom config set`, `doom engines add`, `doom engines set`, `doom wads add`,
+    `doom wads set`, and `Ctrl+S` in the TUI `Launch Options` and `Configuration Manager` views) must write atomically
+    and generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per
+    file and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion, in-TUI `Ctrl+R` resets, and
+    repository templates during `doom engines cfg sync`) before overwriting any existing user file.
+    `fsutil.WriteFileAtomic`, `fsutil.WriteReaderAtomic`, `fsutil.CopyFileAtomic`, and `fsutil.DownloadVerified` share
+    `writeReaderTempAndRename`, which streams to a same-directory `.doom-tmp-*` file, applies `Chmod`, `Sync`, and
+    `Close`, and runs any validation callback (including SHA-256 verification) before calling `fsutil.BackupFile` and
+    `os.Rename` so failed or corrupt writes never create spurious `.bak.*` files.
+*   **Verified HTTP downloads and archive security**: All outbound HTTP downloads (`engine.Installer`,
+    `wad.Downloader`, and `wad.InstallSoundFontURL`) must use `fsutil.DownloadVerified` and `fsutil.UserAgent`
+    (`"doom-cli/2.0"`). All archive extractions (`archive/zip`), direct downloads, and relative sub-path resolutions
+    must sanitize entry paths against `..` traversal sequences via `fsutil.SafeJoin` and verify containment before any
+    filesystem write.
+*   **Two-tier settings precedence**: CLI settings (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, and
+    `soundfonts-dir`) resolve in a strict two-tier hierarchy (`config` in `config.json` takes precedence over platform
+    `default` values), with `DOOM_CONFIG_DIR` as the sole application environment variable and zero global persistent
+    flags or per-setting `DOOM_*` environment variables.
 *   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
         and speedrunning precision are desired (such as *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*,
@@ -37,6 +47,19 @@ All contributions must respect the core repository invariants:
     *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom scripting, high-resolution texture packs like OTEX
         (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
     *   **No duplicate IWADs**: Never include the base game IWAD in `files`. The IWAD must only be specified in `iwad`.
+    *   **Unified launch argument and preview synthesis**: `PrepareLaunch` and `FormatLaunchPreview` share
+        `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
+        `DefaultArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods` sorting, and missing optional file omission
+        (when `idx != nil`) never diverge between live execution, `doom wads show`, and the TUI `Launch Options`
+        command preview.
+    *   **Four-tier preset readiness and acquisition predicates**: `DirIndex.IsPresetInstalled` checks the base IWAD
+        plus required files for launch readiness and search indexing; `DirIndex.ArePresetFilesInstalled` checks
+        required files only for `wad.Downloader` (reusing a single `DirIndex` across `DownloadAll` and rebuilding only
+        when an archive downloads); `DirIndex.NeedsSteamDiscovery` checks for no download sources, a missing IWAD, or
+        missing optional files to gate Steam and GOG extraction during `doom wads fetch <name>` and TUI `Ctrl+F`; and
+        `areAllPresetFilesPresent` checks the IWAD plus all required and optional files so TUI `Ctrl+F` runs when only
+        optional assets like `idkfa 2024.wad` are missing, with all `FileSpec` lookups routed through
+        `DirIndex.ResolveFileSpec`.
     *   **Filename normalization and declarative aliases**: Maintain case-insensitive and dash-, underscore-, and
         space-tolerant file resolution (`preset.NormalizeFilename`) across WAD roots, archive extraction, and Steam and
         GOG discovery. When an upstream archive or rerelease uses a distinct filename stem, declare `"aliases"` on the
@@ -100,17 +123,17 @@ doom-cli/
 ├── catalog/                # One-entity-per-file curated catalog (engine.<id>.json, preset.<id>.json)
 ├── cmd/doom/               # Command-line interface definitions using Cobra
 │   ├── main.go             # Entrypoint, root direct game launcher, path and catalog helpers
-│   ├── wads.go             # 'doom wads' interactive TUI browser and subcommands (list, show, fetch, scan, add, set, reset, remove, lint, build)
-│   ├── engines.go          # 'doom engines' interactive TUI manager and subcommands (list, install, add, set, reset, remove, cfg)
+│   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, scan, add, set, reset, remove, lint, build)
+│   ├── engines.go          # 'doom engines' TUI manager (list, install, add, set, reset, remove, cfg)
 │   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, themes)
 │   └── setup.go            # 'doom setup' turnkey installation workflow
 ├── internal/
 │   ├── config/             # Platform path resolvers (paths.go) and settings-only config.json (settings.go)
 │   ├── display/            # Native display resolution and refresh rate auto-detection
 │   ├── engine/             # Source port runners, argument synthesis, declarative binary installers
-│   │   ├── runner.go       # Synthesizes arguments (including .deh and .bex ordering) and executes engine processes
+│   │   ├── runner.go       # Launch synthesis (PrepareLaunch), zero-I/O preview (FormatLaunchPreview), and execution
 │   │   └── installer.go    # Declarative GitHub release and pinned fallback binary installer
-│   ├── fsutil/             # Atomic file writes (temporary file and rename), backups, and SafeJoin
+│   ├── fsutil/             # Atomic writes, backups, SHA-256 verified HTTP downloads (DownloadVerified), and SafeJoin
 │   ├── preset/             # Two-layer entity catalog, store, linter, file resolver, README compiler
 │   │   ├── preset.go       # Entity models, strict decoding, layered catalog loader, quarantine
 │   │   ├── store.go        # User catalog.d write operations (AddEngine, ConfigEngine, AddPreset, ConfigPreset)
@@ -131,7 +154,7 @@ doom-cli/
 │   │   └── builtin_themes.go # Curated color palettes adhering to the 60-30-10 design principle
 │   └── wad/                # WAD downloading, archive extraction, and SoundFont deployment
 │       ├── downloader.go   # Multi-mirror SHA-256 verified downloader for community megawads
-│       ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README (.txt) extractor
+│       ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README extractor
 │       └── soundfont.go    # Roland SC-55 SoundFont installer
 ├── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
 │   ├── rules/              # Project overrides and conventions (monospace-tui.md)
