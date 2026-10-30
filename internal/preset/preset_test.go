@@ -1192,7 +1192,7 @@ func TestLookupNormalization_EngineDisplayName_And_RemovePresetCurated(t *testin
 		t.Fatalf("LoadCuratedCatalog: %v", err)
 	}
 
-	// 1. Find and FindExact resolve Roman numeral and normalized filename queries
+	// 1. Find and FindExact resolve Roman numeral, WAD stem, implicit doom prefix, and initialism queries
 	for _, tc := range []struct {
 		query  string
 		wantID string
@@ -1200,9 +1200,58 @@ func TestLookupNormalization_EngineDisplayName_And_RemovePresetCurated(t *testin
 		{query: "doom2", wantID: "doom-ii"},
 		{query: "doom_ii", wantID: "doom-ii"},
 		{query: "doom2.wad", wantID: "doom-ii"},
+		{query: "II", wantID: "doom-ii"},
+		{query: "ii", wantID: "doom-ii"},
+		{query: "2", wantID: "doom-ii"},
+		{query: "I", wantID: "doom"},
+		{query: "i", wantID: "doom"},
+		{query: "1", wantID: "doom"},
+		{query: "doom1", wantID: "doom"},
+		{query: "doom1.wad", wantID: "doom"},
+		{query: "zero", wantID: "doom-zero"},
 		{query: "sigil2", wantID: "sigil-ii"},
 		{query: "eviternity2", wantID: "eviternity-ii"},
 		{query: "sunlust.wad", wantID: "sunlust"},
+		{query: "plutonia", wantID: "the-plutonia-experiment"},
+		{query: "plutonia.wad", wantID: "the-plutonia-experiment"},
+		{query: "pl2", wantID: "plutonia-2"},
+		{query: "pl2.wad", wantID: "plutonia-2"},
+		{query: "tnt", wantID: "tnt-evilution"},
+		{query: "tnt.wad", wantID: "tnt-evilution"},
+		{query: "evilution", wantID: "tnt-evilution"},
+		{query: "revilution", wantID: "tnt-revilution"},
+		{query: "tntr", wantID: "tnt-revilution"},
+		{query: "tntr.wad", wantID: "tnt-revilution"},
+		{query: "av", wantID: "alien-vendetta"},
+		{query: "av.wad", wantID: "alien-vendetta"},
+		{query: "aa", wantID: "ancient-aliens"},
+		{query: "aaliens", wantID: "ancient-aliens"},
+		{query: "aaliens.wad", wantID: "ancient-aliens"},
+		{query: "btsx1", wantID: "back-to-saturn-x-episode-1"},
+		{query: "btsx_e1a.wad", wantID: "back-to-saturn-x-episode-1"},
+		{query: "btsx2", wantID: "back-to-saturn-x-episode-2"},
+		{query: "btsx_e2a.wad", wantID: "back-to-saturn-x-episode-2"},
+		{query: "dtwid", wantID: "doom-the-way-id-did"},
+		{query: "dtwid.wad", wantID: "doom-the-way-id-did"},
+		{query: "d2twid", wantID: "doom-ii-the-way-id-did"},
+		{query: "d2twid.wad", wantID: "doom-ii-the-way-id-did"},
+		{query: "Doom 2: The Way ID Did", wantID: "doom-ii-the-way-id-did"},
+		{query: "gdturbo", wantID: "going-down-turbo"},
+		{query: "gdt", wantID: "going-down-turbo"},
+		{query: "gd", wantID: "going-down-turbo"},
+		{query: "going-down", wantID: "going-down-turbo"},
+		{query: "id1", wantID: "legacy-of-rust"},
+		{query: "id1.wad", wantID: "legacy-of-rust"},
+		{query: "lor", wantID: "legacy-of-rust"},
+		{query: "rust", wantID: "legacy-of-rust"},
+		{query: "neis", wantID: "no-end-in-sight"},
+		{query: "neis.wad", wantID: "no-end-in-sight"},
+		{query: "nerve", wantID: "no-rest-for-the-living"},
+		{query: "nerve.wad", wantID: "no-rest-for-the-living"},
+		{query: "nrftl", wantID: "no-rest-for-the-living"},
+		{query: "sod", wantID: "speed-of-doom"},
+		{query: "sodfinal", wantID: "speed-of-doom"},
+		{query: "sodfinal.wad", wantID: "speed-of-doom"},
 	} {
 		p := curated.Find(tc.query)
 		if p == nil || p.ID != tc.wantID {
@@ -1212,6 +1261,14 @@ func TestLookupNormalization_EngineDisplayName_And_RemovePresetCurated(t *testin
 		if exactErr != nil || pExact == nil || pExact.ID != tc.wantID {
 			t.Errorf("curated.FindExact(%q) = (%+v, %v), want ID %q", tc.query, pExact, exactErr, tc.wantID)
 		}
+	}
+
+	// 1b. Ambiguous series queries resolve to the first episode in Find, but return an ambiguity error in FindExact
+	if p := curated.Find("btsx"); p == nil || p.ID != "back-to-saturn-x-episode-1" {
+		t.Errorf("curated.Find(\"btsx\") = %+v, want back-to-saturn-x-episode-1", p)
+	}
+	if _, err := curated.FindExact("btsx"); err == nil || !strings.Contains(err.Error(), "is ambiguous") {
+		t.Errorf("expected curated.FindExact(\"btsx\") to return ambiguity error, got %v", err)
 	}
 
 	// 2. Add custom engine "Woof!" and verify FindEngine matches DisplayName "Woof!" and FormatLabel

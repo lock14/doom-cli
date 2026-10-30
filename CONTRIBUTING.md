@@ -60,11 +60,13 @@ All contributions must respect the core repository invariants:
         `areAllPresetFilesPresent` checks the IWAD plus all required and optional files so TUI `Ctrl+F` runs when only
         optional assets like `idkfa 2024.wad` are missing, with all `FileSpec` lookups routed through
         `DirIndex.ResolveFileSpec`.
-    *   **Filename normalization and declarative aliases**: Maintain case-insensitive and dash-, underscore-, and
-        space-tolerant file resolution (`preset.NormalizeFilename`) across WAD roots, archive extraction, and Steam and
-        GOG discovery. When an upstream archive or rerelease uses a distinct filename stem, declare `"aliases"` on the
-        `FileSpec` in `catalog/preset.<id>.json` so both `preset.DirIndex` and `steam.DefaultTargetPatterns()`
-        derive from a single source of truth.
+    *   **Filename and preset query normalization and declarative aliases**: Maintain case-insensitive and dash-,
+        underscore-, and space-tolerant file resolution (`preset.NormalizeFilename`) across WAD roots, archive
+        extraction, and Steam and GOG discovery, alongside tiered preset query resolution (`Catalog.Find`,
+        `Catalog.FindExact`, and `preset.NormalizePresetQuery`) across WAD stems, Roman numerals, implicit `doom`
+        prefixes, and multi-word initialisms. When an upstream archive or rerelease uses a distinct filename stem,
+        declare `"aliases"` on the `FileSpec` in `catalog/preset.<id>.json` so both `preset.DirIndex` and
+        `steam.DefaultTargetPatterns()` derive from a single source of truth.
     *   **Two-layer catalog**: Curated defaults in `catalog/*.json` are immutable; user engines, presets, and overrides
         layer cleanly as individual drop-in files in `<ConfigDir>/catalog.d/*.json`, while `<ConfigDir>/config.json`
         stores CLI settings only.

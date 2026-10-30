@@ -1463,6 +1463,12 @@ func TestModel_SearchTokens_CompatibilityAndReadiness(t *testing.T) {
 	if len(m.filtered) != 1 || m.filtered[0].ID != "eviternity-ii" {
 		t.Errorf("expected filter 'missing' to match uninstalled eviternity-ii, got %+v", m.filtered)
 	}
+
+	// Filter by PWAD filename "av.wad"
+	m.updateFiltered("av.wad")
+	if len(m.filtered) != 1 || m.filtered[0].ID != "alien-vendetta" {
+		t.Errorf("expected filter 'av.wad' to match alien-vendetta, got %+v", m.filtered)
+	}
 }
 
 func TestModel_ContextualHelpView_AndFetchAssets(t *testing.T) {

@@ -118,9 +118,21 @@ func buildSearchTarget(p preset.Preset, dirIndex *preset.DirIndex) string {
 	if dirIndex != nil && dirIndex.IsPresetInstalled(p) {
 		readiness = "ready installed"
 	}
+	var files strings.Builder
+	for _, f := range p.Files {
+		if f.Optional {
+			continue
+		}
+		base := filepath.Base(strings.TrimSpace(f.Name))
+		if base == "" || strings.EqualFold(base, "extras.wad") {
+			continue
+		}
+		files.WriteByte(' ')
+		files.WriteString(base)
+	}
 	return strings.TrimSpace(fmt.Sprintf(
-		"%s %s %s %s %s",
-		p.Name, p.Engine, p.Category, p.Compatibility, readiness,
+		"%s %s %s %s%s %s",
+		p.Name, p.Engine, p.Category, p.Compatibility, files.String(), readiness,
 	))
 }
 

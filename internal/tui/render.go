@@ -632,7 +632,7 @@ func (m model) buildHelpContent(fromMode int) string {
 		fmt.Sprintf("  %-22s  Quit launcher", k("Esc, Ctrl+C")),
 		"",
 		h("Fuzzy Search Tokens"),
-		"  Filter by title, engine (dsda-doom, uzdoom), category (Doom II, Heretic),",
+		"  Filter by title, WAD filename, engine (dsda-doom, uzdoom), category (Doom II, Heretic),",
 		"  compatibility (MBF21, Boom, Vanilla, ID24), or readiness (ready, installed, missing).",
 	}
 
