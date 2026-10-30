@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "myhouse",
+  "name": "MyHouse.pk3",
+  "engine": "uzdoom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "myhouse.pk3"
+    }
+  ],
+  "category": "Community Episode",
+  "genre": "Psychological Horror",
+  "difficulty": "Casual",
+  "quality": "S-Tier (9.5/10)",
+  "compatibility": "GZDoom",
+  "description": "Non-euclidean psychological horror showcase",
+  "author": "Veddge",
+  "release_date": "2023",
+  "sources": [
+    {
+      "url": "https://archive.org/download/myhouse_202511/myhouse.pk3",
+      "sha256": "25ee4c7464b2c01c761b91236e50d7c3ec5fbc8de79118a5fa4acb9c4f34ae81"
+    },
+    {
+      "url": "https://archive.org/download/myhouse-versions/myhouse-20230416.pk3",
+      "sha256": "25ee4c7464b2c01c761b91236e50d7c3ec5fbc8de79118a5fa4acb9c4f34ae81"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/forum/topic/134292-myhousewad/",
+      "rel": "doomworld"
+    }
+  ],
+  "sort": 175
+}

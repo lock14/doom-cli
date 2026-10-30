@@ -15,9 +15,18 @@
     }
   ],
   "category": "Official Expansion",
+  "genre": "Classic Techbase and Hell",
+  "difficulty": "Moderate",
+  "quality": "A-Tier (8.5/10)",
   "compatibility": "Vanilla",
   "description": "Official 9-level expansion for Doom II",
   "author": "Nerve Software",
   "release_date": "2010",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/No_Rest_for_the_Living",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 200
 }

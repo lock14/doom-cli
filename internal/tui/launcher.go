@@ -131,8 +131,9 @@ func buildSearchTarget(p preset.Preset, dirIndex *preset.DirIndex) string {
 		files.WriteString(base)
 	}
 	return strings.TrimSpace(fmt.Sprintf(
-		"%s %s %s %s%s %s",
-		p.Name, p.Engine, p.Category, p.Compatibility, files.String(), readiness,
+		"%s %s %s %s %s %s %s%s %s",
+		p.Name, p.Engine, p.Category, p.Genre, p.Difficulty, p.Quality,
+		p.Compatibility, files.String(), readiness,
 	))
 }
 

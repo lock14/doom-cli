@@ -13,6 +13,14 @@
       ]
     }
   ],
+  "category": "Community Megawad",
+  "genre": "Architectural Slaughter",
+  "difficulty": "Extreme",
+  "quality": "S-Tier (9.5/10)",
+  "compatibility": "MBF21 / Boom",
+  "description": "Monumental architectural slaughter megawad",
+  "author": "Insane_Gazebo",
+  "release_date": "2009",
   "sources": [
     {
       "url": "https://dsdarchive.com/files/wads/doom2/5016/Sunder_2512.zip",
@@ -29,10 +37,5 @@
       "rel": "doomworld"
     }
   ],
-  "category": "Community Megawad",
-  "compatibility": "MBF21 / Boom",
-  "description": "Monumental architectural slaughter megawad",
-  "author": "Insane_Gazebo",
-  "release_date": "2009",
   "sort": 260
 }

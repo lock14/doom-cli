@@ -12,9 +12,18 @@
     }
   ],
   "category": "Official IWAD",
+  "genre": "Adventure Techbase",
+  "difficulty": "Moderate",
+  "quality": "B-Tier (7.0/10)",
   "compatibility": "Vanilla",
   "description": "Classic Final Doom IWAD with modern soundtrack",
   "author": "TeamTNT",
   "release_date": "1996",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/TNT:_Evilution",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 300
 }

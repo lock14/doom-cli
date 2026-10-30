@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "strife",
+  "name": "Strife: Quest for the Sigil",
+  "engine": "uzdoom",
+  "iwad": "STRIFE1.WAD",
+  "files": [
+    {
+      "name": "VOICES.WAD",
+      "optional": true
+    }
+  ],
+  "category": "Official IWAD",
+  "genre": "Hub-Based Action RPG",
+  "difficulty": "Moderate",
+  "quality": "A-Tier (8.5/10)",
+  "compatibility": "Rogue Entertainment",
+  "description": "Rogue Entertainment sci-fi fantasy FPS and RPG hybrid",
+  "author": "Rogue Entertainment",
+  "release_date": "1996",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/Strife:_Quest_for_the_Sigil",
+      "rel": "doomwiki"
+    }
+  ],
+  "sort": 255
+}

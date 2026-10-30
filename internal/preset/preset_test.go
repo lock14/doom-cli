@@ -1423,3 +1423,126 @@ func TestNeedsSteamDiscoveryAndNonDirCatalogErrors(t *testing.T) {
 		t.Errorf("expected LoadPresetBaseAndOverride(file, doom2) to fail with 'not a directory', got %v", err)
 	}
 }
+
+func TestCuratedNewPresetsTaxonomyAndPrimaryURL(t *testing.T) {
+	t.Parallel()
+	cat, err := LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+
+	queries := []struct {
+		name       string
+		query      string
+		wantID     string
+		wantEngine string
+		wantGenre  string
+		wantDiff   string
+		wantQual   string
+	}{
+		{
+			name:       "AUGER;ZENITH by id",
+			query:      "auger-zenith",
+			wantID:     "auger-zenith",
+			wantEngine: "dsda-doom",
+			wantGenre:  "Cyberpunk Adventure",
+			wantDiff:   "Moderate",
+			wantQual:   "S-Tier (9.5/10)",
+		},
+		{
+			name:       "AUGER;ZENITH by alias filename",
+			query:      "augerzenith.wad",
+			wantID:     "auger-zenith",
+			wantEngine: "dsda-doom",
+			wantGenre:  "Cyberpunk Adventure",
+			wantDiff:   "Moderate",
+			wantQual:   "S-Tier (9.5/10)",
+		},
+		{
+			name:       "MyHouse.pk3 by filename",
+			query:      "myhouse.pk3",
+			wantID:     "myhouse",
+			wantEngine: "uzdoom",
+			wantGenre:  "Psychological Horror",
+			wantDiff:   "Casual",
+			wantQual:   "S-Tier (9.5/10)",
+		},
+		{
+			name:       "Overboard by id",
+			query:      "overboard",
+			wantID:     "overboard",
+			wantEngine: "dsda-doom",
+			wantGenre:  "Set-Piece Adventure",
+			wantDiff:   "Moderate",
+			wantQual:   "S-Tier (9.0/10)",
+		},
+		{
+			name:       "Rowdy Rudy II by filename",
+			query:      "rudy2.wad",
+			wantID:     "rowdy-rudy-ii",
+			wantEngine: "dsda-doom",
+			wantGenre:  "DeHackEd Action",
+			wantDiff:   "Moderate",
+			wantQual:   "A-Tier (8.0/10)",
+		},
+		{
+			name:       "Strife by IWAD",
+			query:      "STRIFE1.WAD",
+			wantID:     "strife",
+			wantEngine: "uzdoom",
+			wantGenre:  "Hub-Based Action RPG",
+			wantDiff:   "Moderate",
+			wantQual:   "A-Tier (8.5/10)",
+		},
+		{
+			name:       "Going Down shorthand resolves to Going Down Turbo",
+			query:      "going-down",
+			wantID:     "going-down-turbo",
+			wantEngine: "dsda-doom",
+			wantGenre:  "Set-Piece Chaos",
+			wantDiff:   "Hard",
+			wantQual:   "S-Tier (9.5/10)",
+		},
+	}
+
+	for _, tc := range queries {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			p := cat.Find(tc.query)
+			if p == nil {
+				t.Fatalf("cat.Find(%q) returned nil", tc.query)
+			}
+			if p.ID != tc.wantID || p.Engine != tc.wantEngine {
+				t.Errorf("got ID=%q Engine=%q, want ID=%q Engine=%q", p.ID, p.Engine, tc.wantID, tc.wantEngine)
+			}
+			if p.Genre != tc.wantGenre || p.Difficulty != tc.wantDiff || p.Quality != tc.wantQual {
+				t.Errorf(
+					"got Genre=%q Difficulty=%q Quality=%q, want %q / %q / %q",
+					p.Genre, p.Difficulty, p.Quality, tc.wantGenre, tc.wantDiff, tc.wantQual,
+				)
+			}
+			if p.PrimaryURL() == "" {
+				t.Errorf("expected non-empty PrimaryURL() for %s", p.ID)
+			}
+		})
+	}
+
+	// Verify applyPresetOverride supports Genre, Difficulty, and Quality
+	base := *cat.Find("sunlust")
+	customGenre := "Custom Genre"
+	customDiff := "Custom Difficulty"
+	customQual := "Custom Quality"
+	ov := Override{
+		Set: &OverrideSet{
+			Genre:      &customGenre,
+			Difficulty: &customDiff,
+			Quality:    &customQual,
+		},
+	}
+	applyPresetOverride(cat, &base, &ov)
+	if base.Genre != "Custom Genre" ||
+		base.Difficulty != "Custom Difficulty" ||
+		base.Quality != "Custom Quality" {
+		t.Errorf("override taxonomy fields not applied: %+v", base)
+	}
+}

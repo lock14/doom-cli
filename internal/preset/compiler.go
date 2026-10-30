@@ -11,15 +11,15 @@ import (
 )
 
 var readmeTableRegex = regexp.MustCompile(
-	`(?i)(## Preconfigured presets\n\n[^\n]+\n\n)(\|[\s\S]+?)(\n\n(?:---|## ))`,
+	`(?i)(## Preconfigured presets\n\n[\s\S]+?\n\n)(\|[\s\S]+?)(\n\n(?:---|## ))`,
 )
 
 // GenerateReadmeTable constructs the markdown table for README.md using each
-// preset's resolved engine display name from the catalog.
+// preset's resolved engine display name, genre, difficulty, quality, and primary link from the catalog.
 func GenerateReadmeTable(cat *Catalog) string {
 	lines := []string{
-		"| Megawad or expansion | Engine | Compatibility and details |",
-		"| :--- | :--- | :--- |",
+		"| Megawad or expansion | Engine | Genre | Difficulty | Quality | Compatibility and details |",
+		"| :--- | :--- | :--- | :--- | :--- | :--- |",
 	}
 	if cat == nil {
 		return strings.Join(lines, "\n")
@@ -28,8 +28,18 @@ func GenerateReadmeTable(cat *Catalog) string {
 		if p.IsCustom() {
 			continue
 		}
+		nameCell := p.Name
+		if primaryURL := p.PrimaryURL(); primaryURL != "" {
+			nameCell = fmt.Sprintf("[%s](%s)", p.Name, primaryURL)
+		}
 		engDisplay := cat.EngineDisplayName(p.Engine)
-		lines = append(lines, fmt.Sprintf("| %s | %s | %s |", p.Name, engDisplay, p.Description))
+		lines = append(
+			lines,
+			fmt.Sprintf(
+				"| %s | %s | %s | %s | %s | %s |",
+				nameCell, engDisplay, p.Genre, p.Difficulty, p.Quality, p.Description,
+			),
+		)
 	}
 	return strings.Join(lines, "\n")
 }

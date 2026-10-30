@@ -7,9 +7,18 @@
   "iwad": "HEXEN.WAD",
   "files": [],
   "category": "Official IWAD",
+  "genre": "Hub-Based Fantasy",
+  "difficulty": "Moderate",
+  "quality": "A-Tier (8.0/10)",
   "compatibility": "Raven Software",
   "description": "Raven Software hub-based fantasy shooter",
   "author": "Raven Software",
   "release_date": "1995",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/Hexen:_Beyond_Heretic",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 150
 }

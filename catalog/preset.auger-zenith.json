@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "auger-zenith",
+  "name": "AUGER;ZENITH",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "DBP37_AUGZEN.wad",
+      "aliases": [
+        "augerzenith.wad"
+      ]
+    }
+  ],
+  "category": "Community Megawad",
+  "genre": "Cyberpunk Adventure",
+  "difficulty": "Moderate",
+  "quality": "S-Tier (9.5/10)",
+  "compatibility": "Limit-Removing",
+  "description": "Neon-soaked cyberpunk city megawad with custom palette",
+  "author": "SuperCupcakeTactics & Doomer Boards",
+  "release_date": "2021",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/dbp37_augzen.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/dbp37_augzen",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 25
+}

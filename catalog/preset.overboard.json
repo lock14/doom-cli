@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "overboard",
+  "name": "Overboard",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "overboard.wad"
+    }
+  ],
+  "category": "Community Episode",
+  "genre": "Set-Piece Adventure",
+  "difficulty": "Moderate",
+  "quality": "S-Tier (9.0/10)",
+  "compatibility": "Boom",
+  "description": "Island-hopping vacation episode with New Game+ remix",
+  "author": "mouldy",
+  "release_date": "2022",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/overboard.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/overboard",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 203
+}

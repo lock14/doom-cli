@@ -15,9 +15,18 @@
     }
   ],
   "category": "Official Expansion",
+  "genre": "90s Anthology",
+  "difficulty": "Moderate",
+  "quality": "C-Tier (6.0/10)",
   "compatibility": "Vanilla",
   "description": "Full 20-level classic collection",
   "author": "Various (Commissioned by id Software)",
   "release_date": "1995",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/Master_Levels_for_Doom_II",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 170
 }

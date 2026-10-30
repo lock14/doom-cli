@@ -7,9 +7,18 @@
   "iwad": "HERETIC.WAD",
   "files": [],
   "category": "Official IWAD",
+  "genre": "Dark Fantasy FPS",
+  "difficulty": "Moderate",
+  "quality": "A-Tier (8.5/10)",
   "compatibility": "Raven Software",
   "description": "Raven Software classic fantasy shooter",
   "author": "Raven Software",
   "release_date": "1994",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/Heretic",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 140
 }
