@@ -231,11 +231,7 @@ func newWadsCmd() *cobra.Command {
 				)
 			}
 
-			targetKey := name
-			if p := findPreset(cat, name); p != nil {
-				targetKey = p.ID
-			}
-			outPath, target, err := preset.ConfigPreset(paths.CatalogDir, cat, targetKey, req)
+			outPath, target, err := preset.ConfigPreset(paths.CatalogDir, cat, name, req)
 			if err != nil {
 				return err
 			}
@@ -259,12 +255,8 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			targetKey := name
-			if p := findPreset(cat, name); p != nil {
-				targetKey = p.ID
-			}
 			out := cmdOut(cmd)
-			target, removed, err := preset.ResetPresetOverride(paths.CatalogDir, cat, targetKey)
+			target, removed, err := preset.ResetPresetOverride(paths.CatalogDir, cat, name)
 			if err != nil {
 				return err
 			}
@@ -292,11 +284,7 @@ func newWadsCmd() *cobra.Command {
 				return err
 			}
 
-			targetKey := name
-			if p := findPreset(cat, name); p != nil {
-				targetKey = p.ID
-			}
-			removed, err := preset.RemovePreset(paths.CatalogDir, curated, cat, targetKey)
+			removed, err := preset.RemovePreset(paths.CatalogDir, curated, cat, name)
 			if err != nil {
 				return err
 			}
@@ -576,19 +564,5 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 }
 
 func findPreset(cat *preset.Catalog, query string) *preset.Preset {
-	if p := cat.Find(query); p != nil {
-		return p
-	}
-	normQuery := preset.NormalizeFilename(query)
-	romanQuery := preset.NormalizePresetQuery(query)
-	if normQuery == "" {
-		return nil
-	}
-	for i := range cat.Presets {
-		if strings.Contains(preset.NormalizeFilename(cat.Presets[i].Name), normQuery) ||
-			strings.Contains(preset.NormalizePresetQuery(cat.Presets[i].Name), romanQuery) {
-			return &cat.Presets[i]
-		}
-	}
-	return nil
+	return cat.Find(query)
 }

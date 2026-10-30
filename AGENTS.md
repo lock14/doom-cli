@@ -341,8 +341,10 @@ Linux, macOS, and Windows:
     promoted to `catalog/` by copying a single file. `MergeUserDir` resets curated entities to their
     `loadEmbeddedCurated()` baselines before applying `catalog.d` so repeated in-TUI reloads and override resets are
     idempotent, `LoadPresetBaseAndOverride` loads unmerged base presets and `exclude_files` overrides for
-    `Launch Options`, `NormalizePresetQuery` normalizes `.wad` and `.pk3` extensions and Roman numerals across `Find`
-    and `FindExact`, `RemovePreset` and `RemoveEngine` protect `LayerCurated` entities from deletion, `LintCatalog`
+    `Launch Options`, `NormalizePresetQuery` normalizes `.wad`, `.pk3`, `.deh`, and `.bex` extensions and word-level
+    Roman numerals across tiered preset lookup (`Find` and `FindExact`, matching exact IDs and names, canonical WAD
+    stems, implicit `doom` prefixes, multi-word initialisms, and whole-word token sequences), `RemovePreset` and
+    `RemoveEngine` protect `LayerCurated` entities from deletion, `LintCatalog`
     gates repository-only template, `README.md`, and documentation checks behind `hasDiskCatalog`, and each
     configuration diff, deploy, or TUI `Configuration Manager` session probes `display.DetectDisplay()` once and passes
     the result to `RenderAutoexecWithRate` and `RenderDSDADoomWithRes`.

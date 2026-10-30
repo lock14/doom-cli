@@ -134,8 +134,9 @@ doom setup
 ## CLI command reference
 
 The `doom` CLI is organized around five primary commands. `doom [wad]` accepts preset IDs, unquoted multi-word WAD
-names (`doom Doom II`, `doom Ancient Aliens -skill 4`), Roman or Arabic numerals (`doom doom2`, `doom sigil2`), and
-`.wad` or `.pk3` extensions (`doom sunlust.wad`). Engine flags and console commands passed to `doom [wad]` (such as
+names (`doom Doom II`, `doom Ancient Aliens -skill 4`), Roman or Arabic numerals (`doom doom2`, `doom 2`,
+`doom sigil2`), WAD stems and filenames (`doom av`, `doom plutonia`, `doom sunlust.wad`), and multi-word acronyms
+(`doom btsx1`, `doom d2twid`, `doom nrftl`). Engine flags and console commands passed to `doom [wad]` (such as
 `-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine:
 
 ### Core commands
@@ -218,10 +219,11 @@ interface powered by Bubble Tea:
 
 ![Interactive preset browser](assets/tui-presets.png)
 
-- **Fuzzy search**: Type characters to filter presets immediately by name, engine, category, compatibility (`MBF21`,
-  `Boom`, `Vanilla`, `ID24`), or readiness (`ready`, `installed`, `missing`), use `Home` and `End` to move the filter
-  text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the selection cursor, page through
-  the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to launch the selected preset.
+- **Fuzzy search**: Type characters to filter presets immediately by name, WAD filename, engine, category,
+  compatibility (`MBF21`, `Boom`, `Vanilla`, `ID24`), or readiness (`ready`, `installed`, `missing`), use `Home` and
+  `End` to move the filter text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the
+  selection cursor, page through the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to
+  launch the selected preset.
 - **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, and
   release metadata.
 - **File readiness indicators**: Displays `[✓ Found]` when required files resolve on disk, `[✗ Missing]` when required
@@ -246,7 +248,7 @@ interface powered by Bubble Tea:
 
 | Key | Action |
 | :--- | :--- |
-| Character keys | Filter presets by name, engine, category, compatibility, or readiness |
+| Character keys | Filter presets by name, WAD filename, engine, category, compatibility, or readiness |
 | `Home` or `End` | Move text cursor to start or end of filter input |
 | `↑`, `Ctrl+P`, or `Ctrl+K` | Move selection up |
 | `↓`, `Ctrl+N`, or `Ctrl+J` | Move selection down |

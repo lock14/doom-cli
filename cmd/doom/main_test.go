@@ -1401,14 +1401,29 @@ func TestRootDirectLauncherDryRunAndEngineOverride(t *testing.T) {
 		t.Fatalf("engines reset dsda-doom failed: %v", err)
 	}
 
-	// 5. Preset resolution via findPreset (substring and Roman numeral / numeric matching)
-	for _, query := range []string{"doom2", "doom-ii", "evilution"} {
+	// 5. Preset resolution via findPreset (Roman numeral, implicit doom prefix, WAD stem, and token matching)
+	for _, tc := range []struct {
+		query    string
+		wantIWAD string
+	}{
+		{query: "II", wantIWAD: "DOOM2.WAD"},
+		{query: "ii", wantIWAD: "DOOM2.WAD"},
+		{query: "2", wantIWAD: "DOOM2.WAD"},
+		{query: "doom2", wantIWAD: "DOOM2.WAD"},
+		{query: "doom-ii", wantIWAD: "DOOM2.WAD"},
+		{query: "1", wantIWAD: "DOOM.WAD"},
+		{query: "evilution", wantIWAD: "TNT.WAD"},
+		{query: "tnt", wantIWAD: "TNT.WAD"},
+	} {
 		out.Reset()
 		rootCmd = newRootCmd()
 		rootCmd.SetOut(&out)
-		rootCmd.SetArgs([]string{query, "--dry-run"})
+		rootCmd.SetArgs([]string{tc.query, "--dry-run"})
 		if err := rootCmd.Execute(); err != nil {
-			t.Fatalf("doom %s --dry-run failed: %v", query, err)
+			t.Fatalf("doom %s --dry-run failed: %v", tc.query, err)
+		}
+		if !strings.Contains(out.String(), tc.wantIWAD) {
+			t.Errorf("doom %s --dry-run output = %q, want IWAD %q", tc.query, out.String(), tc.wantIWAD)
 		}
 	}
 }

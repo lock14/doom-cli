@@ -28,8 +28,9 @@ doom wads
 
 - `doom [wad] [flags]`: Direct game launcher (defaults to *The Ultimate Doom* when no `<wad>` argument is given),
   accepting preset IDs, unquoted multi-word WAD names (`doom Doom II`), Roman or Arabic numerals (`doom doom2`,
-  `doom sigil2`), and `.wad` or `.pk3` extensions (`doom sunlust.wad`), and supporting `--engine` (`-e`), `--dry-run`,
-  and pass-through engine arguments (such as `doom -skill 4 -warp 1 1` and `+map E1M1`).
+  `doom 2`, `doom sigil2`), WAD stems and filenames (`doom av`, `doom plutonia`, `doom sunlust.wad`), and multi-word
+  acronyms (`doom btsx1`, `doom d2twid`, `doom nrftl`), and supporting `--engine` (`-e`), `--dry-run`, and pass-through
+  engine arguments (such as `doom -skill 4 -warp 1 1` and `+map E1M1`).
 - `doom wads`: Opens the interactive TUI WAD browser powered by Bubble Tea.
 - `doom wads list`: Lists all presets (built-in and custom), engine assignments, and on-disk readiness
   (`[✓ Ready]` or `[✗ Missing]`).
