@@ -1513,3 +1513,48 @@ func TestRunWadsTUISingleShot(t *testing.T) {
 		t.Errorf("expected exactly 1 engine launch in single-shot mode, got %d (%v)", len(lines), lines)
 	}
 }
+
+func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
+	tempDir := t.TempDir()
+	t.Setenv("DOOM_CONFIG_DIR", tempDir)
+
+	var listBuf bytes.Buffer
+	listCmd := newRootCmd()
+	listCmd.SetOut(&listBuf)
+	listCmd.SetErr(&listBuf)
+	listCmd.SetArgs([]string{"wads", "list"})
+	if err := listCmd.Execute(); err != nil {
+		t.Fatalf("wads list failed: %v", err)
+	}
+	listOut := listBuf.String()
+	for _, want := range []string{
+		"AUGER;ZENITH",
+		"Cyberpunk Adventure | Moderate | S-Tier (9.5/10)",
+		"MyHouse.pk3",
+		"Strife: Quest for the Sigil",
+	} {
+		if !strings.Contains(listOut, want) {
+			t.Errorf("expected wads list output to contain %q, got:\n%s", want, listOut)
+		}
+	}
+
+	var showBuf bytes.Buffer
+	showCmd := newRootCmd()
+	showCmd.SetOut(&showBuf)
+	showCmd.SetErr(&showBuf)
+	showCmd.SetArgs([]string{"wads", "show", "auger-zenith"})
+	if err := showCmd.Execute(); err != nil {
+		t.Fatalf("wads show auger-zenith failed: %v", err)
+	}
+	showOut := showBuf.String()
+	for _, want := range []string{
+		"Genre:         Cyberpunk Adventure",
+		"Difficulty:    Moderate",
+		"Quality:       S-Tier (9.5/10)",
+		"https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/dbp37_augzen",
+	} {
+		if !strings.Contains(showOut, want) {
+			t.Errorf("expected wads show output to contain %q, got:\n%s", want, showOut)
+		}
+	}
+}

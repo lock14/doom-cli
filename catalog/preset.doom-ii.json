@@ -12,9 +12,18 @@
     }
   ],
   "category": "Official IWAD",
+  "genre": "Classic Campaign",
+  "difficulty": "Moderate",
+  "quality": "S-Tier (9.5/10)",
   "compatibility": "Vanilla",
   "description": "Classic IWAD with modern MIDI audio",
   "author": "id Software",
   "release_date": "1994",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/Doom_II",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 70
 }

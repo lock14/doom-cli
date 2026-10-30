@@ -12,9 +12,18 @@
     }
   ],
   "category": "Official IWAD",
+  "genre": "Tactical Combat",
+  "difficulty": "Hard",
+  "quality": "S-Tier (9.0/10)",
   "compatibility": "Vanilla",
   "description": "Classic Final Doom IWAD with modern soundtrack",
   "author": "Dario Casali & Milo Casali",
   "release_date": "1996",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/The_Plutonia_Experiment",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 280
 }

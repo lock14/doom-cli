@@ -1790,3 +1790,47 @@ func TestConfigManager_CtrlJKAndDiffHelpAndWidth90Footer(t *testing.T) {
 			m.viewingHelp, m.helpMode)
 	}
 }
+
+func TestModel_FilteringAndPreviewTaxonomyMetadata(t *testing.T) {
+	t.Parallel()
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+	m := initialModel(cat, nil, ClassicTheme, false)
+	m.width = 160
+	m.height = 30
+
+	// Filter by genre
+	m.updateFiltered("cyberpunk")
+	if len(m.filtered) != 1 || m.filtered[0].ID != "auger-zenith" {
+		t.Fatalf("expected 1 match 'auger-zenith' for 'cyberpunk', got %d", len(m.filtered))
+	}
+
+	// Filter by difficulty
+	m.updateFiltered("extreme")
+	if len(m.filtered) < 2 {
+		t.Fatalf("expected at least 2 matches for 'extreme' difficulty, got %d", len(m.filtered))
+	}
+
+	// Filter by quality
+	m.updateFiltered("10/10")
+	if len(m.filtered) < 4 {
+		t.Fatalf("expected at least 4 matches for '10/10' quality, got %d", len(m.filtered))
+	}
+
+	// Render preview for AUGER;ZENITH and verify Genre, Difficulty, Quality, and Link appear
+	m.updateFiltered("AUGER;ZENITH")
+	m.cursor = 0
+	view := m.View()
+	for _, want := range []string{
+		"Genre:", "Cyberpunk Adventure",
+		"Difficulty:", "Moderate",
+		"Quality:", "S-Tier (9.5/10)",
+		"Link:", "https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/dbp37_augzen",
+	} {
+		if !strings.Contains(view, want) {
+			t.Errorf("expected TUI view to contain %q, got:\n%s", want, view)
+		}
+	}
+}

@@ -223,6 +223,9 @@ type Preset struct {
 	Files             []FileSpec `json:"files,omitempty"`
 	Args              []string   `json:"args,omitempty"`
 	Category          string     `json:"category,omitempty"`
+	Genre             string     `json:"genre,omitempty"`
+	Difficulty        string     `json:"difficulty,omitempty"`
+	Quality           string     `json:"quality,omitempty"`
 	Compatibility     string     `json:"compatibility,omitempty"`
 	Description       string     `json:"description,omitempty"`
 	Author            string     `json:"author,omitempty"`
@@ -265,6 +268,16 @@ func (p Preset) FileNames() []string {
 	return out
 }
 
+// PrimaryURL returns the first non-empty informational link URL on the preset, or "".
+func (p Preset) PrimaryURL() string {
+	for _, l := range p.Links {
+		if u := strings.TrimSpace(l.URL); u != "" {
+			return u
+		}
+	}
+	return ""
+}
+
 // OverrideTarget identifies the entity an Override applies to.
 type OverrideTarget struct {
 	Kind Kind   `json:"kind"`
@@ -278,6 +291,9 @@ type OverrideSet struct {
 	Files             *[]FileSpec `json:"files,omitempty"`
 	Args              *[]string   `json:"args,omitempty"`
 	Category          *string     `json:"category,omitempty"`
+	Genre             *string     `json:"genre,omitempty"`
+	Difficulty        *string     `json:"difficulty,omitempty"`
+	Quality           *string     `json:"quality,omitempty"`
 	Compatibility     *string     `json:"compatibility,omitempty"`
 	Description       *string     `json:"description,omitempty"`
 	Author            *string     `json:"author,omitempty"`
@@ -1411,6 +1427,15 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 		}
 		if s.Category != nil {
 			p.Category = *s.Category
+		}
+		if s.Genre != nil {
+			p.Genre = *s.Genre
+		}
+		if s.Difficulty != nil {
+			p.Difficulty = *s.Difficulty
+		}
+		if s.Quality != nil {
+			p.Quality = *s.Quality
 		}
 		if s.Compatibility != nil {
 			p.Compatibility = *s.Compatibility

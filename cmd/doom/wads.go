@@ -460,9 +460,25 @@ func runWadsList(cmd *cobra.Command, _ []string) error {
 		} else if p.Overridden {
 			statusFlag = " (overridden)"
 		}
+		var metaParts []string
+		if p.Genre != "" {
+			metaParts = append(metaParts, p.Genre)
+		}
+		if p.Difficulty != "" {
+			metaParts = append(metaParts, p.Difficulty)
+		}
+		if p.Quality != "" {
+			metaParts = append(metaParts, p.Quality)
+		}
+		metaSuffix := p.Description
+		if len(metaParts) > 0 && metaSuffix != "" {
+			metaSuffix = fmt.Sprintf("%s (%s)", metaSuffix, strings.Join(metaParts, " | "))
+		} else if len(metaParts) > 0 {
+			metaSuffix = strings.Join(metaParts, " | ")
+		}
 		fmt.Fprintf(
 			out, "%2d. %-30s %s %s %s%s - %s\n",
-			i+1, p.Name, tag, catTag, installStatus, statusFlag, p.Description,
+			i+1, p.Name, tag, catTag, installStatus, statusFlag, metaSuffix,
 		)
 	}
 	return nil
@@ -492,6 +508,15 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	}
 	if p.Category != "" {
 		fmt.Fprintf(out, "  Category:      %s\n", p.Category)
+	}
+	if p.Genre != "" {
+		fmt.Fprintf(out, "  Genre:         %s\n", p.Genre)
+	}
+	if p.Difficulty != "" {
+		fmt.Fprintf(out, "  Difficulty:    %s\n", p.Difficulty)
+	}
+	if p.Quality != "" {
+		fmt.Fprintf(out, "  Quality:       %s\n", p.Quality)
 	}
 	if p.Compatibility != "" {
 		fmt.Fprintf(out, "  Compatibility: %s\n", p.Compatibility)

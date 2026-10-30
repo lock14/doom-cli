@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "rowdy-rudy-ii",
+  "name": "Rowdy Rudy II: POWERTRIP!",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [
+    {
+      "name": "rudy2.wad"
+    },
+    {
+      "name": "rudy2.deh"
+    }
+  ],
+  "category": "Community Megawad",
+  "genre": "DeHackEd Action",
+  "difficulty": "Moderate",
+  "quality": "A-Tier (8.0/10)",
+  "compatibility": "Vanilla",
+  "description": "20-map vanilla action set with custom weapons and enemies",
+  "author": "Doomkid et al.",
+  "release_date": "2020",
+  "sources": [
+    {
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/rudy2.zip"
+    }
+  ],
+  "links": [
+    {
+      "url": "https://www.doomworld.com/idgames/levels/doom2/megawads/rudy2",
+      "rel": "idgames"
+    }
+  ],
+  "sort": 206
+}

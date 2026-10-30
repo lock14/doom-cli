@@ -32,10 +32,10 @@ doom wads
   acronyms (`doom btsx1`, `doom d2twid`, `doom nrftl`), and supporting `--engine` (`-e`), `--dry-run`, and pass-through
   engine arguments (such as `doom -skill 4 -warp 1 1` and `+map E1M1`).
 - `doom wads`: Opens the interactive TUI WAD browser powered by Bubble Tea.
-- `doom wads list`: Lists all presets (built-in and custom), engine assignments, and on-disk readiness
-  (`[✓ Ready]` or `[✗ Missing]`).
-- `doom wads show <name>`: Displays resolved launch configuration, `Launch Cmd:` preview, sources, links, and file
-  availability.
+- `doom wads list`: Lists all presets (built-in and custom), engine assignments, genre, difficulty, quality rating, and
+  on-disk readiness (`[✓ Ready]` or `[✗ Missing]`).
+- `doom wads show <name>`: Displays resolved launch configuration, genre, difficulty, quality rating, `Launch Cmd:`
+  preview, sources, links, and file availability.
 - `doom wads fetch [name|all]`: Downloads and extracts community megawads from idgames mirrors.
 - `doom wads scan`: Auto-discovers and imports official Steam and GOG commercial IWADs and expansions, and synthesizes
   `idkfa 2024.wad` from `extras.wad`.

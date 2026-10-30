@@ -64,10 +64,18 @@
         `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
 *   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
-        and speedrunning precision are desired (such as *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*,
-        *Legacy of Rust*, and *Sigil*).
-    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom features, advanced scripting, high-resolution texture
-        packs like OTEX (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
+        and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
+        *Overboard*, *Rowdy Rudy II*, *Sunder*, *Sunlust*, *Legacy of Rust*, and *Sigil*).
+    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom features, advanced scripting (*MyHouse.pk3*),
+        high-resolution texture packs like OTEX (*Eviternity I & II*), or Raven Software and Rogue Entertainment games
+        (*Heretic*, *Hexen*, *Strife*).
+    *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
+        declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
+        `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
+        `doom wads show`, and the interactive TUI preview pane and fuzzy filter). When a mapset has an author-sanctioned
+        rebalanced edition (such as *Going Down Turbo* (`gdturbo.wad`), `mouldy`'s 2024 10th-anniversary remaster of
+        *Going Down* (`gd.wad`)), curate the definitive edition rather than duplicating both versions, and route
+        shorthand queries (`doom gd`, `doom going-down`) to the canonical preset via `NormalizePresetQuery`.
     *   **Two-layer entity catalog and quarantine**: Built-in entities in `catalog/*.json` serve as the immutable
         curated layer (`LayerCurated`). User engines (`engine.<id>.json`), custom presets (`preset.<id>.json`), and
         surgical overrides (`override.preset.<id>.json`, `override.engine.<id>.json`) live in

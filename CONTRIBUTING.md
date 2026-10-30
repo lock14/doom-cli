@@ -42,10 +42,17 @@ All contributions must respect the core repository invariants:
     flags or per-setting `DOOM_*` environment variables.
 *   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
-        and speedrunning precision are desired (such as *Alien Vendetta*, *BTSX*, *Sunder*, *Sunlust*,
-        *Legacy of Rust*, and *Sigil*).
-    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom scripting, high-resolution texture packs like OTEX
-        (*Eviternity I & II*), or Raven Software games (*Heretic*, *Hexen*).
+        and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
+        *Overboard*, *Rowdy Rudy II*, *Sunder*, *Sunlust*, *Legacy of Rust*, and *Sigil*).
+    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom scripting (*MyHouse.pk3*), high-resolution texture packs
+        like OTEX (*Eviternity I & II*), or Raven Software and Rogue Entertainment games (*Heretic*, *Hexen*, *Strife*).
+    *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
+        declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
+        `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
+        `doom wads show`, and the interactive TUI preview pane and fuzzy filter). When a mapset has an author-sanctioned
+        rebalanced edition (such as *Going Down Turbo* (`gdturbo.wad`), `mouldy`'s 2024 10th-anniversary remaster of
+        *Going Down* (`gd.wad`)), curate the definitive edition rather than duplicating both versions, and route
+        shorthand queries (`doom gd`, `doom going-down`) to the canonical preset via `NormalizePresetQuery`.
     *   **No duplicate IWADs**: Never include the base game IWAD in `files`. The IWAD must only be specified in `iwad`.
     *   **Unified launch argument and preview synthesis**: `PrepareLaunch` and `FormatLaunchPreview` share
         `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
@@ -187,6 +194,9 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
        { "name": "idkfa 2024.wad", "optional": true }
      ],
      "category": "Community Megawad",
+     "genre": "Run-and-Gun",
+     "difficulty": "Hard",
+     "quality": "S-Tier (9.5/10)",
      "compatibility": "Boom",
      "description": "Short description of the mapset and compatibility",
      "author": "Author Name",
@@ -209,8 +219,8 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      ```bash
      cp ~/.config/doom-cli/catalog.d/preset.my-mapset.json catalog/preset.my-mapset.json
      ```
-     Then ensure `author`, `release_date`, `category`, and a unique positive `sort` integer (spaced by 10s in display
-     order) are set.
+     Then ensure `author`, `release_date`, `category`, `genre`, `difficulty`, `quality`, `links`, and a unique positive
+     `sort` integer (spaced by 10s in display order) are set.
    - **IWAD separation**: Do not include the base game IWAD in `files`.
    - **Canonical archive filenames and aliases**: `files[].name` must match the exact canonical filename inside the
      upstream `.zip` archive (`Eviternity II.wad`, `Sunder 2512.wad`, `SODfinal.wad`, `aaliens.wad`, `scythe.wad`,

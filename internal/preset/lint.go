@@ -307,8 +307,16 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 		if te.curated {
 			if strings.TrimSpace(p.Author) == "" ||
 				strings.TrimSpace(p.ReleaseDate) == "" ||
-				strings.TrimSpace(p.Category) == "" {
-				addErr(where, "curated preset %s requires author, release_date, and category", p.ID)
+				strings.TrimSpace(p.Category) == "" ||
+				strings.TrimSpace(p.Genre) == "" ||
+				strings.TrimSpace(p.Difficulty) == "" ||
+				strings.TrimSpace(p.Quality) == "" ||
+				p.PrimaryURL() == "" {
+				addErr(
+					where,
+					"curated preset %s requires author, release_date, category, genre, difficulty, quality, and links",
+					p.ID,
+				)
 			}
 			if p.Sort <= 0 {
 				addWarn(where, "curated preset %s has no positive sort order", p.ID)

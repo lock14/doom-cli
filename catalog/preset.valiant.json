@@ -11,6 +11,9 @@
     }
   ],
   "category": "Community Megawad",
+  "genre": "DeHackEd Action",
+  "difficulty": "Hard",
+  "quality": "S-Tier (9.5/10)",
   "compatibility": "MBF",
   "description": "MBF megawad with custom weapons and DeHackEd patch",
   "author": "Paul \"skillsaw\" DeBruyne",

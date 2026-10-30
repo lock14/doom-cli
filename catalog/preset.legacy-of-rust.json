@@ -27,9 +27,18 @@
     }
   ],
   "category": "Official Expansion",
+  "genre": "Official ID24 Episode",
+  "difficulty": "Hard",
+  "quality": "A-Tier (8.5/10)",
   "compatibility": "ID24",
   "description": "Official ID24 episode with custom weapons and monsters",
   "author": "id Software & Nightdive Studios",
   "release_date": "2024",
+  "links": [
+    {
+      "url": "https://doomwiki.org/wiki/Legacy_of_Rust",
+      "rel": "doomwiki"
+    }
+  ],
   "sort": 160
 }

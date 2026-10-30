@@ -272,6 +272,21 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Category:      "), cur.Category),
 		)
 	}
+	if cur.Genre != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Genre:         "), cur.Genre),
+		)
+	}
+	if cur.Difficulty != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Difficulty:    "), cur.Difficulty),
+		)
+	}
+	if cur.Quality != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Quality:       "), cur.Quality),
+		)
+	}
 	if cur.Compatibility != "" {
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Compatibility: "), cur.Compatibility),
@@ -280,6 +295,11 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	if cur.Description != "" {
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Description:   "), cur.Description),
+		)
+	}
+	if primaryURL := cur.PrimaryURL(); primaryURL != "" {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Link:          "), primaryURL),
 		)
 	}
 	previewLines = append(previewLines,
@@ -360,6 +380,25 @@ func (m model) condensePreviewLines(
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(cur.Args, " ")),
 		)
 	}
+	var profileParts []string
+	if cur.Genre != "" {
+		profileParts = append(profileParts, cur.Genre)
+	}
+	if cur.Difficulty != "" {
+		profileParts = append(profileParts, cur.Difficulty)
+	}
+	if cur.Quality != "" {
+		profileParts = append(profileParts, cur.Quality)
+	}
+	if len(profileParts) > 0 {
+		label := "Genre:         "
+		if len(profileParts) > 1 {
+			label = "Profile:       "
+		}
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render(label), strings.Join(profileParts, " • ")),
+		)
+	}
 	switch {
 	case cur.Author != "" && cur.ReleaseDate != "":
 		metaCandidates = append(metaCandidates,
@@ -391,6 +430,11 @@ func (m model) condensePreviewLines(
 	if cur.Description != "" {
 		metaCandidates = append(metaCandidates,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Description:   "), cur.Description),
+		)
+	}
+	if primaryURL := cur.PrimaryURL(); primaryURL != "" {
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Link:          "), primaryURL),
 		)
 	}
 
@@ -633,6 +677,7 @@ func (m model) buildHelpContent(fromMode int) string {
 		"",
 		h("Fuzzy Search Tokens"),
 		"  Filter by title, WAD filename, engine (dsda-doom, uzdoom), category (Doom II, Heretic),",
+		"  genre (slaughter, cyberpunk), difficulty (casual, hard, extreme), quality (s-tier),",
 		"  compatibility (MBF21, Boom, Vanilla, ID24), or readiness (ready, installed, missing).",
 	}
 

@@ -219,13 +219,13 @@ interface powered by Bubble Tea:
 
 ![Interactive preset browser](assets/tui-presets.png)
 
-- **Fuzzy search**: Type characters to filter presets immediately by name, WAD filename, engine, category,
-  compatibility (`MBF21`, `Boom`, `Vanilla`, `ID24`), or readiness (`ready`, `installed`, `missing`), use `Home` and
-  `End` to move the filter text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the
-  selection cursor, page through the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to
-  launch the selected preset.
-- **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, and
-  release metadata.
+- **Fuzzy search**: Type characters to filter presets immediately by name, WAD filename, engine, category, genre,
+  difficulty, quality, compatibility (`MBF21`, `Boom`, `Vanilla`, `ID24`), or readiness (`ready`, `installed`,
+  `missing`), use `Home` and `End` to move the filter text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or
+  `Ctrl+J` to move the selection cursor, page through the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`,
+  and press `Enter` to launch the selected preset.
+- **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, genre,
+  difficulty, quality rating, documentation link, and release metadata.
 - **File readiness indicators**: Displays `[✓ Found]` when required files resolve on disk, `[✗ Missing]` when required
   files are absent, and `[Optional]` when optional files are absent.
 - **Launch options and preset configuration**: Press `Ctrl+O` or `F4` to configure target engine, skill level
@@ -248,7 +248,7 @@ interface powered by Bubble Tea:
 
 | Key | Action |
 | :--- | :--- |
-| Character keys | Filter presets by name, WAD filename, engine, category, compatibility, or readiness |
+| Character keys | Filter presets by name, WAD filename, engine, category, genre, difficulty, quality, compatibility, or readiness |
 | `Home` or `End` | Move text cursor to start or end of filter input |
 | `↑`, `Ctrl+P`, or `Ctrl+K` | Move selection up |
 | `↓`, `Ctrl+N`, or `Ctrl+J` | Move selection down |
@@ -631,56 +631,67 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 > Commercial game files are not tracked in Git. This repository contains configuration files, launcher presets, and
 > automated fetch tools. You must provide your own legally acquired game files:
 > - **Commercial IWADs and official expansions**: Acquire `DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`,
->   `HERETIC.WAD`, and `HEXEN.WAD` from digital storefronts, and run `doom wads scan` to auto-discover and import
->   commercial IWADs, official expansions (*Legacy of Rust*, *No Rest for the Living*, *Master Levels*, *Sigil*, and
->   *Sigil II*), and the synthesized `idkfa 2024.wad` soundtrack (extracted from `extras.wad`) directly from your Steam
->   and GOG libraries:
+>   `HERETIC.WAD`, `HEXEN.WAD`, and `STRIFE1.WAD` from digital storefronts, and run `doom wads scan` to auto-discover
+>   and import commercial IWADs, official expansions (*Legacy of Rust*, *No Rest for the Living*, *Master Levels*,
+>   *Sigil*, *Sigil II*, and `VOICES.WAD` for *Strife*), and the synthesized `idkfa 2024.wad` soundtrack (extracted from
+>   `extras.wad`) directly from your Steam and GOG libraries:
 >   - *Doom + Doom II*: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) or
 >     [GOG](https://www.gog.com/en/game/doom_doom_ii)
 >   - *Heretic + Hexen*: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) or
 >     [GOG](https://www.gog.com/en/game/heretic_hexen)
+>   - *The Original Strife: Veteran Edition*:
+>     [Steam](https://store.steampowered.com/app/317040/The_Original_Strife_Veteran_Edition/) or
+>     [GOG](https://www.gog.com/en/game/strife_veteran_edition)
 > - **Community megawads and expansions**: Fetch *Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*,
 >   *Sunder*, and other mapsets automatically via `doom wads fetch` or download them from the
 >   [Doomworld idgames archive](https://www.doomworld.com/idgames/).
 
 ## Preconfigured presets
 
-All presets are declaratively managed in [`catalog/`](catalog/) and mapped to their optimal engine:
+All presets are declaratively managed in [`catalog/`](catalog/) with their paired engine, gameplay genre, difficulty
+tier, quality rating, and primary documentation link. *Going Down Turbo* (`gdturbo.wad`) is curated as the canonical
+10th-anniversary rebalanced edition of *Going Down*, and launching `doom gd` or `doom going-down` resolves directly to
+`going-down-turbo`:
 
-| Megawad or expansion | Engine | Compatibility and details |
-| :--- | :--- | :--- |
-| Alien Vendetta | DSDA-Doom | Classic Boom megawad with DeHackEd patch |
-| Ancient Aliens | UZDoom | MBF complevel 11 megawad with custom color palette |
-| Back to Saturn X: Episode 1 | DSDA-Doom | Vanilla and Boom megawad with custom soundtrack and palettes |
-| Back to Saturn X: Episode 2 | DSDA-Doom | Vanilla and Boom megawad with custom soundtrack and palettes |
-| Deathless | DSDA-Doom | Modern Ultimate Doom episode replacement |
-| Doom | DSDA-Doom | Classic IWAD with modern MIDI audio |
-| Doom II | DSDA-Doom | Classic IWAD with modern MIDI audio |
-| Doom Zero | DSDA-Doom | Anniversary megawad with DeHackEd modifications |
-| Doom: The Way ID Did | DSDA-Doom | Classic vanilla-style homage megawad |
-| Doom II: The Way ID Did | DSDA-Doom | Classic vanilla-style homage megawad |
-| Eviternity | UZDoom | OTEX texture pack and custom monsters |
-| Eviternity II | UZDoom | OTEX texture pack, MBF21 features, and custom monsters |
-| Going Down Turbo | DSDA-Doom | Fast-paced, compact map pack |
-| Heretic | UZDoom | Raven Software classic fantasy shooter |
-| Hexen | UZDoom | Raven Software hub-based fantasy shooter |
-| Legacy of Rust | DSDA-Doom | Official ID24 episode with custom weapons and monsters |
-| Master Levels | DSDA-Doom | Full 20-level classic collection |
-| Nostalgia | DSDA-Doom | Vanilla-compatible megawad |
-| No End In Sight | DSDA-Doom | Classic 4-episode expansion for Ultimate Doom |
-| No Rest for the Living | DSDA-Doom | Official 9-level expansion for Doom II |
-| Sigil | DSDA-Doom | John Romero's unofficial 5th episode for Ultimate Doom |
-| Sigil II | DSDA-Doom | John Romero's unofficial 6th episode for Ultimate Doom |
-| Scythe | DSDA-Doom | Iconic fast-paced speedrunning megawad |
-| Scythe 2 | DSDA-Doom | Erik Alm's legendary sequel with custom monsters |
-| Speed of Doom | DSDA-Doom | 33-level intense challenge megawad |
-| Sunder | DSDA-Doom | Monumental architectural slaughter megawad |
-| Sunlust | DSDA-Doom | 32-level visual and gameplay masterpiece |
-| The Plutonia Experiment | DSDA-Doom | Classic Final Doom IWAD with modern soundtrack |
-| Plutonia 2 | DSDA-Doom | Community sequel to The Plutonia Experiment |
-| TNT: Evilution | DSDA-Doom | Classic Final Doom IWAD with modern soundtrack |
-| TNT: Revilution | DSDA-Doom | Community sequel to TNT: Evilution |
-| Valiant | UZDoom | MBF megawad with custom weapons and DeHackEd patch |
+| Megawad or expansion | Engine | Genre | Difficulty | Quality | Compatibility and details |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| [Alien Vendetta](https://www.doomworld.com/idgames/levels/doom2/megawads/av) | DSDA-Doom | Run-and-Gun and Slaughter | Very Hard | S-Tier (9.5/10) | Classic Boom megawad with DeHackEd patch |
+| [Ancient Aliens](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens) | UZDoom | Sci-Fi Run-and-Gun | Hard | S-Tier (10/10) | MBF complevel 11 megawad with custom color palette |
+| [AUGER;ZENITH](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/dbp37_augzen) | DSDA-Doom | Cyberpunk Adventure | Moderate | S-Tier (9.5/10) | Neon-soaked cyberpunk city megawad with custom palette |
+| [Back to Saturn X: Episode 1](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1) | DSDA-Doom | Techbase Run-and-Gun | Hard | S-Tier (9.5/10) | Vanilla and Boom megawad with custom soundtrack and palettes |
+| [Back to Saturn X: Episode 2](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2) | DSDA-Doom | Gothic Adventure | Hard | S-Tier (9.5/10) | Vanilla and Boom megawad with custom soundtrack and palettes |
+| [Deathless](https://www.doomworld.com/idgames/levels/doom/Ports/megawads/deathless) | DSDA-Doom | Classic Run-and-Gun | Casual | A-Tier (8.5/10) | Modern Ultimate Doom episode replacement |
+| [Doom](https://doomwiki.org/wiki/The_Ultimate_Doom) | DSDA-Doom | Classic Campaign | Casual | S-Tier (9.5/10) | Classic IWAD with modern MIDI audio |
+| [Doom II](https://doomwiki.org/wiki/Doom_II) | DSDA-Doom | Classic Campaign | Moderate | S-Tier (9.5/10) | Classic IWAD with modern MIDI audio |
+| [Doom Zero](https://www.doomworld.com/forum/topic/109216-doom-zero-launch-and-celebrating-25-years-of-doom-ii/) | DSDA-Doom | Puzzle Action | Moderate | B-Tier (7.5/10) | Anniversary megawad with DeHackEd modifications |
+| [Doom: The Way ID Did](https://www.doomworld.com/idgames/levels/doom/megawads/dtwid) | DSDA-Doom | Classic id Homage | Casual | B-Tier (7.5/10) | Classic vanilla-style homage megawad |
+| [Doom II: The Way ID Did](https://www.doomworld.com/idgames/levels/doom2/megawads/d2twid) | DSDA-Doom | Classic id Homage | Moderate | B-Tier (7.5/10) | Classic vanilla-style homage megawad |
+| [Eviternity](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity) | UZDoom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack and custom monsters |
+| [Eviternity II](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity2) | UZDoom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack, MBF21 features, and custom monsters |
+| [Going Down Turbo](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/gdturbo) | DSDA-Doom | Set-Piece Chaos | Hard | S-Tier (9.5/10) | 10th-anniversary rebalanced edition of Going Down |
+| [Heretic](https://doomwiki.org/wiki/Heretic) | UZDoom | Dark Fantasy FPS | Moderate | A-Tier (8.5/10) | Raven Software classic fantasy shooter |
+| [Hexen](https://doomwiki.org/wiki/Hexen:_Beyond_Heretic) | UZDoom | Hub-Based Fantasy | Moderate | A-Tier (8.0/10) | Raven Software hub-based fantasy shooter |
+| [Legacy of Rust](https://doomwiki.org/wiki/Legacy_of_Rust) | DSDA-Doom | Official ID24 Episode | Hard | A-Tier (8.5/10) | Official ID24 episode with custom weapons and monsters |
+| [Master Levels](https://doomwiki.org/wiki/Master_Levels_for_Doom_II) | DSDA-Doom | 90s Anthology | Moderate | C-Tier (6.0/10) | Full 20-level classic collection |
+| [MyHouse.pk3](https://www.doomworld.com/forum/topic/134292-myhousewad/) | UZDoom | Psychological Horror | Casual | S-Tier (9.5/10) | Non-euclidean psychological horror showcase |
+| [Nostalgia](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/nostalgia) | DSDA-Doom | Compact Run-and-Gun | Casual | A-Tier (8.5/10) | Vanilla-compatible megawad |
+| [No End In Sight](https://www.doomworld.com/idgames/levels/doom/Ports/megawads/neis) | DSDA-Doom | Atmospheric Adventure | Hard | A-Tier (8.5/10) | Classic 4-episode expansion for Ultimate Doom |
+| [No Rest for the Living](https://doomwiki.org/wiki/No_Rest_for_the_Living) | DSDA-Doom | Classic Techbase and Hell | Moderate | A-Tier (8.5/10) | Official 9-level expansion for Doom II |
+| [Overboard](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/overboard) | DSDA-Doom | Set-Piece Adventure | Moderate | S-Tier (9.0/10) | Island-hopping vacation episode with New Game+ remix |
+| [Rowdy Rudy II: POWERTRIP!](https://www.doomworld.com/idgames/levels/doom2/megawads/rudy2) | DSDA-Doom | DeHackEd Action | Moderate | A-Tier (8.0/10) | 20-map vanilla action set with custom weapons and enemies |
+| [Sigil](https://doomwiki.org/wiki/SIGIL) | DSDA-Doom | Gothic Hell | Moderate | A-Tier (8.0/10) | John Romero's unofficial 5th episode for Ultimate Doom |
+| [Sigil II](https://doomwiki.org/wiki/SIGIL_II) | DSDA-Doom | Gothic Hell | Hard | A-Tier (8.5/10) | John Romero's unofficial 6th episode for Ultimate Doom |
+| [Scythe](https://www.doomworld.com/idgames/levels/doom2/megawads/scythe) | DSDA-Doom | Speedrun Action | Hard | S-Tier (9.0/10) | Iconic fast-paced speedrunning megawad |
+| [Scythe 2](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/scythe2) | DSDA-Doom | Adventure and Slaughter | Very Hard | S-Tier (9.5/10) | Erik Alm's legendary sequel with custom monsters |
+| [Speed of Doom](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sodfinal) | DSDA-Doom | Run-and-Gun and Slaughter | Very Hard | S-Tier (9.5/10) | 33-level intense challenge megawad |
+| [Strife: Quest for the Sigil](https://doomwiki.org/wiki/Strife:_Quest_for_the_Sigil) | UZDoom | Hub-Based Action RPG | Moderate | A-Tier (8.5/10) | Rogue Entertainment sci-fi fantasy FPS and RPG hybrid |
+| [Sunder](https://dsdarchive.com/wads/sunder) | DSDA-Doom | Architectural Slaughter | Extreme | S-Tier (9.5/10) | Monumental architectural slaughter megawad |
+| [Sunlust](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunlust) | DSDA-Doom | Combat Puzzle and Slaughter | Extreme | S-Tier (10/10) | 32-level visual and gameplay masterpiece |
+| [The Plutonia Experiment](https://doomwiki.org/wiki/The_Plutonia_Experiment) | DSDA-Doom | Tactical Combat | Hard | S-Tier (9.0/10) | Classic Final Doom IWAD with modern soundtrack |
+| [Plutonia 2](https://www.doomworld.com/idgames/levels/doom2/megawads/pl2) | DSDA-Doom | Tactical and Slaughter | Very Hard | S-Tier (9.5/10) | Community sequel to The Plutonia Experiment |
+| [TNT: Evilution](https://doomwiki.org/wiki/TNT:_Evilution) | DSDA-Doom | Adventure Techbase | Moderate | B-Tier (7.0/10) | Classic Final Doom IWAD with modern soundtrack |
+| [TNT: Revilution](https://www.doomworld.com/idgames/levels/doom2/megawads/tntr) | DSDA-Doom | Sci-Fi Adventure | Moderate | A-Tier (8.5/10) | Community sequel to TNT: Evilution |
+| [Valiant](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant) | UZDoom | DeHackEd Action | Hard | S-Tier (9.5/10) | MBF megawad with custom weapons and DeHackEd patch |
 
 ## Engine profiles and customizations
 
