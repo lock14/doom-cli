@@ -666,3 +666,96 @@ func TestInstaller_DarwinZipAppBundleAndSafeShellWrapper(t *testing.T) {
 		t.Errorf("wrapper content = %q, want %q", string(wrapperBytes), wantExec)
 	}
 }
+
+func TestInstaller_DarwinZipAppBundleSymlinkConfinement(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated privileges on windows")
+	}
+	t.Parallel()
+	tmpDir := t.TempDir()
+	binDir := filepath.Join(tmpDir, "bin")
+	appsDir := filepath.Join(tmpDir, "apps")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	writeZipSymlink := func(zw *zip.Writer, name, target string) {
+		t.Helper()
+		hdr := &zip.FileHeader{Name: name}
+		hdr.SetMode(os.ModeSymlink | 0o777)
+		w, err := zw.CreateHeader(hdr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(target)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 1. Valid multi-hop macOS .framework symlink chain inside .app succeeds.
+	validZip := filepath.Join(tmpDir, "valid-framework.zip")
+	vf, err := os.Create(validZip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vzw := zip.NewWriter(vf)
+	for name, body := range map[string]string{
+		"dsda-doom.app/Contents/MacOS/dsda-doom":                                 "macho-bin",
+		"dsda-doom.app/Contents/Frameworks/SDL2.framework/Versions/A/SDL2":       "sdl2-bin",
+		"dsda-doom.app/Contents/Frameworks/SDL2.framework/Versions/A/Info.plist": "<plist/>",
+	} {
+		w, createErr := vzw.Create(name)
+		if createErr != nil {
+			t.Fatal(createErr)
+		}
+		_, _ = w.Write([]byte(body))
+	}
+	// Place top-level framework symlink BEFORE Versions/Current to exercise multi-pass ordering.
+	writeZipSymlink(vzw, "dsda-doom.app/Contents/Frameworks/SDL2.framework/SDL2", "Versions/Current/SDL2")
+	writeZipSymlink(vzw, "dsda-doom.app/Contents/Frameworks/SDL2.framework/Versions/Current", "A")
+	if err := vzw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_ = vf.Close()
+
+	ins := NewInstaller(binDir, nil)
+	ins.GOOS = "darwin"
+	ins.AppsDir = appsDir
+	if err := ins.extractZipBinary(validZip, "dsda-doom", filepath.Join(binDir, "dsda-doom")); err != nil {
+		t.Fatalf("expected valid .framework symlinks in .app to succeed, got: %v", err)
+	}
+	fwLink := filepath.Join(appsDir, "dsda-doom.app", "Contents", "Frameworks", "SDL2.framework", "SDL2")
+	if got, readErr := os.ReadFile(fwLink); readErr != nil || string(got) != "sdl2-bin" {
+		t.Fatalf("expected multi-hop framework symlink to resolve to sdl2-bin, got %q (%v)", string(got), readErr)
+	}
+
+	// 2. Malicious chained symlink escape (hop -> .., hop/escape -> ../../../outside) is rejected.
+	outsideTarget := filepath.Join(tmpDir, "outside.txt")
+	if err := os.WriteFile(outsideTarget, []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	evilZip := filepath.Join(tmpDir, "evil-symlink.zip")
+	ef, err := os.Create(evilZip)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ezw := zip.NewWriter(ef)
+	w, err := ezw.Create("evil.app/Contents/MacOS/dsda-doom")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = w.Write([]byte("macho-bin"))
+	writeZipSymlink(ezw, "evil.app/Contents/Frameworks/hop", "..")
+	writeZipSymlink(ezw, "evil.app/Contents/Frameworks/hop/escape", "../../../outside.txt")
+	if err := ezw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_ = ef.Close()
+
+	if err := ins.extractZipBinary(evilZip, "dsda-doom", filepath.Join(binDir, "dsda-doom")); err == nil {
+		t.Fatal("expected chained symlink escape outside .app bundle to be rejected, got nil")
+	}
+	if _, statErr := os.Stat(filepath.Join(appsDir, "evil.app")); !os.IsNotExist(statErr) {
+		t.Errorf("expected rejected evil.app bundle not to be installed, stat err: %v", statErr)
+	}
+}

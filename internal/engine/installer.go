@@ -435,6 +435,16 @@ func (ins *Installer) extractZipMacAppBundle(
 		return err
 	}
 
+	appRoot, err := os.OpenRoot(stagedApp)
+	if err != nil {
+		return err
+	}
+	defer appRoot.Close()
+
+	var symlinks []*zip.File
+	var symlinkRels []string
+
+	// Pass 1: extract regular files inside os.Root before creating any symlinks.
 	for _, zf := range zr.File {
 		slashName := zipEntrySlashName(zf)
 		if !strings.HasPrefix(slashName, appPrefix) {
@@ -444,14 +454,13 @@ func (ins *Installer) extractZipMacAppBundle(
 		if relInApp == "" || strings.HasSuffix(relInApp, "/") || zf.FileInfo().IsDir() {
 			continue
 		}
-		entryDest, joinErr := fsutil.SafeJoin(stagedApp, relInApp)
-		if joinErr != nil {
-			return fmt.Errorf("unsafe path in .app archive %q: %w", zf.Name, joinErr)
+		cleanRel, relErr := fsutil.CleanRel(relInApp)
+		if relErr != nil {
+			return fmt.Errorf("unsafe path in .app archive %q: %w", zf.Name, relErr)
 		}
 		if isZipSymlink(zf) {
-			if err := extractSafeBundleSymlink(zf, stagedApp, entryDest); err != nil {
-				return err
-			}
+			symlinks = append(symlinks, zf)
+			symlinkRels = append(symlinkRels, cleanRel)
 			continue
 		}
 		perm := os.FileMode(0o644)
@@ -459,9 +468,35 @@ func (ins *Installer) extractZipMacAppBundle(
 			strings.HasSuffix(strings.ToLower(relInApp), ".dylib") {
 			perm = 0o755
 		}
-		if err := extractZipEntry(zf, stagedApp, entryDest, perm); err != nil {
+		if err := extractRootZipEntry(appRoot, zf, cleanRel, perm); err != nil {
 			return err
 		}
+	}
+
+	// Pass 2: create validated bundle symlinks inside os.Root.
+	if len(symlinks) > 0 {
+		realRoot, evalErr := filepath.EvalSymlinks(stagedApp)
+		if evalErr != nil {
+			return evalErr
+		}
+		for i, zf := range symlinks {
+			if err := extractSafeBundleSymlink(appRoot, realRoot, stagedApp, zf, symlinkRels[i]); err != nil {
+				return err
+			}
+		}
+		// Pass 3: verify every symlink chain resolves strictly inside os.Root.
+		for i, cleanRel := range symlinkRels {
+			if _, statErr := appRoot.Stat(cleanRel); statErr != nil {
+				return fmt.Errorf(
+					"symlink %q resolves outside or missing in .app bundle: %w",
+					symlinks[i].Name, statErr,
+				)
+			}
+		}
+	}
+
+	if err := appRoot.Close(); err != nil {
+		return err
 	}
 
 	if _, err := resolveMacBundleExecutable(stagedApp, targetName); err != nil {
@@ -483,7 +518,44 @@ func (ins *Installer) extractZipMacAppBundle(
 	return nil
 }
 
-func extractSafeBundleSymlink(zf *zip.File, bundleRoot, linkPath string) error {
+func extractRootZipEntry(appRoot *os.Root, zf *zip.File, cleanRel string, perm os.FileMode) error {
+	parent := filepath.Dir(cleanRel)
+	if parent != "." && parent != "" {
+		if err := appRoot.MkdirAll(parent, 0o755); err != nil {
+			return err
+		}
+	}
+
+	rc, err := zf.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	outFile, err := appRoot.OpenFile(cleanRel, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	limited := &io.LimitedReader{R: rc, N: fsutil.MaxExtractFileBytes + 1}
+	written, copyErr := io.Copy(outFile, limited)
+	closeErr := outFile.Close()
+	if copyErr != nil {
+		_ = appRoot.Remove(cleanRel)
+		return copyErr
+	}
+	if written > fsutil.MaxExtractFileBytes {
+		_ = appRoot.Remove(cleanRel)
+		return fmt.Errorf("archive entry %q exceeds maximum size (%d bytes)", zf.Name, fsutil.MaxExtractFileBytes)
+	}
+	return closeErr
+}
+
+func extractSafeBundleSymlink(
+	appRoot *os.Root,
+	realRoot, bundleRoot string,
+	zf *zip.File,
+	cleanRel string,
+) error {
 	rc, err := zf.Open()
 	if err != nil {
 		return err
@@ -495,26 +567,36 @@ func extractSafeBundleSymlink(zf *zip.File, bundleRoot, linkPath string) error {
 		return err
 	}
 	target := strings.TrimSpace(string(linkBytes))
-	if target == "" || filepath.IsAbs(target) || strings.HasPrefix(target, "/") || strings.HasPrefix(target, `\`) {
+	slashTarget := strings.ReplaceAll(target, `\`, `/`)
+	if target == "" || strings.ContainsRune(target, 0) || filepath.IsAbs(target) ||
+		strings.HasPrefix(slashTarget, "/") || (len(slashTarget) >= 2 && slashTarget[1] == ':') {
 		return fmt.Errorf("unsafe symlink target %q in archive entry %q", target, zf.Name)
 	}
 
-	linkDir := filepath.Dir(linkPath)
-	resolved := filepath.Clean(filepath.Join(linkDir, filepath.FromSlash(strings.ReplaceAll(target, `\`, `/`))))
-	cleanRoot := filepath.Clean(bundleRoot)
-	prefix := cleanRoot
-	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
-		prefix += string(filepath.Separator)
+	parent := filepath.Dir(cleanRel)
+	if parent != "." && parent != "" {
+		if err := appRoot.MkdirAll(parent, 0o755); err != nil {
+			return err
+		}
 	}
-	if resolved != cleanRoot && !strings.HasPrefix(resolved, prefix) {
+
+	realLinkDir, err := filepath.EvalSymlinks(filepath.Join(bundleRoot, parent))
+	if err != nil {
+		return err
+	}
+	relDir, err := filepath.Rel(realRoot, realLinkDir)
+	if err != nil || relDir == ".." || strings.HasPrefix(filepath.Clean(relDir), "..") {
+		return fmt.Errorf("symlink parent %q escapes .app bundle", zf.Name)
+	}
+
+	resolvedTarget := filepath.Clean(filepath.Join(realLinkDir, filepath.FromSlash(slashTarget)))
+	relTarget, err := filepath.Rel(realRoot, resolvedTarget)
+	if err != nil || relTarget == ".." || strings.HasPrefix(filepath.Clean(relTarget), "..") {
 		return fmt.Errorf("symlink %q target %q escapes .app bundle", zf.Name, target)
 	}
 
-	if err := os.MkdirAll(linkDir, 0o755); err != nil {
-		return err
-	}
-	_ = os.Remove(linkPath)
-	return os.Symlink(target, linkPath)
+	_ = appRoot.Remove(cleanRel)
+	return appRoot.Symlink(filepath.FromSlash(slashTarget), cleanRel)
 }
 
 func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
