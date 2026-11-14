@@ -26,7 +26,8 @@
   "release_date": "2012",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e1.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e1.zip",
+      "sha256": "9f6d2fba63e20e2fddd5a1012813da1087b751f9311d3d8bf4757f69373c2c9a"
     }
   ],
   "links": [

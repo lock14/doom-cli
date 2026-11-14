@@ -20,7 +20,8 @@
   "release_date": "2023",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternityii.zip",
+      "sha256": "0fb738712c9007e8c238b6a88fb57842148ef3d6036a17f9a82c9949f131e9c9"
     }
   ],
   "links": [

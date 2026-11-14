@@ -2,6 +2,7 @@ package engine
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -20,15 +22,21 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
+var rePlistBundleExec = regexp.MustCompile(
+	`(?s)<key>\s*CFBundleExecutable\s*</key>\s*<string>\s*([^<\r\n]+?)\s*</string>`,
+)
+
 // Installer manages downloading and deploying Doom source ports from declarative recipes.
 type Installer struct {
 	BinDir  string
+	AppsDir string
 	Client  *http.Client
 	Out     io.Writer
 	APIBase string
 	GOOS    string
 	GOARCH  string
 	Force   bool
+	Ctx     context.Context
 }
 
 // NewInstaller creates a new engine installer targeting binDir.
@@ -46,6 +54,13 @@ func NewInstaller(binDir string, out io.Writer) *Installer {
 	}
 }
 
+func (ins *Installer) ctx() context.Context {
+	if ins.Ctx != nil {
+		return ins.Ctx
+	}
+	return context.Background()
+}
+
 func (ins *Installer) goos() string {
 	if ins.GOOS != "" {
 		return ins.GOOS
@@ -58,6 +73,17 @@ func (ins *Installer) goarch() string {
 		return ins.GOARCH
 	}
 	return runtime.GOARCH
+}
+
+func (ins *Installer) appsDir() (string, error) {
+	if strings.TrimSpace(ins.AppsDir) != "" {
+		return ins.AppsDir, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolving user home directory: %w", err)
+	}
+	return filepath.Join(home, "Applications"), nil
 }
 
 // PlatformKey formats an OS/arch pair as "<goos>/<goarch>".
@@ -118,15 +144,19 @@ func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformReci
 	}
 
 	if apiURL != "" && len(recipe.Assets) > 0 {
-		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+		req, err := http.NewRequestWithContext(ins.ctx(), http.MethodGet, apiURL, nil)
 		if err == nil {
 			req.Header.Set("User-Agent", fsutil.UserAgent)
-			resp, doErr := ins.Client.Do(req)
+			client := ins.Client
+			if client == nil {
+				client = &http.Client{Timeout: 30 * time.Second}
+			}
+			resp, doErr := client.Do(req)
 			if doErr == nil {
 				defer resp.Body.Close()
 				if resp.StatusCode == http.StatusOK {
 					var release GitHubRelease
-					if decErr := json.NewDecoder(resp.Body).Decode(&release); decErr == nil {
+					if decErr := json.NewDecoder(io.LimitReader(resp.Body, 8<<20)).Decode(&release); decErr == nil {
 						if url, digest, ok := SelectAsset(recipe, release.Assets); ok {
 							return url, digest, nil
 						}
@@ -134,6 +164,10 @@ func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformReci
 				}
 			}
 		}
+	}
+
+	if err := ins.ctx().Err(); err != nil {
+		return "", "", err
 	}
 
 	if recipe.Pinned != nil && strings.TrimSpace(recipe.Pinned.URL) != "" {
@@ -155,7 +189,7 @@ func (ins *Installer) resolveRecipeAsset(repo string, recipe preset.PlatformReci
 
 // DownloadFileVerified downloads a file from url to targetPath and checks expectedSHA256 when provided.
 func (ins *Installer) DownloadFileVerified(url, targetPath, expectedSHA256 string) error {
-	_, err := fsutil.DownloadVerified(ins.Client, url, targetPath, expectedSHA256, 0o755)
+	_, err := fsutil.DownloadVerifiedContext(ins.ctx(), ins.Client, url, targetPath, expectedSHA256, 0o755)
 	return err
 }
 
@@ -174,14 +208,17 @@ func (ins *Installer) InstallEngine(eng preset.EngineConfig) error {
 		return nil
 	}
 
-	targetName := filepath.Base(eng.EffectiveBinary())
+	targetName := path.Base(strings.ReplaceAll(eng.EffectiveBinary(), `\`, `/`))
 	if ins.goos() == "windows" && !strings.HasSuffix(strings.ToLower(targetName), ".exe") {
 		targetName += ".exe"
 	}
-	dest := filepath.Join(ins.BinDir, targetName)
+	dest, err := fsutil.SafeJoin(ins.BinDir, targetName)
+	if err != nil {
+		return fmt.Errorf("invalid engine binary target %q: %w", targetName, err)
+	}
 
 	if !ins.Force {
-		if fi, err := os.Stat(dest); err == nil && fi.Size() > 0 {
+		if fi, statErr := os.Stat(dest); statErr == nil && fi.Size() > 0 {
 			fmt.Fprintf(
 				ins.Out,
 				"✓ %s already installed: %s\n  (Use --force to re-download)\n\n",
@@ -222,6 +259,10 @@ func (ins *Installer) InstallCatalog(cat *preset.Catalog) error {
 
 	var errs []error
 	for _, id := range ids {
+		if err := ins.ctx().Err(); err != nil {
+			errs = append(errs, err)
+			break
+		}
 		if err := ins.InstallEngine(cat.Engines[id]); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", id, err))
 		}
@@ -229,12 +270,96 @@ func (ins *Installer) InstallCatalog(cat *preset.Catalog) error {
 	return errors.Join(errs...)
 }
 
+func urlPathLower(rawURL string) string {
+	lower := strings.ToLower(strings.TrimSpace(rawURL))
+	if idx := strings.IndexAny(lower, "?#"); idx >= 0 {
+		lower = lower[:idx]
+	}
+	return lower
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func writeMacAppWrapper(dest, appBin string) error {
+	wrapper := fmt.Sprintf("#!/bin/sh\nexec %s \"$@\"\n", shellSingleQuote(appBin))
+	_, err := fsutil.WriteFileAtomic(dest, []byte(wrapper), 0o755)
+	return err
+}
+
+func swapDirectoryAtomic(stagedDir, appDest string) error {
+	backupDir := appDest + ".doom-bak"
+	_ = os.RemoveAll(backupDir)
+
+	hadExisting := false
+	if _, err := os.Lstat(appDest); err == nil {
+		if err := os.Rename(appDest, backupDir); err != nil {
+			return fmt.Errorf("backing up existing bundle %s: %w", appDest, err)
+		}
+		hadExisting = true
+	}
+
+	if err := os.Rename(stagedDir, appDest); err != nil {
+		if hadExisting {
+			_ = os.Rename(backupDir, appDest)
+		}
+		return fmt.Errorf("installing bundle %s: %w", appDest, err)
+	}
+
+	if hadExisting {
+		_ = os.RemoveAll(backupDir)
+	}
+	return nil
+}
+
+func resolveMacBundleExecutable(appDir, targetName string) (string, error) {
+	macOSDir := filepath.Join(appDir, "Contents", "MacOS")
+	entries, err := os.ReadDir(macOSDir)
+	if err != nil || len(entries) == 0 {
+		return "", fmt.Errorf("executable not found in %s", macOSDir)
+	}
+
+	cleanTarget := strings.TrimSuffix(strings.ToLower(targetName), ".exe")
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if strings.ToLower(e.Name()) == cleanTarget {
+			return filepath.Join(macOSDir, e.Name()), nil
+		}
+	}
+
+	plistPath := filepath.Join(appDir, "Contents", "Info.plist")
+	if plistData, readErr := os.ReadFile(plistPath); readErr == nil {
+		if m := rePlistBundleExec.FindSubmatch(plistData); len(m) >= 2 {
+			execName := filepath.Base(strings.TrimSpace(string(m[1])))
+			if execName != "" && execName != "." && execName != ".." {
+				cand := filepath.Join(macOSDir, execName)
+				if fi, statErr := os.Stat(cand); statErr == nil && !fi.IsDir() {
+					return cand, nil
+				}
+			}
+		}
+	}
+
+	for _, e := range entries {
+		if !e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+			return filepath.Join(macOSDir, e.Name()), nil
+		}
+	}
+	return "", fmt.Errorf("no valid executable found in %s", macOSDir)
+}
+
 func (ins *Installer) deployAsset(targetName, url, expectedSHA256 string) error {
 	if url == "" {
 		return fmt.Errorf("no download URL found for %s", targetName)
 	}
 
-	dest := filepath.Join(ins.BinDir, targetName)
+	dest, err := fsutil.SafeJoin(ins.BinDir, targetName)
+	if err != nil {
+		return fmt.Errorf("illegal binary target %q: %w", targetName, err)
+	}
 	fmt.Fprintf(ins.Out, "  Downloading %s from %s\n", targetName, url)
 
 	tmpDir, err := os.MkdirTemp("", "engine_dl_*")
@@ -248,10 +373,10 @@ func (ins *Installer) deployAsset(targetName, url, expectedSHA256 string) error 
 		return fmt.Errorf("download error: %w", err)
 	}
 
-	lowerURL := strings.ToLower(url)
-	if strings.HasSuffix(lowerURL, ".zip") {
+	lowerPath := urlPathLower(url)
+	if strings.HasSuffix(lowerPath, ".zip") {
 		return ins.extractZipBinary(tmpFile, targetName, dest)
-	} else if strings.HasSuffix(lowerURL, ".dmg") && ins.goos() == "darwin" {
+	} else if strings.HasSuffix(lowerPath, ".dmg") && ins.goos() == "darwin" {
 		return ins.extractDMGBinary(tmpFile, targetName, dest)
 	}
 
@@ -261,6 +386,135 @@ func (ins *Installer) deployAsset(targetName, url, expectedSHA256 string) error 
 	_ = os.Chmod(dest, 0o755)
 	fmt.Fprintf(ins.Out, "✓ Installed %s to %s\n\n", targetName, dest)
 	return nil
+}
+
+func zipEntrySlashName(zf *zip.File) string {
+	return strings.ReplaceAll(zf.Name, `\`, `/`)
+}
+
+func isZipSymlink(zf *zip.File) bool {
+	return zf.Mode()&os.ModeSymlink != 0
+}
+
+func findAppBundlePrefix(slashPath string) (string, string, bool) {
+	parts := strings.Split(slashPath, "/")
+	for i, part := range parts {
+		if strings.HasSuffix(strings.ToLower(part), ".app") && part != ".app" {
+			prefix := strings.Join(parts[:i+1], "/") + "/"
+			return prefix, part, true
+		}
+	}
+	return "", "", false
+}
+
+func (ins *Installer) extractZipMacAppBundle(
+	zr *zip.ReadCloser,
+	appPrefix, appBundleName, targetName, dest string,
+) error {
+	appsDir, err := ins.appsDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(appsDir, 0o755); err != nil {
+		return err
+	}
+
+	appDest, err := fsutil.SafeJoin(appsDir, appBundleName)
+	if err != nil {
+		return fmt.Errorf("illegal .app bundle name %q: %w", appBundleName, err)
+	}
+
+	stageParent, err := os.MkdirTemp(appsDir, ".doom-app-stage-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stageParent)
+
+	stagedApp := filepath.Join(stageParent, appBundleName)
+	if err := os.MkdirAll(stagedApp, 0o755); err != nil {
+		return err
+	}
+
+	for _, zf := range zr.File {
+		slashName := zipEntrySlashName(zf)
+		if !strings.HasPrefix(slashName, appPrefix) {
+			continue
+		}
+		relInApp := strings.TrimPrefix(slashName, appPrefix)
+		if relInApp == "" || strings.HasSuffix(relInApp, "/") || zf.FileInfo().IsDir() {
+			continue
+		}
+		entryDest, joinErr := fsutil.SafeJoin(stagedApp, relInApp)
+		if joinErr != nil {
+			return fmt.Errorf("unsafe path in .app archive %q: %w", zf.Name, joinErr)
+		}
+		if isZipSymlink(zf) {
+			if err := extractSafeBundleSymlink(zf, stagedApp, entryDest); err != nil {
+				return err
+			}
+			continue
+		}
+		perm := os.FileMode(0o644)
+		if zf.Mode()&0o111 != 0 || strings.HasPrefix(relInApp, "Contents/MacOS/") ||
+			strings.HasSuffix(strings.ToLower(relInApp), ".dylib") {
+			perm = 0o755
+		}
+		if err := extractZipEntry(zf, stagedApp, entryDest, perm); err != nil {
+			return err
+		}
+	}
+
+	if _, err := resolveMacBundleExecutable(stagedApp, targetName); err != nil {
+		return err
+	}
+	if err := swapDirectoryAtomic(stagedApp, appDest); err != nil {
+		return err
+	}
+
+	appBin, err := resolveMacBundleExecutable(appDest, targetName)
+	if err != nil {
+		return err
+	}
+	if err := writeMacAppWrapper(dest, appBin); err != nil {
+		return err
+	}
+
+	fmt.Fprintf(ins.Out, "✓ Installed %s (.app bundle wrapper) to %s\n\n", targetName, dest)
+	return nil
+}
+
+func extractSafeBundleSymlink(zf *zip.File, bundleRoot, linkPath string) error {
+	rc, err := zf.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	linkBytes, err := io.ReadAll(io.LimitReader(rc, 4096))
+	if err != nil {
+		return err
+	}
+	target := strings.TrimSpace(string(linkBytes))
+	if target == "" || filepath.IsAbs(target) || strings.HasPrefix(target, "/") || strings.HasPrefix(target, `\`) {
+		return fmt.Errorf("unsafe symlink target %q in archive entry %q", target, zf.Name)
+	}
+
+	linkDir := filepath.Dir(linkPath)
+	resolved := filepath.Clean(filepath.Join(linkDir, filepath.FromSlash(strings.ReplaceAll(target, `\`, `/`))))
+	cleanRoot := filepath.Clean(bundleRoot)
+	prefix := cleanRoot
+	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
+		prefix += string(filepath.Separator)
+	}
+	if resolved != cleanRoot && !strings.HasPrefix(resolved, prefix) {
+		return fmt.Errorf("symlink %q target %q escapes .app bundle", zf.Name, target)
+	}
+
+	if err := os.MkdirAll(linkDir, 0o755); err != nil {
+		return err
+	}
+	_ = os.Remove(linkPath)
+	return os.Symlink(target, linkPath)
 }
 
 func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
@@ -275,10 +529,10 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 
 	// 1. Exact match on targetName (such as "uzdoom.exe" or "dsda-doom")
 	for _, zf := range zr.File {
-		if zf.FileInfo().IsDir() {
+		if zf.FileInfo().IsDir() || isZipSymlink(zf) {
 			continue
 		}
-		base := strings.ToLower(filepath.Base(zf.Name))
+		base := strings.ToLower(path.Base(zipEntrySlashName(zf)))
 		if base == strings.ToLower(targetName) {
 			binMatch = zf
 			break
@@ -288,10 +542,10 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	// 2. Fallback: match without .exe extension, ensuring on Windows it has .exe extension
 	if binMatch == nil {
 		for _, zf := range zr.File {
-			if zf.FileInfo().IsDir() {
+			if zf.FileInfo().IsDir() || isZipSymlink(zf) {
 				continue
 			}
-			base := strings.ToLower(filepath.Base(zf.Name))
+			base := strings.ToLower(path.Base(zipEntrySlashName(zf)))
 			if ins.goos() == "windows" && !strings.HasSuffix(base, ".exe") {
 				continue
 			}
@@ -307,42 +561,55 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 		return fmt.Errorf("binary %s not found in zip", targetName)
 	}
 
-	cleanDest := filepath.Clean(dest)
-	cleanBinDir := filepath.Clean(ins.BinDir)
-	prefix := cleanBinDir + string(filepath.Separator)
-	if !strings.HasPrefix(cleanDest, prefix) {
+	// On macOS, if the binary resides inside a .app bundle (such as dsda-doom-mac-uni.zip),
+	// preserve the complete .app bundle (Contents/Frameworks, Contents/Resources) and install a wrapper.
+	if ins.goos() == "darwin" {
+		if appPrefix, appName, ok := findAppBundlePrefix(zipEntrySlashName(binMatch)); ok {
+			return ins.extractZipMacAppBundle(zr, appPrefix, appName, targetName, dest)
+		}
+	}
+
+	cleanDest, err := fsutil.SafeJoin(ins.BinDir, targetName)
+	if err != nil || cleanDest != filepath.Clean(dest) {
 		return fmt.Errorf("illegal binary target: %s", targetName)
 	}
 
-	if err := extractZipEntry(binMatch, cleanBinDir, cleanDest); err != nil {
+	if err := extractZipEntry(binMatch, ins.BinDir, cleanDest, 0o755); err != nil {
 		return err
 	}
-	_ = os.Chmod(dest, 0o755)
+	_ = os.Chmod(cleanDest, 0o755)
 
 	// Also extract companion files (.wad, .pk3, dlls, soundfonts, etc.)
-	binParent := filepath.Dir(binMatch.Name)
+	binSlash := zipEntrySlashName(binMatch)
+	binParent := path.Dir(binSlash)
 	for _, zf := range zr.File {
-		if zf.FileInfo().IsDir() || zf == binMatch {
+		if zf.FileInfo().IsDir() || isZipSymlink(zf) || zf == binMatch {
 			continue
 		}
-		relPath, relErr := filepath.Rel(binParent, zf.Name)
-		if relErr != nil || strings.HasPrefix(relPath, "..") {
+		entrySlash := zipEntrySlashName(zf)
+		var relSlash string
+		if binParent == "." || binParent == "" {
+			relSlash = entrySlash
+		} else if strings.HasPrefix(entrySlash, binParent+"/") {
+			relSlash = strings.TrimPrefix(entrySlash, binParent+"/")
+		} else {
 			continue
 		}
-		base := filepath.Base(filepath.Clean(zf.Name))
-		if base == "." || base == ".." || strings.Contains(base, "..") {
+
+		base := path.Base(relSlash)
+		if !isCompanionFile(base) {
 			continue
 		}
-		if isCompanionFile(base) {
-			companionDest := filepath.Clean(filepath.Join(cleanBinDir, filepath.FromSlash(relPath)))
-			if !strings.HasPrefix(companionDest, prefix) {
-				continue
-			}
-			_ = extractZipEntry(zf, cleanBinDir, companionDest)
+		companionDest, joinErr := fsutil.SafeJoin(ins.BinDir, relSlash)
+		if joinErr != nil {
+			continue
+		}
+		if err := extractZipEntry(zf, ins.BinDir, companionDest, 0o644); err != nil {
+			return fmt.Errorf("extracting companion file %s: %w", zf.Name, err)
 		}
 	}
 
-	fmt.Fprintf(ins.Out, "✓ Installed %s to %s\n\n", targetName, dest)
+	fmt.Fprintf(ins.Out, "✓ Installed %s to %s\n\n", targetName, cleanDest)
 	return nil
 }
 
@@ -369,7 +636,12 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 	}
 	defer os.RemoveAll(mountPoint)
 
-	attachCmd := exec.Command("hdiutil", "attach", dmgPath, "-mountpoint", mountPoint, "-nobrowse", "-quiet")
+	attachCmd := exec.CommandContext(
+		ins.ctx(),
+		"hdiutil", "attach", dmgPath,
+		"-mountpoint", mountPoint,
+		"-nobrowse", "-readonly", "-noautoopen", "-quiet",
+	)
 	if err := attachCmd.Run(); err != nil {
 		return fmt.Errorf("failed to attach DMG: %w", err)
 	}
@@ -383,8 +655,10 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 	}
 
 	var appEntry string
+	var appBundleName string
 	for _, e := range entries {
-		if strings.HasSuffix(strings.ToLower(e.Name()), ".app") {
+		if strings.HasSuffix(strings.ToLower(e.Name()), ".app") && e.Name() != ".app" {
+			appBundleName = e.Name()
 			appEntry = filepath.Join(mountPoint, e.Name())
 			break
 		}
@@ -394,28 +668,41 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 		return fmt.Errorf("no .app bundle found in DMG")
 	}
 
-	home, err := os.UserHomeDir()
+	appsDir, err := ins.appsDir()
 	if err != nil {
-		return fmt.Errorf("resolving user home directory: %w", err)
+		return err
 	}
-	appsDir := filepath.Join(home, "Applications")
-	_ = os.MkdirAll(appsDir, 0o755)
-	appDest := filepath.Join(appsDir, filepath.Base(appEntry))
+	if err := os.MkdirAll(appsDir, 0o755); err != nil {
+		return err
+	}
+	appDest, err := fsutil.SafeJoin(appsDir, appBundleName)
+	if err != nil {
+		return fmt.Errorf("illegal .app bundle name %q: %w", appBundleName, err)
+	}
 
-	_ = os.RemoveAll(appDest)
-	if err := exec.Command("cp", "-R", appEntry, appsDir+"/").Run(); err != nil {
+	stageParent, err := os.MkdirTemp(appsDir, ".doom-dmg-stage-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stageParent)
+
+	stagedApp := filepath.Join(stageParent, appBundleName)
+	if err := exec.CommandContext(ins.ctx(), "cp", "-RP", appEntry, stagedApp).Run(); err != nil {
 		return fmt.Errorf("failed to copy .app to %s: %w", appsDir, err)
 	}
 
-	macOSDir := filepath.Join(appDest, "Contents", "MacOS")
-	macEntries, err := os.ReadDir(macOSDir)
-	if err != nil || len(macEntries) == 0 {
-		return fmt.Errorf("executable not found in %s", macOSDir)
+	if _, err := resolveMacBundleExecutable(stagedApp, targetName); err != nil {
+		return err
+	}
+	if err := swapDirectoryAtomic(stagedApp, appDest); err != nil {
+		return err
 	}
 
-	appBin := filepath.Join(macOSDir, macEntries[0].Name())
-	wrapper := fmt.Sprintf("#!/bin/sh\nexec %q \"$@\"\n", appBin)
-	if _, err := fsutil.WriteFileAtomic(dest, []byte(wrapper), 0o755); err != nil {
+	appBin, err := resolveMacBundleExecutable(appDest, targetName)
+	if err != nil {
+		return err
+	}
+	if err := writeMacAppWrapper(dest, appBin); err != nil {
 		return err
 	}
 
@@ -423,11 +710,14 @@ func (ins *Installer) extractDMGBinary(dmgPath, targetName, dest string) error {
 	return nil
 }
 
-func extractZipEntry(zf *zip.File, destDir, destPath string) error {
+func extractZipEntry(zf *zip.File, destDir, destPath string, perm os.FileMode) error {
 	cleanDir := filepath.Clean(destDir)
 	cleanDest := filepath.Clean(destPath)
-	prefix := cleanDir + string(filepath.Separator)
-	if !strings.HasPrefix(cleanDest, prefix) {
+	prefix := cleanDir
+	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
+		prefix += string(filepath.Separator)
+	}
+	if cleanDest == cleanDir || !strings.HasPrefix(cleanDest, prefix) {
 		return fmt.Errorf("illegal file path in archive: %s", zf.Name)
 	}
 
@@ -437,7 +727,7 @@ func extractZipEntry(zf *zip.File, destDir, destPath string) error {
 	}
 	defer rc.Close()
 
-	_, _, err = fsutil.WriteReaderAtomic(cleanDest, rc, 0o644)
+	_, _, err = fsutil.WriteLimitedReaderAtomic(cleanDest, rc, fsutil.MaxExtractFileBytes, perm)
 	return err
 }
 

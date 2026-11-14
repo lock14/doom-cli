@@ -58,10 +58,15 @@
         keys across round-trips, and `doom wads set` and `doom engines set` preserve untouched override fields
         across successive calls.
     *   **Verified HTTP downloads and archive security**: All outbound HTTP downloads (`engine.Installer`,
-        `wad.Downloader`, and `wad.InstallSoundFontURL`) must use `fsutil.DownloadVerified` and `fsutil.UserAgent`
-        (`"doom-cli/2.0"`). All archive extractions (`archive/zip`), direct file downloads, and relative sub-path
-        resolutions must sanitize paths against `..` traversal, drive-letter, and absolute path sequences using
-        `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
+        `wad.Downloader`, and `wad.InstallSoundFontContext`) must use `fsutil.DownloadVerified` or
+        `fsutil.DownloadVerifiedContext` and `fsutil.UserAgent` (`"doom-cli/2.0"`), enforcing bounded stream sizes
+        (`MaxDownloadBytes`) and rejecting `https://` to `http://` redirect downgrades. Every curated preset source in
+        `catalog/preset.<id>.json` (`LayerCurated`) must declare a verified 64-character hex `sha256` digest (while
+        `sha256` remains optional on `LayerUser` presets), and `DefaultSoundFontURL` is pinned to an immutable commit
+        with `DefaultSoundFontSHA256`. All archive extractions (`archive/zip` via `fsutil.WriteLimitedReaderAtomic` and
+        `MaxExtractFileBytes`), direct file downloads, and relative sub-path resolutions must sanitize paths against
+        `..` traversal, drive-letter, reserved Windows device stems, trailing dots or spaces, and absolute path
+        sequences using `fsutil.CleanRel` and `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
 *   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
         and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
@@ -124,10 +129,13 @@
         and Doom II map music slots) for classic source port compatibility, and writes a valid `PWAD` atomically to
         `<WadsDir>/idkfa 2024.wad`.
     *   **Visual aesthetic and frame pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
-        (software light mode `gl_lightmode 0`, banded stepping `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`,
-        and nearest-neighbor texture sampling with 16x anisotropic filtering). In DSDA-Doom, maintain classic software
-        lightmaps (`render_doom_lightmaps 1`), banded sector fading (`gl_fade_mode 1`), and textured widescreen status
-        bar borders (`sts_solid_bg_color 0`), alongside `dsda_fps_limit 0`, `render_vsync 1`, and
+        (Vulkan backend preference `vid_preferbackend 1`, software light mode `gl_lightmode 0`, banded stepping
+        `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`, and nearest-neighbor texture sampling with 16x anisotropic
+        filtering) without personal movement or weapon `bind` statements in `uzdoom/autoexec.cfg` so user rebinds in
+        `uzdoom.ini` persist across launches (retaining `F5`, `F6`, and `F9` quick save and load utilities). In
+        DSDA-Doom, maintain classic software lightmaps (`render_doom_lightmaps 1`), banded sector fading
+        (`gl_fade_mode 1`), textured widescreen status bar borders (`sts_solid_bg_color 0`), standard WASD movement and
+        `1` through `9` weapon slot defaults in Profile 0, and `dsda_fps_limit 0`, `render_vsync 1`, and
         `uncapped_framerate 1` so high-refresh monitors pace frames smoothly to native monitor refresh rates.
 *   **TUI styling and font glyph hygiene**:
     *   **Monospace TUI specification and overrides**: Terminal UI work in `internal/tui/`, `cmd/doom/wads.go`,
@@ -221,7 +229,7 @@ Linux, macOS, and Windows:
 *   **Documentation comments**: All exported packages, types, interfaces, constants, and functions must have
     comprehensive Go doc comments starting with the symbol name and adhering to standard Go and `revive` conventions.
 *   **Static analysis and linting**: Enforce clean linting via `revive -config revive.toml -formatter friendly ./...`
-    and `go vet ./...`.
+    (including `unreachable-code` and `unused-parameter`) and `go vet ./...`.
 
 # Testing conventions
 
@@ -330,11 +338,13 @@ Linux, macOS, and Windows:
     `InitialModeEngines`, and `InitialModeConfig` on interactive terminals and fall back to `RunNumberedMenu`,
     `runEnginesList`, and `runConfigShow` on non-TTY streams. Pressing `Enter` in the TUI enforces an in-TUI
     missing-files guard (`!m.isPresetReady(cur)`) or exits for a single-shot launch, where `runWadsTUI` reloads disk
-    state via `loadAppState()` and forwards `selected.EngineOverridden` to `PrepareLaunch`. All 12 non-positional
-    commands enforce `Args: cobra.NoArgs`, while `UnknownFlags: true` is restricted strictly to root
-    `doom [wad] [flags]`, where `parseRootInvocation` joins unquoted multi-word WAD names (`doom Doom II`) and forwards
-    native Doom single-dash flags (`-episode`, `-extratics`, `-endoom`, `-height`, `-viddump`) and `+` console
-    commands.
+    state via `loadAppStateWithErr` and forwards `selected.EngineOverridden` to `PrepareLaunch`. All 12 non-positional
+    commands enforce `Args: cobra.NoArgs`, `main()` wires `signal.NotifyContext` (`SIGINT` and `SIGTERM`) into
+    `ExecuteContext`, `splitCommandArgs` preserves single- and double-quoted paths on `--args` and `--prefix-args`, and
+    `DisableFlagParsing: true` plus `UnknownFlags: true` are restricted strictly to root `doom [wad] [flags]`, where
+    `parseRootInvocation` joins unquoted multi-word WAD names (`doom Doom II`) and forwards native Doom single-dash
+    flags (`-episode`, `-extratics`, `-endoom`, `-exec`, `-errorlog`, `-edf`, `-height`, `-viddump`) and `+` console
+    commands without pflag shorthand collisions.
 *   **Persistent asset directory hierarchy and two-tier settings precedence**: Users can override and persist all asset
     and execution directories (`wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`) and UI preferences (`theme`,
     `nerd-fonts`) via `doom config set <key> <val>` in `config.json` or via the in-TUI `Ctrl+G` configuration manager.

@@ -74,6 +74,20 @@ func AddEngine(userDir string, curated *Catalog, eng EngineConfig) (string, erro
 			)
 		}
 	}
+	for _, al := range eng.Aliases {
+		cleanAl := strings.ToLower(strings.TrimSpace(al))
+		if cleanAl == "" {
+			continue
+		}
+		if err := ValidateID(cleanAl); err != nil {
+			return "", fmt.Errorf("invalid engine alias %q: %w", al, err)
+		}
+		if curated != nil {
+			if existing, ok := curated.FindEngine(cleanAl); ok && existing.Layer == LayerCurated {
+				return "", fmt.Errorf("engine alias %q collides with curated engine %q", al, existing.ID)
+			}
+		}
+	}
 
 	eng.SchemaVersion = SchemaVersion
 	eng.Kind = KindEngine
@@ -120,6 +134,9 @@ func ConfigEngine(userDir string, layered *Catalog, key string, opts EngineOverr
 	eng, ok := layered.FindEngine(key)
 	if !ok {
 		return "", fmt.Errorf("unknown engine %q (register it first with `doom engines add`)", key)
+	}
+	if err := ValidateID(eng.ID); err != nil {
+		return "", fmt.Errorf("invalid engine id %q: %w", eng.ID, err)
 	}
 
 	if opts.ArgsStyle != nil {
@@ -207,6 +224,9 @@ func ResetEngineOverride(userDir string, layered *Catalog, key string) error {
 	if !ok {
 		return fmt.Errorf("unknown engine %q", key)
 	}
+	if err := ValidateID(eng.ID); err != nil {
+		return fmt.Errorf("invalid engine id %q: %w", eng.ID, err)
+	}
 	overridePath := filepath.Join(userDir, fmt.Sprintf("override.engine.%s.json", eng.ID))
 	if err := os.Remove(overridePath); err != nil && !os.IsNotExist(err) {
 		return err
@@ -235,6 +255,9 @@ func RemoveEngine(userDir string, curated, layered *Catalog, key string) (string
 	}
 	if targetID == "" {
 		targetID = Slug(clean)
+	}
+	if err := ValidateID(targetID); err != nil {
+		return "", nil, fmt.Errorf("invalid engine id %q: %w", targetID, err)
 	}
 
 	if curated != nil {
@@ -315,6 +338,14 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 	if strings.TrimSpace(p.IWAD) == "" {
 		p.IWAD = "DOOM2.WAD"
 	}
+	if _, err := fsutil.CleanRel(strings.TrimSpace(p.IWAD)); err != nil {
+		return "", fmt.Errorf("invalid iwad path %q: %w", p.IWAD, err)
+	}
+	for _, f := range p.Files {
+		if _, err := fsutil.CleanRel(strings.TrimSpace(f.Name)); err != nil {
+			return "", fmt.Errorf("invalid file path %q: %w", f.Name, err)
+		}
+	}
 	if strings.TrimSpace(p.Engine) == "" {
 		p.Engine = "dsda-doom"
 	}
@@ -351,6 +382,7 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 type OverridePatchRequest struct {
 	Engine       *string
 	IWAD         *string
+	SetArgs      *[]string
 	AppendArgs   *[]string
 	AppendFiles  *[]FileSpec
 	ExcludeFiles *[]string
@@ -366,6 +398,21 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 	target, err := layered.FindExact(key)
 	if err != nil {
 		return "", nil, err
+	}
+	if err := ValidateID(target.ID); err != nil {
+		return "", nil, fmt.Errorf("invalid preset id %q: %w", target.ID, err)
+	}
+	if req.IWAD != nil && strings.TrimSpace(*req.IWAD) != "" {
+		if _, err := fsutil.CleanRel(strings.TrimSpace(*req.IWAD)); err != nil {
+			return "", nil, fmt.Errorf("invalid iwad path %q: %w", *req.IWAD, err)
+		}
+	}
+	if req.AppendFiles != nil {
+		for _, f := range *req.AppendFiles {
+			if _, err := fsutil.CleanRel(strings.TrimSpace(f.Name)); err != nil {
+				return "", nil, fmt.Errorf("invalid file path %q: %w", f.Name, err)
+			}
+		}
 	}
 
 	if req.Engine != nil && *req.Engine != "" && layered != nil {
@@ -401,17 +448,35 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 			ov.Set = &OverrideSet{}
 		}
 		if req.Engine != nil {
-			ov.Set.Engine = req.Engine
+			if *req.Engine == "" {
+				ov.Set.Engine = nil
+			} else {
+				ov.Set.Engine = req.Engine
+			}
 		}
 		if req.IWAD != nil {
-			ov.Set.IWAD = req.IWAD
+			if *req.IWAD == "" {
+				ov.Set.IWAD = nil
+			} else {
+				ov.Set.IWAD = req.IWAD
+			}
 		}
 	}
-	if req.AppendArgs != nil {
+	if req.SetArgs != nil {
+		if ov.Set == nil {
+			ov.Set = &OverrideSet{}
+		}
+		s := append([]string(nil), (*req.SetArgs)...)
+		ov.Set.Args = &s
+		ov.AppendArgs = nil
+	} else if req.AppendArgs != nil {
 		ov.AppendArgs = append([]string(nil), (*req.AppendArgs)...)
 		if ov.Set != nil {
 			ov.Set.Args = nil
 		}
+	}
+	if ov.Set != nil && ov.Set.IsEmpty() {
+		ov.Set = nil
 	}
 	if req.AppendFiles != nil {
 		ov.AppendFiles = cloneFileSpecs(*req.AppendFiles)
@@ -445,6 +510,9 @@ func ResetPresetOverride(userDir string, layered *Catalog, key string) (*Preset,
 	if err != nil {
 		return nil, false, err
 	}
+	if err := ValidateID(target.ID); err != nil {
+		return nil, false, fmt.Errorf("invalid preset id %q: %w", target.ID, err)
+	}
 	overridePath := filepath.Join(userDir, fmt.Sprintf("override.preset.%s.json", target.ID))
 	if err := os.Remove(overridePath); err != nil {
 		if os.IsNotExist(err) {
@@ -466,6 +534,9 @@ func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Prese
 	target, err := layered.FindExact(key)
 	if err != nil {
 		return nil, err
+	}
+	if err := ValidateID(target.ID); err != nil {
+		return nil, fmt.Errorf("invalid preset id %q: %w", target.ID, err)
 	}
 
 	presetPath := filepath.Join(userDir, fmt.Sprintf("preset.%s.json", target.ID))

@@ -23,7 +23,8 @@
   "release_date": "2002",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/av.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/av.zip",
+      "sha256": "5c5382cc50b565946b6725b3058cc1fdefe7367ee3067808068900117aabf8fc"
     }
   ],
   "links": [

@@ -36,7 +36,8 @@ doom wads
   on-disk readiness (`[✓ Ready]` or `[✗ Missing]`).
 - `doom wads show <name>`: Displays resolved launch configuration, genre, difficulty, quality rating, `Launch Cmd:`
   preview, sources, links, and file availability.
-- `doom wads fetch [name|all]`: Downloads and extracts community megawads from idgames mirrors.
+- `doom wads fetch [name|all]`: Downloads and extracts SHA-256 verified community megawads from idgames mirrors and
+  extracts missing commercial IWADs or optional assets (`idkfa 2024.wad`) from local Steam and GOG libraries.
 - `doom wads scan`: Auto-discovers and imports official Steam and GOG commercial IWADs and expansions, and synthesizes
   `idkfa 2024.wad` from `extras.wad`.
 - `doom wads add <name>`: Adds a custom WAD or preset to `catalog.d/preset.<id>.json`.
@@ -122,8 +123,10 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
   (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per file and cleaning up orphaned `.bak.*` files via
   `fsutil.RemoveBackups` on entity or override deletion and `doom engines cfg sync`) are created across all CLI and
   in-TUI (`Ctrl+S` and `Ctrl+R`) configuration writes before modifying existing user files.
-- **Archive and download security**: Zip Slip and path traversal prevention via `fsutil.SafeJoin` and streaming SHA-256
-  verification via `fsutil.DownloadVerified` (`fsutil.UserAgent` `"doom-cli/2.0"`).
+- **Archive and download security**: Zip Slip and path traversal prevention via `fsutil.CleanRel` and
+  `fsutil.SafeJoin`, bounded extraction (`fsutil.WriteLimitedReaderAtomic`), HTTPS-to-HTTP redirect downgrade rejection,
+  mandatory `sha256` digests on curated preset sources and pinned `GeneralUser-GS.sf2`, and streaming SHA-256
+  verification via `fsutil.DownloadVerifiedContext` (`fsutil.UserAgent` `"doom-cli/2.0"`).
 - **Strict line length (120 columns)**: Code enforced at 120 columns via `revive.toml` and `.editorconfig`.
 
 ## References

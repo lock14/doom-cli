@@ -35,7 +35,7 @@ func DecodeText(raw []byte) string {
 		}
 	}
 
-	// Count CP437 box-drawing, shading, and block characters vs Windows-1252 punctuation
+	// Count CP437 box-drawing, shading, block, and CP437-exclusive Latin letters vs Windows-1252 punctuation
 	cpScore := 0
 	winScore := 0
 	for _, b := range normalized {
@@ -43,7 +43,10 @@ func DecodeText(raw []byte) string {
 		case b >= 0xB0 && b <= 0xDF:
 			// Box-drawing, shading blocks (░▒▓█▄▀), and borders (║═│─) in CP437
 			cpScore++
-		case (b >= 0x80 && b <= 0x9F):
+		case b == 0x81 || b == 0x8D || b == 0x8F || b == 0x90 || b == 0x9D:
+			// Undefined C1 bytes in Windows-1252 that encode valid letters (such as ü = 0x81) in CP437
+			cpScore++
+		case b >= 0x80 && b <= 0x9F:
 			// Smart quotes, dashes, ellipsis, bullet, trademark in Windows-1252
 			winScore++
 		}
@@ -56,15 +59,6 @@ func DecodeText(raw []byte) string {
 	}
 
 	if decoded, err := charmap.Windows1252.NewDecoder().Bytes(normalized); err == nil {
-		return string(decoded)
-	}
-
-	if decoded, err := charmap.ISO8859_1.NewDecoder().Bytes(normalized); err == nil {
-		return string(decoded)
-	}
-
-	// Fallback to CP437 as it maps all 256 byte values
-	if decoded, err := charmap.CodePage437.NewDecoder().Bytes(normalized); err == nil {
 		return string(decoded)
 	}
 

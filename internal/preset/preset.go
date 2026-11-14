@@ -309,6 +309,34 @@ type OverrideSet struct {
 	DisplayName       *string     `json:"display_name,omitempty"`
 }
 
+// IsEmpty reports whether every replacement pointer on s is nil.
+func (s *OverrideSet) IsEmpty() bool {
+	if s == nil {
+		return true
+	}
+	return s.Engine == nil &&
+		s.IWAD == nil &&
+		s.Files == nil &&
+		s.Args == nil &&
+		s.Category == nil &&
+		s.Genre == nil &&
+		s.Difficulty == nil &&
+		s.Quality == nil &&
+		s.Compatibility == nil &&
+		s.Description == nil &&
+		s.Author == nil &&
+		s.ReleaseDate == nil &&
+		s.Sources == nil &&
+		s.Links == nil &&
+		s.LoadMapsAfterMods == nil &&
+		s.Binary == nil &&
+		s.ArgsStyle == nil &&
+		s.DefaultArgs == nil &&
+		s.PrefixArgs == nil &&
+		s.Badge == nil &&
+		s.DisplayName == nil
+}
+
 // Override patches a lower-layer preset or engine without replacing its base file.
 type Override struct {
 	SchemaVersion int            `json:"schema_version,omitempty"`
@@ -364,6 +392,14 @@ func cloneFileSpecs(files []FileSpec) []FileSpec {
 	return out
 }
 
+func cloneEngineConfig(e EngineConfig) EngineConfig {
+	ec := e
+	ec.PrefixArgs = append([]string(nil), e.PrefixArgs...)
+	ec.DefaultArgs = append([]string(nil), e.DefaultArgs...)
+	ec.Aliases = append([]string(nil), e.Aliases...)
+	return ec
+}
+
 // Clone returns a deep copy of the Catalog.
 func (c *Catalog) Clone() *Catalog {
 	if c == nil {
@@ -375,19 +411,10 @@ func (c *Catalog) Clone() *Catalog {
 		Diagnostics: append([]Diagnostic(nil), c.Diagnostics...),
 	}
 	for k, e := range c.Engines {
-		ec := e
-		ec.PrefixArgs = append([]string(nil), e.PrefixArgs...)
-		ec.DefaultArgs = append([]string(nil), e.DefaultArgs...)
-		ec.Aliases = append([]string(nil), e.Aliases...)
-		out.Engines[k] = ec
+		out.Engines[k] = cloneEngineConfig(e)
 	}
 	for i, p := range c.Presets {
-		pc := p
-		pc.Files = cloneFileSpecs(p.Files)
-		pc.Args = append([]string(nil), p.Args...)
-		pc.Sources = append([]Source(nil), p.Sources...)
-		pc.Links = append([]Link(nil), p.Links...)
-		out.Presets[i] = pc
+		out.Presets[i] = *clonePreset(p)
 	}
 	return out
 }
@@ -417,8 +444,15 @@ func findEngineInMap(engines map[string]EngineConfig, clean string) (EngineConfi
 	if eng, ok := engines[clean]; ok {
 		return eng, true
 	}
+	keys := make([]string, 0, len(engines))
+	for k := range engines {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	slug := Slug(clean)
-	for k, eng := range engines {
+	for _, k := range keys {
+		eng := engines[k]
 		if strings.EqualFold(k, clean) ||
 			strings.EqualFold(eng.ID, clean) ||
 			strings.EqualFold(eng.DisplayName, clean) ||
@@ -516,7 +550,7 @@ func NormalizePresetQuery(s string) string {
 func presetWadStems(p Preset) []string {
 	var stems []string
 	add := func(raw string) {
-		base := stripPresetExt(filepath.Base(strings.TrimSpace(raw)))
+		base := stripPresetExt(slashBase(raw))
 		if base == "" || base == "extras" {
 			return
 		}
@@ -539,7 +573,7 @@ func presetWadStems(p Preset) []string {
 	if !p.HasRequiredFiles() {
 		if strings.TrimSpace(p.IWAD) != "" {
 			add(p.IWAD)
-			if NormalizeFilename(stripPresetExt(filepath.Base(p.IWAD))) == "doom" {
+			if NormalizeFilename(stripPresetExt(slashBase(p.IWAD))) == "doom" {
 				add("doom1")
 			}
 		}
@@ -1211,15 +1245,21 @@ func MergeUserDir(base *Catalog, userDir string) (*Catalog, error) {
 	seenEngines := make(map[string]bool)
 	for _, ent := range curatedEnts {
 		if ent.Engine != nil {
-			ec := *ent.Engine
+			ec := cloneEngineConfig(*ent.Engine)
 			baseEnts = append(baseEnts, Entity{Engine: &ec, Path: ent.Path})
 			seenEngines[ec.ID] = true
 		}
 	}
-	for id, eng := range base.Engines {
-		ec := eng
+	engineKeys := make([]string, 0, len(base.Engines))
+	for id := range base.Engines {
+		engineKeys = append(engineKeys, id)
+	}
+	sort.Strings(engineKeys)
+	for _, id := range engineKeys {
+		eng := base.Engines[id]
+		ec := cloneEngineConfig(eng)
 		if seenEngines[id] {
-			if !eng.Overridden {
+			if !eng.Overridden && eng.Layer == LayerCurated {
 				for i := range baseEnts {
 					if baseEnts[i].Engine != nil && baseEnts[i].Engine.ID == id {
 						baseEnts[i].Engine = &ec
@@ -1228,18 +1268,29 @@ func MergeUserDir(base *Catalog, userDir string) (*Catalog, error) {
 				}
 			}
 		} else if eng.Layer == LayerUser {
-			if !diskUserEngines[id] && !eng.Overridden {
+			// Preserve synthetic in-memory fixtures (Path == "") while letting disk userDir govern disk entities.
+			if eng.Path == "" && !diskUserEngines[id] && !eng.Overridden {
 				userEnts = append(userEnts, Entity{Engine: &ec, Path: eng.Path})
 			}
 		} else {
 			baseEnts = append(baseEnts, Entity{Engine: &ec, Path: eng.Path})
+			seenEngines[id] = true
 		}
 	}
+
+	seenBasePresets := make(map[string]bool)
 	for i, p := range base.Presets {
 		if p.Layer == LayerUser {
-			if !diskUserPresets[p.ID] && !p.Overridden {
+			if p.Path == "" && !diskUserPresets[p.ID] && !p.Overridden {
 				pc := *clonePreset(p)
 				userEnts = append(userEnts, Entity{Preset: &pc, Path: p.Path})
+			} else if p.Path != "" && !diskUserPresets[p.ID] && curatedCat != nil {
+				// Restore any curated preset previously shadowed by a now-deleted user preset file.
+				if cp, findErr := curatedCat.FindExact(p.ID); findErr == nil && cp != nil && cp.ID == p.ID {
+					pc := *clonePreset(*cp)
+					baseEnts = append(baseEnts, Entity{Preset: &pc, Path: pc.Path})
+					seenBasePresets[pc.ID] = true
+				}
 			}
 			continue
 		}
@@ -1259,7 +1310,9 @@ func MergeUserDir(base *Catalog, userDir string) (*Catalog, error) {
 			pc.Sort = i + 1
 		}
 		baseEnts = append(baseEnts, Entity{Preset: &pc, Path: pc.Path})
+		seenBasePresets[pc.ID] = true
 	}
+	_ = seenBasePresets
 
 	cat := buildCatalog(baseEnts, userEnts)
 	cat.Diagnostics = append(diags, cat.Diagnostics...)
@@ -1288,10 +1341,31 @@ func buildCatalog(curatedEnts, userEnts []Entity) *Catalog {
 		for _, ent := range b.ents {
 			switch {
 			case ent.Engine != nil:
-				eng := *ent.Engine
+				eng := cloneEngineConfig(*ent.Engine)
 				eng.Layer = b.layer
 				eng.Path = ent.Path
 				eng.ArgsStyle = eng.EffectiveArgsStyle()
+				if b.layer == LayerUser {
+					if existing, exists := cat.Engines[eng.ID]; exists && existing.Layer == LayerCurated {
+						cat.Diagnostics = append(cat.Diagnostics, Diagnostic{
+							Path:     ent.Path,
+							Severity: "warn",
+							Message: fmt.Sprintf(
+								"user engine %s cannot shadow built-in curated engine %s",
+								eng.ID, existing.ID,
+							),
+						})
+						continue
+					}
+					if owner, exists := aliasOwner[strings.ToLower(eng.ID)]; exists && owner != eng.ID {
+						cat.Diagnostics = append(cat.Diagnostics, Diagnostic{
+							Path:     ent.Path,
+							Severity: "warn",
+							Message:  fmt.Sprintf("engine id %s conflicts with alias on engine %s", eng.ID, owner),
+						})
+						continue
+					}
+				}
 				conflict := false
 				for _, alias := range eng.Aliases {
 					al := strings.ToLower(strings.TrimSpace(alias))
@@ -1324,12 +1398,14 @@ func buildCatalog(curatedEnts, userEnts []Entity) *Catalog {
 					continue
 				}
 				for _, alias := range eng.Aliases {
-					aliasOwner[strings.ToLower(strings.TrimSpace(alias))] = eng.ID
+					if al := strings.ToLower(strings.TrimSpace(alias)); al != "" {
+						aliasOwner[al] = eng.ID
+					}
 				}
 				cat.Engines[eng.ID] = eng
 
 			case ent.Preset != nil:
-				p := *ent.Preset
+				p := *clonePreset(*ent.Preset)
 				p.Layer = b.layer
 				p.Path = ent.Path
 				layerPresets = append(layerPresets, p)
@@ -1468,14 +1544,14 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 			if norm := NormalizeFilename(ex); norm != "" {
 				excluded[norm] = true
 			}
-			if baseNorm := NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
+			if baseNorm := NormalizeFilename(slashBase(ex)); baseNorm != "" {
 				excluded[baseNorm] = true
 			}
 		}
 		var kept []FileSpec
 		for _, f := range p.Files {
 			norm := NormalizeFilename(f.Name)
-			baseNorm := NormalizeFilename(filepath.Base(f.Name))
+			baseNorm := NormalizeFilename(slashBase(f.Name))
 			if (norm != "" && excluded[norm]) || (baseNorm != "" && excluded[baseNorm]) {
 				continue
 			}
@@ -1527,9 +1603,11 @@ func LoadPresetBaseAndOverride(catalogDir string, id string) (*Preset, *Override
 			if base != nil {
 				candidateID = base.ID
 			}
-			userPresetPath := filepath.Join(dir, fmt.Sprintf("preset.%s.json", candidateID))
+			userPresetName := fmt.Sprintf("preset.%s.json", candidateID)
+			userPresetPath := filepath.Join(dir, userPresetName)
 			if raw, readErr := os.ReadFile(userPresetPath); readErr == nil {
-				if ent, decErr := DecodeEntity(raw); decErr == nil && ent.Preset != nil {
+				if ent, decErr := DecodeEntity(raw); decErr == nil &&
+					ent.Preset != nil && ExpectedFilename(ent) == userPresetName {
 					up := clonePreset(*ent.Preset)
 					up.Layer = LayerUser
 					up.Path = filepath.ToSlash(userPresetPath)
@@ -1554,9 +1632,11 @@ func LoadPresetBaseAndOverride(catalogDir string, id string) (*Preset, *Override
 			}
 
 			if base != nil {
-				ovPath := filepath.Join(dir, fmt.Sprintf("override.preset.%s.json", base.ID))
+				ovName := fmt.Sprintf("override.preset.%s.json", base.ID)
+				ovPath := filepath.Join(dir, ovName)
 				if raw, readErr := os.ReadFile(ovPath); readErr == nil {
-					if ent, decErr := DecodeEntity(raw); decErr == nil && ent.Override != nil {
+					if ent, decErr := DecodeEntity(raw); decErr == nil &&
+						ent.Override != nil && ExpectedFilename(ent) == ovName {
 						ov := *ent.Override
 						ov.Path = filepath.ToSlash(ovPath)
 						ov.AppendFiles = cloneFileSpecs(ent.Override.AppendFiles)
@@ -1601,7 +1681,7 @@ func applyEngineOverride(e *EngineConfig, ov *Override) {
 		}
 	}
 	if len(ov.AppendArgs) > 0 {
-		e.DefaultArgs = append(e.DefaultArgs, ov.AppendArgs...)
+		e.DefaultArgs = append(append([]string(nil), e.DefaultArgs...), ov.AppendArgs...)
 	}
 	e.Overridden = true
 }

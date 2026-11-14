@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/lock14/doom-cli/internal/fsutil"
 )
@@ -71,11 +72,12 @@ func LoadConfig(paths *Paths) (*AppConfig, error) {
 	if err := json.Unmarshal(data, &rawMap); err != nil {
 		return nil, err
 	}
-	if _, ok := rawMap["nerd_fonts"]; ok {
-		cfg.nerdFontsSet = true
-	}
 	for k, v := range rawMap {
-		if !knownConfigKeys[k] {
+		lowerKey := strings.ToLower(k)
+		if lowerKey == "nerd_fonts" {
+			cfg.nerdFontsSet = true
+		}
+		if !knownConfigKeys[lowerKey] {
 			if cfg.extra == nil {
 				cfg.extra = make(map[string]json.RawMessage)
 			}
@@ -98,7 +100,7 @@ func SaveConfig(paths *Paths, cfg *AppConfig) error {
 
 	merged := make(map[string]any, len(cfg.extra)+len(knownConfigKeys))
 	for k, v := range cfg.extra {
-		if !knownConfigKeys[k] {
+		if !knownConfigKeys[strings.ToLower(k)] {
 			merged[k] = v
 		}
 	}

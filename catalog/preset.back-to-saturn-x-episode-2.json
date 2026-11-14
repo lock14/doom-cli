@@ -7,13 +7,13 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "btsx_e2.deh"
-    },
-    {
       "name": "btsx_e2a.wad"
     },
     {
       "name": "btsx_e2b.wad"
+    },
+    {
+      "name": "btsx_e2.deh"
     }
   ],
   "category": "Community Megawad",
@@ -26,7 +26,8 @@
   "release_date": "2014",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e2.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e2.zip",
+      "sha256": "2365b9ff5884027523553519830884cc85106c483fdf19c0f2bbe75155b60331"
     }
   ],
   "links": [

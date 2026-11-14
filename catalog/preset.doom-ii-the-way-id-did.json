@@ -7,10 +7,10 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "D2TWID.deh"
+      "name": "D2TWID.wad"
     },
     {
-      "name": "D2TWID.wad"
+      "name": "D2TWID.deh"
     },
     {
       "name": "idkfa 2024.wad",
@@ -27,7 +27,8 @@
   "release_date": "2013",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/d2twid.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/d2twid.zip",
+      "sha256": "e5ef240143640e537ab5b47239967ec9e70ba84a314ee40d3a2acb66757aed32"
     }
   ],
   "links": [

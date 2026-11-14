@@ -52,4 +52,31 @@ func TestParseDisplayOutputs(t *testing.T) {
 	if res, rate := parseWlrDisplay(wlrOut); res != "3840x2160" || rate != 240 {
 		t.Errorf("parseWlrDisplay = (%q, %d), want (\"3840x2160\", 240)", res, rate)
 	}
+
+	// ProMotion / VRR range on macOS captures upper bound rather than minimum floor.
+	darwinVRR := "Displays:\n  Liquid Retina XDR:\n" +
+		"    Resolution: 3456 x 2234\n    UI Looks like: 1728 x 1117 @ 48.00Hz - 120.00Hz\n"
+	if res, rate := parseDarwinDisplay(darwinVRR); res != "3456x2234" || rate != 120 {
+		t.Errorf("parseDarwinDisplay(VRR) = (%q, %d), want (\"3456x2234\", 120)", res, rate)
+	}
+
+	// xrandr prefers primary output over earlier secondary output.
+	xrandrMulti := "Screen 0: minimum 8 x 8\n" +
+		"HDMI-1 connected 1920x1080+2560+0\n   1920x1080     60.00*\n" +
+		"DP-2 connected primary 2560x1440+0+0\n   2560x1440     165.00*\n"
+	if res, rate := parseXrandrDisplay(xrandrMulti); res != "2560x1440" || rate != 165 {
+		t.Errorf("parseXrandrDisplay(multi) = (%q, %d), want (\"2560x1440\", 165)", res, rate)
+	}
+
+	// kscreen-doctor strips ANSI escapes and selects active @144* mode over listed @60 mode.
+	kscreenOut := "\x1b[32mOutput: 1 DP-1\x1b[0m\n  Modes: 1:2560x1440@60 2:2560x1440@144*!\n"
+	if rate := parseKscreenRate(kscreenOut); rate != 144 {
+		t.Errorf("parseKscreenRate = %d, want 144", rate)
+	}
+
+	// Windows multi-GPU + virtual adapter output selects active primary display.
+	winMulti := "x@\n1920x1080@60\n2560x1440@165\n2560x1440\n"
+	if res, rate := parseWindowsDisplay(winMulti); res != "2560x1440" || rate != 165 {
+		t.Errorf("parseWindowsDisplay = (%q, %d), want (\"2560x1440\", 165)", res, rate)
+	}
 }

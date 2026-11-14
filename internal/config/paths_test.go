@@ -7,8 +7,15 @@ import (
 	"testing"
 )
 
+func sanitizePathEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("DOOM_CONFIG_DIR", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+}
+
 func TestResolveForLinux(t *testing.T) {
-	t.Parallel()
+	sanitizePathEnv(t)
 	p := ResolveFor("linux")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), ".config/uzdoom") {
 		t.Errorf("expected .config/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
@@ -31,7 +38,7 @@ func TestResolveForLinux(t *testing.T) {
 }
 
 func TestResolveForDarwin(t *testing.T) {
-	t.Parallel()
+	sanitizePathEnv(t)
 	p := ResolveFor("darwin")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Library/Application Support/uzdoom") {
 		t.Errorf("expected Library/Application Support/uzdoom in UZDoomDir, got %s", p.UZDoomDir)
@@ -45,7 +52,7 @@ func TestResolveForDarwin(t *testing.T) {
 }
 
 func TestResolveForWindows(t *testing.T) {
-	t.Parallel()
+	sanitizePathEnv(t)
 	p := ResolveFor("windows")
 	if !strings.Contains(filepath.ToSlash(p.UZDoomDir), "Games/Doom/bin") {
 		t.Errorf("expected Games/Doom/bin in UZDoomDir, got %s", p.UZDoomDir)

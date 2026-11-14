@@ -17,10 +17,11 @@ import (
 
 func newWadsCmd() *cobra.Command {
 	wadsCmd := &cobra.Command{
-		Use:   "wads",
-		Short: "Browse, launch, fetch, and configure WAD presets",
-		Args:  cobra.NoArgs,
-		RunE:  runWadsTUI,
+		Use:          "wads",
+		Short:        "Browse, launch, fetch, and configure WAD presets",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
+		RunE:         runWadsTUI,
 	}
 
 	listCmd := &cobra.Command{
@@ -43,11 +44,12 @@ func newWadsCmd() *cobra.Command {
 		Short: "Extract commercial IWADs from Steam/GOG and download community megawads",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
 			out := cmdOut(cmd)
+			ctx := cmd.Context()
 
 			target := "all"
 			if len(args) > 0 {
@@ -57,13 +59,14 @@ func newWadsCmd() *cobra.Command {
 			if strings.EqualFold(target, "all") {
 				searchRoots := steam.GetSearchRoots()
 				if len(searchRoots) > 0 {
-					if _, err := steam.DiscoverAndExtract(
-						cat, searchRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+					if _, err := steam.DiscoverAndExtractContext(
+						ctx, cat, searchRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
 					); err != nil {
 						return err
 					}
 				}
 				dl := wad.NewDownloader(paths.WadRoots(), fetchForce, out)
+				dl.Ctx = ctx
 				return dl.DownloadAll(cat)
 			}
 
@@ -77,32 +80,51 @@ func newWadsCmd() *cobra.Command {
 
 			idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 			alreadyInstalled := strings.TrimSpace(p.IWAD) != "" && idx.IsPresetInstalled(*p)
-			if !alreadyInstalled || fetchForce {
-				if fetchForce || idx.NeedsSteamDiscovery(*p) {
-					if _, err := steam.DiscoverAndExtract(
-						cat, nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
-					); err != nil {
-						return err
-					}
+			var extracted int
+			if fetchForce || idx.NeedsSteamDiscovery(*p) {
+				var discErr error
+				extracted, discErr = steam.DiscoverAndExtractContext(
+					ctx, cat, nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+				)
+				if discErr != nil {
+					return discErr
 				}
 			}
 
 			if len(p.Sources) == 0 {
 				idx = preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 				if !idx.IsPresetInstalled(*p) {
-					fmt.Fprintf(
-						out,
-						"%s is a commercial game and could not be found in local Steam or GOG libraries.\n",
-						p.Name,
-					)
-				} else if alreadyInstalled && !fetchForce {
+					if !p.IsCustom() {
+						fmt.Fprintf(
+							out,
+							"%s is a commercial game and could not be found in local Steam or GOG libraries.\n",
+							p.Name,
+						)
+					} else {
+						fmt.Fprintf(
+							out,
+							"%s has no download sources configured and required WAD files are missing.\n",
+							p.Name,
+						)
+					}
+					return fmt.Errorf("missing required files for %s", p.Name)
+				}
+				if alreadyInstalled && !fetchForce && extracted == 0 {
 					fmt.Fprintf(out, "✓ %s already installed\n", p.Name)
 				}
 				return nil
 			}
 
 			dl := wad.NewDownloader(paths.WadRoots(), fetchForce, out)
-			return dl.DownloadPreset(*p)
+			dl.Ctx = ctx
+			if err := dl.DownloadPreset(*p); err != nil {
+				return err
+			}
+			idx = preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+			if !idx.IsPresetInstalled(*p) {
+				return fmt.Errorf("missing required files for %s (ensure base IWAD %s is installed)", p.Name, p.IWAD)
+			}
+			return nil
 		},
 	}
 	fetchCmd.Flags().BoolVar(
@@ -115,12 +137,12 @@ func newWadsCmd() *cobra.Command {
 		Short: "Scan local Steam and GOG libraries to extract commercial IWADs and expansions",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
-			_, err = steam.DiscoverAndExtract(
-				cat, nil, paths.WadsDir, scanForce, cmdOut(cmd), paths.WadsDirs...,
+			_, err = steam.DiscoverAndExtractContext(
+				cmd.Context(), cat, nil, paths.WadsDir, scanForce, cmdOut(cmd), paths.WadsDirs...,
 			)
 			return err
 		},
@@ -140,7 +162,7 @@ func newWadsCmd() *cobra.Command {
 				return fmt.Errorf("preset name cannot be empty")
 			}
 
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -151,7 +173,10 @@ func newWadsCmd() *cobra.Command {
 
 			var extraArgs []string
 			if strings.TrimSpace(addFlags.args) != "" {
-				extraArgs = strings.Fields(addFlags.args)
+				extraArgs, err = splitCommandArgs(addFlags.args)
+				if err != nil {
+					return err
+				}
 			}
 
 			p := preset.Preset{
@@ -186,7 +211,7 @@ func newWadsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -204,7 +229,10 @@ func newWadsCmd() *cobra.Command {
 				changed = true
 			}
 			if cmd.Flags().Changed("args") || setFlags.args != "" {
-				v := strings.Fields(setFlags.args)
+				v, splitErr := splitCommandArgs(setFlags.args)
+				if splitErr != nil {
+					return splitErr
+				}
 				req.AppendArgs = &v
 				changed = true
 			}
@@ -251,7 +279,7 @@ func newWadsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -275,7 +303,7 @@ func newWadsCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -384,7 +412,8 @@ func parseFileSpecs(raw []string) []preset.FileSpec {
 }
 
 func runWadsTUI(cmd *cobra.Command, _ []string) error {
-	paths, cfg, cat, err := loadAppState()
+	errOut := cmdErr(cmd)
+	paths, cfg, cat, err := loadAppStateWithErr(errOut)
 	if err != nil {
 		return err
 	}
@@ -407,7 +436,7 @@ func runWadsTUI(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	if refreshedPaths, _, refreshedCat, reloadErr := loadAppState(); reloadErr == nil {
+	if refreshedPaths, _, refreshedCat, reloadErr := loadAppStateWithErr(errOut); reloadErr == nil {
 		paths = refreshedPaths
 		cat = refreshedCat
 	}
@@ -417,7 +446,6 @@ func runWadsTUI(cmd *cobra.Command, _ []string) error {
 		engOverride = selected.Engine
 	}
 	out := cmdOut(cmd)
-	errOut := cmdErr(cmd)
 	opts := engine.LaunchOptions{
 		EngineOverride: engOverride,
 		WadRoots:       paths.WadRoots(),
@@ -435,7 +463,7 @@ func runWadsTUI(cmd *cobra.Command, _ []string) error {
 }
 
 func runWadsList(cmd *cobra.Command, _ []string) error {
-	paths, _, cat, err := loadAppState()
+	paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
 	}
@@ -486,7 +514,7 @@ func runWadsList(cmd *cobra.Command, _ []string) error {
 
 func runWadsShow(cmd *cobra.Command, args []string) error {
 	name := args[0]
-	paths, _, cat, err := loadAppState()
+	paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
 	}

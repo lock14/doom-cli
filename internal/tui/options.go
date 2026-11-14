@@ -99,17 +99,40 @@ func (s *launchOptionsState) isBoomEngine() bool {
 	return s.selectedEngine().EffectiveArgsStyle() == "boom"
 }
 
-func (s *launchOptionsState) syncInputFocus() {
+func (s *launchOptionsState) isFieldDisabled(idx int) bool {
+	if !s.isBoomEngine() {
+		return idx == launchFieldSoloNet || idx == launchFieldComplevel
+	}
+	return false
+}
+
+func (s *launchOptionsState) moveFocus(delta int) {
+	total := s.totalFields()
+	if total <= 0 {
+		s.focusIdx = 0
+		return
+	}
+	for range total {
+		s.focusIdx = (s.focusIdx + delta + total) % total
+		if !s.isFieldDisabled(s.focusIdx) {
+			return
+		}
+	}
+}
+
+func (s *launchOptionsState) syncInputFocus() tea.Cmd {
+	var cmds []tea.Cmd
 	if s.focusIdx == launchFieldWarp {
-		s.warpInput.Focus()
+		cmds = append(cmds, s.warpInput.Focus())
 	} else {
 		s.warpInput.Blur()
 	}
 	if s.focusIdx == s.extraFieldIdx() {
-		s.extraInput.Focus()
+		cmds = append(cmds, s.extraInput.Focus())
 	} else {
 		s.extraInput.Blur()
 	}
+	return tea.Batch(cmds...)
 }
 
 func (m model) availableEngines() []preset.EngineConfig {
@@ -145,10 +168,11 @@ func (m model) availableEngines() []preset.EngineConfig {
 	return out
 }
 
-func (m *model) openLaunchOptions() {
+func (m *model) openLaunchOptions() tea.Cmd {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
-		return
+		return nil
 	}
+	m.input.Blur()
 	cur := m.filtered[m.cursor]
 	catDir := m.catalogDir()
 
@@ -252,10 +276,11 @@ func (m *model) openLaunchOptions() {
 		overrideArgs = cur.Args[len(base.Args):]
 	}
 	state.parseArgsIntoFields(overrideArgs)
-	state.syncInputFocus()
+	cmd := state.syncInputFocus()
 
 	m.launchOpts = state
 	m.viewingLaunchOpts = true
+	return cmd
 }
 
 func (s *launchOptionsState) parseArgsIntoFields(args []string) {
@@ -356,11 +381,13 @@ func (s *launchOptionsState) synthesizeAppendArgs() []string {
 	if s.respawn {
 		args = append(args, "-respawn")
 	}
-	if s.soloNet {
-		args = append(args, "-solonet")
-	}
-	if s.complevelIdx > 0 && s.complevelIdx < len(complevelOptions) {
-		args = append(args, "-complevel", complevelOptions[s.complevelIdx].value)
+	if s.isBoomEngine() {
+		if s.soloNet {
+			args = append(args, "-solonet")
+		}
+		if s.complevelIdx > 0 && s.complevelIdx < len(complevelOptions) {
+			args = append(args, "-complevel", complevelOptions[s.complevelIdx].value)
+		}
 	}
 	if extraFields := strings.Fields(s.extraInput.Value()); len(extraFields) > 0 {
 		args = append(args, extraFields...)
@@ -462,17 +489,26 @@ func (m model) updateLaunchOptions(msg tea.Msg) (tea.Model, tea.Cmd) {
 		isTextField := s.focusIdx == launchFieldWarp || s.focusIdx == s.extraFieldIdx()
 		switch msg.String() {
 		case "ctrl+c":
+			if m.fetchCancel != nil {
+				m.fetchCancel()
+			}
 			m.quitting = true
 			return m, tea.Quit
 
 		case "esc":
 			m.viewingLaunchOpts = false
 			m.launchOpts = nil
-			return m, nil
+			return m, m.input.Focus()
 
-		case "f1":
+		case "f1", "alt+?":
 			m.openHelp(helpModeLaunchOptions)
 			return m, nil
+
+		case "?":
+			if !isTextField {
+				m.openHelp(helpModeLaunchOptions)
+				return m, nil
+			}
 
 		case "enter":
 			launched := s.buildLaunchPreset()
@@ -480,7 +516,7 @@ func (m model) updateLaunchOptions(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewingLaunchOpts = false
 				m.launchOpts = nil
 				m.statusMsg = fmt.Sprintf("✗ Missing required files for %s (press Ctrl+F to fetch)", launched.Name)
-				return m, nil
+				return m, m.input.Focus()
 			}
 			m.selected = &launched
 			m.viewingLaunchOpts = false
@@ -496,39 +532,23 @@ func (m model) updateLaunchOptions(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "up", "ctrl+p", "shift+tab":
-			s.focusIdx--
-			if s.focusIdx < 0 {
-				s.focusIdx = s.totalFields() - 1
-			}
-			s.syncInputFocus()
-			return m, nil
+			s.moveFocus(-1)
+			return m, s.syncInputFocus()
 
 		case "down", "ctrl+n", "tab":
-			s.focusIdx++
-			if s.focusIdx >= s.totalFields() {
-				s.focusIdx = 0
-			}
-			s.syncInputFocus()
-			return m, nil
+			s.moveFocus(1)
+			return m, s.syncInputFocus()
 
 		case "ctrl+k":
 			if !isTextField {
-				s.focusIdx--
-				if s.focusIdx < 0 {
-					s.focusIdx = s.totalFields() - 1
-				}
-				s.syncInputFocus()
-				return m, nil
+				s.moveFocus(-1)
+				return m, s.syncInputFocus()
 			}
 
 		case "ctrl+j":
 			if !isTextField {
-				s.focusIdx++
-				if s.focusIdx >= s.totalFields() {
-					s.focusIdx = 0
-				}
-				s.syncInputFocus()
-				return m, nil
+				s.moveFocus(1)
+				return m, s.syncInputFocus()
 			}
 
 		case "left":
@@ -578,9 +598,13 @@ func (s *launchOptionsState) adjustField(delta int) {
 	case launchFieldRespawn:
 		s.respawn = !s.respawn
 	case launchFieldSoloNet:
-		s.soloNet = !s.soloNet
+		if s.isBoomEngine() {
+			s.soloNet = !s.soloNet
+		}
 	case launchFieldComplevel:
-		s.complevelIdx = (s.complevelIdx + delta + len(complevelOptions)) % len(complevelOptions)
+		if s.isBoomEngine() {
+			s.complevelIdx = (s.complevelIdx + delta + len(complevelOptions)) % len(complevelOptions)
+		}
 	default:
 		optIdx := s.focusIdx - launchFieldOptBase
 		if optIdx >= 0 && optIdx < len(s.optionalFiles) {
@@ -600,9 +624,18 @@ func (m *model) saveLaunchOptionsOverride() {
 	excludeFiles := s.excludedFileNames()
 
 	req := preset.OverridePatchRequest{
-		Engine:       &engID,
-		AppendArgs:   &appendArgs,
 		ExcludeFiles: &excludeFiles,
+	}
+	if !strings.EqualFold(engID, s.base.Engine) {
+		req.Engine = &engID
+	} else if s.existingOv != nil && s.existingOv.Set != nil && s.existingOv.Set.Engine != nil {
+		emptyEng := ""
+		req.Engine = &emptyEng
+	}
+	if s.existingOv != nil && s.existingOv.Set != nil && s.existingOv.Set.Args != nil {
+		req.SetArgs = &appendArgs
+	} else {
+		req.AppendArgs = &appendArgs
 	}
 
 	if catDir != "" {

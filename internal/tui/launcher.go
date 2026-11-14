@@ -3,6 +3,8 @@ package tui
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -86,6 +88,11 @@ type model struct {
 	quitting         bool
 	statusMsg        string
 	lastFetchOutput  string
+	fetching         bool
+	fetchCancel      context.CancelFunc
+	fetchID          uint64
+	detectedRes      string
+	detectedRate     int
 
 	// Readme viewer state
 	viewingReadme bool
@@ -310,12 +317,38 @@ func initialModel(
 	}
 }
 
+type fetchCompleteMsg struct {
+	id        uint64
+	preset    preset.Preset
+	output    string
+	steamErr  error
+	dlErr     error
+	cancelled bool
+}
+
 func (m *model) openHelp(mode int) {
+	m.input.Blur()
 	_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 	m.helpMode = mode
 	m.helpViewport = viewport.New(vpWidth, vpHeight)
 	m.helpViewport.SetContent(m.buildHelpContent(mode))
 	m.viewingHelp = true
+}
+
+func (m *model) restoreFocusCmd() tea.Cmd {
+	if m.viewingLaunchOpts && m.launchOpts != nil {
+		return m.launchOpts.syncInputFocus()
+	}
+	if m.viewingConfigMgr && m.cfgMgr != nil {
+		if m.cfgMgr.viewingDiff {
+			return nil
+		}
+		return m.cfgMgr.syncFocus()
+	}
+	if m.viewingReadme || m.viewingHelp {
+		return nil
+	}
+	return m.input.Focus()
 }
 
 func (m model) areAllPresetFilesPresent(p preset.Preset) bool {
@@ -332,57 +365,102 @@ func (m model) areAllPresetFilesPresent(p preset.Preset) bool {
 	return true
 }
 
-func (m *model) handleFetchAssets() {
+func (m *model) handleFetchAssets() tea.Cmd {
+	if m.fetching {
+		return nil
+	}
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
-		return
+		return nil
 	}
 	cur := m.filtered[m.cursor]
 	if m.areAllPresetFilesPresent(cur) {
 		m.statusMsg = fmt.Sprintf("✓ Ready: %s", cur.Name)
-		return
+		return nil
 	}
 
 	writeDir := m.wadsWriteDir()
-	roots := m.effectiveWadRoots()
+	roots := append([]string(nil), m.effectiveWadRoots()...)
 	if writeDir == "" && len(roots) == 0 {
 		m.statusMsg = "✗ Fetch failed: no WAD directory configured"
-		return
+		return nil
 	}
 
-	var buf bytes.Buffer
-	var steamErr error
-	if m.dirIndex.NeedsSteamDiscovery(cur) && writeDir != "" {
-		searchRoots := m.steamSearchRoots
-		_, steamErr = steam.DiscoverAndExtract(
-			m.catalog, searchRoots, writeDir, false, &buf, m.extraWadRoots()...,
-		)
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.fetchID++
+	reqID := m.fetchID
+	m.fetching = true
+	m.fetchCancel = cancel
+	m.statusMsg = fmt.Sprintf("Fetching %s... (Esc to cancel)", cur.Name)
 
-	var dlErr error
-	if len(roots) > 0 && len(cur.Sources) > 0 {
-		dl := wad.NewDownloader(roots, false, &buf)
-		if m.httpClient != nil {
-			dl.Client = m.httpClient
+	var catClone *preset.Catalog
+	if m.catalog != nil {
+		catClone = m.catalog.Clone()
+	}
+	presetCopy := cur
+	presetCopy.Files = append([]preset.FileSpec(nil), cur.Files...)
+	presetCopy.Sources = append([]preset.Source(nil), cur.Sources...)
+	needsSteam := m.dirIndex != nil && m.dirIndex.NeedsSteamDiscovery(cur) && writeDir != ""
+	searchRoots := append([]string(nil), m.steamSearchRoots...)
+	extraRoots := append([]string(nil), m.extraWadRoots()...)
+	httpClient := m.httpClient
+
+	return func() tea.Msg {
+		defer cancel()
+		var buf bytes.Buffer
+		var steamErr error
+		if needsSteam {
+			_, steamErr = steam.DiscoverAndExtractContext(
+				ctx, catClone, searchRoots, writeDir, false, &buf, extraRoots...,
+			)
 		}
-		dlErr = dl.DownloadPreset(cur)
-	}
 
+		var dlErr error
+		if ctx.Err() == nil && len(roots) > 0 && len(presetCopy.Sources) > 0 {
+			dl := wad.NewDownloader(roots, false, &buf)
+			dl.Ctx = ctx
+			if httpClient != nil {
+				dl.Client = httpClient
+			}
+			dlErr = dl.DownloadPreset(presetCopy)
+		}
+
+		return fetchCompleteMsg{
+			id:        reqID,
+			preset:    presetCopy,
+			output:    buf.String(),
+			steamErr:  steamErr,
+			dlErr:     dlErr,
+			cancelled: ctx.Err() != nil,
+		}
+	}
+}
+
+func (m *model) applyFetchComplete(msg fetchCompleteMsg) {
+	if msg.id != m.fetchID {
+		return
+	}
+	m.fetching = false
+	m.fetchCancel = nil
 	m.rebuildIndexAndTargets()
-	m.lastFetchOutput = buf.String()
+	m.lastFetchOutput = msg.output
 
-	if dlErr != nil {
-		m.statusMsg = fmt.Sprintf("✗ Fetch failed: %v", dlErr)
+	if msg.cancelled || errors.Is(msg.dlErr, context.Canceled) || errors.Is(msg.steamErr, context.Canceled) {
+		m.statusMsg = fmt.Sprintf("✗ Fetch cancelled for %s", msg.preset.Name)
 		return
 	}
-	if steamErr != nil {
-		m.statusMsg = fmt.Sprintf("✗ Steam/GOG scan failed: %v", steamErr)
+	if msg.dlErr != nil {
+		m.statusMsg = fmt.Sprintf("✗ Fetch failed: %v", msg.dlErr)
 		return
 	}
-	if m.dirIndex != nil && m.dirIndex.IsPresetInstalled(cur) {
-		m.statusMsg = fmt.Sprintf("✓ Ready: %s", cur.Name)
+	if msg.steamErr != nil {
+		m.statusMsg = fmt.Sprintf("✗ Steam/GOG scan failed: %v", msg.steamErr)
 		return
 	}
-	m.statusMsg = fmt.Sprintf("✗ Missing required files for %s", cur.Name)
+	if m.dirIndex != nil && m.dirIndex.IsPresetInstalled(msg.preset) {
+		m.statusMsg = fmt.Sprintf("✓ Ready: %s", msg.preset.Name)
+		return
+	}
+	m.statusMsg = fmt.Sprintf("✗ Missing required files for %s", msg.preset.Name)
 }
 
 func (m model) Init() tea.Cmd {
@@ -390,6 +468,11 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if doneMsg, ok := msg.(fetchCompleteMsg); ok {
+		m.applyFetchComplete(doneMsg)
+		return m, nil
+	}
+
 	if m.viewingHelp {
 		switch msg := msg.(type) {
 		case tea.WindowSizeMsg:
@@ -399,15 +482,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 			m.helpViewport.Width = vpWidth
 			m.helpViewport.Height = vpHeight
+			if m.helpViewport.PastBottom() {
+				m.helpViewport.GotoBottom()
+			}
 			return m, nil
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "ctrl+c":
+				if m.fetchCancel != nil {
+					m.fetchCancel()
+				}
 				m.quitting = true
 				return m, tea.Quit
-			case "esc", "f1", "q", "Q":
+			case "esc", "f1", "alt+?", "?", "q", "Q":
 				m.viewingHelp = false
-				return m, nil
+				return m, m.restoreFocusCmd()
 			case "g", "home":
 				m.helpViewport.GotoTop()
 				return m, nil
@@ -438,19 +527,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 			m.viewport.Width = vpWidth
 			m.viewport.Height = vpHeight
+			if m.viewport.PastBottom() {
+				m.viewport.GotoBottom()
+			}
 			return m, nil
 
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "ctrl+c":
+				if m.fetchCancel != nil {
+					m.fetchCancel()
+				}
 				m.quitting = true
 				return m, tea.Quit
-			case "f1":
+			case "f1", "alt+?", "?":
 				m.openHelp(helpModeReadme)
 				return m, nil
 			case "esc", "q", "Q", "tab", "ctrl+r":
 				m.viewingReadme = false
-				return m, nil
+				return m, m.input.Focus()
 			case "g", "home":
 				m.viewport.GotoTop()
 				return m, nil
@@ -463,7 +558,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if !m.isPresetReady(cur) {
 						m.viewingReadme = false
 						m.statusMsg = fmt.Sprintf("✗ Missing required files for %s (press Ctrl+F to fetch)", cur.Name)
-						return m, nil
+						return m, m.input.Focus()
 					}
 					m.selected = &cur
 					return m, tea.Quit
@@ -486,25 +581,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "ctrl+c":
+			if m.fetchCancel != nil {
+				m.fetchCancel()
+			}
 			m.quitting = true
 			return m, tea.Quit
 
-		case "f1":
+		case "esc":
+			if m.fetching {
+				if m.fetchCancel != nil {
+					m.fetchCancel()
+					m.fetchCancel = nil
+				}
+				m.fetching = false
+				m.fetchID++
+				m.statusMsg = "✗ Fetch cancelled"
+				return m, nil
+			}
+			m.quitting = true
+			return m, tea.Quit
+
+		case "f1", "alt+?":
 			m.openHelp(helpModeBrowser)
 			return m, nil
 
 		case "ctrl+o", "f4":
-			m.openLaunchOptions()
-			return m, nil
+			return m, m.openLaunchOptions()
 
 		case "ctrl+g", "f2":
-			m.openConfigManager()
-			return m, nil
+			return m, m.openConfigManager()
 
 		case "ctrl+f":
-			m.handleFetchAssets()
-			return m, nil
+			return m, m.handleFetchAssets()
 
 		case "enter":
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
@@ -523,6 +632,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if txtPath, ok := m.resolveReadme(cur); ok {
 					content, err := preset.ReadReadme(txtPath)
 					if err == nil {
+						m.input.Blur()
 						m.viewingReadme = true
 						m.readmeTitle = fmt.Sprintf("README: %s (%s)", cur.Name, filepath.Base(txtPath))
 						_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)

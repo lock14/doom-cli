@@ -2,6 +2,7 @@ package preset
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,6 +12,18 @@ import (
 )
 
 var filenameReplacer = strings.NewReplacer(" ", "", "-", "", "_", "")
+
+func slashBase(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	return path.Base(strings.ReplaceAll(trimmed, `\`, `/`))
+}
+
+func slashExt(raw string) string {
+	return path.Ext(slashBase(raw))
+}
 
 var knownIWADNames = map[string]bool{
 	"doom.wad":      true,
@@ -26,7 +39,8 @@ var knownIWADNames = map[string]bool{
 }
 
 func isIWADName(name string) bool {
-	return knownIWADNames[strings.ToLower(strings.TrimSpace(name))]
+	norm := NormalizeFilename(slashBase(name))
+	return norm != "" && knownIWADNames[norm]
 }
 
 var (
@@ -43,7 +57,7 @@ func buildAliasMap(presets []Preset) map[string][]string {
 			if len(f.Aliases) == 0 {
 				continue
 			}
-			base := filepath.Base(strings.TrimSpace(f.Name))
+			base := slashBase(f.Name)
 			if base == "" || isIWADName(base) {
 				continue
 			}
@@ -133,7 +147,7 @@ func getCuratedAliasMap() map[string][]string {
 
 // FileAliases returns any recognized alternate filenames for name across the catalog's presets.
 func (c *Catalog) FileAliases(name string) []string {
-	key := NormalizeFilename(filepath.Base(strings.TrimSpace(name)))
+	key := NormalizeFilename(slashBase(name))
 	if key == "" {
 		return nil
 	}
@@ -212,7 +226,7 @@ func (idx *DirIndex) WithPresets(presets ...Preset) *DirIndex {
 }
 
 func (idx *DirIndex) aliasesFor(targetName string) []string {
-	key := NormalizeFilename(filepath.Base(strings.TrimSpace(targetName)))
+	key := NormalizeFilename(slashBase(targetName))
 	if key == "" {
 		return nil
 	}
@@ -246,12 +260,30 @@ func (idx *DirIndex) fileAliases(f FileSpec) []string {
 	return out
 }
 
+func isResolvableFile(dir string, entry os.DirEntry) bool {
+	if entry.IsDir() {
+		return false
+	}
+	if entry.Type()&os.ModeSymlink != 0 {
+		fi, err := os.Stat(filepath.Join(dir, entry.Name()))
+		return err == nil && !fi.IsDir()
+	}
+	return true
+}
+
 func (rc *rootCache) loadSubdirs() []subDirCache {
 	rc.subOnce.Do(func() {
 		var names []string
 		for _, entry := range rc.entries {
-			if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			if strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			if entry.IsDir() {
 				names = append(names, entry.Name())
+			} else if entry.Type()&os.ModeSymlink != 0 {
+				if fi, err := os.Stat(filepath.Join(rc.dir, entry.Name())); err == nil && fi.IsDir() {
+					names = append(names, entry.Name())
+				}
 			}
 		}
 		sort.Strings(names)
@@ -268,49 +300,59 @@ func (rc *rootCache) loadSubdirs() []subDirCache {
 	return rc.subdirs
 }
 
-// ResolveFile searches for targetName across indexed WAD roots with case-insensitivity,
-// normalization, known aliases, safe relative sub-paths, and 1-level subdirectory fallback
-// for non-IWAD files.
-func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
-	if idx == nil || len(idx.roots) == 0 || strings.TrimSpace(targetName) == "" {
+func (idx *DirIndex) resolveCandidates(primary string, extraAliases []string) (string, bool) {
+	if idx == nil || len(idx.roots) == 0 || strings.TrimSpace(primary) == "" {
 		return "", false
 	}
-
-	// Relative sub-path (such as "sub/foo.wad" or "sub\foo.wad")
-	if strings.ContainsAny(targetName, `/\`) {
-		return idx.resolveRelativeSubpath(targetName)
-	}
-
-	// 1. Direct match across root 0..N top-level entries
-	for _, rc := range idx.roots {
-		if p, ok := resolveSingle(rc.dir, rc.entries, targetName); ok {
+	if strings.ContainsAny(primary, `/\`) {
+		if p, ok := idx.resolveRelativeSubpath(primary); ok {
 			return p, true
+		}
+		// If primary is a relative subpath and not found there, check top-level/subdir aliases.
+		if len(extraAliases) == 0 {
+			return "", false
 		}
 	}
 
-	// 2. Alias match across root 0..N top-level entries
-	aliases := idx.aliasesFor(targetName)
-	for _, alias := range aliases {
-		for _, rc := range idx.roots {
-			if p, ok := resolveSingle(rc.dir, rc.entries, alias); ok {
+	var topCandidates []string
+	if !strings.ContainsAny(primary, `/\`) {
+		topCandidates = append(topCandidates, primary)
+	}
+	seen := make(map[string]bool)
+	if len(topCandidates) > 0 {
+		seen[NormalizeFilename(primary)] = true
+	}
+	for _, al := range extraAliases {
+		trimmed := strings.TrimSpace(al)
+		if trimmed == "" || strings.ContainsAny(trimmed, `/\`) {
+			continue
+		}
+		norm := NormalizeFilename(trimmed)
+		if norm == "" || seen[norm] {
+			continue
+		}
+		seen[norm] = true
+		topCandidates = append(topCandidates, trimmed)
+	}
+	if len(topCandidates) == 0 {
+		return "", false
+	}
+
+	// 1. Check top-level entries root-by-root (primary WadsDir first, canonical before aliases).
+	for _, rc := range idx.roots {
+		for _, cand := range topCandidates {
+			if p, ok := resolveSingle(rc.dir, rc.entries, cand); ok {
 				return p, true
 			}
 		}
 	}
 
-	// 3. For non-IWAD files, scan 1-level child directories across root 0..N
-	if !isIWADName(targetName) {
+	// 2. For non-IWAD files, scan 1-level child directories root-by-root.
+	if !isIWADName(primary) {
 		for _, rc := range idx.roots {
 			for _, sub := range rc.loadSubdirs() {
-				if p, ok := resolveSingle(sub.dir, sub.entries, targetName); ok {
-					return p, true
-				}
-			}
-		}
-		for _, alias := range aliases {
-			for _, rc := range idx.roots {
-				for _, sub := range rc.loadSubdirs() {
-					if p, ok := resolveSingle(sub.dir, sub.entries, alias); ok {
+				for _, cand := range topCandidates {
+					if p, ok := resolveSingle(sub.dir, sub.entries, cand); ok {
 						return p, true
 					}
 				}
@@ -319,6 +361,19 @@ func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
 	}
 
 	return "", false
+}
+
+// ResolveFile searches for targetName across indexed WAD roots with case-insensitivity,
+// normalization, known aliases, safe relative sub-paths, and 1-level subdirectory fallback
+// for non-IWAD files.
+func (idx *DirIndex) ResolveFile(targetName string) (string, bool) {
+	if idx == nil || len(idx.roots) == 0 || strings.TrimSpace(targetName) == "" {
+		return "", false
+	}
+	if strings.ContainsAny(targetName, `/\`) {
+		return idx.resolveRelativeSubpath(targetName)
+	}
+	return idx.resolveCandidates(targetName, idx.aliasesFor(targetName))
 }
 
 func (rc *rootCache) readRelDir(subDirRel string) ([]os.DirEntry, string, bool) {
@@ -378,15 +433,7 @@ func (idx *DirIndex) ResolveFileSpec(f FileSpec) (string, bool) {
 	if idx == nil {
 		return "", false
 	}
-	if p, ok := idx.ResolveFile(f.Name); ok {
-		return p, true
-	}
-	for _, al := range idx.fileAliases(f) {
-		if p, ok := idx.ResolveFile(al); ok {
-			return p, true
-		}
-	}
-	return "", false
+	return idx.resolveCandidates(f.Name, idx.fileAliases(f))
 }
 
 // IsPresetInstalled reports whether the preset's base IWAD (when specified) and all
@@ -453,37 +500,37 @@ func (idx *DirIndex) ResolveReadme(p Preset) (string, bool) {
 		if f.Optional {
 			continue
 		}
-		ext := filepath.Ext(f.Name)
+		ext := slashExt(f.Name)
 		base := strings.TrimSuffix(f.Name, ext)
-		if path, ok := idx.ResolveFile(base + ".txt"); ok {
-			return path, true
+		if resolved, ok := idx.ResolveFile(base + ".txt"); ok {
+			return resolved, true
 		}
 		if strings.ContainsAny(base, `/\`) {
-			if path, ok := idx.ResolveFile(filepath.Base(base) + ".txt"); ok {
-				return path, true
+			if resolved, ok := idx.ResolveFile(slashBase(base) + ".txt"); ok {
+				return resolved, true
 			}
 		}
 		for _, al := range idx.fileAliases(f) {
-			alExt := filepath.Ext(al)
+			alExt := slashExt(al)
 			alBase := strings.TrimSuffix(al, alExt)
 			if alBase != "" {
-				if path, ok := idx.ResolveFile(alBase + ".txt"); ok {
-					return path, true
+				if resolved, ok := idx.ResolveFile(alBase + ".txt"); ok {
+					return resolved, true
 				}
 			}
 		}
 	}
 	nameClean := strings.ReplaceAll(p.Name, " ", "") + ".txt"
-	if path, ok := idx.ResolveFile(nameClean); ok {
-		return path, true
+	if resolved, ok := idx.ResolveFile(nameClean); ok {
+		return resolved, true
 	}
-	if path, ok := idx.resolveReadmePrefix(p); ok {
-		return path, true
+	if resolved, ok := idx.resolveReadmePrefix(p); ok {
+		return resolved, true
 	}
 	if !p.HasRequiredFiles() {
-		iwadBase := strings.TrimSuffix(p.IWAD, filepath.Ext(p.IWAD))
-		if path, ok := idx.ResolveFile(iwadBase + ".txt"); ok {
-			return path, true
+		iwadBase := strings.TrimSuffix(p.IWAD, slashExt(p.IWAD))
+		if resolved, ok := idx.ResolveFile(iwadBase + ".txt"); ok {
+			return resolved, true
 		}
 	}
 	return "", false
@@ -504,17 +551,18 @@ func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
 		if f.Optional {
 			continue
 		}
-		base := filepath.Base(strings.TrimSpace(f.Name))
-		addStem(strings.TrimSuffix(base, filepath.Ext(base)))
+		base := slashBase(f.Name)
+		addStem(strings.TrimSuffix(base, slashExt(base)))
 		for _, al := range idx.fileAliases(f) {
-			addStem(strings.TrimSuffix(al, filepath.Ext(al)))
+			alBase := slashBase(al)
+			addStem(strings.TrimSuffix(alBase, slashExt(alBase)))
 		}
 	}
 	addStem(p.Name)
 
 	matchEntries := func(dir string, entries []os.DirEntry, stem string) (string, bool) {
 		for _, entry := range entries {
-			if entry.IsDir() {
+			if !isResolvableFile(dir, entry) {
 				continue
 			}
 			norm := NormalizeFilename(entry.Name())
@@ -531,14 +579,14 @@ func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
 
 	for _, stem := range stems {
 		for _, rc := range idx.roots {
-			if path, ok := matchEntries(rc.dir, rc.entries, stem); ok {
-				return path, true
+			if resolved, ok := matchEntries(rc.dir, rc.entries, stem); ok {
+				return resolved, true
 			}
 		}
 		for _, rc := range idx.roots {
 			for _, sub := range rc.loadSubdirs() {
-				if path, ok := matchEntries(sub.dir, sub.entries, stem); ok {
-					return path, true
+				if resolved, ok := matchEntries(sub.dir, sub.entries, stem); ok {
+					return resolved, true
 				}
 			}
 		}
@@ -548,7 +596,7 @@ func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
 
 // IsReadmeSuffix reports whether a normalized suffix after a preset or WAD stem
 // represents a README or versioned documentation suffix (such as "readme*",
-// "v<digit>*", or "<digit>.<digit>*") without matching sequel numbers ("2").
+// "v<digit>*", or "<digit>.<digit>*") without matching sequel numbers ("2" or "2v1.0").
 func IsReadmeSuffix(rest string) bool {
 	if strings.HasPrefix(rest, "readme") {
 		return true
@@ -556,8 +604,16 @@ func IsReadmeSuffix(rest string) bool {
 	if len(rest) >= 2 && rest[0] == 'v' && rest[1] >= '0' && rest[1] <= '9' {
 		return true
 	}
-	if len(rest) >= 3 && rest[0] >= '0' && rest[0] <= '9' && strings.ContainsRune(rest, '.') {
-		return true
+	if len(rest) >= 3 && rest[0] >= '0' && rest[0] <= '9' {
+		dot := strings.IndexByte(rest, '.')
+		if dot > 0 && dot+1 < len(rest) && rest[dot+1] >= '0' && rest[dot+1] <= '9' {
+			for i := 0; i < dot; i++ {
+				if rest[i] < '0' || rest[i] > '9' {
+					return false
+				}
+			}
+			return true
+		}
 	}
 	return false
 }
@@ -574,7 +630,7 @@ func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (st
 
 	// 1. Exact match against cached entries
 	for _, entry := range entries {
-		if !entry.IsDir() && entry.Name() == targetName {
+		if entry.Name() == targetName && isResolvableFile(wadsDir, entry) {
 			return filepath.Join(wadsDir, entry.Name()), true
 		}
 	}
@@ -584,22 +640,16 @@ func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (st
 
 	// 2. Case-insensitive match
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
 		name := entry.Name()
-		if strings.ToLower(name) == targetLower {
+		if strings.ToLower(name) == targetLower && isResolvableFile(wadsDir, entry) {
 			return filepath.Join(wadsDir, name), true
 		}
 	}
 
 	// 3. Normalized match (ignoring spaces, dashes, underscores)
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
 		name := entry.Name()
-		if NormalizeFilename(name) == targetNorm {
+		if NormalizeFilename(name) == targetNorm && isResolvableFile(wadsDir, entry) {
 			return filepath.Join(wadsDir, name), true
 		}
 	}

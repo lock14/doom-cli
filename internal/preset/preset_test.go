@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -1566,6 +1567,158 @@ func TestCuratedNewPresetsTaxonomyAndPrimaryURL(t *testing.T) {
 	for _, src := range mh.Sources {
 		if src.SHA256 == "25ee4c7464b2c01c761b91236e50d7c3ec5fbc8de79118a5fa4acb9c4f34ae81" {
 			t.Errorf("myhouse source %s still uses incompatible 2023 sha256", src.URL)
+		}
+	}
+}
+
+func TestCatalogSliceIsolation_MergeDeletion_Symlinks_And_CuratedSHA256(t *testing.T) {
+	t.Parallel()
+
+	// 1. Verify IsReadmeSuffix rejects sequel+version ("2v1.0") while accepting dotted versions ("1.1")
+	if IsReadmeSuffix("2v1.0") {
+		t.Errorf("expected IsReadmeSuffix(\"2v1.0\") = false")
+	}
+	if !IsReadmeSuffix("1.1") || !IsReadmeSuffix("v2.0") || !IsReadmeSuffix("readme_final") {
+		t.Errorf("expected IsReadmeSuffix to accept 1.1, v2.0, and readme_final")
+	}
+
+	// 2. Verify DecodeText maps CP437 0x81 ('ü') cleanly without U+FFFD replacement
+	if got := DecodeText([]byte{'M', 0x81, 'l', 'l', 'e', 'r'}); got != "Müller" {
+		t.Errorf("DecodeText(CP437 0x81) = %q, want \"Müller\"", got)
+	}
+
+	// 3. Verify MergeUserDir drops deleted disk user presets/engines instead of resurrecting them
+	userDir := t.TempDir()
+	curated, err := LoadCuratedCatalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AddEngine(userDir, curated, EngineConfig{
+		ID:     "nugget",
+		Binary: "nugget-doom",
+	}); err != nil {
+		t.Fatalf("AddEngine(nugget): %v", err)
+	}
+	layered, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := AddPreset(userDir, curated, layered, Preset{
+		ID:     "temp-pack",
+		Name:   "Temp Pack",
+		Engine: "nugget",
+		IWAD:   "DOOM2.WAD",
+		Files:  []FileSpec{{Name: "temppack.wad"}},
+	}); err != nil {
+		t.Fatalf("AddPreset(temp-pack): %v", err)
+	}
+
+	initialMerged, err := LoadLayeredCatalog(userDir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initialMerged.Find("temp-pack") == nil {
+		t.Fatal("expected temp-pack in initialMerged")
+	}
+
+	if _, err := RemovePreset(userDir, curated, initialMerged, "temp-pack"); err != nil {
+		t.Fatalf("RemovePreset(temp-pack): %v", err)
+	}
+	if _, _, err := RemoveEngine(userDir, curated, initialMerged, "nugget"); err != nil {
+		t.Fatalf("RemoveEngine(nugget): %v", err)
+	}
+
+	reMerged, err := MergeUserDir(initialMerged, userDir)
+	if err != nil {
+		t.Fatalf("MergeUserDir after deletion: %v", err)
+	}
+	if reMerged.Find("temp-pack") != nil {
+		t.Errorf("expected deleted user preset temp-pack not to be resurrected by MergeUserDir")
+	}
+	if _, exists := reMerged.Engines["nugget"]; exists {
+		t.Errorf("expected deleted user engine nugget not to be resurrected by MergeUserDir")
+	}
+
+	// 4. Verify DirIndex primary root precedence over secondary root and symlink handling
+	root0 := t.TempDir()
+	root1 := t.TempDir()
+	primAlias := filepath.Join(root0, "custom_short.wad")
+	secCanon := filepath.Join(root1, "custom_v2.wad")
+	_ = os.WriteFile(primAlias, []byte("prim"), 0o644)
+	_ = os.WriteFile(secCanon, []byte("sec"), 0o644)
+
+	spec := FileSpec{Name: "custom_v2.wad", Aliases: []string{"custom_short.wad"}}
+	idx := NewDirIndex(root0, root1)
+	if got, ok := idx.ResolveFileSpec(spec); !ok || got != primAlias {
+		t.Errorf("ResolveFileSpec multi-root = (%q, %v), want primary root alias %q", got, ok, primAlias)
+	}
+
+	if runtime.GOOS != "windows" {
+		symRoot := t.TempDir()
+		extSub := t.TempDir()
+		subFile := filepath.Join(extSub, "linked_map.wad")
+		_ = os.WriteFile(subFile, []byte("pwad"), 0o644)
+		if err := os.Symlink(
+			filepath.Join(symRoot, "nonexistent.wad"),
+			filepath.Join(symRoot, "dangling.wad"),
+		); err == nil {
+			_ = os.Symlink(extSub, filepath.Join(symRoot, "linked_sub"))
+			symIdx := NewDirIndex(symRoot)
+			if _, ok := symIdx.ResolveFile("dangling.wad"); ok {
+				t.Errorf("expected dangling symlink to be ignored by DirIndex")
+			}
+			wantLinked := filepath.Join(symRoot, "linked_sub", "linked_map.wad")
+			if got, ok := symIdx.ResolveFile("linked_map.wad"); !ok || got != wantLinked {
+				t.Errorf("expected symlinked 1-level subdir to resolve %q, got (%q, %v)", wantLinked, got, ok)
+			}
+		}
+	}
+
+	// 5. Verify LintCatalog enforces curated SHA-256, normalized IWAD alias check, and JSON-escaped Windows path audit
+	lintRoot := t.TempDir()
+	lintCatDir := filepath.Join(lintRoot, "catalog")
+	_ = os.MkdirAll(lintCatDir, 0o755)
+	_ = os.WriteFile(
+		filepath.Join(lintCatDir, "engine.dsda-doom.json"),
+		[]byte(`{"schema_version":1,"kind":"engine","id":"dsda-doom","args_style":"boom"}`),
+		0o644,
+	)
+	winEscaped := "C:" + `\\Users\\` + "alice"
+	unpinnedCurated := `{
+  "schema_version": 1,
+  "kind": "preset",
+  "id": "unpinned-test",
+  "name": "Unpinned Test",
+  "engine": "dsda-doom",
+  "iwad": "DOOM2.WAD",
+  "files": [{"name": "map.wad", "aliases": ["FREE_DOOM_2.WAD"]}],
+  "category": "Community Megawad",
+  "genre": "Action",
+  "difficulty": "Moderate",
+  "quality": "A-Tier",
+  "author": "Tester",
+  "release_date": "2024",
+  "description": "` + winEscaped + `",
+  "sources": [{"url": "https://example.com/map.zip"}],
+  "links": [{"url": "https://example.com/info"}],
+  "sort": 10
+}`
+	_ = os.WriteFile(filepath.Join(lintCatDir, "preset.unpinned-test.json"), []byte(unpinnedCurated), 0o644)
+	diags, err := LintCatalog(lintRoot, "")
+	if err != nil {
+		t.Fatalf("LintCatalog: %v", err)
+	}
+	var diagText strings.Builder
+	for _, d := range diags {
+		diagText.WriteString(d.String() + "\n")
+	}
+	for _, want := range []string{
+		"requires a non-empty sha256 digest",
+		"must not match iwad \"FREE_DOOM_2.WAD\"",
+		"contains hardcoded personal path",
+	} {
+		if !strings.Contains(diagText.String(), want) {
+			t.Errorf("expected lint output to contain %q, got:\n%s", want, diagText.String())
 		}
 	}
 }

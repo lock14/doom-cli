@@ -1558,3 +1558,270 @@ func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestSplitCommandArgsAndQuotedCLIFlags(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    []string
+		wantErr bool
+	}{
+		{
+			name:  "empty string returns empty slice",
+			input: "   ",
+			want:  []string{},
+		},
+		{
+			name:  "double quoted path with spaces",
+			input: `-config "/opt/my doom/woof.cfg" -complevel 21`,
+			want:  []string{"-config", "/opt/my doom/woof.cfg", "-complevel", "21"},
+		},
+		{
+			name:  "single quoted path with spaces",
+			input: `-file '/opt/wad collection/test map.wad'`,
+			want:  []string{"-file", "/opt/wad collection/test map.wad"},
+		},
+		{
+			name:  "backslash escaped space and quotes",
+			input: `-config /opt/my\ doom/port.cfg +name \"Doomer\"`,
+			want:  []string{"-config", "/opt/my doom/port.cfg", "+name", `"Doomer"`},
+		},
+		{
+			name:  "windows paths inside and outside double quotes preserved",
+			input: `-config "C:\Games\My Doom\woof.cfg" -iwad D:\WADs\DOOM2.WAD`,
+			want:  []string{"-config", `C:\Games\My Doom\woof.cfg`, "-iwad", `D:\WADs\DOOM2.WAD`},
+		},
+		{
+			name:    "unterminated single quote rejected",
+			input:   `-config '/opt/unterminated`,
+			wantErr: true,
+		},
+		{
+			name:    "unterminated double quote rejected",
+			input:   `-config "/opt/unterminated`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := splitCommandArgs(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("splitCommandArgs(%q) error = %v, wantErr = %v", tt.input, err, tt.wantErr)
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("splitCommandArgs(%q) = %#v, want %#v", tt.input, got, tt.want)
+			}
+		})
+	}
+
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+
+	engCmd := newEnginesCmd()
+	engCmd.SetArgs([]string{
+		"add", "Crispy",
+		"--id", "crispy",
+		"--binary", "crispy-doom",
+		"--style", "boom",
+		"--prefix-args", `-config "/opt/my doom/crispy.cfg"`,
+		"--args", `-file "/opt/extra mods/hud.wad"`,
+	})
+	if err := engCmd.Execute(); err != nil {
+		t.Fatalf("engines add with quoted args failed: %v", err)
+	}
+
+	wadCmd := newWadsCmd()
+	wadCmd.SetArgs([]string{"set", "doom", "--args", `-record "/opt/my demos/run 1.lmp"`})
+	if err := wadCmd.Execute(); err != nil {
+		t.Fatalf("wads set with quoted args failed: %v", err)
+	}
+
+	_, _, cat, err := loadAppState()
+	if err != nil {
+		t.Fatalf("loadAppState: %v", err)
+	}
+	crispy, ok := cat.FindEngine("crispy")
+	if !ok {
+		t.Fatal("expected crispy engine in catalog")
+	}
+	wantPrefix := []string{"-config", "/opt/my doom/crispy.cfg"}
+	if !reflect.DeepEqual(crispy.PrefixArgs, wantPrefix) {
+		t.Errorf("crispy.PrefixArgs = %#v, want %#v", crispy.PrefixArgs, wantPrefix)
+	}
+	wantDefault := []string{"-file", "/opt/extra mods/hud.wad"}
+	if !reflect.DeepEqual(crispy.DefaultArgs, wantDefault) {
+		t.Errorf("crispy.DefaultArgs = %#v, want %#v", crispy.DefaultArgs, wantDefault)
+	}
+	doomPreset := cat.Find("doom")
+	wantWadArgs := []string{"-record", "/opt/my demos/run 1.lmp"}
+	if doomPreset == nil || !reflect.DeepEqual(doomPreset.Args, wantWadArgs) {
+		t.Errorf("doomPreset.Args = %#v, want %#v", doomPreset, wantWadArgs)
+	}
+}
+
+func TestRootExecFlag_BuildLauncherNilCfg_ThemeDirReject_And_FetchBehavior(t *testing.T) {
+	tempDir := t.TempDir()
+	wadsDir := filepath.Join(tempDir, "wads")
+	binDir := filepath.Join(tempDir, "bin")
+	for _, d := range []string{wadsDir, binDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Setenv("HOME", tempDir)
+	t.Setenv("USERPROFILE", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("XDG_DATA_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	for _, kv := range [][2]string{
+		{"bin-dir", binDir},
+		{"wads-dir", wadsDir},
+	} {
+		if err := runConfigSet(nil, []string{kv[0], kv[1]}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 1. buildLauncherOptions does not panic when cfg or paths is nil.
+	paths := resolveAppPaths()
+	theme, _, opts := buildLauncherOptions(paths, nil, nil, 0)
+	if theme.Name == "" || opts.ThemeSource != "default" {
+		t.Errorf("unexpected buildLauncherOptions(paths, nil) result: theme=%q src=%q", theme.Name, opts.ThemeSource)
+	}
+	theme2, _, _ := buildLauncherOptions(nil, nil, nil, 0)
+	if theme2.Name == "" {
+		t.Errorf("unexpected empty theme for buildLauncherOptions(nil, nil)")
+	}
+
+	// 2. doom config set theme <directory> rejects directory paths.
+	someDir := filepath.Join(tempDir, "not-a-theme-file")
+	if err := os.MkdirAll(someDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := runConfigSet(nil, []string{"theme", someDir}); err == nil {
+		t.Errorf("expected runConfigSet(theme, directory) to fail, got nil")
+	}
+
+	// 3. doom wads fetch <commercial> returns non-zero error when missing from local and Steam libraries.
+	var fetchOut bytes.Buffer
+	wadsCmd := newWadsCmd()
+	wadsCmd.SetOut(&fetchOut)
+	wadsCmd.SetErr(&fetchOut)
+	wadsCmd.SetArgs([]string{"fetch", "doom-ii"})
+	if err := wadsCmd.Execute(); err == nil {
+		t.Fatal("expected wads fetch doom-ii to return error when DOOM2.WAD is missing")
+	}
+	if !strings.Contains(fetchOut.String(), "is a commercial game") {
+		t.Errorf("expected commercial game message for missing doom-ii, got:\n%s", fetchOut.String())
+	}
+
+	// 4. doom wads fetch <custom> returns non-zero error with non-commercial message when required file is missing.
+	addCmd := newWadsCmd()
+	addCmd.SetArgs([]string{"add", "LocalMap", "--files", "missing-local.wad"})
+	if err := addCmd.Execute(); err != nil {
+		t.Fatalf("wads add LocalMap failed: %v", err)
+	}
+	fetchOut.Reset()
+	wadsCmd = newWadsCmd()
+	wadsCmd.SetOut(&fetchOut)
+	wadsCmd.SetErr(&fetchOut)
+	wadsCmd.SetArgs([]string{"fetch", "LocalMap"})
+	if err := wadsCmd.Execute(); err == nil {
+		t.Fatal("expected wads fetch LocalMap to return error when required files are missing")
+	}
+	if strings.Contains(fetchOut.String(), "is a commercial game") ||
+		!strings.Contains(fetchOut.String(), "has no download sources configured") {
+		t.Errorf("expected custom no-sources message for LocalMap, got:\n%s", fetchOut.String())
+	}
+
+	// 5. doom -exec autoexec.cfg -errorlog err.txt --dry-run forwards -exec and -errorlog cleanly.
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, binName := range []string{"dsda-doom", "dsda-doom.exe"} {
+		if err := os.WriteFile(filepath.Join(binDir, binName), []byte("bin"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var rootOut bytes.Buffer
+	rootCmd := newRootCmd()
+	rootCmd.SetOut(&rootOut)
+	rootCmd.SetErr(&rootOut)
+	rootCmd.SetArgs([]string{"-exec", "autoexec.cfg", "-errorlog", "err.txt", "--dry-run"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("doom -exec autoexec.cfg -errorlog err.txt --dry-run failed: %v", err)
+	}
+	if !strings.Contains(rootOut.String(), "-exec autoexec.cfg -errorlog err.txt") {
+		t.Errorf("expected -exec and -errorlog forwarded to engine, got:\n%s", rootOut.String())
+	}
+
+	// 6. doom wads fetch doom-ii runs Steam discovery to synthesize optional idkfa 2024.wad
+	// even when DOOM2.WAD is already present in wads-dir.
+	oggPayload := []byte("OggS\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00")
+	extrasBuf := buildMinimalWAD("PWAD", "H_RUNNIN", oggPayload)
+	for _, steamSub := range []string{
+		filepath.Join(tempDir, "GOG Games", "rerelease"),
+		filepath.Join(tempDir, "Saved Games", "Nightdive Studios", "DOOM", "rerelease"),
+	} {
+		if err := os.MkdirAll(steamSub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(steamSub, "extras.wad"), extrasBuf, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	fetchOut.Reset()
+	wadsCmd = newWadsCmd()
+	wadsCmd.SetOut(&fetchOut)
+	wadsCmd.SetErr(&fetchOut)
+	wadsCmd.SetArgs([]string{"fetch", "doom-ii"})
+	if err := wadsCmd.Execute(); err != nil {
+		t.Fatalf("wads fetch doom-ii with existing DOOM2.WAD failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "idkfa 2024.wad")); err != nil {
+		t.Errorf("expected wads fetch doom-ii to synthesize optional idkfa 2024.wad, stat err: %v", err)
+	}
+
+	// 7. Malformed config warning routes through cmd.ErrOrStderr() via loadAppStateWithErr.
+	if err := os.WriteFile(paths.ConfigFile, []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var listOut, listErr bytes.Buffer
+	listCmd := newWadsCmd()
+	listCmd.SetOut(&listOut)
+	listCmd.SetErr(&listErr)
+	listCmd.SetArgs([]string{"list"})
+	if err := listCmd.Execute(); err != nil {
+		t.Fatalf("wads list with malformed config failed: %v", err)
+	}
+	if !strings.Contains(listErr.String(), "Warning: could not parse") {
+		t.Errorf("expected malformed config warning on cmd stderr, got:\n%s", listErr.String())
+	}
+}
+
+func buildMinimalWAD(magic, lumpName string, payload []byte) []byte {
+	var b bytes.Buffer
+	b.WriteString(magic)
+	// numlumps = 1 (int32 LE), infotableofs = 12 + len(payload) (int32 LE)
+	n := uint32(1)
+	ofs := uint32(12 + len(payload))
+	b.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+	b.Write([]byte{byte(ofs), byte(ofs >> 8), byte(ofs >> 16), byte(ofs >> 24)})
+	b.Write(payload)
+	// directory entry: filepos = 12, size = len(payload), 8-byte padded name
+	pos := uint32(12)
+	sz := uint32(len(payload))
+	b.Write([]byte{byte(pos), byte(pos >> 8), byte(pos >> 16), byte(pos >> 24)})
+	b.Write([]byte{byte(sz), byte(sz >> 8), byte(sz >> 16), byte(sz >> 24)})
+	var nameBytes [8]byte
+	copy(nameBytes[:], lumpName)
+	b.Write(nameBytes[:])
+	return b.Bytes()
+}

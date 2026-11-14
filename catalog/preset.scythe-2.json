@@ -20,7 +20,8 @@
   "release_date": "2005",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/scythe2.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/scythe2.zip",
+      "sha256": "0d5c1ab9d0152f5f1cf7a0d4ca2f41f5a6ac2986fa6ee850504d1d49e020cd8d"
     }
   ],
   "links": [

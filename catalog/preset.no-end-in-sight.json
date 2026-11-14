@@ -23,7 +23,8 @@
   "release_date": "2016",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/neis.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/neis.zip",
+      "sha256": "2cbc625a7bb5f0796046fc42b478f5b375060899366d652432375f26f50da66a"
     }
   ],
   "links": [

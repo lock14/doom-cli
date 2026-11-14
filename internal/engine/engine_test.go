@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -520,5 +521,148 @@ func TestFormatLaunchPreview(t *testing.T) {
 	}
 	if strings.Contains(previewMulti, "missing_opt.wad") {
 		t.Errorf("FormatLaunchPreview should omit missing_opt.wad, got %q", previewMulti)
+	}
+}
+
+func TestExecute_RelativePathsAndDashPrefixedWAD(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell script mock skipped on windows")
+	}
+	t.Parallel()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := t.TempDir()
+	binDir := filepath.Join(tmpDir, "bin")
+	wadsDir := filepath.Join(tmpDir, "wads")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(wadsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	outMarker := filepath.Join(tmpDir, "invoked.txt")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > " + shellSingleQuote(outMarker) + "\n"
+	fakeBin := filepath.Join(binDir, "dsda-doom")
+	if err := os.WriteFile(fakeBin, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wadsDir, "-tricky.wad"), []byte("pwad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	relBinDir, err := filepath.Rel(wd, binDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	relWadsDir, err := filepath.Rel(wd, wadsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p := preset.Preset{
+		Name:   "Relative Launch",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files:  []preset.FileSpec{{Name: "-tricky.wad"}},
+	}
+	plan, err := PrepareLaunch(p, LaunchOptions{
+		BinDir:   relBinDir,
+		WadRoots: []string{relWadsDir},
+		DryRun:   false,
+	})
+	if err != nil {
+		t.Fatalf("PrepareLaunch failed: %v", err)
+	}
+	if !filepath.IsAbs(plan.EngineBin) {
+		t.Fatalf("expected absolute EngineBin, got %q", plan.EngineBin)
+	}
+	for _, f := range plan.OrderedFiles {
+		if !filepath.IsAbs(f) || strings.HasPrefix(f, "-") {
+			t.Fatalf("expected absolute non-flag OrderedFile path, got %q", f)
+		}
+	}
+
+	var out bytes.Buffer
+	if err := Execute(plan, &out, &out); err != nil {
+		t.Fatalf("live Execute with relative BinDir and WadRoots failed: %v", err)
+	}
+	recorded, err := os.ReadFile(outMarker)
+	if err != nil {
+		t.Fatalf("mock engine binary did not write marker: %v", err)
+	}
+	if !strings.Contains(string(recorded), filepath.Join(wadsDir, "-tricky.wad")) {
+		t.Errorf("recorded args missing absolute -tricky.wad path:\n%s", string(recorded))
+	}
+}
+
+func TestInstaller_DarwinZipAppBundleAndSafeShellWrapper(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	binDir := filepath.Join(tmpDir, "bin")
+	appsDir := filepath.Join(tmpDir, "Apps$With'Special`Chars")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(tmpDir, "dsda-doom-mac-uni.zip")
+	zf, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(zf)
+	entries := map[string]string{
+		"dsda-doom.app/Contents/Info.plist": "<plist><dict><key>CFBundleExecutable</key>" +
+			"<string>dsda-doom</string></dict></plist>",
+		"dsda-doom.app/Contents/MacOS/helper":          "helper-bin",
+		"dsda-doom.app/Contents/MacOS/dsda-doom":       "macho-main-bin",
+		"dsda-doom.app/Contents/Frameworks/libSDL2.so": "sdl2-dylib",
+		"dsda-doom.app/Contents/Resources/dsda.wad":    "dsda-resource-wad",
+	}
+	for name, body := range entries {
+		w, createErr := zw.Create(name)
+		if createErr != nil {
+			t.Fatal(createErr)
+		}
+		_, _ = w.Write([]byte(body))
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_ = zf.Close()
+
+	ins := NewInstaller(binDir, nil)
+	ins.GOOS = "darwin"
+	ins.AppsDir = appsDir
+	wrapperDest := filepath.Join(binDir, "dsda-doom")
+	if err := ins.extractZipBinary(zipPath, "dsda-doom", wrapperDest); err != nil {
+		t.Fatalf("extractZipBinary(darwin .app): %v", err)
+	}
+
+	// Verify Frameworks and Resources inside .app bundle are preserved intact.
+	fwPath := filepath.Join(appsDir, "dsda-doom.app", "Contents", "Frameworks", "libSDL2.so")
+	if got, err := os.ReadFile(fwPath); err != nil || string(got) != "sdl2-dylib" {
+		t.Fatalf("expected framework preserved at %s, got %q (%v)", fwPath, string(got), err)
+	}
+	resPath := filepath.Join(appsDir, "dsda-doom.app", "Contents", "Resources", "dsda.wad")
+	if got, err := os.ReadFile(resPath); err != nil || string(got) != "dsda-resource-wad" {
+		t.Fatalf("expected resource preserved at %s, got %q (%v)", resPath, string(got), err)
+	}
+
+	// Verify POSIX shell wrapper uses single quotes so $With and backticks cannot execute commands.
+	wrapperBytes, err := os.ReadFile(wrapperDest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantExec := "exec " + shellSingleQuote(
+		filepath.Join(appsDir, "dsda-doom.app", "Contents", "MacOS", "dsda-doom"),
+	) + " \"$@\"\n"
+	if !strings.Contains(string(wrapperBytes), wantExec) {
+		t.Errorf("wrapper content = %q, want %q", string(wrapperBytes), wantExec)
 	}
 }

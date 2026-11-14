@@ -2,13 +2,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"reflect"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
+	"unicode"
 
 	"github.com/spf13/cobra"
 
@@ -26,7 +28,9 @@ var (
 )
 
 func main() {
-	if err := newRootCmd().Execute(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := newRootCmd().ExecuteContext(ctx); err != nil {
 		os.Exit(1)
 	}
 }
@@ -48,9 +52,11 @@ Run 'doom' with no arguments to launch The Ultimate Doom directly, pass a WAD
 preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 'doom wads' to open the interactive terminal WAD browser.`,
 		Args:               cobra.ArbitraryArgs,
+		SilenceUsage:       true,
+		DisableFlagParsing: true,
 		FParseErrWhitelist: cobra.FParseErrWhitelist{UnknownFlags: true},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			rawArgs := cmdRawArgs(cmd, args)
+			rawArgs := append([]string{"doom"}, args...)
 			if hasStandaloneFlag(rawArgs, "-h", "--help") {
 				return cmd.Help()
 			}
@@ -63,7 +69,9 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 				return parseErr
 			}
 
-			paths, _, cat, err := loadAppState()
+			out := cmdOut(cmd)
+			errOut := cmdErr(cmd)
+			paths, _, cat, err := loadAppStateWithErr(errOut)
 			if err != nil {
 				return err
 			}
@@ -82,8 +90,6 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 			}
 			effectiveDryRun := dryRun || parsedDryRun
 
-			out := cmdOut(cmd)
-			errOut := cmdErr(cmd)
 			opts := engine.LaunchOptions{
 				EngineOverride: effectiveEngine,
 				WadRoots:       paths.WadRoots(),
@@ -107,21 +113,8 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 		&engineOverride, "engine", "e", "", "Override source port engine (uzdoom, dsda-doom, or custom engine ID)",
 	)
 	rootCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Print launch command without executing")
-
-	attachStrictHelpAndVersionFlags(rootCmd, true)
-
-	defaultFlagErr := rootCmd.FlagErrorFunc()
-	rootCmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-		if c == rootCmd && err != nil &&
-			strings.Contains(err.Error(), "flag needs an argument: 'e' in -") &&
-			!hasDanglingEngineFlag(cmdRawArgs(c, nil)) {
-			return rootCmd.RunE(c, c.Flags().Args())
-		}
-		if defaultFlagErr != nil {
-			return defaultFlagErr(c, err)
-		}
-		return err
-	})
+	rootCmd.InitDefaultHelpFlag()
+	rootCmd.InitDefaultVersionFlag()
 
 	rootCmd.AddCommand(
 		newWadsCmd(),
@@ -131,55 +124,6 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 	)
 
 	return rootCmd
-}
-
-type strictShorthandBoolValue struct {
-	cmd       *cobra.Command
-	shortFlag string
-	longFlag  string
-	val       bool
-}
-
-func (b *strictShorthandBoolValue) Set(s string) error {
-	v, err := strconv.ParseBool(s)
-	if err != nil {
-		return err
-	}
-	b.val = v
-	return nil
-}
-
-func (b *strictShorthandBoolValue) Type() string {
-	return "bool"
-}
-
-func (b *strictShorthandBoolValue) IsBoolFlag() bool {
-	return true
-}
-
-func (b *strictShorthandBoolValue) String() string {
-	if !b.val {
-		return "false"
-	}
-	if b.cmd != nil && !hasStandaloneFlag(cmdRawArgs(b.cmd, nil), b.shortFlag, b.longFlag) {
-		return "false"
-	}
-	return "true"
-}
-
-func attachStrictHelpAndVersionFlags(cmd *cobra.Command, withVersion bool) {
-	helpVal := &strictShorthandBoolValue{cmd: cmd, shortFlag: "-h", longFlag: "--help"}
-	cmd.Flags().VarP(helpVal, "help", "h", "help for "+cmd.Name())
-	if f := cmd.Flags().Lookup("help"); f != nil {
-		f.NoOptDefVal = "true"
-	}
-	if withVersion {
-		versionVal := &strictShorthandBoolValue{cmd: cmd, shortFlag: "-v", longFlag: "--version"}
-		cmd.Flags().VarP(versionVal, "version", "v", "version for "+cmd.Name())
-		if f := cmd.Flags().Lookup("version"); f != nil {
-			f.NoOptDefVal = "true"
-		}
-	}
 }
 
 func hasStandaloneFlag(rawArgs []string, shortFlag, longFlag string) bool {
@@ -200,55 +144,11 @@ func hasStandaloneFlag(rawArgs []string, shortFlag, longFlag string) bool {
 	return false
 }
 
-func hasDanglingEngineFlag(rawArgs []string) bool {
-	for i := 1; i < len(rawArgs); i++ {
-		arg := rawArgs[i]
-		if arg == "--" {
-			return false
-		}
-		if arg == "-e" || arg == "--engine" {
-			if i+1 >= len(rawArgs) {
-				return true
-			}
-			i++
-		}
-	}
-	return false
-}
-
-func cmdRawArgs(cmd *cobra.Command, cobraArgs []string) []string {
-	for c := cmd; c != nil; c = c.Parent() {
-		v := reflect.ValueOf(c)
-		if v.Kind() == reflect.Ptr && !v.IsNil() {
-			f := v.Elem().FieldByName("args")
-			if f.IsValid() && f.Kind() == reflect.Slice && !f.IsNil() {
-				res := make([]string, f.Len())
-				for i := 0; i < f.Len(); i++ {
-					res[i] = f.Index(i).String()
-				}
-				if c != cmd.Root() && c.Name() != "" {
-					return append([]string{"doom", c.Name()}, res...)
-				}
-				return append([]string{"doom"}, res...)
-			}
-		}
-	}
-	return rootRawArgs(cobraArgs)
-}
-
-func rootRawArgs(cobraArgs []string) []string {
-	if len(os.Args) > 0 {
-		bin := filepath.Base(os.Args[0])
-		if !strings.HasSuffix(bin, ".test") && !strings.HasSuffix(bin, ".test.exe") {
-			return os.Args
-		}
-	}
-	return append([]string{"doom"}, cobraArgs...)
-}
-
 func isKnownDoomEFlag(arg string) bool {
 	switch strings.ToLower(strings.TrimSpace(arg)) {
-	case "-episode", "-extratics", "-endoom", "-emulate", "-export", "-exe", "-ef1", "-ef2":
+	case "-episode", "-extratics", "-endoom", "-exec", "-errorlog",
+		"-export_text_file", "-emulate", "-export", "-exe", "-edf",
+		"-ef1", "-ef2", "-empty":
 		return true
 	default:
 		return false
@@ -404,10 +304,17 @@ func resolveAppPaths() *config.Paths {
 }
 
 func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
+	return loadAppStateWithErr(os.Stderr)
+}
+
+func loadAppStateWithErr(errOut io.Writer) (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
+	if errOut == nil {
+		errOut = os.Stderr
+	}
 	p := config.GetPaths()
 	cfg, cfgErr := config.LoadConfig(p)
 	if cfgErr != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not parse %s (%v); using defaults\n", p.ConfigFile, cfgErr)
+		fmt.Fprintf(errOut, "Warning: could not parse %s (%v); using defaults\n", p.ConfigFile, cfgErr)
 		cfg = &config.AppConfig{}
 	}
 
@@ -418,10 +325,93 @@ func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
 		return p, cfg, nil, err
 	}
 	for _, d := range cat.Diagnostics {
-		fmt.Fprintf(os.Stderr, "warning: %s\n", d.String())
+		fmt.Fprintf(errOut, "warning: %s\n", d.String())
 	}
 
 	return p, cfg, cat, nil
+}
+
+func splitCommandArgs(raw string) ([]string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return []string{}, nil
+	}
+
+	var args []string
+	var cur strings.Builder
+	inToken := false
+	inSingle := false
+	inDouble := false
+
+	runes := []rune(raw)
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+
+		if inSingle {
+			if r == '\'' {
+				inSingle = false
+			} else {
+				cur.WriteRune(r)
+			}
+			continue
+		}
+
+		if inDouble {
+			if r == '"' {
+				inDouble = false
+				continue
+			}
+			if r == '\\' && i+1 < len(runes) && (runes[i+1] == '"' || runes[i+1] == '\\') {
+				i++
+				cur.WriteRune(runes[i])
+				continue
+			}
+			cur.WriteRune(r)
+			continue
+		}
+
+		if unicode.IsSpace(r) {
+			if inToken {
+				args = append(args, cur.String())
+				cur.Reset()
+				inToken = false
+			}
+			continue
+		}
+
+		if r == '\'' {
+			inSingle = true
+			inToken = true
+			continue
+		}
+		if r == '"' {
+			inDouble = true
+			inToken = true
+			continue
+		}
+		if r == '\\' && i+1 < len(runes) {
+			next := runes[i+1]
+			if unicode.IsSpace(next) || next == '\'' || next == '"' {
+				i++
+				cur.WriteRune(next)
+				inToken = true
+				continue
+			}
+		}
+
+		cur.WriteRune(r)
+		inToken = true
+	}
+
+	if inSingle {
+		return nil, fmt.Errorf("unterminated single quote in arguments: %s", raw)
+	}
+	if inDouble {
+		return nil, fmt.Errorf("unterminated double quote in arguments: %s", raw)
+	}
+	if inToken {
+		args = append(args, cur.String())
+	}
+	return args, nil
 }
 
 func wadsDirsSource(cfg *config.AppConfig) string {
@@ -444,21 +434,27 @@ func buildLauncherOptions(
 	extraArgs []string,
 	initialMode int,
 ) (tui.Theme, bool, tui.LauncherOptions) {
-	theme := tui.ResolveTheme(cfg.Theme, paths.ThemesDir)
-	_, themeSrc := resolveThemeWithSource(cfg)
-	nerdFonts, nfSrc := resolveNerdFontsWithSource(cfg)
-
-	var cfgWads, cfgBin, cfgSF string
+	var cfgTheme, cfgWads, cfgBin, cfgSF string
 	if cfg != nil {
+		cfgTheme = cfg.Theme
 		cfgWads = cfg.WadsDir
 		cfgBin = cfg.BinDir
 		cfgSF = cfg.SoundFontsDir
 	}
+	var themesDir, catalogDir string
+	if paths != nil {
+		themesDir = paths.ThemesDir
+		catalogDir = paths.CatalogDir
+	}
+
+	theme := tui.ResolveTheme(cfgTheme, themesDir)
+	_, themeSrc := resolveThemeWithSource(cfg)
+	nerdFonts, nfSrc := resolveNerdFontsWithSource(cfg)
 
 	opts := tui.LauncherOptions{
 		Paths:            paths,
 		AppConfig:        cfg,
-		CatalogDir:       paths.CatalogDir,
+		CatalogDir:       catalogDir,
 		ExtraArgs:        extraArgs,
 		ThemeSource:      themeSrc,
 		NerdFontsSource:  nfSrc,

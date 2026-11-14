@@ -41,8 +41,8 @@ func calculateReadmeDimensions(termWidth, termHeight int) (boxWidth, vpWidth, vp
 		boxWidth = minBoxWidth
 	}
 	vpWidth = boxWidth - 2
-	if vpWidth < 36 {
-		vpWidth = 36
+	if vpWidth < 1 {
+		vpWidth = 1
 	}
 	vpHeight = calculateInteriorHeight(termHeight)
 	return boxWidth, vpWidth, vpHeight

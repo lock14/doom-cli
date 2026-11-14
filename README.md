@@ -235,10 +235,12 @@ interface powered by Bubble Tea:
 - **In-app configuration manager**: Press `Ctrl+G` or `F2` (or run `doom config` or `doom engines` directly) to open a
   3-tab configuration manager for CLI settings, engine overrides, and source port configuration deployment and diffs.
 - **In-app asset acquisition**: Press `Ctrl+F` to extract Steam and GOG IWADs or download community WADs for the
-  selected preset and refresh file readiness in place.
+  selected preset asynchronously in the background (or press `Esc` to cancel an in-flight download) and refresh file
+  readiness in place.
 - **In-app README viewer**: Press `Tab` or `Ctrl+R` on any preset to read its bundled idgames `.txt` documentation in a
   scrollable viewport with automatic CP437 box-drawing decoding.
-- **Contextual help**: Press `F1` from any view to inspect context-aware keybindings and search tokens.
+- **Contextual help**: Press `F1` or `Alt+?` from any view (or `?` on non-text fields and document or diff viewers) to
+  inspect context-aware keybindings and search tokens.
 - **Single-shot launch and readiness guard**: Launches the selected preset and exits when the game closes, or stays in
   the browser with an actionable prompt (`Ctrl+F`) if required WADs are missing, and exits cleanly with `Esc` or
   `Ctrl+C`. Configure color themes and Nerd Fonts badges via `doom config set theme <name>`,
@@ -257,19 +259,20 @@ interface powered by Bubble Tea:
 | `Enter` | Launch selected preset |
 | `Ctrl+O` or `F4` | Open launch options and per-preset configuration |
 | `Ctrl+G` or `F2` | Open 3-tab configuration manager |
-| `Ctrl+F` | Fetch or extract missing WADs for selected preset |
+| `Ctrl+F` | Fetch or extract missing WADs asynchronously for selected preset |
 | `Tab` or `Ctrl+R` | Open bundled README in document viewer |
-| `F1` | Open contextual help |
-| `Esc` or `Ctrl+C` | Quit launcher |
+| `F1` or `Alt+?` | Open contextual help |
+| `Esc` or `Ctrl+C` | Cancel an active `Ctrl+F` download (`Esc`) or quit launcher |
 
 ### Launch options and preset configuration controls
 
 When configuring a preset via `Ctrl+O` or `F4`, move between fields with `↑`, `↓`, `Tab`, `Shift+Tab`, `Ctrl+P`,
-`Ctrl+N`, `Ctrl+K`, or `Ctrl+J`, cycle spin selectors (`Engine`, `Skill`, `Complevel`) with `←` and `→`, toggle
-checkboxes (`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`, and optional WADs) with `Space`, press
-`Enter` for an ephemeral one-shot launch, press `Ctrl+S` to save persistent overrides to
-`catalog.d/override.preset.<id>.json`, press `Ctrl+R` to reset overrides to catalog defaults, or press `Esc` to return
-to the browser:
+`Ctrl+N`, `Ctrl+K`, or `Ctrl+J` (Boom-only `-solonet` and `-complevel` rows are dimmed and skipped when a ZDoom-family
+engine is selected), cycle spin selectors (`Engine`, `Skill`, `Complevel`) with `←` and `→`, toggle checkboxes
+(`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`, and optional WADs) with `Space`, press `Enter` for an
+ephemeral one-shot launch, press `Ctrl+S` to save persistent overrides to `catalog.d/override.preset.<id>.json`, press
+`Ctrl+R` to reset overrides to catalog defaults, press `F1`, `Alt+?`, or `?` for help, or press `Esc` to return to the
+browser:
 
 | Key | Action |
 | :--- | :--- |
@@ -280,7 +283,7 @@ to the browser:
 | `Enter` | Launch preset immediately with current options (ephemeral one-shot launch) |
 | `Ctrl+S` | Save current options persistently to `catalog.d/override.preset.<id>.json` |
 | `Ctrl+R` | Reset persistent preset override back to catalog defaults |
-| `F1` | Open contextual help |
+| `F1`, `Alt+?`, or `?` | Open contextual help (`?` when not focused on a text input) |
 | `Esc` | Cancel and return to preset browser |
 | `Ctrl+C` | Quit launcher |
 
@@ -291,7 +294,8 @@ When managing settings via `Ctrl+G` or `F2`, switch between `1. CLI Settings`, `
 `Ctrl+N`, `Ctrl+K`, or `Ctrl+J`, cycle spin selectors (`Theme`, `Engine`, `Args Style`) or action buttons
 (`< View Diff >`, `< Deploy Curated Configs >`) with `←` and `→`, toggle checkboxes or trigger port configuration
 actions with `Space` or `Enter`, save the active tab atomically with `Ctrl+S`, reset engine overrides on Tab 2 with
-`Ctrl+R`, or press `Esc` to close and revert unsaved live theme and Nerd Fonts previews:
+`Ctrl+R`, press `F1`, `Alt+?`, or `?` for help, or press `Esc` to close and revert unsaved live theme and Nerd Fonts
+previews:
 
 | Key | Action |
 | :--- | :--- |
@@ -302,7 +306,7 @@ actions with `Space` or `Enter`, save the active tab atomically with `Ctrl+S`, r
 | `Space` or `Enter` | Toggle checkbox or trigger Tab 3 `< View Diff >` and `< Deploy Curated Configs >` actions |
 | `Ctrl+S` | Save active tab settings atomically with timestamped backups |
 | `Ctrl+R` | Reset selected engine override on Tab 2 back to base defaults |
-| `F1` | Open contextual help |
+| `F1`, `Alt+?`, or `?` | Open contextual help (`?` on non-text rows and diff viewer) |
 | `Esc` | Close configuration manager and revert unsaved live previews |
 | `Ctrl+C` | Quit launcher |
 
@@ -312,8 +316,8 @@ actions with `Space` or `Enter`, save the active tab atomically with `Ctrl+S`, r
 
 When viewing a preset's documentation via `Tab` or `Ctrl+R`, scroll line-by-line with `↑` or `k` and `↓` or `j`, page
 through with `PgUp`, `b`, `u`, `Ctrl+U`, `PgDn`, `f`, `d`, `Space`, or `Ctrl+D`, jump to the top or bottom with `g`,
-`Home`, `G`, or `End`, press `Enter` to launch the selected preset, press `F1` for help, or press `Tab`, `Ctrl+R`,
-`Esc`, `q`, or `Q` to return to the preset list:
+`Home`, `G`, or `End`, press `Enter` to launch the selected preset, press `F1`, `Alt+?`, or `?` for help, or press
+`Tab`, `Ctrl+R`, `Esc`, `q`, or `Q` to return to the preset list:
 
 | Key | Action |
 | :--- | :--- |
@@ -324,7 +328,7 @@ through with `PgUp`, `b`, `u`, `Ctrl+U`, `PgDn`, `f`, `d`, `Space`, or `Ctrl+D`,
 | `g` or `Home` | Jump to top of document |
 | `G` or `End` | Jump to bottom of document |
 | `Enter` | Launch selected preset |
-| `F1` | Open contextual help |
+| `F1`, `Alt+?`, or `?` | Open contextual help |
 | `Tab`, `Ctrl+R`, `Esc`, `q`, or `Q` | Close document viewer and return to preset list |
 | `Ctrl+C` | Quit launcher |
 
@@ -697,19 +701,22 @@ tier, quality rating, and primary documentation link. *Going Down Turbo* (`gdtur
 
 ### UZDoom ("Software-Plus" profile)
 
-Configured in [`uzdoom/autoexec.cfg`](uzdoom/autoexec.cfg) to reproduce the crisp Nightdive Remaster aesthetic:
-- **Software sector lighting**: `gl_lightmode 0` with light stepping (`gl_bandedsw 1`).
+Configured in [`uzdoom/autoexec.cfg`](uzdoom/autoexec.cfg) to reproduce the crisp Nightdive Remaster aesthetic while
+leaving movement, weapon, and mouse sensitivity bindings to your personal `uzdoom.ini`:
+- **Vulkan renderer and software sector lighting**: Vulkan backend preference (`vid_preferbackend 1`) and software light
+  mode (`gl_lightmode 0`) with light stepping (`gl_bandedsw 1`).
 - **Tonemapping**: 256-color palette tonemapping (`gl_tonemap 3`).
 - **Nearest-neighbor filtering**: Crisp, unblurred pixels (`gl_texture_filter 0`) with 16x anisotropic filtering
   (`gl_texture_filter_aniso 16`).
 - **Remaster HUD and crosshair**: Minimalist widescreen alternate HUD and classic Nightdive green crosshair (`#00FF00`).
-- **Audio and quick saves**: High-definition 48 kHz audio sampling, FluidSynth MIDI backend, and `F5` and `F9` quick
-  save and quick load bindings.
+- **Audio and quick saves**: High-definition 48 kHz audio sampling, FluidSynth MIDI backend, and `F5`, `F6`, and `F9`
+  quick save and quick load utility bindings.
 
 ### DSDA-Doom (speedrunning and demo accuracy)
 
 Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
-- **Compatibility**: Default `complevel 21` (MBF21 standard).
+- **Compatibility**: Default `complevel 21` (MBF21 standard) with standard WASD movement, `E` and `Space` use, and `1`
+  through `9` weapon slot defaults.
 - **Video and lighting**: OpenGL mode with classic Doom software lightmaps (`render_doom_lightmaps 1`), banded sector
   fading (`gl_fade_mode 1`), VSync frame pacing, and uncapped high-refresh support (no artificial 60 FPS cap).
 - **Widescreen status bar and extended HUD (exHUD)**: Classic textured widescreen status bar borders

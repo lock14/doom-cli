@@ -18,12 +18,13 @@ import (
 
 func newEnginesCmd() *cobra.Command {
 	enginesCmd := &cobra.Command{
-		Use:   "engines",
-		Short: "Manage Doom source port binaries, engine overrides, configs, and SoundFonts",
-		Args:  cobra.NoArgs,
+		Use:          "engines",
+		Short:        "Manage Doom source port binaries, engine overrides, configs, and SoundFonts",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
-				paths, cfg, cat, err := loadAppState()
+				paths, cfg, cat, err := loadAppStateWithErr(cmdErr(cmd))
 				if err != nil {
 					return err
 				}
@@ -52,11 +53,12 @@ func newEnginesCmd() *cobra.Command {
 		Short: "Download and install portable Doom engines, engine configs, and SoundFont",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
 			out := cmdOut(cmd)
+			ctx := cmd.Context()
 
 			target := "all"
 			if len(args) > 0 {
@@ -64,6 +66,7 @@ func newEnginesCmd() *cobra.Command {
 			}
 
 			ins := engine.NewInstaller(paths.BinDir, out)
+			ins.Ctx = ctx
 			ins.Force = installForce
 			if strings.EqualFold(target, "all") {
 				if err := ins.InstallCatalog(cat); err != nil {
@@ -72,7 +75,7 @@ func newEnginesCmd() *cobra.Command {
 				if err := templates.DeployConfigsWithOptions(paths, installForce, out); err != nil {
 					return err
 				}
-				_, err := wad.InstallSoundFont(paths.SoundFontsDir, installForce, out)
+				_, err := wad.InstallSoundFontContext(ctx, paths.SoundFontsDir, installForce, out)
 				return err
 			}
 
@@ -106,7 +109,7 @@ func newEnginesCmd() *cobra.Command {
 				return fmt.Errorf("engine name cannot be empty")
 			}
 
-			paths, _, _, err := loadAppState()
+			paths, _, _, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -117,11 +120,17 @@ func newEnginesCmd() *cobra.Command {
 
 			var defaultArgs []string
 			if strings.TrimSpace(addFlags.args) != "" {
-				defaultArgs = strings.Fields(addFlags.args)
+				defaultArgs, err = splitCommandArgs(addFlags.args)
+				if err != nil {
+					return err
+				}
 			}
 			var prefixArgs []string
 			if strings.TrimSpace(addFlags.prefixArgs) != "" {
-				prefixArgs = strings.Fields(addFlags.prefixArgs)
+				prefixArgs, err = splitCommandArgs(addFlags.prefixArgs)
+				if err != nil {
+					return err
+				}
 			}
 
 			id := addFlags.id
@@ -168,7 +177,7 @@ func newEnginesCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -187,14 +196,20 @@ func newEnginesCmd() *cobra.Command {
 				changed = true
 			}
 			if cmd.Flags().Changed("args") || setFlags.args != "" {
-				v := strings.Fields(setFlags.args)
+				v, splitErr := splitCommandArgs(setFlags.args)
+				if splitErr != nil {
+					return splitErr
+				}
 				opts.DefaultArgs = &v
 				empty := []string{}
 				opts.AppendArgs = &empty
 				changed = true
 			}
 			if cmd.Flags().Changed("prefix-args") || setFlags.prefixArgs != "" {
-				v := strings.Fields(setFlags.prefixArgs)
+				v, splitErr := splitCommandArgs(setFlags.prefixArgs)
+				if splitErr != nil {
+					return splitErr
+				}
 				opts.PrefixArgs = &v
 				changed = true
 			}
@@ -235,7 +250,7 @@ func newEnginesCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -253,7 +268,7 @@ func newEnginesCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
-			paths, _, cat, err := loadAppState()
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
 				return err
 			}
@@ -356,7 +371,7 @@ func newEnginesCfgCmd() *cobra.Command {
 }
 
 func runEnginesList(cmd *cobra.Command, _ []string) error {
-	paths, _, cat, err := loadAppState()
+	paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
 	}

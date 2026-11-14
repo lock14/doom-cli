@@ -26,10 +26,10 @@ func BenchmarkDecodeText_ASCII(b *testing.B) {
 }
 
 func BenchmarkDecodeText_CP437(b *testing.B) {
-	// Sample with CP437 box-drawing and block-fill characters
-	sample := []byte("╔══════════════════════════════════════╗\n" +
-		"║  DOOM: THE WAY ID DID - EPISODE 1    ║\n" +
-		"╚══════════════════════════════════════╝\n" +
+	// Raw CP437 box-drawing (0xC9, 0xCD, 0xBB, 0xBA, 0xC8, 0xBC) and block-fill bytes
+	sample := []byte("\xc9\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xbb\n" +
+		"\xba  DOOM CP437  \xba\n" +
+		"\xc8\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xbc\n" +
 		"\xb0\xb1\xb2\xdb\xdf\xdc")
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -53,10 +53,11 @@ func BenchmarkResolveFile(b *testing.B) {
 	for _, f := range files {
 		_ = os.WriteFile(filepath.Join(tmpDir, f), []byte("test"), 0644)
 	}
+	idx := NewDirIndex(tmpDir)
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = NewDirIndex(tmpDir).ResolveFile("eviternityii.wad")
+		_, _ = idx.ResolveFile("eviternityii.wad")
 	}
 }

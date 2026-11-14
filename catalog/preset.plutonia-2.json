@@ -23,7 +23,8 @@
   "release_date": "2008",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/pl2.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/pl2.zip",
+      "sha256": "bb925d13119e6d5dfea69a5ffe17d8954cdc3f2da0a6128a58f6ff6a366a0c66"
     }
   ],
   "links": [

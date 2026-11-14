@@ -28,15 +28,18 @@ jobs:
 
       - name: Determine changed packages
         id: set-matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            BASE="origin/${{ github.base_ref }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="origin/$BASE_REF"
           else
             BASE="HEAD~1"
           fi
 
           echo "Base reference: $BASE"
-          GO_FILES=$(git diff --name-only $BASE...HEAD -- '*.go')
+          GO_FILES=$(git diff --name-only "$BASE...HEAD" -- '*.go')
 
           if [ -z "$GO_FILES" ]; then
             echo "No Go files changed. Skipping benchmarks."
@@ -103,28 +106,34 @@ jobs:
           go install filippo.io/mostly-harmless/benchdiff@latest
 
       - name: Run benchdiff (Performance Regression Check)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          TARGET_PKG: ${{ matrix.pkg }}
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            BASE="origin/${{ github.base_ref }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="origin/$BASE_REF"
           else
             BASE="HEAD~1"
           fi
 
-          echo "Running benchdiff against $BASE on: ${{ matrix.pkg }}"
+          echo "Running benchdiff against $BASE on: $TARGET_PKG"
 
-          # -count=6 allows benchstat to compute valid 95% confidence intervals
-          set -o pipefail
-          OUTPUT=$(benchdiff -base-ref $BASE -- -run '^$' -bench . -benchmem -count=6 -benchtime=500ms -timeout=15m ${{ matrix.pkg }})
+          # -count=6 allows benchstat to compute valid 95% confidence intervals.
+          # Disable set -e around benchdiff so non-zero regression exits still write GITHUB_STEP_SUMMARY.
+          set +e
+          OUTPUT=$(benchdiff -base-ref "$BASE" -- -run '^$' -bench . -benchmem -count=6 -benchtime=500ms -timeout=15m "$TARGET_PKG" 2>&1)
           EXIT_CODE=$?
+          set -e
 
           echo "$OUTPUT"
 
           # Write Markdown summary to GitHub Actions Step Summary UI
           {
-            echo "## Benchmark regression check: \`${{ matrix.pkg }}\`"
+            echo "## Benchmark regression check: \`$TARGET_PKG\`"
             echo ""
             echo "**Base ref**: \`$BASE\`"
-            echo "**Tested package**: \`${{ matrix.pkg }}\`"
+            echo "**Tested package**: \`$TARGET_PKG\`"
             echo ""
             echo "<details open><summary><b>Benchmark diff report</b></summary>"
             echo ""
@@ -133,6 +142,6 @@ jobs:
             echo '```'
             echo ""
             echo "</details>"
-          } >> $GITHUB_STEP_SUMMARY
+          } >> "$GITHUB_STEP_SUMMARY"
 
           exit $EXIT_CODE
