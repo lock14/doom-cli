@@ -397,8 +397,14 @@ func isZipSymlink(zf *zip.File) bool {
 }
 
 func findAppBundlePrefix(slashPath string) (string, string, bool) {
+	if strings.Contains(slashPath, "..") {
+		return "", "", false
+	}
 	parts := strings.Split(slashPath, "/")
 	for i, part := range parts {
+		if strings.Contains(part, "..") || strings.ContainsAny(part, `/\`) {
+			return "", "", false
+		}
 		if strings.HasSuffix(strings.ToLower(part), ".app") && part != ".app" {
 			prefix := strings.Join(parts[:i+1], "/") + "/"
 			return prefix, part, true
@@ -411,6 +417,9 @@ func (ins *Installer) extractZipMacAppBundle(
 	zr *zip.ReadCloser,
 	appPrefix, appBundleName, targetName, dest string,
 ) error {
+	if strings.Contains(appBundleName, "..") || strings.ContainsAny(appBundleName, `/\`) {
+		return fmt.Errorf("illegal .app bundle name %q", appBundleName)
+	}
 	appsDir, err := ins.appsDir()
 	if err != nil {
 		return err
@@ -430,7 +439,10 @@ func (ins *Installer) extractZipMacAppBundle(
 	}
 	defer os.RemoveAll(stageParent)
 
-	stagedApp := filepath.Join(stageParent, appBundleName)
+	stagedApp, err := fsutil.SafeJoin(stageParent, appBundleName)
+	if err != nil {
+		return fmt.Errorf("illegal staged .app bundle path %q: %w", appBundleName, err)
+	}
 	if err := os.MkdirAll(stagedApp, 0o755); err != nil {
 		return err
 	}
@@ -519,6 +531,9 @@ func (ins *Installer) extractZipMacAppBundle(
 }
 
 func extractRootZipEntry(appRoot *os.Root, zf *zip.File, cleanRel string, perm os.FileMode) error {
+	if strings.Contains(cleanRel, "..") {
+		return fmt.Errorf("unsafe path in .app archive %q", zf.Name)
+	}
 	parent := filepath.Dir(cleanRel)
 	if parent != "." && parent != "" {
 		if err := appRoot.MkdirAll(parent, 0o755); err != nil {
@@ -556,6 +571,9 @@ func extractSafeBundleSymlink(
 	zf *zip.File,
 	cleanRel string,
 ) error {
+	if strings.Contains(cleanRel, "..") {
+		return fmt.Errorf("unsafe symlink path in .app archive %q", zf.Name)
+	}
 	rc, err := zf.Open()
 	if err != nil {
 		return err
@@ -611,7 +629,7 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 
 	// 1. Exact match on targetName (such as "uzdoom.exe" or "dsda-doom")
 	for _, zf := range zr.File {
-		if zf.FileInfo().IsDir() || isZipSymlink(zf) {
+		if zf.FileInfo().IsDir() || isZipSymlink(zf) || strings.Contains(zf.Name, "..") {
 			continue
 		}
 		base := strings.ToLower(path.Base(zipEntrySlashName(zf)))
@@ -624,7 +642,7 @@ func (ins *Installer) extractZipBinary(zipPath, targetName, dest string) error {
 	// 2. Fallback: match without .exe extension, ensuring on Windows it has .exe extension
 	if binMatch == nil {
 		for _, zf := range zr.File {
-			if zf.FileInfo().IsDir() || isZipSymlink(zf) {
+			if zf.FileInfo().IsDir() || isZipSymlink(zf) || strings.Contains(zf.Name, "..") {
 				continue
 			}
 			base := strings.ToLower(path.Base(zipEntrySlashName(zf)))
