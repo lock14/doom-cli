@@ -82,6 +82,7 @@ func (d *Downloader) extractFromZip(
 	aliasCat := &preset.Catalog{Presets: presets}
 
 	var wadFiles []*zip.File
+	var pk3Files []*zip.File
 	var dehFiles []*zip.File
 	var txtFiles []*zip.File
 	for _, zf := range zr.File {
@@ -99,6 +100,8 @@ func (d *Downloader) extractFromZip(
 		baseLower := strings.ToLower(filepath.Base(cleanName))
 		if strings.HasSuffix(baseLower, ".wad") {
 			wadFiles = append(wadFiles, zf)
+		} else if strings.HasSuffix(baseLower, ".pk3") {
+			pk3Files = append(pk3Files, zf)
 		} else if strings.HasSuffix(baseLower, ".deh") || strings.HasSuffix(baseLower, ".bex") {
 			dehFiles = append(dehFiles, zf)
 		} else if strings.HasSuffix(baseLower, ".txt") {
@@ -166,6 +169,8 @@ func (d *Downloader) extractFromZip(
 		if match == nil {
 			if strings.HasSuffix(expLower, ".wad") && len(wadFiles) == 1 {
 				match = wadFiles[0]
+			} else if strings.HasSuffix(expLower, ".pk3") && len(pk3Files) == 1 {
+				match = pk3Files[0]
 			} else if (strings.HasSuffix(expLower, ".deh") || strings.HasSuffix(expLower, ".bex")) &&
 				len(dehFiles) == 1 {
 				match = dehFiles[0]

@@ -456,3 +456,79 @@ func TestDownloader_FallbackReadmeRenamedToPrimaryStem(t *testing.T) {
 		t.Errorf("ResolveReadme = (%q, %v), want (%q, true)", resolved, ok, wantTxt)
 	}
 }
+
+func TestDownloader_ExtractPK3AndReadmeFromZip(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		entries     map[string]string
+		expected    string
+		wantContent string
+		wantReadme  string
+	}{
+		{
+			name: "nested pk3 and matching txt extracted while ignoring extra archives",
+			entries: map[string]string{
+				"MyHouse/Journal.docx":      "journal-bytes",
+				"MyHouse/files/myhouse.zip": "standalone-wad-zip",
+				"MyHouse/files/myhouse.txt": "myhouse-lore-readme",
+				"MyHouse/files/myhouse.pk3": "updated-2025-pk3",
+				"MyHouse/photos/photo1.jpg": "photo-bytes",
+			},
+			expected:    "myhouse.pk3",
+			wantContent: "updated-2025-pk3",
+			wantReadme:  "myhouse-lore-readme",
+		},
+		{
+			name: "single pk3 fallback when archive entry carries date suffix",
+			entries: map[string]string{
+				"myhouse-20250428.pk3": "single-pk3-payload",
+				"readme.txt":           "fallback-readme",
+			},
+			expected:    "myhouse.pk3",
+			wantContent: "single-pk3-payload",
+			wantReadme:  "fallback-readme",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tmpDir := t.TempDir()
+			zipBytes := createTestZip(t, tc.entries)
+			zipPath := filepath.Join(tmpDir, "bundle.zip")
+			if err := os.WriteFile(zipPath, zipBytes, 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			wadsDir := filepath.Join(tmpDir, "wads")
+			dl := NewDownloader([]string{wadsDir}, false, nil)
+			p := preset.Preset{
+				ID:    "myhouse",
+				Name:  "MyHouse.pk3",
+				Files: []preset.FileSpec{{Name: tc.expected}},
+			}
+			if err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{tc.expected}, p); err != nil {
+				t.Fatalf("extractFromZip failed: %v", err)
+			}
+
+			gotPK3, err := os.ReadFile(filepath.Join(wadsDir, tc.expected))
+			if err != nil || string(gotPK3) != tc.wantContent {
+				t.Fatalf("extracted %s = %q (err=%v), want %q", tc.expected, string(gotPK3), err, tc.wantContent)
+			}
+			if _, err := os.Stat(filepath.Join(wadsDir, "myhouse.zip")); !os.IsNotExist(err) {
+				t.Errorf("expected inner myhouse.zip not to be extracted to wadsDir")
+			}
+
+			idx := preset.NewDirIndex(wadsDir)
+			readmePath, ok := idx.ResolveReadme(p)
+			if !ok {
+				t.Fatalf("expected ResolveReadme to locate extracted myhouse.txt")
+			}
+			gotReadme, err := os.ReadFile(readmePath)
+			if err != nil || string(gotReadme) != tc.wantReadme {
+				t.Errorf("readme content = %q (err=%v), want %q", string(gotReadme), err, tc.wantReadme)
+			}
+		})
+	}
+}

@@ -20,12 +20,12 @@
   "release_date": "2023",
   "sources": [
     {
-      "url": "https://archive.org/download/myhouse_202511/myhouse.pk3",
-      "sha256": "25ee4c7464b2c01c761b91236e50d7c3ec5fbc8de79118a5fa4acb9c4f34ae81"
+      "url": "https://archive.org/download/my-house-20250505-t-011956-z-1-001/MyHouse-20250505T011956Z-1-001.zip",
+      "sha256": "6d21bd2b513f7e50091fcd16b7b24f25e702aee8255f81ccbc87b4960030938c"
     },
     {
-      "url": "https://archive.org/download/myhouse-versions/myhouse-20230416.pk3",
-      "sha256": "25ee4c7464b2c01c761b91236e50d7c3ec5fbc8de79118a5fa4acb9c4f34ae81"
+      "url": "https://archive.org/download/myhouse-versions/myhouse-20250428.pk3",
+      "sha256": "44665f732ae2cb81e9d45007949ef001383970f8513ee7a010f432b05cb3221e"
     }
   ],
   "links": [

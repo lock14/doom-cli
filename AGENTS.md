@@ -73,9 +73,11 @@
         declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
         `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
         `doom wads show`, and the interactive TUI preview pane and fuzzy filter). When a mapset has an author-sanctioned
-        rebalanced edition (such as *Going Down Turbo* (`gdturbo.wad`), `mouldy`'s 2024 10th-anniversary remaster of
-        *Going Down* (`gd.wad`)), curate the definitive edition rather than duplicating both versions, and route
-        shorthand queries (`doom gd`, `doom going-down`) to the canonical preset via `NormalizePresetQuery`.
+        rebalanced or source-port compatibility edition (such as *Going Down Turbo* (`gdturbo.wad`), `mouldy`'s 2024
+        10th-anniversary remaster of *Going Down* (`gd.wad`), or `Veddge`'s April 2025 update of *MyHouse.pk3* for
+        GZDoom 4.14 and UZDoom), curate the definitive edition rather than duplicating versions or keeping incompatible
+        older mirrors, and route shorthand queries (`doom gd`, `doom going-down`) to the canonical preset via
+        `NormalizePresetQuery`.
     *   **Two-layer entity catalog and quarantine**: Built-in entities in `catalog/*.json` serve as the immutable
         curated layer (`LayerCurated`). User engines (`engine.<id>.json`), custom presets (`preset.<id>.json`), and
         surgical overrides (`override.preset.<id>.json`, `override.engine.<id>.json`) live in

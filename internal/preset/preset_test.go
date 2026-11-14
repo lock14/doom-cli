@@ -1468,6 +1468,15 @@ func TestCuratedNewPresetsTaxonomyAndPrimaryURL(t *testing.T) {
 			wantQual:   "S-Tier (9.5/10)",
 		},
 		{
+			name:       "MyHouse.pk3 by spaced query",
+			query:      "my house",
+			wantID:     "myhouse",
+			wantEngine: "uzdoom",
+			wantGenre:  "Psychological Horror",
+			wantDiff:   "Casual",
+			wantQual:   "S-Tier (9.5/10)",
+		},
+		{
 			name:       "Overboard by id",
 			query:      "overboard",
 			wantID:     "overboard",
@@ -1544,5 +1553,19 @@ func TestCuratedNewPresetsTaxonomyAndPrimaryURL(t *testing.T) {
 		base.Difficulty != "Custom Difficulty" ||
 		base.Quality != "Custom Quality" {
 		t.Errorf("override taxonomy fields not applied: %+v", base)
+	}
+
+	// Verify MyHouse.pk3 points to Veddge's April 2025 UZDoom-compatible sources rather than the 2023 build.
+	mh, err := cat.FindExact("my house")
+	if err != nil {
+		t.Fatalf("cat.FindExact(\"my house\") failed: %v", err)
+	}
+	if len(mh.Sources) < 2 {
+		t.Fatalf("expected at least 2 mirrors for myhouse, got %d", len(mh.Sources))
+	}
+	for _, src := range mh.Sources {
+		if src.SHA256 == "25ee4c7464b2c01c761b91236e50d7c3ec5fbc8de79118a5fa4acb9c4f34ae81" {
+			t.Errorf("myhouse source %s still uses incompatible 2023 sha256", src.URL)
+		}
 	}
 }
