@@ -1,4 +1,4 @@
-package preset
+package catalog
 
 import (
 	"os"
@@ -13,7 +13,8 @@ import (
 
 var filenameReplacer = strings.NewReplacer(" ", "", "-", "", "_", "")
 
-func slashBase(raw string) string {
+// SlashBase returns the final slash-separated path element of raw after normalizing backslashes.
+func SlashBase(raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return ""
@@ -22,7 +23,7 @@ func slashBase(raw string) string {
 }
 
 func slashExt(raw string) string {
-	return path.Ext(slashBase(raw))
+	return path.Ext(SlashBase(raw))
 }
 
 var knownIWADNames = map[string]bool{
@@ -38,8 +39,9 @@ var knownIWADNames = map[string]bool{
 	"freedoom2.wad": true,
 }
 
-func isIWADName(name string) bool {
-	norm := NormalizeFilename(slashBase(name))
+// IsIWADName reports whether name normalizes to a standard base game IWAD filename.
+func IsIWADName(name string) bool {
+	norm := NormalizeFilename(SlashBase(name))
 	return norm != "" && knownIWADNames[norm]
 }
 
@@ -57,15 +59,15 @@ func buildAliasMap(presets []Preset) map[string][]string {
 			if len(f.Aliases) == 0 {
 				continue
 			}
-			base := slashBase(f.Name)
-			if base == "" || isIWADName(base) {
+			base := SlashBase(f.Name)
+			if base == "" || IsIWADName(base) {
 				continue
 			}
 			grp := make([]string, 0, 1+len(f.Aliases))
 			grp = append(grp, base)
 			for _, al := range f.Aliases {
 				trimmed := strings.TrimSpace(al)
-				if trimmed == "" || strings.ContainsAny(trimmed, `/\`) || isIWADName(trimmed) {
+				if trimmed == "" || strings.ContainsAny(trimmed, `/\`) || IsIWADName(trimmed) {
 					continue
 				}
 				grp = append(grp, trimmed)
@@ -147,7 +149,7 @@ func getCuratedAliasMap() map[string][]string {
 
 // FileAliases returns any recognized alternate filenames for name across the catalog's presets.
 func (c *Catalog) FileAliases(name string) []string {
-	key := NormalizeFilename(slashBase(name))
+	key := NormalizeFilename(SlashBase(name))
 	if key == "" {
 		return nil
 	}
@@ -226,7 +228,7 @@ func (idx *DirIndex) WithPresets(presets ...Preset) *DirIndex {
 }
 
 func (idx *DirIndex) aliasesFor(targetName string) []string {
-	key := NormalizeFilename(slashBase(targetName))
+	key := NormalizeFilename(SlashBase(targetName))
 	if key == "" {
 		return nil
 	}
@@ -308,7 +310,6 @@ func (idx *DirIndex) resolveCandidates(primary string, extraAliases []string) (s
 		if p, ok := idx.resolveRelativeSubpath(primary); ok {
 			return p, true
 		}
-		// If primary is a relative subpath and not found there, check top-level/subdir aliases.
 		if len(extraAliases) == 0 {
 			return "", false
 		}
@@ -348,7 +349,7 @@ func (idx *DirIndex) resolveCandidates(primary string, extraAliases []string) (s
 	}
 
 	// 2. For non-IWAD files, scan 1-level child directories root-by-root.
-	if !isIWADName(primary) {
+	if !IsIWADName(primary) {
 		for _, rc := range idx.roots {
 			for _, sub := range rc.loadSubdirs() {
 				for _, cand := range topCandidates {
@@ -506,7 +507,7 @@ func (idx *DirIndex) ResolveReadme(p Preset) (string, bool) {
 			return resolved, true
 		}
 		if strings.ContainsAny(base, `/\`) {
-			if resolved, ok := idx.ResolveFile(slashBase(base) + ".txt"); ok {
+			if resolved, ok := idx.ResolveFile(SlashBase(base) + ".txt"); ok {
 				return resolved, true
 			}
 		}
@@ -551,10 +552,10 @@ func (idx *DirIndex) resolveReadmePrefix(p Preset) (string, bool) {
 		if f.Optional {
 			continue
 		}
-		base := slashBase(f.Name)
+		base := SlashBase(f.Name)
 		addStem(strings.TrimSuffix(base, slashExt(base)))
 		for _, al := range idx.fileAliases(f) {
-			alBase := slashBase(al)
+			alBase := SlashBase(al)
 			addStem(strings.TrimSuffix(alBase, slashExt(alBase)))
 		}
 	}
@@ -628,7 +629,6 @@ func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (st
 		return "", false
 	}
 
-	// 1. Exact match against cached entries
 	for _, entry := range entries {
 		if entry.Name() == targetName && isResolvableFile(wadsDir, entry) {
 			return filepath.Join(wadsDir, entry.Name()), true
@@ -638,7 +638,6 @@ func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (st
 	targetLower := strings.ToLower(targetName)
 	targetNorm := NormalizeFilename(targetName)
 
-	// 2. Case-insensitive match
 	for _, entry := range entries {
 		name := entry.Name()
 		if strings.ToLower(name) == targetLower && isResolvableFile(wadsDir, entry) {
@@ -646,7 +645,6 @@ func resolveSingle(wadsDir string, entries []os.DirEntry, targetName string) (st
 		}
 	}
 
-	// 3. Normalized match (ignoring spaces, dashes, underscores)
 	for _, entry := range entries {
 		name := entry.Name()
 		if NormalizeFilename(name) == targetNorm && isResolvableFile(wadsDir, entry) {

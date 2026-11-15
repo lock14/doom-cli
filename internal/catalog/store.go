@@ -1,4 +1,4 @@
-package preset
+package catalog
 
 import (
 	"bytes"

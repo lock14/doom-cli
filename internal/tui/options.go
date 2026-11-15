@@ -10,8 +10,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/engine"
-	"github.com/lock14/doom-cli/internal/preset"
 )
 
 type spinOption struct {
@@ -39,16 +39,16 @@ var complevelOptions = []spinOption{
 }
 
 type optionalFileToggle struct {
-	spec    preset.FileSpec
+	spec    catalog.FileSpec
 	enabled bool
 }
 
 type launchOptionsState struct {
 	presetID      string
 	presetName    string
-	base          preset.Preset
-	existingOv    *preset.Override
-	engines       []preset.EngineConfig
+	base          catalog.Preset
+	existingOv    *catalog.Override
+	engines       []catalog.EngineConfig
 	engineIdx     int
 	skillIdx      int
 	warpInput     textinput.Model
@@ -85,9 +85,9 @@ func (s *launchOptionsState) totalFields() int {
 	return launchFieldOptBase + len(s.optionalFiles) + 1
 }
 
-func (s *launchOptionsState) selectedEngine() preset.EngineConfig {
+func (s *launchOptionsState) selectedEngine() catalog.EngineConfig {
 	if len(s.engines) == 0 {
-		return preset.EngineConfig{ID: "dsda-doom", DisplayName: "DSDA-Doom", ArgsStyle: "boom"}
+		return catalog.EngineConfig{ID: "dsda-doom", DisplayName: "DSDA-Doom", ArgsStyle: "boom"}
 	}
 	if s.engineIdx < 0 || s.engineIdx >= len(s.engines) {
 		return s.engines[0]
@@ -135,8 +135,8 @@ func (s *launchOptionsState) syncInputFocus() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m model) availableEngines() []preset.EngineConfig {
-	seen := make(map[string]preset.EngineConfig)
+func (m model) availableEngines() []catalog.EngineConfig {
+	seen := make(map[string]catalog.EngineConfig)
 	if m.catalog != nil {
 		for k, e := range m.catalog.Engines {
 			seen[strings.ToLower(k)] = e
@@ -150,7 +150,7 @@ func (m model) availableEngines() []preset.EngineConfig {
 		}
 	}
 
-	var out []preset.EngineConfig
+	var out []catalog.EngineConfig
 	for _, firstID := range []string{"dsda-doom", "uzdoom"} {
 		if eng, ok := seen[firstID]; ok {
 			out = append(out, eng)
@@ -176,25 +176,25 @@ func (m *model) openLaunchOptions() tea.Cmd {
 	cur := m.filtered[m.cursor]
 	catDir := m.catalogDir()
 
-	base, ov, err := preset.LoadPresetBaseAndOverride(catDir, cur.ID)
+	base, ov, err := catalog.LoadPresetBaseAndOverride(catDir, cur.ID)
 	if m.baseCatalog != nil {
 		if bp, findErr := m.baseCatalog.FindExact(cur.ID); findErr == nil && bp != nil && !bp.Overridden {
 			baseCopy := *bp
-			baseCopy.Files = append([]preset.FileSpec(nil), bp.Files...)
+			baseCopy.Files = append([]catalog.FileSpec(nil), bp.Files...)
 			baseCopy.Args = append([]string(nil), bp.Args...)
 			base = &baseCopy
 		}
 	}
 	if err != nil || base == nil {
 		baseCopy := cur
-		baseCopy.Files = append([]preset.FileSpec(nil), cur.Files...)
+		baseCopy.Files = append([]catalog.FileSpec(nil), cur.Files...)
 		baseCopy.Args = append([]string(nil), cur.Args...)
 		base = &baseCopy
 	}
 	if ov == nil && catDir != "" {
 		ovPath := filepath.Join(catDir, fmt.Sprintf("override.preset.%s.json", base.ID))
 		if raw, readErr := os.ReadFile(ovPath); readErr == nil {
-			if ent, decErr := preset.DecodeEntity(raw); decErr == nil && ent.Override != nil {
+			if ent, decErr := catalog.DecodeEntity(raw); decErr == nil && ent.Override != nil {
 				ov = ent.Override
 			}
 		}
@@ -216,10 +216,10 @@ func (m *model) openLaunchOptions() tea.Cmd {
 	excludedNorm := make(map[string]bool)
 	if ov != nil {
 		for _, ex := range ov.ExcludeFiles {
-			if norm := preset.NormalizeFilename(ex); norm != "" {
+			if norm := catalog.NormalizeFilename(ex); norm != "" {
 				excludedNorm[norm] = true
 			}
-			if baseNorm := preset.NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
+			if baseNorm := catalog.NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
 				excludedNorm[baseNorm] = true
 			}
 		}
@@ -230,8 +230,8 @@ func (m *model) openLaunchOptions() tea.Cmd {
 		if !f.Optional {
 			continue
 		}
-		norm := preset.NormalizeFilename(f.Name)
-		baseNorm := preset.NormalizeFilename(filepath.Base(f.Name))
+		norm := catalog.NormalizeFilename(f.Name)
+		baseNorm := catalog.NormalizeFilename(filepath.Base(f.Name))
 		enabled := !excludedNorm[norm] && !excludedNorm[baseNorm]
 		optFiles = append(optFiles, optionalFileToggle{
 			spec:    f,
@@ -399,7 +399,7 @@ func (s *launchOptionsState) excludedFileNames() []string {
 	var excluded []string
 	optNorms := make(map[string]bool, len(s.optionalFiles))
 	for _, opt := range s.optionalFiles {
-		norm := preset.NormalizeFilename(opt.spec.Name)
+		norm := catalog.NormalizeFilename(opt.spec.Name)
 		optNorms[norm] = true
 		if !opt.enabled {
 			excluded = append(excluded, opt.spec.Name)
@@ -407,7 +407,7 @@ func (s *launchOptionsState) excludedFileNames() []string {
 	}
 	if s.existingOv != nil {
 		for _, ex := range s.existingOv.ExcludeFiles {
-			if !optNorms[preset.NormalizeFilename(ex)] {
+			if !optNorms[catalog.NormalizeFilename(ex)] {
 				excluded = append(excluded, ex)
 			}
 		}
@@ -415,9 +415,9 @@ func (s *launchOptionsState) excludedFileNames() []string {
 	return excluded
 }
 
-func (s *launchOptionsState) buildLaunchPreset() preset.Preset {
+func (s *launchOptionsState) buildLaunchPreset() catalog.Preset {
 	p := s.base
-	p.Files = append([]preset.FileSpec(nil), s.base.Files...)
+	p.Files = append([]catalog.FileSpec(nil), s.base.Files...)
 	p.Args = append([]string(nil), s.base.Args...)
 
 	if s.existingOv != nil {
@@ -426,7 +426,7 @@ func (s *launchOptionsState) buildLaunchPreset() preset.Preset {
 				p.IWAD = *s.existingOv.Set.IWAD
 			}
 			if s.existingOv.Set.Files != nil {
-				p.Files = append([]preset.FileSpec(nil), (*s.existingOv.Set.Files)...)
+				p.Files = append([]catalog.FileSpec(nil), (*s.existingOv.Set.Files)...)
 			}
 			if s.existingOv.Set.Args != nil {
 				p.Args = nil
@@ -445,17 +445,17 @@ func (s *launchOptionsState) buildLaunchPreset() preset.Preset {
 	if len(excluded) > 0 {
 		exMap := make(map[string]bool, len(excluded)*2)
 		for _, ex := range excluded {
-			if norm := preset.NormalizeFilename(ex); norm != "" {
+			if norm := catalog.NormalizeFilename(ex); norm != "" {
 				exMap[norm] = true
 			}
-			if baseNorm := preset.NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
+			if baseNorm := catalog.NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
 				exMap[baseNorm] = true
 			}
 		}
-		var kept []preset.FileSpec
+		var kept []catalog.FileSpec
 		for _, f := range p.Files {
-			norm := preset.NormalizeFilename(f.Name)
-			baseNorm := preset.NormalizeFilename(filepath.Base(f.Name))
+			norm := catalog.NormalizeFilename(f.Name)
+			baseNorm := catalog.NormalizeFilename(filepath.Base(f.Name))
 			if (norm != "" && exMap[norm]) || (baseNorm != "" && exMap[baseNorm]) {
 				continue
 			}
@@ -623,7 +623,7 @@ func (m *model) saveLaunchOptionsOverride() {
 	appendArgs := s.synthesizeAppendArgs()
 	excludeFiles := s.excludedFileNames()
 
-	req := preset.OverridePatchRequest{
+	req := catalog.OverridePatchRequest{
 		ExcludeFiles: &excludeFiles,
 	}
 	if !strings.EqualFold(engID, s.base.Engine) {
@@ -639,11 +639,11 @@ func (m *model) saveLaunchOptionsOverride() {
 	}
 
 	if catDir != "" {
-		if _, _, err := preset.ConfigPreset(catDir, m.catalog, s.presetID, req); err != nil {
+		if _, _, err := catalog.ConfigPreset(catDir, m.catalog, s.presetID, req); err != nil {
 			s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
 			return
 		}
-		if _, ov, err := preset.LoadPresetBaseAndOverride(catDir, s.presetID); err == nil {
+		if _, ov, err := catalog.LoadPresetBaseAndOverride(catDir, s.presetID); err == nil {
 			s.existingOv = ov
 		}
 	}
@@ -659,7 +659,7 @@ func (m *model) resetLaunchOptionsOverride() {
 	s := m.launchOpts
 	catDir := m.catalogDir()
 	if catDir != "" {
-		if _, _, err := preset.ResetPresetOverride(catDir, m.catalog, s.presetID); err != nil {
+		if _, _, err := catalog.ResetPresetOverride(catDir, m.catalog, s.presetID); err != nil {
 			s.statusMsg = fmt.Sprintf("✗ Reset failed: %v", err)
 			return
 		}

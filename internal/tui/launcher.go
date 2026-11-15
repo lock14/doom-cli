@@ -17,8 +17,8 @@ import (
 	"github.com/sahilm/fuzzy"
 	"golang.org/x/term"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/config"
-	"github.com/lock14/doom-cli/internal/preset"
 	"github.com/lock14/doom-cli/internal/steam"
 	"github.com/lock14/doom-cli/internal/wad"
 )
@@ -60,8 +60,8 @@ type model struct {
 	theme            Theme
 	styles           ThemeStyles
 	nerdFonts        bool
-	catalog          *preset.Catalog
-	baseCatalog      *preset.Catalog
+	catalog          *catalog.Catalog
+	baseCatalog      *catalog.Catalog
 	wadRoots         []string
 	paths            *config.Paths
 	appConfig        *config.AppConfig
@@ -76,13 +76,13 @@ type model struct {
 	initialMode      int
 	steamSearchRoots []string
 	httpClient       *http.Client
-	dirIndex         *preset.DirIndex
+	dirIndex         *catalog.DirIndex
 	readmeCache      map[string]string
 	searchTargets    []string
 	input            textinput.Model
-	filtered         []preset.Preset
+	filtered         []catalog.Preset
 	cursor           int
-	selected         *preset.Preset
+	selected         *catalog.Preset
 	width            int
 	height           int
 	quitting         bool
@@ -113,14 +113,14 @@ type model struct {
 	helpViewport viewport.Model
 }
 
-func readmeCacheKey(p preset.Preset) string {
+func readmeCacheKey(p catalog.Preset) string {
 	if p.ID != "" {
 		return p.ID
 	}
 	return p.Name
 }
 
-func buildSearchTarget(p preset.Preset, dirIndex *preset.DirIndex) string {
+func buildSearchTarget(p catalog.Preset, dirIndex *catalog.DirIndex) string {
 	readiness := "missing"
 	if dirIndex != nil && dirIndex.IsPresetInstalled(p) {
 		readiness = "ready installed"
@@ -189,7 +189,7 @@ func (m model) resolveFile(name string) (string, bool) {
 	return "", false
 }
 
-func (m model) resolveReadme(p preset.Preset) (string, bool) {
+func (m model) resolveReadme(p catalog.Preset) (string, bool) {
 	if m.readmeCache != nil {
 		if path, cached := m.readmeCache[readmeCacheKey(p)]; cached {
 			return path, path != ""
@@ -203,14 +203,14 @@ func (m model) resolveReadme(p preset.Preset) (string, bool) {
 
 func (m *model) rebuildIndexAndTargets() {
 	if m.catalog == nil {
-		m.catalog = &preset.Catalog{}
+		m.catalog = &catalog.Catalog{}
 	}
 	var currentID string
 	if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
 		currentID = m.filtered[m.cursor].ID
 	}
 
-	m.dirIndex = preset.NewDirIndex(m.effectiveWadRoots()...).WithCatalog(m.catalog)
+	m.dirIndex = catalog.NewDirIndex(m.effectiveWadRoots()...).WithCatalog(m.catalog)
 	m.readmeCache = make(map[string]string, len(m.catalog.Presets))
 	m.searchTargets = make([]string, 0, len(m.catalog.Presets))
 	for _, p := range m.catalog.Presets {
@@ -242,21 +242,21 @@ func (m *model) rebuildIndexAndTargets() {
 
 func (m *model) reloadCatalogAndIndex() {
 	catDir := m.catalogDir()
-	if cat, err := preset.MergeUserDir(m.baseCatalog, catDir); err == nil && cat != nil {
+	if cat, err := catalog.MergeUserDir(m.baseCatalog, catDir); err == nil && cat != nil {
 		m.catalog = cat
 	}
 	m.rebuildIndexAndTargets()
 }
 
 func initialModel(
-	catalog *preset.Catalog,
+	cat *catalog.Catalog,
 	wadRoots []string,
 	theme Theme,
 	nerdFonts bool,
 	initialPreset ...string,
 ) model {
-	if catalog == nil {
-		catalog = &preset.Catalog{}
+	if cat == nil {
+		cat = &catalog.Catalog{}
 	}
 	if theme.Name == "" {
 		theme = ClassicTheme
@@ -279,7 +279,7 @@ func initialModel(
 
 	cursor := 0
 	if len(initialPreset) > 0 && initialPreset[0] != "" {
-		for i, p := range catalog.Presets {
+		for i, p := range cat.Presets {
 			if strings.EqualFold(p.Name, initialPreset[0]) || strings.EqualFold(p.ID, initialPreset[0]) {
 				cursor = i
 				break
@@ -287,10 +287,10 @@ func initialModel(
 		}
 	}
 
-	dirIndex := preset.NewDirIndex(wadRoots...).WithCatalog(catalog)
-	readmeCache := make(map[string]string, len(catalog.Presets))
-	searchTargets := make([]string, 0, len(catalog.Presets))
-	for _, p := range catalog.Presets {
+	dirIndex := catalog.NewDirIndex(wadRoots...).WithCatalog(cat)
+	readmeCache := make(map[string]string, len(cat.Presets))
+	searchTargets := make([]string, 0, len(cat.Presets))
+	for _, p := range cat.Presets {
 		searchTargets = append(searchTargets, buildSearchTarget(p, dirIndex))
 		if path, ok := dirIndex.ResolveReadme(p); ok {
 			readmeCache[readmeCacheKey(p)] = path
@@ -303,14 +303,14 @@ func initialModel(
 		theme:         theme,
 		styles:        styles,
 		nerdFonts:     nerdFonts,
-		catalog:       catalog,
-		baseCatalog:   catalog.Clone(),
+		catalog:       cat,
+		baseCatalog:   cat.Clone(),
 		wadRoots:      append([]string(nil), wadRoots...),
 		dirIndex:      dirIndex,
 		readmeCache:   readmeCache,
 		searchTargets: searchTargets,
 		input:         ti,
-		filtered:      catalog.Presets,
+		filtered:      cat.Presets,
 		cursor:        cursor,
 		width:         w,
 		height:        h,
@@ -319,7 +319,7 @@ func initialModel(
 
 type fetchCompleteMsg struct {
 	id        uint64
-	preset    preset.Preset
+	preset    catalog.Preset
 	output    string
 	steamErr  error
 	dlErr     error
@@ -351,7 +351,7 @@ func (m *model) restoreFocusCmd() tea.Cmd {
 	return m.input.Focus()
 }
 
-func (m model) areAllPresetFilesPresent(p preset.Preset) bool {
+func (m model) areAllPresetFilesPresent(p catalog.Preset) bool {
 	if strings.TrimSpace(p.IWAD) != "" {
 		if _, ok := m.resolveFile(p.IWAD); !ok {
 			return false
@@ -392,13 +392,13 @@ func (m *model) handleFetchAssets() tea.Cmd {
 	m.fetchCancel = cancel
 	m.statusMsg = fmt.Sprintf("Fetching %s... (Esc to cancel)", cur.Name)
 
-	var catClone *preset.Catalog
+	var catClone *catalog.Catalog
 	if m.catalog != nil {
 		catClone = m.catalog.Clone()
 	}
 	presetCopy := cur
-	presetCopy.Files = append([]preset.FileSpec(nil), cur.Files...)
-	presetCopy.Sources = append([]preset.Source(nil), cur.Sources...)
+	presetCopy.Files = append([]catalog.FileSpec(nil), cur.Files...)
+	presetCopy.Sources = append([]catalog.Source(nil), cur.Sources...)
 	needsSteam := m.dirIndex != nil && m.dirIndex.NeedsSteamDiscovery(cur) && writeDir != ""
 	searchRoots := append([]string(nil), m.steamSearchRoots...)
 	extraRoots := append([]string(nil), m.extraWadRoots()...)
@@ -630,7 +630,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
 				cur := m.filtered[m.cursor]
 				if txtPath, ok := m.resolveReadme(cur); ok {
-					content, err := preset.ReadReadme(txtPath)
+					content, err := catalog.ReadReadme(txtPath)
 					if err == nil {
 						m.input.Blur()
 						m.viewingReadme = true
@@ -706,7 +706,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) isPresetReady(p preset.Preset) bool {
+func (m model) isPresetReady(p catalog.Preset) bool {
 	return strings.TrimSpace(p.IWAD) != "" && m.dirIndex != nil && m.dirIndex.IsPresetInstalled(p)
 }
 
@@ -730,7 +730,7 @@ func (m *model) updateFiltered(query string) {
 	}
 
 	matches := fuzzy.Find(query, targets)
-	var result []preset.Preset
+	var result []catalog.Preset
 	for _, match := range matches {
 		result = append(result, m.catalog.Presets[match.Index])
 	}
@@ -804,20 +804,20 @@ func (m model) View() string {
 
 // RunInteractiveLauncherWithOptions runs the interactive Bubble Tea UI launcher with full CLI context.
 func RunInteractiveLauncherWithOptions(
-	catalog *preset.Catalog,
+	cat *catalog.Catalog,
 	wadRoots []string,
 	theme Theme,
 	nerdFonts bool,
 	opts LauncherOptions,
-) (*preset.Preset, error) {
+) (*catalog.Preset, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
 		if opts.InitialMode != InitialModeWads {
 			return nil, nil
 		}
-		return RunNumberedMenu(catalog, os.Stdin, os.Stdout)
+		return RunNumberedMenu(cat, os.Stdin, os.Stdout)
 	}
 
-	m := initialModel(catalog, wadRoots, theme, nerdFonts)
+	m := initialModel(cat, wadRoots, theme, nerdFonts)
 	m.applyOptions(opts)
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

@@ -8,8 +8,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/engine"
-	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/repolint"
 	"github.com/lock14/doom-cli/internal/steam"
 	"github.com/lock14/doom-cli/internal/tui"
 	"github.com/lock14/doom-cli/internal/wad"
@@ -78,7 +79,7 @@ func newWadsCmd() *cobra.Command {
 				)
 			}
 
-			idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+			idx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 			alreadyInstalled := strings.TrimSpace(p.IWAD) != "" && idx.IsPresetInstalled(*p)
 			var extracted int
 			if fetchForce || idx.NeedsSteamDiscovery(*p) {
@@ -92,7 +93,7 @@ func newWadsCmd() *cobra.Command {
 			}
 
 			if len(p.Sources) == 0 {
-				idx = preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+				idx = catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 				if !idx.IsPresetInstalled(*p) {
 					if !p.IsCustom() {
 						fmt.Fprintf(
@@ -120,7 +121,7 @@ func newWadsCmd() *cobra.Command {
 			if err := dl.DownloadPreset(*p); err != nil {
 				return err
 			}
-			idx = preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+			idx = catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 			if !idx.IsPresetInstalled(*p) {
 				return fmt.Errorf("missing required files for %s (ensure base IWAD %s is installed)", p.Name, p.IWAD)
 			}
@@ -166,7 +167,7 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			curated, err := preset.LoadCuratedCatalog()
+			curated, err := catalog.LoadCurated()
 			if err != nil {
 				return err
 			}
@@ -179,7 +180,7 @@ func newWadsCmd() *cobra.Command {
 				}
 			}
 
-			p := preset.Preset{
+			p := catalog.Preset{
 				ID:          addFlags.id,
 				Name:        name,
 				Engine:      addFlags.engine,
@@ -189,7 +190,7 @@ func newWadsCmd() *cobra.Command {
 				Description: addFlags.description,
 			}
 
-			outPath, err := preset.AddPreset(paths.CatalogDir, curated, cat, p)
+			outPath, err := catalog.AddPreset(paths.CatalogDir, curated, cat, p)
 			if err != nil {
 				return err
 			}
@@ -216,7 +217,7 @@ func newWadsCmd() *cobra.Command {
 				return err
 			}
 
-			var req preset.OverridePatchRequest
+			var req catalog.OverridePatchRequest
 			changed := false
 			if cmd.Flags().Changed("engine") || setFlags.engine != "" {
 				v := setFlags.engine
@@ -259,7 +260,7 @@ func newWadsCmd() *cobra.Command {
 				)
 			}
 
-			outPath, target, err := preset.ConfigPreset(paths.CatalogDir, cat, name, req)
+			outPath, target, err := catalog.ConfigPreset(paths.CatalogDir, cat, name, req)
 			if err != nil {
 				return err
 			}
@@ -284,7 +285,7 @@ func newWadsCmd() *cobra.Command {
 				return err
 			}
 			out := cmdOut(cmd)
-			target, removed, err := preset.ResetPresetOverride(paths.CatalogDir, cat, name)
+			target, removed, err := catalog.ResetPresetOverride(paths.CatalogDir, cat, name)
 			if err != nil {
 				return err
 			}
@@ -307,12 +308,12 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			curated, err := preset.LoadCuratedCatalog()
+			curated, err := catalog.LoadCurated()
 			if err != nil {
 				return err
 			}
 
-			removed, err := preset.RemovePreset(paths.CatalogDir, curated, cat, name)
+			removed, err := catalog.RemovePreset(paths.CatalogDir, curated, cat, name)
 			if err != nil {
 				return err
 			}
@@ -333,7 +334,7 @@ func newWadsCmd() *cobra.Command {
 				root = "."
 			}
 			paths := resolveAppPaths()
-			diags, err := preset.LintCatalog(root, paths.CatalogDir)
+			diags, err := repolint.LintCatalog(root, paths.CatalogDir)
 			if err != nil {
 				return err
 			}
@@ -341,7 +342,7 @@ func newWadsCmd() *cobra.Command {
 			for _, d := range diags {
 				fmt.Fprintf(out, "[%s] %s\n", strings.ToUpper(d.Severity), d.String())
 			}
-			if preset.HasErrors(diags) {
+			if repolint.HasErrors(diags) {
 				return fmt.Errorf("catalog lint failed with errors")
 			}
 			fmt.Fprintln(out, "✓ Catalog lint passed")
@@ -359,7 +360,7 @@ func newWadsCmd() *cobra.Command {
 			if len(args) > 0 {
 				root = args[0]
 			}
-			if err := preset.SyncReadme(root); err != nil {
+			if err := repolint.SyncReadme(root); err != nil {
 				return err
 			}
 			fmt.Fprintln(cmdOut(cmd), "✓ Successfully synchronized README.md with catalog/*.json")
@@ -401,11 +402,11 @@ func bindWadCommonFlags(cmd *cobra.Command, f *wadOptionFlags, defaultEngine, de
 	cmd.Flags().StringVar(&f.args, "args", "", "Additional launch arguments")
 }
 
-func parseFileSpecs(raw []string) []preset.FileSpec {
-	var specs []preset.FileSpec
+func parseFileSpecs(raw []string) []catalog.FileSpec {
+	var specs []catalog.FileSpec
 	for _, f := range raw {
 		if trimmed := strings.TrimSpace(f); trimmed != "" {
-			specs = append(specs, preset.FileSpec{Name: trimmed})
+			specs = append(specs, catalog.FileSpec{Name: trimmed})
 		}
 	}
 	return specs
@@ -467,7 +468,7 @@ func runWadsList(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	dirIdx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+	dirIdx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 	out := cmdOut(cmd)
 
 	fmt.Fprintln(out, "=== Available Doom Presets ===")
@@ -563,7 +564,7 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintf(out, "  Engine:        %s%s\n", engStr, engineOverridden)
 
-	idx := preset.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+	idx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 	iwadPath, iwadFound := idx.ResolveFile(p.IWAD)
 	iwadStatus := "[✗ Missing]"
 	if iwadFound {
@@ -616,6 +617,6 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func findPreset(cat *preset.Catalog, query string) *preset.Preset {
+func findPreset(cat *catalog.Catalog, query string) *catalog.Preset {
 	return cat.Find(query)
 }

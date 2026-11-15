@@ -2,24 +2,18 @@
 package steam
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/fsutil"
-	"github.com/lock14/doom-cli/internal/preset"
 )
 
 // TargetPattern maps a candidate source filename to its canonical destination name in WADs directory.
@@ -43,7 +37,7 @@ func baseSlash(p string) string {
 // DefaultTargetPatterns returns all official commercial Doom files, expansions, and catalog WADs
 // (including declared filename aliases) to extract from Steam and GOG installations.
 func DefaultTargetPatterns() []TargetPattern {
-	cat, err := preset.LoadCuratedCatalog()
+	cat, err := catalog.LoadCurated()
 	if err != nil {
 		return nil
 	}
@@ -52,7 +46,7 @@ func DefaultTargetPatterns() []TargetPattern {
 
 // TargetPatternsForCatalog synthesizes extraction target patterns from the given preset catalog,
 // mapping both canonical filenames and their declared aliases to each preset's canonical filename.
-func TargetPatternsForCatalog(cat *preset.Catalog) []TargetPattern {
+func TargetPatternsForCatalog(cat *catalog.Catalog) []TargetPattern {
 	if cat == nil {
 		return nil
 	}
@@ -66,7 +60,7 @@ func TargetPatternsForCatalog(cat *preset.Catalog) []TargetPattern {
 		if src == "" || dst == "" {
 			return
 		}
-		key := preset.NormalizeFilename(src) + "->" + strings.ToLower(dst)
+		key := catalog.NormalizeFilename(src) + "->" + strings.ToLower(dst)
 		if seen[key] {
 			return
 		}
@@ -111,136 +105,6 @@ func TargetPatternsForCatalog(cat *preset.Catalog) []TargetPattern {
 	return patterns
 }
 
-var vdfPathRegex = regexp.MustCompile(`^\s*"path"\s*"([^"]+)"`)
-
-// ParseVDFPaths parses folder path values from a VDF reader without checking filesystem existence.
-func ParseVDFPaths(r io.Reader) []string {
-	var paths []string
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		line := scanner.Text()
-		matches := vdfPathRegex.FindStringSubmatch(line)
-		if len(matches) > 1 {
-			p := strings.TrimSpace(matches[1])
-			p = strings.ReplaceAll(p, `\\`, `\`)
-			paths = append(paths, p)
-		}
-	}
-	return paths
-}
-
-// ParseLibraryFolders extracts secondary library folder paths from Steam's libraryfolders.vdf.
-func ParseLibraryFolders(vdfPath string) []string {
-	f, err := os.Open(vdfPath)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
-
-	var paths []string
-	for _, p := range ParseVDFPaths(f) {
-		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-			paths = append(paths, p)
-		}
-	}
-	return paths
-}
-
-// GetSearchRoots returns platform-specific potential game directory roots.
-func GetSearchRoots() []string {
-	home, _ := os.UserHomeDir()
-	var roots []string
-
-	switch runtime.GOOS {
-	case "darwin":
-		if home != "" {
-			roots = append(roots,
-				filepath.Join(home, "Library", "Application Support", "Steam"),
-				filepath.Join(home, "Library", "Application Support", "GOG.com"),
-				filepath.Join(home, "GOG Games"),
-			)
-		}
-		for _, pat := range []string{
-			"/Applications/*Doom*",
-			"/Applications/*DOOM*",
-			"/Applications/*Heretic*",
-			"/Applications/*Hexen*",
-			"/Applications/*Strife*",
-			"/Applications/*GOG*",
-		} {
-			if matches, err := filepath.Glob(pat); err == nil {
-				roots = append(roots, matches...)
-			}
-		}
-
-	case "windows":
-		prog86 := os.Getenv("ProgramFiles(x86)")
-		if prog86 == "" {
-			prog86 = `C:\Program Files (x86)`
-		}
-		prog := os.Getenv("ProgramFiles")
-		if prog == "" {
-			prog = `C:\Program Files`
-		}
-		roots = append(roots,
-			filepath.Join(prog86, "Steam"),
-			filepath.Join(prog, "Steam"),
-			`C:\GOG Games`,
-		)
-		if home != "" {
-			roots = append(roots,
-				filepath.Join(home, "Saved Games", "Nightdive Studios", "DOOM"),
-				filepath.Join(home, "Saved Games", "id Software"),
-			)
-		}
-		for _, drive := range []string{"C", "D", "E", "F", "G"} {
-			roots = append(roots, drive+`:\Steam`, drive+`:\GOG Games`, drive+`:\Games`)
-		}
-
-	default: // Linux and BSD
-		if home != "" {
-			roots = append(roots,
-				filepath.Join(home, ".local", "share", "Steam"),
-				filepath.Join(home, ".steam", "steam"),
-				filepath.Join(home, ".steam", "root"),
-				filepath.Join(home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
-				filepath.Join(home, "GOG Games"),
-				filepath.Join(home, ".local", "share", "bottles"),
-				filepath.Join(home, ".wine"),
-			)
-		}
-	}
-
-	// For any existing Steam directories, look for libraryfolders.vdf
-	var candidates []string
-	for _, r := range roots {
-		candidates = append(candidates, r)
-		vdf := filepath.Join(r, "steamapps", "libraryfolders.vdf")
-		candidates = append(candidates, ParseLibraryFolders(vdf)...)
-	}
-
-	return normalizeExistingDirs(candidates)
-}
-
-func normalizeExistingDirs(candidates []string) []string {
-	var existing []string
-	seen := make(map[string]bool)
-	for _, r := range candidates {
-		clean := filepath.Clean(r)
-		if resolved, err := filepath.EvalSymlinks(clean); err == nil {
-			clean = filepath.Clean(resolved)
-		}
-		if seen[clean] {
-			continue
-		}
-		seen[clean] = true
-		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
-			existing = append(existing, clean)
-		}
-	}
-	return existing
-}
-
 var skippedSteamSubdirs = map[string]bool{
 	"shadercache": true,
 	"workshop":    true,
@@ -254,7 +118,7 @@ var skippedSteamSubdirs = map[string]bool{
 // using target patterns synthesized from cat (or the curated catalog when cat is nil).
 // When force is false, files already present in wadsDir or any extraWadRoots are skipped.
 func DiscoverAndExtract(
-	cat *preset.Catalog,
+	cat *catalog.Catalog,
 	searchRoots []string,
 	wadsDir string,
 	force bool,
@@ -269,7 +133,7 @@ func DiscoverAndExtract(
 // DiscoverAndExtractContext searches for official game files and catalog WADs under ctx.
 func DiscoverAndExtractContext(
 	ctx context.Context,
-	cat *preset.Catalog,
+	cat *catalog.Catalog,
 	searchRoots []string,
 	wadsDir string,
 	force bool,
@@ -354,7 +218,7 @@ func DiscoverAndExtractContext(
 				strings.HasSuffix(lowerName, ".deh") ||
 				strings.HasSuffix(lowerName, ".bex") {
 				indexed[lowerName] = append(indexed[lowerName], walkPath)
-				normName := preset.NormalizeFilename(d.Name())
+				normName := catalog.NormalizeFilename(d.Name())
 				indexedNorm[normName] = append(indexedNorm[normName], walkPath)
 			}
 			return nil
@@ -365,11 +229,11 @@ func DiscoverAndExtractContext(
 	}
 
 	if cat == nil {
-		cat, _ = preset.LoadCuratedCatalog()
+		cat, _ = catalog.LoadCurated()
 	}
 	patterns := TargetPatternsForCatalog(cat)
 	wadRoots := append([]string{wadsDir}, extraWadRoots...)
-	dirIdx := preset.NewDirIndex(wadRoots...).WithCatalog(cat)
+	dirIdx := catalog.NewDirIndex(wadRoots...).WithCatalog(cat)
 	foundCount := 0
 	installedTargets := make(map[string]bool)
 	processedTargets := make(map[string]bool)
@@ -385,7 +249,7 @@ func DiscoverAndExtractContext(
 		if err := ctx.Err(); err != nil {
 			return foundCount, err
 		}
-		if idkfaDestName == "" && preset.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
+		if idkfaDestName == "" && catalog.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
 			idkfaDestName = tp.DestName
 		}
 		destLower := strings.ToLower(tp.DestName)
@@ -436,7 +300,7 @@ func DiscoverAndExtractContext(
 			}
 		}
 		for _, p := range destPatterns {
-			for _, c := range indexedNorm[preset.NormalizeFilename(p.SourcePattern)] {
+			for _, c := range indexedNorm[catalog.NormalizeFilename(p.SourcePattern)] {
 				addCandidate(c)
 			}
 		}
@@ -541,181 +405,4 @@ func rankRereleaseCandidates(paths []string) []string {
 		return len(filepath.Dir(ranked[i])) < len(filepath.Dir(ranked[j]))
 	})
 	return ranked
-}
-
-// idkfaReusedTrackSlots maps an H_ lump name in extras.wad to additional D_ lump
-// names that share the same composition in DOOM.WAD and DOOM2.WAD (per TRAKINFO).
-// Multiple WAD directory entries share the same lump offset and size without
-// duplicating audio payload bytes.
-var idkfaReusedTrackSlots = map[string][]string{
-	// Doom I reused music slots
-	"H_INTRO": {"D_INTROA"},
-	"H_E1M6":  {"D_E3M6"},
-	"H_E1M7":  {"D_E2M5", "D_E3M5"},
-	"H_E1M8":  {"D_E3M4"},
-	"H_E1M9":  {"D_E3M9"},
-	"H_E2M3":  {"D_INTER"},
-	"H_E2M7":  {"D_E3M7"},
-	"H_E2M9":  {"D_E3M1"},
-	// Doom II reused music slots
-	"H_RUNNIN": {"D_RUNNI2"},
-	"H_STALKS": {"D_STLKS2", "D_STLKS3"},
-	"H_COUNTD": {"D_COUNT2"},
-	"H_DOOM":   {"D_DOOM2"},
-	"H_THE_DA": {"D_THEDA2", "D_THEDA3"},
-	"H_SHAWN":  {"D_SHAWN2", "D_SHAWN3"},
-	"H_DDTBLU": {"D_DDTBL2", "D_DDTBL3"},
-	"H_DEAD":   {"D_DEAD2"},
-	"H_ROMERO": {"D_ROMER2"},
-	"H_MESSAG": {"D_MESSG2"},
-}
-
-// SynthesizeIDKFAWAD extracts Andrew Hulshult's IDKFA soundtrack lumps (prefixed with H_)
-// from a DOOM + DOOM II (2024) extras.wad file, renames each lump prefix from H_ to D_
-// (including reused map music slots from TRAKINFO) so classic source ports play them
-// automatically, and writes a valid PWAD atomically to dstPath.
-func SynthesizeIDKFAWAD(srcExtrasPath, dstPath string) (int, error) {
-	f, err := os.Open(srcExtrasPath)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-
-	fi, err := f.Stat()
-	if err != nil {
-		return 0, err
-	}
-	fileSize := fi.Size()
-	if fileSize < 12 {
-		return 0, errors.New("file too small to be a WAD")
-	}
-
-	var hdr [12]byte
-	if _, err := io.ReadFull(f, hdr[:]); err != nil {
-		return 0, err
-	}
-	ident := string(hdr[0:4])
-	if ident != "PWAD" && ident != "IWAD" {
-		return 0, fmt.Errorf("invalid WAD header %q", ident)
-	}
-
-	numLumps := int64(binary.LittleEndian.Uint32(hdr[4:8]))
-	dirOffset := int64(binary.LittleEndian.Uint32(hdr[8:12]))
-	if numLumps <= 0 || numLumps > 65536 || dirOffset < 12 || dirOffset+numLumps*16 > fileSize {
-		return 0, errors.New("corrupt WAD directory bounds")
-	}
-
-	dirBuf := make([]byte, numLumps*16)
-	if _, err := f.ReadAt(dirBuf, dirOffset); err != nil {
-		return 0, err
-	}
-
-	type audioPayload struct {
-		srcPos int64
-		outPos uint32
-		size   uint32
-		hName  string
-		dName  string
-	}
-
-	var payloads []audioPayload
-	seenDNames := make(map[string]bool)
-	curOutPos := int64(12)
-
-	for i := int64(0); i < numLumps; i++ {
-		entry := dirBuf[i*16 : (i+1)*16]
-		lumpPos := int64(binary.LittleEndian.Uint32(entry[0:4]))
-		lumpSize := int64(binary.LittleEndian.Uint32(entry[4:8]))
-		if lumpSize <= 0 || lumpPos < 12 || lumpPos+lumpSize > fileSize {
-			continue
-		}
-		nameSlice := entry[8:16]
-		if nul := bytes.IndexByte(nameSlice, 0); nul >= 0 {
-			nameSlice = nameSlice[:nul]
-		}
-		upperName := strings.ToUpper(string(nameSlice))
-		if len(upperName) < 3 || !strings.HasPrefix(upperName, "H_") || lumpSize < 4 {
-			continue
-		}
-		dName := "D_" + upperName[2:]
-		if seenDNames[dName] {
-			continue
-		}
-		var magic [4]byte
-		if _, err := f.ReadAt(magic[:], lumpPos); err != nil || string(magic[:]) != "OggS" {
-			continue
-		}
-		if curOutPos+lumpSize > math.MaxInt32 {
-			return 0, errors.New("synthesized WAD exceeds signed 32-bit PWAD limit")
-		}
-		seenDNames[dName] = true
-		payloads = append(payloads, audioPayload{
-			srcPos: lumpPos,
-			outPos: uint32(curOutPos),
-			size:   uint32(lumpSize),
-			hName:  upperName,
-			dName:  dName,
-		})
-		curOutPos += lumpSize
-	}
-
-	if len(payloads) == 0 {
-		return 0, errors.New("no H_ soundtrack lumps found in extras.wad")
-	}
-
-	type wadDirEntry struct {
-		outPos uint32
-		size   uint32
-		name   [8]byte
-	}
-
-	var dirEntries []wadDirEntry
-	addDirEntry := func(outPos, size uint32, lumpName string) {
-		var nameBytes [8]byte
-		copy(nameBytes[:], lumpName)
-		dirEntries = append(dirEntries, wadDirEntry{
-			outPos: outPos,
-			size:   size,
-			name:   nameBytes,
-		})
-	}
-
-	for _, p := range payloads {
-		addDirEntry(p.outPos, p.size, p.dName)
-		for _, alias := range idkfaReusedTrackSlots[p.hName] {
-			if !seenDNames[alias] {
-				seenDNames[alias] = true
-				addDirEntry(p.outPos, p.size, alias)
-			}
-		}
-	}
-
-	if curOutPos+int64(len(dirEntries))*16 > math.MaxInt32 {
-		return 0, errors.New("synthesized WAD directory exceeds signed 32-bit PWAD limit")
-	}
-
-	var outHdr [12]byte
-	copy(outHdr[0:4], "PWAD")
-	binary.LittleEndian.PutUint32(outHdr[4:8], uint32(len(dirEntries)))
-	binary.LittleEndian.PutUint32(outHdr[8:12], uint32(curOutPos))
-
-	outDir := make([]byte, len(dirEntries)*16)
-	for i, de := range dirEntries {
-		dstEntry := outDir[i*16 : (i+1)*16]
-		binary.LittleEndian.PutUint32(dstEntry[0:4], de.outPos)
-		binary.LittleEndian.PutUint32(dstEntry[4:8], de.size)
-		copy(dstEntry[8:16], de.name[:])
-	}
-
-	readers := make([]io.Reader, 0, len(payloads)+2)
-	readers = append(readers, bytes.NewReader(outHdr[:]))
-	for _, p := range payloads {
-		readers = append(readers, io.NewSectionReader(f, p.srcPos, int64(p.size)))
-	}
-	readers = append(readers, bytes.NewReader(outDir))
-
-	if _, _, err := fsutil.WriteReaderAtomic(dstPath, io.MultiReader(readers...), 0o644); err != nil {
-		return 0, err
-	}
-	return len(dirEntries), nil
 }

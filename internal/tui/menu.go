@@ -7,21 +7,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/catalog"
 )
 
 // RunNumberedMenu provides a standard interactive menu without full-screen TUI.
-func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*preset.Preset, error) {
-	if catalog == nil {
-		catalog = &preset.Catalog{}
+func RunNumberedMenu(cat *catalog.Catalog, in io.Reader, out io.Writer) (*catalog.Preset, error) {
+	if cat == nil {
+		cat = &catalog.Catalog{}
 	}
 
 	fmt.Fprintln(out, "======================================================")
 	fmt.Fprintln(out, "               DOOM PRESET LAUNCHER                   ")
 	fmt.Fprintln(out, "======================================================")
 
-	for i, p := range catalog.Presets {
-		eng := catalog.EngineDisplayName(p.Engine)
+	for i, p := range cat.Presets {
+		eng := cat.EngineDisplayName(p.Engine)
 		fmt.Fprintf(out, "%2d. %-30s [%s]\n", i+1, p.Name, eng)
 	}
 	fmt.Fprintln(out)
@@ -36,8 +36,8 @@ func RunNumberedMenu(catalog *preset.Catalog, in io.Reader, out io.Writer) (*pre
 		return nil, nil
 	}
 	idx, err := strconv.Atoi(text)
-	if err == nil && idx >= 1 && idx <= len(catalog.Presets) {
-		return &catalog.Presets[idx-1], nil
+	if err == nil && idx >= 1 && idx <= len(cat.Presets) {
+		return &cat.Presets[idx-1], nil
 	}
 
 	return nil, fmt.Errorf("invalid menu selection")

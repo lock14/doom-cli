@@ -1,4 +1,4 @@
-package preset
+package catalog
 
 import (
 	"bytes"
@@ -16,11 +16,9 @@ func DecodeText(raw []byte) string {
 		return ""
 	}
 
-	// Normalize CRLF to LF and bare CR to LF
 	normalized := bytes.ReplaceAll(raw, []byte("\r\n"), []byte("\n"))
 	normalized = bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
 
-	// Check if already valid UTF-8 without accidental Arabic code points from CP437 blocks
 	if utf8.Valid(normalized) {
 		text := string(normalized)
 		hasAccidentalArabic := false
@@ -35,19 +33,15 @@ func DecodeText(raw []byte) string {
 		}
 	}
 
-	// Count CP437 box-drawing, shading, block, and CP437-exclusive Latin letters vs Windows-1252 punctuation
 	cpScore := 0
 	winScore := 0
 	for _, b := range normalized {
 		switch {
 		case b >= 0xB0 && b <= 0xDF:
-			// Box-drawing, shading blocks (░▒▓█▄▀), and borders (║═│─) in CP437
 			cpScore++
 		case b == 0x81 || b == 0x8D || b == 0x8F || b == 0x90 || b == 0x9D:
-			// Undefined C1 bytes in Windows-1252 that encode valid letters (such as ü = 0x81) in CP437
 			cpScore++
 		case b >= 0x80 && b <= 0x9F:
-			// Smart quotes, dashes, ellipsis, bullet, trademark in Windows-1252
 			winScore++
 		}
 	}

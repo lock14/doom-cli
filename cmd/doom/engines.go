@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/engine"
-	"github.com/lock14/doom-cli/internal/preset"
-	"github.com/lock14/doom-cli/internal/templates"
+	"github.com/lock14/doom-cli/internal/portcfg"
 	"github.com/lock14/doom-cli/internal/tui"
 	"github.com/lock14/doom-cli/internal/wad"
 )
@@ -72,7 +72,7 @@ func newEnginesCmd() *cobra.Command {
 				if err := ins.InstallCatalog(cat); err != nil {
 					return err
 				}
-				if err := templates.DeployConfigsWithOptions(paths, installForce, out); err != nil {
+				if err := portcfg.DeployConfigsWithOptions(paths, installForce, out); err != nil {
 					return err
 				}
 				_, err := wad.InstallSoundFontContext(ctx, paths.SoundFontsDir, installForce, out)
@@ -113,7 +113,7 @@ func newEnginesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			curated, err := preset.LoadCuratedCatalog()
+			curated, err := catalog.LoadCurated()
 			if err != nil {
 				return err
 			}
@@ -135,10 +135,10 @@ func newEnginesCmd() *cobra.Command {
 
 			id := addFlags.id
 			if id == "" {
-				id = preset.Slug(name)
+				id = catalog.Slug(name)
 			}
 
-			eng := preset.EngineConfig{
+			eng := catalog.EngineConfig{
 				ID:          id,
 				DisplayName: name,
 				Description: addFlags.description,
@@ -149,7 +149,7 @@ func newEnginesCmd() *cobra.Command {
 				Badge:       addFlags.badge,
 			}
 
-			outPath, err := preset.AddEngine(paths.CatalogDir, curated, eng)
+			outPath, err := catalog.AddEngine(paths.CatalogDir, curated, eng)
 			if err != nil {
 				return err
 			}
@@ -183,7 +183,7 @@ func newEnginesCmd() *cobra.Command {
 			}
 			out := cmdOut(cmd)
 
-			var opts preset.EngineOverrideOptions
+			var opts catalog.EngineOverrideOptions
 			changed := false
 			if cmd.Flags().Changed("binary") || setFlags.binary != "" {
 				v := setFlags.binary
@@ -231,7 +231,7 @@ func newEnginesCmd() *cobra.Command {
 				)
 			}
 
-			outPath, err := preset.ConfigEngine(paths.CatalogDir, cat, name, opts)
+			outPath, err := catalog.ConfigEngine(paths.CatalogDir, cat, name, opts)
 			if err != nil {
 				return err
 			}
@@ -254,7 +254,7 @@ func newEnginesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := preset.ResetEngineOverride(paths.CatalogDir, cat, name); err != nil {
+			if err := catalog.ResetEngineOverride(paths.CatalogDir, cat, name); err != nil {
 				return err
 			}
 			fmt.Fprintf(cmdOut(cmd), "✓ Reset custom engine overrides for %q\n", name)
@@ -272,12 +272,12 @@ func newEnginesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			curated, err := preset.LoadCuratedCatalog()
+			curated, err := catalog.LoadCurated()
 			if err != nil {
 				return err
 			}
 
-			removedPath, referencedBy, err := preset.RemoveEngine(paths.CatalogDir, curated, cat, name)
+			removedPath, referencedBy, err := catalog.RemoveEngine(paths.CatalogDir, curated, cat, name)
 			if err != nil {
 				return err
 			}
@@ -330,7 +330,7 @@ func newEnginesCfgCmd() *cobra.Command {
 		Short: "Inspect, deploy, or synchronize source port configuration files",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return templates.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
+			return portcfg.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
 		},
 	}
 
@@ -339,7 +339,7 @@ func newEnginesCfgCmd() *cobra.Command {
 		Short: "Deploy curated autoexec.cfg and dsda-doom.cfg to system directories",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return templates.DeployConfigsTo(resolveAppPaths(), cmdOut(cmd))
+			return portcfg.DeployConfigsTo(resolveAppPaths(), cmdOut(cmd))
 		},
 	}
 
@@ -348,7 +348,7 @@ func newEnginesCfgCmd() *cobra.Command {
 		Short: "Compare embedded engine templates against live system configurations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return templates.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
+			return portcfg.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
 		},
 	}
 
@@ -362,7 +362,7 @@ func newEnginesCfgCmd() *cobra.Command {
 			if len(args) > 0 {
 				rootDir = args[0]
 			}
-			return templates.SyncConfigs(resolveAppPaths(), rootDir, cmdOut(cmd))
+			return portcfg.SyncConfigs(resolveAppPaths(), rootDir, cmdOut(cmd))
 		},
 	}
 
@@ -394,7 +394,7 @@ func runEnginesList(cmd *cobra.Command, _ []string) error {
 		style := eng.EffectiveArgsStyle()
 		displayName := eng.EffectiveDisplayName()
 		statusFlag := ""
-		if eng.Layer == preset.LayerUser {
+		if eng.Layer == catalog.LayerUser {
 			statusFlag = " (custom)"
 		} else if eng.Overridden {
 			statusFlag = " (overridden)"

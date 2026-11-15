@@ -76,11 +76,11 @@ func runConfigShow(cmd *cobra.Command, _ []string) error {
 	}
 
 	effectiveTheme, themeSource := resolveThemeWithSource(cfg)
-	effectiveNerdFonts, nfSource := resolveNerdFontsWithSource(cfg)
-	wadsDirSrc := dirSource(cfg.WadsDir)
-	wadsDirsSrc := wadsDirsSource(cfg)
-	binDirSrc := dirSource(cfg.BinDir)
-	sfDirSrc := dirSource(cfg.SoundFontsDir)
+	effectiveNerdFonts, nfSource := config.ResolveNerdFontsWithSource(cfg)
+	wadsDirSrc := config.DirSource(cfg.WadsDir)
+	wadsDirsSrc := config.WadsDirsSource(cfg)
+	binDirSrc := config.DirSource(cfg.BinDir)
+	sfDirSrc := config.DirSource(cfg.SoundFontsDir)
 
 	nfState := "disabled (universal rectangular badges)"
 	if effectiveNerdFonts {
@@ -114,7 +114,7 @@ func runConfigGet(cmd *cobra.Command, args []string) error {
 	}
 
 	effectiveTheme, _ := resolveThemeWithSource(cfg)
-	effectiveNerdFonts, _ := resolveNerdFontsWithSource(cfg)
+	effectiveNerdFonts, _ := config.ResolveNerdFontsWithSource(cfg)
 	out := cmdOut(cmd)
 
 	if len(args) == 0 {
@@ -258,7 +258,7 @@ func runConfigThemes(cmd *cobra.Command, _ []string) error {
 	out := cmdOut(cmd)
 
 	activeTheme := tui.ResolveTheme(cfg.Theme, paths.ThemesDir)
-	nerdFonts, _ := resolveNerdFontsWithSource(cfg)
+	nerdFonts, _ := config.ResolveNerdFontsWithSource(cfg)
 
 	fmt.Fprintln(out, "=== Available Doom Themes ===")
 	fmt.Fprintln(out)
@@ -330,11 +330,4 @@ func resolveThemeWithSource(cfg *config.AppConfig) (string, string) {
 func isRegularFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
-}
-
-func resolveNerdFontsWithSource(cfg *config.AppConfig) (bool, string) {
-	if cfg != nil && cfg.HasNerdFonts() {
-		return cfg.NerdFonts, "config"
-	}
-	return false, "default"
 }

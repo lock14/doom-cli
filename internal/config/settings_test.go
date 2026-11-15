@@ -142,3 +142,37 @@ func TestConfigCaseInsensitiveKnownKeysDeduped(t *testing.T) {
 		t.Errorf("expected cleared Theme to stay empty, got %q", reloaded.Theme)
 	}
 }
+
+func TestApplyConfigPathsAndProvenanceHelpers(t *testing.T) {
+	t.Parallel()
+	p := ResolveFor("linux")
+	cfg := &AppConfig{
+		WadsDir:       "/custom/wads",
+		WadsDirs:      []string{"/extra/wads"},
+		BinDir:        "/custom/bin",
+		SoundFontsDir: "/custom/sf2",
+	}
+	cfg.SetNerdFonts(false)
+
+	ApplyConfigPaths(p, cfg)
+	if p.WadsDir != "/custom/wads" || p.BinDir != "/custom/bin" || p.SoundFontsDir != "/custom/sf2" {
+		t.Fatalf("unexpected paths after ApplyConfigPaths: %+v", p)
+	}
+	if len(p.WadsDirs) != 1 || p.WadsDirs[0] != "/extra/wads" {
+		t.Fatalf("unexpected WadsDirs: %v", p.WadsDirs)
+	}
+	if DirSource(cfg.WadsDir) != "config" || DirSource("") != "default" {
+		t.Errorf("unexpected DirSource results")
+	}
+	if WadsDirsSource(cfg) != "config" || WadsDirsSource(&AppConfig{}) != "default" {
+		t.Errorf("unexpected WadsDirsSource results")
+	}
+	nf, nfSrc := ResolveNerdFontsWithSource(cfg)
+	if nf || nfSrc != "config" {
+		t.Errorf("ResolveNerdFontsWithSource(explicit false) = (%v, %q), want (false, \"config\")", nf, nfSrc)
+	}
+	nfDef, nfDefSrc := ResolveNerdFontsWithSource(&AppConfig{})
+	if nfDef || nfDefSrc != "default" {
+		t.Errorf("ResolveNerdFontsWithSource(unset) = (%v, %q), want (false, \"default\")", nfDef, nfDefSrc)
+	}
+}
