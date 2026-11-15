@@ -20,7 +20,8 @@
   "release_date": "2003",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe.zip",
+      "sha256": "a38246e005b4675d1f91474cd8dd93f4da016c4a22b1169dcede2608d72f6e99"
     }
   ],
   "links": [

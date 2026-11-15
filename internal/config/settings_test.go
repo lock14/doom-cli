@@ -112,3 +112,33 @@ func TestConfigPreservesUnknownKeysAndCreatesBackup(t *testing.T) {
 		t.Fatal("expected SaveConfig to create a .bak.<timestamp> backup when overwriting")
 	}
 }
+
+func TestConfigCaseInsensitiveKnownKeysDeduped(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.json")
+	p := &Paths{ConfigFile: configPath}
+
+	raw := "{\n  \"Theme\": \"nord\",\n  \"Wads_Dir\": \"/data/wads\",\n  \"custom_extra\": 42\n}\n"
+	if err := os.WriteFile(configPath, []byte(raw), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(p)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	if cfg.Theme != "nord" || cfg.WadsDir != "/data/wads" {
+		t.Fatalf("unexpected loaded config: %+v", cfg)
+	}
+	cfg.Theme = ""
+	if err := SaveConfig(p, cfg); err != nil {
+		t.Fatalf("SaveConfig: %v", err)
+	}
+	reloaded, err := LoadConfig(p)
+	if err != nil {
+		t.Fatalf("reload LoadConfig: %v", err)
+	}
+	if reloaded.Theme != "" {
+		t.Errorf("expected cleared Theme to stay empty, got %q", reloaded.Theme)
+	}
+}

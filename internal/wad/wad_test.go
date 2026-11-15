@@ -113,7 +113,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 		},
 	}
 
-	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{
+	err := dl.extractFromZip(zipPath, []string{
 		"Eviternity II.wad",
 		"sub/Sunder 2512.wad",
 		"custom_v2.wad",
@@ -182,7 +182,6 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	sunderDL := NewDownloader([]string{sunderWadsDir}, false, nil)
 	if err := sunderDL.extractFromZip(
 		sunderZipPath,
-		int64(sunderBuf.Len()),
 		[]string{"Sunder 2512.wad"},
 		preset.Preset{Name: "Sunder"},
 	); err != nil {
@@ -364,7 +363,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 func TestInstallSoundFont(t *testing.T) {
 	t.Parallel()
 	fakeSF := []byte("RIFF-SF2-MOCK-CONTENT")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(fakeSF)
@@ -409,7 +408,7 @@ func TestDownloader_ExtractFromZip_ZipSlipProtection(t *testing.T) {
 	wadsDir := filepath.Join(tmpDir, "wads")
 	dl := NewDownloader([]string{wadsDir}, false, nil)
 
-	err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{"normal.wad"})
+	err := dl.extractFromZip(zipPath, []string{"normal.wad"})
 	if err != nil {
 		t.Fatalf("unexpected error extracting normal file: %v", err)
 	}
@@ -442,7 +441,7 @@ func TestDownloader_FallbackReadmeRenamedToPrimaryStem(t *testing.T) {
 		Name:  "My Megawad",
 		Files: []preset.FileSpec{{Name: "MyMegawad.wad"}},
 	}
-	if err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{"MyMegawad.wad"}, p); err != nil {
+	if err := dl.extractFromZip(zipPath, []string{"MyMegawad.wad"}, p); err != nil {
 		t.Fatalf("extractFromZip failed: %v", err)
 	}
 
@@ -508,7 +507,7 @@ func TestDownloader_ExtractPK3AndReadmeFromZip(t *testing.T) {
 				Name:  "MyHouse.pk3",
 				Files: []preset.FileSpec{{Name: tc.expected}},
 			}
-			if err := dl.extractFromZip(zipPath, int64(len(zipBytes)), []string{tc.expected}, p); err != nil {
+			if err := dl.extractFromZip(zipPath, []string{tc.expected}, p); err != nil {
 				t.Fatalf("extractFromZip failed: %v", err)
 			}
 
@@ -530,5 +529,54 @@ func TestDownloader_ExtractPK3AndReadmeFromZip(t *testing.T) {
 				t.Errorf("readme content = %q (err=%v), want %q", string(gotReadme), err, tc.wantReadme)
 			}
 		})
+	}
+}
+
+func TestExtractWADLumpFromReaderAndZipSymlinkSkipped(t *testing.T) {
+	t.Parallel()
+	wadBytes := buildTestPWADWithDehacked("Patch File for DeHackEd v3.0\nDoom version = 19\n")
+	r := bytes.NewReader(wadBytes)
+	got, ok := ExtractWADLumpFromReader(r, int64(len(wadBytes)), "DEHACKED")
+	if !ok || !strings.Contains(string(got), "Doom version = 19") {
+		t.Fatalf("ExtractWADLumpFromReader = (%q, %v), want DEHACKED lump", string(got), ok)
+	}
+	if _, okMissing := ExtractWADLumpFromReader(r, int64(len(wadBytes)), "MISSING"); okMissing {
+		t.Errorf("expected missing lump to return false")
+	}
+
+	// Verify zip symlink entries are skipped and never extracted as regular files.
+	tmpDir := t.TempDir()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	symHdr := &zip.FileHeader{Name: "evil.wad"}
+	symHdr.SetMode(os.ModeSymlink | 0o777)
+	sw, err := zw.CreateHeader(symHdr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = sw.Write([]byte("/etc/passwd"))
+	fw, err := zw.Create("good.wad")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = fw.Write([]byte("good-pwad"))
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(tmpDir, "sym.zip")
+	if err := os.WriteFile(zipPath, buf.Bytes(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wadsDir := filepath.Join(tmpDir, "wads")
+	dl := NewDownloader([]string{wadsDir}, false, nil)
+	if err := dl.extractFromZip(zipPath, []string{"good.wad", "evil.wad"}); err == nil {
+		t.Fatalf("expected extractFromZip to reject missing non-symlink match for evil.wad")
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "evil.wad")); !os.IsNotExist(err) {
+		t.Errorf("expected symlink zip entry evil.wad to be skipped")
+	}
+	if data, err := os.ReadFile(filepath.Join(wadsDir, "good.wad")); err != nil || string(data) != "good-pwad" {
+		t.Errorf("good.wad = %q (%v), want good-pwad", string(data), err)
 	}
 }

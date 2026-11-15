@@ -1,6 +1,7 @@
 package fsutil
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -38,6 +40,11 @@ func TestCleanRelAndSafeJoin(t *testing.T) {
 		{name: "drive relative", rel: `C:foo.wad`, wantErr: true},
 		{name: "double slash", rel: "sub//foo.wad", wantErr: true},
 		{name: "NUL byte", rel: "foo\x00.wad", wantErr: true},
+		{name: "trailing space traversal", rel: ".. ", wantErr: true},
+		{name: "trailing dot segment", rel: "sub./foo.wad", wantErr: true},
+		{name: "windows reserved CON", rel: "CON.wad", wantErr: true},
+		{name: "windows reserved COM1", rel: "com1/foo.wad", wantErr: true},
+		{name: "windows reserved LPT9", rel: "LPT9", wantErr: true},
 	}
 
 	for _, tc := range tests {
@@ -262,5 +269,60 @@ func TestDownloadVerifiedAndFailedReaderNoSpuriousBackup(t *testing.T) {
 	gotData, err := os.ReadFile(target)
 	if err != nil || string(gotData) != string(payload) {
 		t.Fatalf("target content = %q (%v), want %q", string(gotData), err, string(payload))
+	}
+}
+
+func TestSafeJoin_FilesystemRootAndBoundsAndRedirectDowngrade(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS != "windows" {
+		joined, err := SafeJoin("/", "DOOM2.WAD")
+		if err != nil || joined != "/DOOM2.WAD" {
+			t.Fatalf("SafeJoin(\"/\", \"DOOM2.WAD\") = (%q, %v), want (\"/DOOM2.WAD\", nil)", joined, err)
+		}
+	}
+
+	// WriteLimitedReaderAtomic enforces maxBytes without creating destination or backup.
+	dir := t.TempDir()
+	target := filepath.Join(dir, "secret.json")
+	if err := os.WriteFile(target, []byte("initial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := WriteLimitedReaderAtomic(
+		target,
+		bytes.NewReader([]byte("too-long-payload")),
+		4,
+		0o644,
+	); err == nil {
+		t.Fatal("expected WriteLimitedReaderAtomic to reject payload exceeding maxBytes")
+	}
+	// Overwriting an existing 0600 file preserves its restrictive permissions.
+	if _, err := WriteFileAtomic(target, []byte("updated"), 0o644); err != nil {
+		t.Fatalf("WriteFileAtomic: %v", err)
+	}
+	if runtime.GOOS != "windows" {
+		fi, err := os.Stat(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fi.Mode().Perm() != 0o600 {
+			t.Errorf("expected existing 0600 mode preserved, got %04o", fi.Mode().Perm())
+		}
+	}
+
+	// HTTPS to HTTP redirect downgrade is rejected.
+	httpTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("insecure-downgrade"))
+	}))
+	defer httpTarget.Close()
+
+	httpsRedirect := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, httpTarget.URL, http.StatusFound)
+	}))
+	defer httpsRedirect.Close()
+
+	dlDest := filepath.Join(dir, "downgraded.bin")
+	if _, err := DownloadVerified(httpsRedirect.Client(), httpsRedirect.URL, dlDest, "", 0o644); err == nil ||
+		!strings.Contains(err.Error(), "downgrade") {
+		t.Fatalf("expected HTTPS-to-HTTP redirect downgrade error, got %v", err)
 	}
 }

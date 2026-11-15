@@ -246,3 +246,65 @@ func TestDeployConfigsWithOptions_PreservesExistingWhenNotForced(t *testing.T) {
 		t.Errorf("expected autoexec.cfg overwritten when force=true")
 	}
 }
+
+func TestRenderWindowsBackslashAndCRLFNormalization(t *testing.T) {
+	t.Parallel()
+	// Nil paths guard returns cleanly without panicking.
+	if got := RenderAutoexecWithRate(nil, 144); len(got) == 0 {
+		t.Fatal("expected non-empty default render when paths == nil")
+	}
+
+	// Windows backslash SoundFont path is normalized to forward slashes in UZDoom autoexec.cfg.
+	winPaths := &config.Paths{
+		SoundFontFile: `D:\Games\Doom\soundfonts\GeneralUser-GS.sf2`,
+	}
+	renderedAuto := string(RenderAutoexecWithRate(winPaths, 165))
+	if !strings.Contains(renderedAuto, `fluid_patchset "D:/Games/Doom/soundfonts/GeneralUser-GS.sf2"`) {
+		t.Fatalf("expected forward-slash fluid_patchset on Windows, got:\n%s", renderedAuto)
+	}
+	if !strings.Contains(renderedAuto, "vid_preferbackend 1") {
+		t.Errorf("expected vid_preferbackend 1 (Vulkan) in autoexec.cfg")
+	}
+
+	// CRLF line endings on disk do not produce false-positive diffs or dirty synced templates.
+	tmpDir := t.TempDir()
+	paths := &config.Paths{
+		SoundFontFile: filepath.Join(tmpDir, "sf", "GeneralUser-GS.sf2"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda"),
+	}
+	if err := DeployConfigsWithDisplay(paths, "2560x1440", 144, true, io.Discard); err != nil {
+		t.Fatalf("DeployConfigsWithDisplay: %v", err)
+	}
+	dsdaFile := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
+	rawLF, err := os.ReadFile(dsdaFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawCRLF := bytes.ReplaceAll(rawLF, []byte("\n"), []byte("\r\n"))
+	if err := os.WriteFile(dsdaFile, rawCRLF, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var diffBuf bytes.Buffer
+	if err := DiffConfigsWithDisplay(paths, "2560x1440", 144, &diffBuf); err != nil {
+		t.Fatalf("DiffConfigsWithDisplay: %v", err)
+	}
+	if !strings.Contains(diffBuf.String(), "dsda-doom.cfg is in sync with system") {
+		t.Errorf("expected CRLF dsda-doom.cfg to report in sync, got:\n%s", diffBuf.String())
+	}
+
+	repoDir := filepath.Join(tmpDir, "repo")
+	_ = os.MkdirAll(filepath.Join(repoDir, "uzdoom"), 0o755)
+	_ = os.MkdirAll(filepath.Join(repoDir, "dsda-doom"), 0o755)
+	if err := SyncConfigs(paths, repoDir, io.Discard); err != nil {
+		t.Fatalf("SyncConfigs: %v", err)
+	}
+	syncedDSDA, err := os.ReadFile(filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(syncedDSDA, []byte("\r\n")) {
+		t.Errorf("expected SyncConfigs to write LF-only template without CRLF")
+	}
+}

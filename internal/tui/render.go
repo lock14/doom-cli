@@ -526,6 +526,9 @@ func renderHeaderBar(leftPart, rightPart string, width int) string {
 		gap := width - leftW - rightW
 		return leftPart + strings.Repeat(" ", gap) + rightPart + "\n\n"
 	}
+	if width > 0 && leftW > width {
+		return truncateANSI(leftPart, width) + "\n\n"
+	}
 	return leftPart + "\n\n"
 }
 
@@ -588,7 +591,13 @@ func (m model) renderReadmeFooter() string {
 
 func (m model) renderFooter(hasReadme bool) string {
 	var items []keyHelp
-	if m.width >= sideBySideMinWidth {
+	if m.fetching {
+		items = []keyHelp{
+			{"↑/↓", "Navigate"},
+			{"F1", "Help"},
+			{"Esc", "Cancel Fetch"},
+		}
+	} else if m.width >= sideBySideMinWidth {
 		items = []keyHelp{
 			{"↑/↓", "Navigate"},
 		}
@@ -605,14 +614,16 @@ func (m model) renderFooter(hasReadme bool) string {
 		)
 	} else {
 		items = []keyHelp{
-			{"↑/↓/PgUp/PgDn", "Navigate"},
+			{"↑/↓", "Nav"},
 		}
 		if hasReadme {
-			items = append(items, keyHelp{"Tab", "View README"})
+			items = append(items, keyHelp{"Tab", "README"})
 		}
 		items = append(items,
+			keyHelp{"Ctrl+O", "Opts"},
+			keyHelp{"F1", "Help"},
 			keyHelp{"Enter", "Launch"},
-			keyHelp{"Esc/Ctrl+C", "Quit"},
+			keyHelp{"Esc", "Quit"},
 		)
 	}
 	footer := m.styles.FormatKeyHelp(items)
@@ -657,6 +668,13 @@ func (m model) renderHelpView() string {
 func (m model) buildHelpContent(fromMode int) string {
 	h := m.styles.TitleActive.Render
 	k := m.styles.KeyHelpKey.Render
+	row := func(keys, desc string) string {
+		pad := 24 - lipgloss.Width(keys)
+		if pad < 2 {
+			pad = 2
+		}
+		return "  " + k(keys) + strings.Repeat(" ", pad) + desc
+	}
 
 	browserTitle := "Preset Browser (Default View)"
 	if fromMode == helpModeBrowser {
@@ -664,16 +682,16 @@ func (m model) buildHelpContent(fromMode int) string {
 	}
 	browserSection := []string{
 		h(browserTitle),
-		fmt.Sprintf("  %-22s  Move selection up or down", k("↑/↓, Ctrl+P/Ctrl+N")),
-		fmt.Sprintf("  %-22s  Page up or down", k("PgUp/PgDn, Ctrl+U/D")),
-		fmt.Sprintf("  %-22s  Move filter text cursor to start or end", k("Home/End")),
-		fmt.Sprintf("  %-22s  Open README Viewer for selected preset", k("Tab, Ctrl+R")),
-		fmt.Sprintf("  %-22s  Open Launch Options & Preset Config", k("Ctrl+O, F4")),
-		fmt.Sprintf("  %-22s  Open 3-Tab Config Manager", k("Ctrl+G, F2")),
-		fmt.Sprintf("  %-22s  Fetch or extract missing WADs for selected preset", k("Ctrl+F")),
-		fmt.Sprintf("  %-22s  Open Contextual Help", k("F1")),
-		fmt.Sprintf("  %-22s  Launch selected preset", k("Enter")),
-		fmt.Sprintf("  %-22s  Quit launcher", k("Esc, Ctrl+C")),
+		row("↑/↓, Ctrl+P/Ctrl+N", "Move selection up or down"),
+		row("PgUp/PgDn, Ctrl+U/D", "Page up or down"),
+		row("Home/End", "Move filter text cursor to start or end"),
+		row("Tab, Ctrl+R", "Open README Viewer for selected preset"),
+		row("Ctrl+O, F4", "Open Launch Options & Preset Config"),
+		row("Ctrl+G, F2", "Open 3-Tab Config Manager"),
+		row("Ctrl+F", "Fetch or extract missing WADs asynchronously"),
+		row("F1, Alt+?", "Open Contextual Help"),
+		row("Enter", "Launch selected preset"),
+		row("Esc, Ctrl+C", "Cancel active fetch or quit launcher"),
 		"",
 		h("Fuzzy Search Tokens"),
 		"  Filter by title, WAD filename, engine (dsda-doom, uzdoom), category (Doom II, Heretic),",
@@ -687,13 +705,14 @@ func (m model) buildHelpContent(fromMode int) string {
 	}
 	launchSection := []string{
 		h(launchTitle),
-		fmt.Sprintf("  %-22s  Move between option fields", k("↑/↓, Tab/Shift+Tab")),
-		fmt.Sprintf("  %-22s  Cycle spin selector values (Engine, Skill, Complevel)", k("←/→")),
-		fmt.Sprintf("  %-22s  Toggle checkboxes (-pistolstart, -fast, Optional WADs)", k("Space")),
-		fmt.Sprintf("  %-22s  Ephemeral one-shot launch with current options", k("Enter")),
-		fmt.Sprintf("  %-22s  Save persistent preset override to catalog.d", k("Ctrl+S")),
-		fmt.Sprintf("  %-22s  Reset persistent preset override to catalog defaults", k("Ctrl+R")),
-		fmt.Sprintf("  %-22s  Return to Preset Browser without launching", k("Esc")),
+		row("↑/↓, Tab/Shift+Tab", "Move between active option fields"),
+		row("←/→", "Cycle spin selector values (Engine, Skill, Complevel)"),
+		row("Space", "Toggle checkboxes (-pistolstart, -fast, Optional WADs)"),
+		row("Enter", "Ephemeral one-shot launch with current options"),
+		row("Ctrl+S", "Save persistent preset override to catalog.d"),
+		row("Ctrl+R", "Reset persistent preset override to catalog defaults"),
+		row("F1, ?", "Open Contextual Help (? on non-text fields)"),
+		row("Esc", "Return to Preset Browser without launching"),
 	}
 
 	cfgTitle := "3-Tab Config Manager (Ctrl+G / F2)"
@@ -702,13 +721,15 @@ func (m model) buildHelpContent(fromMode int) string {
 	}
 	cfgSection := []string{
 		h(cfgTitle),
-		fmt.Sprintf("  %-22s  Switch between tabs (1. CLI, 2. Engines, 3. Ports)", k("1/2/3, [/]")),
-		fmt.Sprintf("  %-22s  Move between settings fields", k("↑/↓, Tab/Shift+Tab")),
-		fmt.Sprintf("  %-22s  Cycle spin selectors or action buttons", k("←/→")),
-		fmt.Sprintf("  %-22s  Toggle checkboxes or trigger Port Config action", k("Space, Enter")),
-		fmt.Sprintf("  %-22s  Save active tab changes atomically with backup", k("Ctrl+S")),
-		fmt.Sprintf("  %-22s  Reset selected engine override (Tab 2)", k("Ctrl+R")),
-		fmt.Sprintf("  %-22s  Close Config Manager and revert unsaved previews", k("Esc")),
+		row("1/2/3, [/]", "Switch between tabs (1. CLI, 2. Engines, 3. Ports)"),
+		row("↑/↓, Tab/Shift+Tab", "Move between settings fields"),
+		row("←/→", "Cycle spin selectors or Port Config action buttons"),
+		row("Space, Enter", "Toggle checkboxes or trigger Port Config action"),
+		row("Ctrl+S", "Save active tab changes atomically with backup"),
+		row("Ctrl+R", "Reset selected engine override (Tab 2)"),
+		row("g/G, PgUp/PgDn", "Scroll Configuration Diff viewer (Tab 3)"),
+		row("F1, ?", "Open Contextual Help (? on non-text fields and Diff)"),
+		row("Esc", "Close Config Manager or Diff and revert unsaved previews"),
 	}
 
 	readmeTitle := "README Viewer (Tab / Ctrl+R)"
@@ -717,10 +738,11 @@ func (m model) buildHelpContent(fromMode int) string {
 	}
 	readmeSection := []string{
 		h(readmeTitle),
-		fmt.Sprintf("  %-22s  Scroll document up or down", k("↑/↓, PgUp/PgDn")),
-		fmt.Sprintf("  %-22s  Jump to top or bottom of document", k("g/G, Home/End")),
-		fmt.Sprintf("  %-22s  Launch selected preset", k("Enter")),
-		fmt.Sprintf("  %-22s  Return to Preset Browser", k("Esc, q, Tab, Ctrl+R")),
+		row("↑/↓, PgUp/PgDn", "Scroll document up or down"),
+		row("g/G, Home/End", "Jump to top or bottom of document"),
+		row("Enter", "Launch selected preset"),
+		row("F1, ?", "Open Contextual Help"),
+		row("Esc, q, Tab, Ctrl+R", "Return to Preset Browser"),
 	}
 
 	var sections [][]string
@@ -775,18 +797,38 @@ func truncateANSI(s string, maxWidth int) string {
 	hasANSI := false
 
 	for i := 0; i < len(s); {
-		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
-			hasANSI = true
-			j := i + 2
-			for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
-				j++
+		if s[i] == '\x1b' && i+1 < len(s) {
+			if s[i+1] == '[' {
+				hasANSI = true
+				j := i + 2
+				for j < len(s) && (s[j] < 0x40 || s[j] > 0x7e) {
+					j++
+				}
+				if j < len(s) {
+					j++
+				}
+				b.WriteString(s[i:j])
+				i = j
+				continue
 			}
-			if j < len(s) {
-				j++
+			if s[i+1] == ']' {
+				hasANSI = true
+				j := i + 2
+				for j < len(s) {
+					if s[j] == '\x07' {
+						j++
+						break
+					}
+					if s[j] == '\x1b' && j+1 < len(s) && s[j+1] == '\\' {
+						j += 2
+						break
+					}
+					j++
+				}
+				b.WriteString(s[i:j])
+				i = j
+				continue
 			}
-			b.WriteString(s[i:j])
-			i = j
-			continue
 		}
 
 		r, size := utf8.DecodeRuneInString(s[i:])

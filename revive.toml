@@ -20,6 +20,8 @@ confidence = 0.8
 [rule.receiver-naming]
 [rule.time-naming]
 [rule.unexported-return]
+[rule.unreachable-code]
+[rule.unused-parameter]
 [rule.indent-error-flow]
 [rule.errorf]
 [rule.line-length-limit]

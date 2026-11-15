@@ -32,9 +32,12 @@ All contributions must respect the core repository invariants:
     `Close`, and runs any validation callback (including SHA-256 verification) before calling `fsutil.BackupFile` and
     `os.Rename` so failed or corrupt writes never create spurious `.bak.*` files.
 *   **Verified HTTP downloads and archive security**: All outbound HTTP downloads (`engine.Installer`,
-    `wad.Downloader`, and `wad.InstallSoundFontURL`) must use `fsutil.DownloadVerified` and `fsutil.UserAgent`
-    (`"doom-cli/2.0"`). All archive extractions (`archive/zip`), direct downloads, and relative sub-path resolutions
-    must sanitize entry paths against `..` traversal sequences via `fsutil.SafeJoin` and verify containment before any
+    `wad.Downloader`, and `wad.InstallSoundFontContext`) must use `fsutil.DownloadVerified` or
+    `fsutil.DownloadVerifiedContext` and `fsutil.UserAgent` (`"doom-cli/2.0"`), enforcing bounded stream sizes and
+    rejecting `https://` to `http://` redirect downgrades. Every curated preset source in `catalog/preset.<id>.json`
+    must include a verified 64-character hex `sha256` digest, and `DefaultSoundFontURL` is pinned to an immutable commit
+    with `DefaultSoundFontSHA256`. All archive extractions (`archive/zip`), direct downloads, and relative sub-path
+    resolutions must sanitize entry paths via `fsutil.CleanRel` and `fsutil.SafeJoin` and verify containment before any
     filesystem write.
 *   **Two-tier settings precedence**: CLI settings (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, and
     `soundfonts-dir`) resolve in a strict two-tier hierarchy (`config` in `config.json` takes precedence over platform
@@ -205,7 +208,8 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      "release_date": "2024",
      "sources": [
        {
-         "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/mymap.zip"
+         "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/mymap.zip",
+         "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
        }
      ],
      "links": [
@@ -228,8 +232,10 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      upstream `.zip` archive (`Eviternity II.wad`, `Sunder 2512.wad`, `SODfinal.wad`, `aaliens.wad`, `scythe.wad`,
      `TNTR.WAD`), while `files[].aliases` is reserved strictly for genuine external distribution or Steam and GOG
      rerelease filename stems (`sigil.wad`, `sigil2.wad`, `sigil_ii.wad`, `sunder.wad`).
-   - **Source URLs**: Every `sources[].url` must use `https://` and end in `.zip`, `.wad`, or `.pk3`; Doomworld web
-     pages belong in `links[]` with `"rel": "idgames"`.
+   - **Source URLs and digests**: Every `sources[].url` must use `https://` and end in `.zip`, `.wad`, or `.pk3`, and
+     every curated preset source in `catalog/preset.<id>.json` must include a lowercase 64-character hex
+     `sources[].sha256` digest (`sha256` remains optional on personal presets in `catalog.d/`); Doomworld web pages
+     belong in `links[]` with `"rel": "idgames"`.
 2. Synchronize the `README.md` preset table and run the catalog linter:
    ```bash
    go run ./cmd/doom wads build

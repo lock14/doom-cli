@@ -4,12 +4,14 @@ package steam
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -24,6 +26,18 @@ import (
 type TargetPattern struct {
 	SourcePattern string
 	DestName      string
+}
+
+func baseSlash(p string) string {
+	trimmed := strings.TrimSpace(p)
+	if trimmed == "" {
+		return ""
+	}
+	clean := path.Base(strings.ReplaceAll(trimmed, `\`, `/`))
+	if clean == "." || clean == "/" {
+		return ""
+	}
+	return clean
 }
 
 // DefaultTargetPatterns returns all official commercial Doom files, expansions, and catalog WADs
@@ -66,7 +80,7 @@ func TargetPatternsForCatalog(cat *preset.Catalog) []TargetPattern {
 	// 1. Base IWADs referenced across the catalog (plus official Hexen expansion HEXDD.WAD)
 	seenIWADs := make(map[string]bool)
 	for _, p := range cat.Presets {
-		iwad := filepath.Base(strings.TrimSpace(p.IWAD))
+		iwad := baseSlash(p.IWAD)
 		if iwad == "" || seenIWADs[strings.ToLower(iwad)] {
 			continue
 		}
@@ -83,7 +97,7 @@ func TargetPatternsForCatalog(cat *preset.Catalog) []TargetPattern {
 	// 2. PWADs, DeHackEd patches, and optional soundtracks declared across catalog presets
 	for _, p := range cat.Presets {
 		for _, f := range p.Files {
-			dest := filepath.Base(strings.TrimSpace(f.Name))
+			dest := baseSlash(f.Name)
 			if dest == "" {
 				continue
 			}
@@ -143,12 +157,23 @@ func GetSearchRoots() []string {
 			roots = append(roots,
 				filepath.Join(home, "Library", "Application Support", "Steam"),
 				filepath.Join(home, "Library", "Application Support", "GOG.com"),
+				filepath.Join(home, "GOG Games"),
 			)
 		}
-		roots = append(roots, "/Applications")
+		for _, pat := range []string{
+			"/Applications/*Doom*",
+			"/Applications/*DOOM*",
+			"/Applications/*Heretic*",
+			"/Applications/*Hexen*",
+			"/Applications/*Strife*",
+			"/Applications/*GOG*",
+		} {
+			if matches, err := filepath.Glob(pat); err == nil {
+				roots = append(roots, matches...)
+			}
+		}
 
 	case "windows":
-		// Standard Windows locations
 		prog86 := os.Getenv("ProgramFiles(x86)")
 		if prog86 == "" {
 			prog86 = `C:\Program Files (x86)`
@@ -168,7 +193,6 @@ func GetSearchRoots() []string {
 				filepath.Join(home, "Saved Games", "id Software"),
 			)
 		}
-		// Check available drive letters
 		for _, drive := range []string{"C", "D", "E", "F", "G"} {
 			roots = append(roots, drive+`:\Steam`, drive+`:\GOG Games`, drive+`:\Games`)
 		}
@@ -217,6 +241,15 @@ func normalizeExistingDirs(candidates []string) []string {
 	return existing
 }
 
+var skippedSteamSubdirs = map[string]bool{
+	"shadercache": true,
+	"workshop":    true,
+	"downloading": true,
+	"temp":        true,
+	"depotcache":  true,
+	"appcache":    true,
+}
+
 // DiscoverAndExtract searches for official game files and catalog WADs across search roots
 // using target patterns synthesized from cat (or the curated catalog when cat is nil).
 // When force is false, files already present in wadsDir or any extraWadRoots are skipped.
@@ -228,12 +261,35 @@ func DiscoverAndExtract(
 	out io.Writer,
 	extraWadRoots ...string,
 ) (int, error) {
+	return DiscoverAndExtractContext(
+		context.Background(), cat, searchRoots, wadsDir, force, out, extraWadRoots...,
+	)
+}
+
+// DiscoverAndExtractContext searches for official game files and catalog WADs under ctx.
+func DiscoverAndExtractContext(
+	ctx context.Context,
+	cat *preset.Catalog,
+	searchRoots []string,
+	wadsDir string,
+	force bool,
+	out io.Writer,
+	extraWadRoots ...string,
+) (int, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if out == nil {
 		out = io.Discard
 	}
 
-	if err := os.MkdirAll(wadsDir, 0755); err != nil {
+	if err := os.MkdirAll(wadsDir, 0o755); err != nil {
 		return 0, fmt.Errorf("failed to create destination directory %s: %w", wadsDir, err)
+	}
+
+	cleanWadsDir := filepath.Clean(wadsDir)
+	if resolved, err := filepath.EvalSymlinks(cleanWadsDir); err == nil {
+		cleanWadsDir = filepath.Clean(resolved)
 	}
 
 	if len(searchRoots) == 0 {
@@ -259,13 +315,26 @@ func DiscoverAndExtract(
 	indexed := make(map[string][]string)
 	indexedNorm := make(map[string][]string)
 	for _, root := range existingRoots {
-		_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		walkErr := filepath.WalkDir(root, func(walkPath string, d os.DirEntry, err error) error {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
 			if err != nil || d == nil {
 				return nil
 			}
-			// Limit depth to avoid scanning irrelevant deep directory trees, while
-			// allowing Proton prefixes (compatdata/<id>/pfx/.../Saved Games/...)
-			rel, relErr := filepath.Rel(root, path)
+			cleanCur := filepath.Clean(walkPath)
+			if d.IsDir() {
+				if cleanCur == cleanWadsDir && cleanCur != root {
+					return filepath.SkipDir
+				}
+				if skippedSteamSubdirs[strings.ToLower(d.Name())] {
+					return filepath.SkipDir
+				}
+			}
+			rel, relErr := filepath.Rel(root, walkPath)
 			if relErr == nil && strings.Count(rel, string(filepath.Separator)) > 15 {
 				if d.IsDir() {
 					return filepath.SkipDir
@@ -275,17 +344,24 @@ func DiscoverAndExtract(
 			if d.IsDir() {
 				return nil
 			}
+			if filepath.Dir(cleanCur) == cleanWadsDir {
+				return nil
+			}
 
 			lowerName := strings.ToLower(d.Name())
 			if strings.HasSuffix(lowerName, ".wad") ||
 				strings.HasSuffix(lowerName, ".pk3") ||
-				strings.HasSuffix(lowerName, ".deh") {
-				indexed[lowerName] = append(indexed[lowerName], path)
+				strings.HasSuffix(lowerName, ".deh") ||
+				strings.HasSuffix(lowerName, ".bex") {
+				indexed[lowerName] = append(indexed[lowerName], walkPath)
 				normName := preset.NormalizeFilename(d.Name())
-				indexedNorm[normName] = append(indexedNorm[normName], path)
+				indexedNorm[normName] = append(indexedNorm[normName], walkPath)
 			}
 			return nil
 		})
+		if errors.Is(walkErr, context.Canceled) || errors.Is(walkErr, context.DeadlineExceeded) {
+			return 0, walkErr
+		}
 	}
 
 	if cat == nil {
@@ -306,6 +382,9 @@ func DiscoverAndExtract(
 	}
 
 	for _, tp := range patterns {
+		if err := ctx.Err(); err != nil {
+			return foundCount, err
+		}
 		if idkfaDestName == "" && preset.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
 			idkfaDestName = tp.DestName
 		}
@@ -343,6 +422,9 @@ func DiscoverAndExtract(
 		var candidates []string
 		seenCand := make(map[string]bool)
 		addCandidate := func(c string) {
+			if filepath.Clean(c) == filepath.Clean(destFile) {
+				return
+			}
 			if !seenCand[c] {
 				seenCand[c] = true
 				candidates = append(candidates, c)
@@ -372,6 +454,9 @@ func DiscoverAndExtract(
 	}
 
 	if idkfaDestName != "" && !installedTargets[strings.ToLower(idkfaDestName)] {
+		if err := ctx.Err(); err != nil {
+			return foundCount, err
+		}
 		if destFile, err := fsutil.SafeJoin(wadsDir, idkfaDestName); err == nil {
 			alreadyExists := false
 			if !force {
@@ -420,8 +505,8 @@ func copyFile(src, dst string) error {
 	return err
 }
 
-func rereleasePriority(path string) int {
-	dir := filepath.ToSlash(filepath.Dir(path))
+func rereleasePriority(filePath string) int {
+	dir := filepath.ToSlash(filepath.Dir(filePath))
 	parts := strings.Split(dir, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
 		seg := parts[i]
@@ -552,14 +637,17 @@ func SynthesizeIDKFAWAD(srcExtrasPath, dstPath string) (int, error) {
 		if len(upperName) < 3 || !strings.HasPrefix(upperName, "H_") || lumpSize < 4 {
 			continue
 		}
+		dName := "D_" + upperName[2:]
+		if seenDNames[dName] {
+			continue
+		}
 		var magic [4]byte
 		if _, err := f.ReadAt(magic[:], lumpPos); err != nil || string(magic[:]) != "OggS" {
 			continue
 		}
-		if curOutPos+lumpSize > math.MaxUint32 {
-			return 0, errors.New("synthesized WAD exceeds 4 GiB limit")
+		if curOutPos+lumpSize > math.MaxInt32 {
+			return 0, errors.New("synthesized WAD exceeds signed 32-bit PWAD limit")
 		}
-		dName := "D_" + upperName[2:]
 		seenDNames[dName] = true
 		payloads = append(payloads, audioPayload{
 			srcPos: lumpPos,
@@ -600,6 +688,10 @@ func SynthesizeIDKFAWAD(srcExtrasPath, dstPath string) (int, error) {
 				addDirEntry(p.outPos, p.size, alias)
 			}
 		}
+	}
+
+	if curOutPos+int64(len(dirEntries))*16 > math.MaxInt32 {
+		return 0, errors.New("synthesized WAD directory exceeds signed 32-bit PWAD limit")
 	}
 
 	var outHdr [12]byte

@@ -24,7 +24,8 @@
   "release_date": "2018",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/deathless.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/deathless.zip",
+      "sha256": "47481ee568d7fada97ffb15ffd308dd3d9085f974ca3687e154c6b9f06e7c9ee"
     }
   ],
   "links": [

@@ -7,10 +7,10 @@
   "iwad": "DOOM2.WAD",
   "files": [
     {
-      "name": "DOOMZERO.DEH"
+      "name": "DoomZero.wad"
     },
     {
-      "name": "DoomZero.wad"
+      "name": "DOOMZERO.DEH"
     },
     {
       "name": "idkfa 2024.wad",

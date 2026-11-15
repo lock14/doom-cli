@@ -20,7 +20,8 @@
   "release_date": "2016",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/aaliens.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/aaliens.zip",
+      "sha256": "1c9d1e256a44bab531c8017e5a590cdcc51ac4411f154446c694589054ec2884"
     }
   ],
   "links": [

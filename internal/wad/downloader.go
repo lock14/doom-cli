@@ -2,6 +2,7 @@
 package wad
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,6 +22,7 @@ type Downloader struct {
 	WadRoots []string
 	Force    bool
 	Out      io.Writer
+	Ctx      context.Context
 }
 
 // NewDownloader creates a new Downloader using roots[0] as the write directory
@@ -40,6 +42,13 @@ func NewDownloader(roots []string, force bool, out io.Writer) *Downloader {
 		Force:    force,
 		Out:      out,
 	}
+}
+
+func (d *Downloader) ctx() context.Context {
+	if d.Ctx != nil {
+		return d.Ctx
+	}
+	return context.Background()
 }
 
 func (d *Downloader) roots() []string {
@@ -138,6 +147,9 @@ func (d *Downloader) downloadPresetWithIndex(p preset.Preset, idx *preset.DirInd
 
 	var lastErr error
 	for _, src := range p.Sources {
+		if err := d.ctx().Err(); err != nil {
+			return false, err
+		}
 		cleanURL := strings.TrimSpace(src.URL)
 		if cleanURL == "" {
 			continue
@@ -184,8 +196,9 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 	defer os.RemoveAll(tmpDir)
 
 	tmpArchive := filepath.Join(tmpDir, "archive.bin")
-	size, err := fsutil.DownloadVerified(d.Client, src.URL, tmpArchive, src.SHA256, 0o644)
-	if err != nil {
+	if _, err := fsutil.DownloadVerifiedContext(
+		d.ctx(), d.Client, src.URL, tmpArchive, src.SHA256, 0o644,
+	); err != nil {
 		return err
 	}
 
@@ -195,7 +208,7 @@ func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []strin
 	}
 
 	if isZip(tmpArchive) {
-		return d.extractFromZip(tmpArchive, size, expectedFiles, p)
+		return d.extractFromZip(tmpArchive, expectedFiles, p)
 	}
 
 	return fmt.Errorf("downloaded payload from %s is not a valid zip archive", src.URL)
@@ -214,11 +227,6 @@ func (d *Downloader) installDirectAsset(ext, tmpArchive string, expectedFiles []
 		return nil
 	}
 
-	data, err := os.ReadFile(tmpArchive)
-	if err != nil {
-		return err
-	}
-
 	if ext == ".wad" {
 		var wadTargets []string
 		var dehTargets []string
@@ -234,7 +242,10 @@ func (d *Downloader) installDirectAsset(ext, tmpArchive string, expectedFiles []
 			}
 		}
 		if len(wadTargets) == 1 && len(dehTargets) == 1 {
-			dehData, ok := ExtractWADLump(data, "DEHACKED")
+			dehData, ok, lumpErr := extractWADLumpFromFile(tmpArchive, "DEHACKED")
+			if lumpErr != nil {
+				return lumpErr
+			}
 			if !ok {
 				return fmt.Errorf("direct .wad download missing embedded DEHACKED lump for %s", dehTargets[0])
 			}
@@ -246,7 +257,7 @@ func (d *Downloader) installDirectAsset(ext, tmpArchive string, expectedFiles []
 			if err != nil {
 				return err
 			}
-			if _, err := fsutil.WriteFileAtomic(wadDest, data, 0o644); err != nil {
+			if _, err := fsutil.CopyFileAtomic(tmpArchive, wadDest, 0o644); err != nil {
 				return err
 			}
 			fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", wadTargets[0], wadDest)
@@ -261,6 +272,21 @@ func (d *Downloader) installDirectAsset(ext, tmpArchive string, expectedFiles []
 	return fmt.Errorf("direct %s download requires 1 expected file, got %d", ext, len(expectedFiles))
 }
 
+func extractWADLumpFromFile(wadPath, lumpName string) ([]byte, bool, error) {
+	f, err := os.Open(wadPath)
+	if err != nil {
+		return nil, false, err
+	}
+	defer f.Close()
+
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, false, err
+	}
+	data, ok := ExtractWADLumpFromReader(f, fi.Size(), lumpName)
+	return data, ok, nil
+}
+
 // DownloadAll downloads all downloadable community megawads in the catalog.
 func (d *Downloader) DownloadAll(catalog *preset.Catalog) error {
 	fmt.Fprintf(d.Out, "=== Doom Community Megawad Downloader ===\n")
@@ -271,6 +297,9 @@ func (d *Downloader) DownloadAll(catalog *preset.Catalog) error {
 	for _, p := range catalog.Presets {
 		if len(p.Sources) == 0 {
 			continue
+		}
+		if err := d.ctx().Err(); err != nil {
+			return err
 		}
 		downloaded, err := d.downloadPresetWithIndex(p, idx)
 		if err != nil {

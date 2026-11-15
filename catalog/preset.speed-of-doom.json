@@ -20,7 +20,8 @@
   "release_date": "2010",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sodfinal.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sodfinal.zip",
+      "sha256": "005288821f88e25977a40d817c23dbd5784caf5fe255376d7c6f04ad16b341e0"
     }
   ],
   "links": [

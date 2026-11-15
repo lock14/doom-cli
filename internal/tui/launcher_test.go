@@ -427,7 +427,7 @@ func TestCalculateReadmeDimensions(t *testing.T) {
 			width:   30,
 			height:  10,
 			wantBox: minBoxWidth,
-			wantW:   36,
+			wantW:   minBoxWidth - 2,
 			wantH:   5,
 		},
 	}
@@ -720,6 +720,13 @@ func TestTruncateANSI(t *testing.T) {
 			maxWidth: 0,
 			want:     "",
 			wantCols: 0,
+		},
+		{
+			name:     "osc hyperlink sequence skipped cleanly",
+			input:    "\x1b]8;;https://example.com\x07Alien Vendetta\x1b]8;;\x07",
+			maxWidth: 6,
+			want:     "\x1b]8;;https://example.com\x07Alien\x1b[0m…",
+			wantCols: 6,
 		},
 	}
 
@@ -1138,7 +1145,7 @@ func TestRenderFooter_NarrowTruncation(t *testing.T) {
 		wantNoReadme     bool
 		wantReadmeFooter bool
 	}{
-		{name: "narrow 60 columns", width: 60, wantWithReadme: true, wantNoReadme: false, wantReadmeFooter: true},
+		{name: "narrow 60 columns", width: 60, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
 		{name: "compact 50 columns", width: 50, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
 		{name: "compact 40 columns", width: 40, wantWithReadme: true, wantNoReadme: true, wantReadmeFooter: true},
 		{name: "standard 80 columns", width: 80, wantWithReadme: false, wantNoReadme: false, wantReadmeFooter: false},
@@ -1686,6 +1693,24 @@ func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testi
 	}
 }
 
+func isolatedConfigPaths(t *testing.T) *config.Paths {
+	t.Helper()
+	tmpDir := t.TempDir()
+	catDir := filepath.Join(tmpDir, "catalog.d")
+	_ = os.MkdirAll(catDir, 0o755)
+	return &config.Paths{
+		ConfigDir:     tmpDir,
+		ConfigFile:    filepath.Join(tmpDir, "config.json"),
+		ThemesDir:     filepath.Join(tmpDir, "themes"),
+		CatalogDir:    catDir,
+		WadsDir:       filepath.Join(tmpDir, "wads"),
+		BinDir:        filepath.Join(tmpDir, "bin"),
+		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
+	}
+}
+
 func TestHandleFetchAssets_MissingRequiredAndEmptyRoots(t *testing.T) {
 	t.Parallel()
 	cat := mockCatalog()
@@ -1698,15 +1723,41 @@ func TestHandleFetchAssets_MissingRequiredAndEmptyRoots(t *testing.T) {
 		t.Errorf("expected error statusMsg when no WAD dir configured, got %q", mEmpty.statusMsg)
 	}
 
-	// 2. Missing required files with isolated empty steamSearchRoots
+	// 2. Missing required files with isolated empty steamSearchRoots dispatches async tea.Cmd
 	emptyWads := t.TempDir()
 	emptySteam := t.TempDir()
 	mMiss := initialModel(cat, []string{emptyWads}, ClassicTheme, false)
 	mMiss.steamSearchRoots = []string{emptySteam}
-	newM, _ = mMiss.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+	newM, cmd := mMiss.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
 	mMiss = newM.(model)
+	if !mMiss.fetching || cmd == nil {
+		t.Fatalf("expected async fetch in progress (fetching=%v, cmd=%v)", mMiss.fetching, cmd)
+	}
+	if !strings.Contains(mMiss.statusMsg, "Fetching") {
+		t.Errorf("expected Fetching statusMsg during async command, got %q", mMiss.statusMsg)
+	}
+
+	// Complete async command and feed message back into Update
+	newM, _ = mMiss.Update(cmd())
+	mMiss = newM.(model)
+	if mMiss.fetching {
+		t.Error("expected fetching == false after fetchCompleteMsg")
+	}
 	if !strings.HasPrefix(mMiss.statusMsg, "✗ Missing required files") {
 		t.Errorf("expected '✗ Missing required files' statusMsg, got %q", mMiss.statusMsg)
+	}
+
+	// 3. Pressing Esc while fetching cancels fetch without quitting launcher
+	newM, _ = mMiss.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+	mMiss = newM.(model)
+	newM, quitCmd := mMiss.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mMiss = newM.(model)
+	if mMiss.quitting || quitCmd != nil || mMiss.fetching {
+		t.Errorf("expected Esc during fetch to cancel without quitting, got quitting=%v fetching=%v",
+			mMiss.quitting, mMiss.fetching)
+	}
+	if !strings.Contains(mMiss.statusMsg, "cancelled") {
+		t.Errorf("expected cancelled statusMsg, got %q", mMiss.statusMsg)
 	}
 }
 
@@ -1716,7 +1767,13 @@ func TestInitialModeConfigAndEngines(t *testing.T) {
 
 	// 1. InitialModeConfig starts in Config Manager Tab 1 (CLI Settings) and exits silently on Esc
 	mCfg := initialModel(cat, nil, ClassicTheme, false)
-	mCfg.applyOptions(LauncherOptions{InitialMode: InitialModeConfig})
+	mCfg.detectedRes = "1920x1080"
+	mCfg.detectedRate = 60
+	mCfg.applyOptions(LauncherOptions{
+		Paths:       isolatedConfigPaths(t),
+		AppConfig:   &config.AppConfig{},
+		InitialMode: InitialModeConfig,
+	})
 	if !mCfg.viewingConfigMgr || mCfg.cfgMgr == nil || mCfg.cfgMgr.activeTab != configTabCLI {
 		t.Fatalf("expected InitialModeConfig to open Config Manager on Tab 1, got viewing=%v cfgMgr=%v",
 			mCfg.viewingConfigMgr, mCfg.cfgMgr)
@@ -1732,7 +1789,13 @@ func TestInitialModeConfigAndEngines(t *testing.T) {
 
 	// 2. InitialModeEngines starts in Config Manager Tab 2 (Engine Overrides) and exits silently on Esc
 	mEng := initialModel(cat, nil, ClassicTheme, false)
-	mEng.applyOptions(LauncherOptions{InitialMode: InitialModeEngines})
+	mEng.detectedRes = "1920x1080"
+	mEng.detectedRate = 60
+	mEng.applyOptions(LauncherOptions{
+		Paths:       isolatedConfigPaths(t),
+		AppConfig:   &config.AppConfig{},
+		InitialMode: InitialModeEngines,
+	})
 	if !mEng.viewingConfigMgr || mEng.cfgMgr == nil || mEng.cfgMgr.activeTab != configTabEngines {
 		t.Fatalf("expected InitialModeEngines to open Config Manager on Tab 2, got viewing=%v cfgMgr=%v",
 			mEng.viewingConfigMgr, mEng.cfgMgr)
@@ -1751,6 +1814,10 @@ func TestConfigManager_CtrlJKAndDiffHelpAndWidth90Footer(t *testing.T) {
 	t.Parallel()
 	cat := mockCatalog()
 	m := initialModel(cat, nil, ClassicTheme, false)
+	m.paths = isolatedConfigPaths(t)
+	m.appConfig = &config.AppConfig{}
+	m.detectedRes = "1920x1080"
+	m.detectedRate = 60
 	m.width = 90
 	m.height = 24
 
@@ -1832,5 +1899,171 @@ func TestModel_FilteringAndPreviewTaxonomyMetadata(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Errorf("expected TUI view to contain %q, got:\n%s", want, view)
 		}
+	}
+}
+
+func TestHelpTrueColorAlignment_And_80x24LongTitleHeader(t *testing.T) {
+	origProfile := lipgloss.ColorProfile()
+	// 0 corresponds to termenv.TrueColor so ANSI SGR codes are emitted.
+	lipgloss.SetColorProfile(0)
+	defer lipgloss.SetColorProfile(origProfile)
+
+	cat, err := preset.LoadCuratedCatalog()
+	if err != nil {
+		t.Fatalf("LoadCuratedCatalog: %v", err)
+	}
+	m := initialModel(cat, nil, PlasmaTheme, false, "back-to-saturn-x-episode-2")
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = newM.(model)
+
+	// 1. Verify TrueColor buildHelpContent aligns all keybinding description columns
+	helpText := m.buildHelpContent(helpModeBrowser)
+	targets := []string{
+		"Move selection up or down",
+		"Open Contextual Help",
+		"Launch selected preset",
+		"Ephemeral one-shot launch with current options",
+	}
+	wantCol := -1
+	for _, line := range strings.Split(helpText, "\n") {
+		for _, desc := range targets {
+			idx := strings.Index(line, desc)
+			if idx > 0 {
+				col := lipgloss.Width(line[:idx])
+				if wantCol == -1 {
+					wantCol = col
+				} else if col != wantCol {
+					t.Errorf("TrueColor help description %q starts at col %d, want %d (line=%q)",
+						desc, col, wantCol, line)
+				}
+			}
+		}
+	}
+	if wantCol != 26 {
+		t.Errorf("expected TrueColor help descriptions at col 26, got %d", wantCol)
+	}
+
+	// 2. Verify Launch Options on long title ("Back to Saturn X Episode 2: Tower in the Fountain of Sparks")
+	// truncates header cleanly within 80 columns and stays <= 24 lines.
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = newM.(model)
+	optView := m.View()
+	rawLines := strings.Split(optView, "\n")
+	if len(rawLines) > 24 {
+		t.Errorf("Launch Options View() for long title at 80x24 produced %d lines, want <= 24", len(rawLines))
+	}
+	for i, line := range rawLines {
+		if w := lipgloss.Width(line); w > 80 {
+			t.Errorf("line %d visible width %d > 80: %q", i, w, line)
+		}
+	}
+}
+
+func TestLaunchOptions_BoomFieldSkipping_SetArgs_And_SurgicalConfigSave(t *testing.T) {
+	t.Parallel()
+	paths := isolatedConfigPaths(t)
+	cat, err := preset.LoadLayeredCatalog(paths.CatalogDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayeredCatalog: %v", err)
+	}
+
+	// 1. On UZDoom preset ("eviternity-ii"), Solo-Net and Complevel are skipped by focus and omitted from args
+	m := initialModel(cat, []string{paths.WadsDir}, ClassicTheme, false, "eviternity-ii")
+	m.paths = paths
+	m.appConfig = &config.AppConfig{}
+	m.customCatalogDir = paths.CatalogDir
+	m.detectedRes = "1920x1080"
+	m.detectedRate = 60
+
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = newM.(model)
+	// Pre-populate soloNet/complevelIdx to verify synthesizeAppendArgs suppresses Boom flags on UZDoom
+	m.launchOpts.soloNet = true
+	m.launchOpts.complevelIdx = 6
+	if args := m.launchOpts.synthesizeAppendArgs(); len(args) != 0 {
+		t.Errorf("expected empty Boom flags on UZDoom, got %v", args)
+	}
+	// Step down from Respawn (index 6) and verify Solo-Net (7) and Complevel (8) are skipped
+	m.launchOpts.focusIdx = launchFieldRespawn
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = newM.(model)
+	if m.launchOpts.focusIdx == launchFieldSoloNet || m.launchOpts.focusIdx == launchFieldComplevel {
+		t.Errorf("expected Down on UZDoom to skip Boom-only fields, landed on %d", m.launchOpts.focusIdx)
+	}
+	// Verify '?' on non-text field opens Contextual Help
+	m.launchOpts.focusIdx = launchFieldEngine
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m = newM.(model)
+	if !m.viewingHelp || m.helpMode != helpModeLaunchOptions {
+		t.Errorf("expected '?' on non-text field to open helpModeLaunchOptions, got %v/%d",
+			m.viewingHelp, m.helpMode)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+	m = newM.(model)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = newM.(model)
+
+	// 2. Preset with non-empty base.Args ("sigil" has ["-warp", "5", "1"]) and pre-existing set.args
+	// preserves replacement set.args on Ctrl+S and omits redundant set.engine
+	ovSigil := `{"kind":"override","target":{"kind":"preset","id":"sigil"},"set":{"args":["-skill","4"]}}`
+	if err := os.WriteFile(
+		filepath.Join(paths.CatalogDir, "override.preset.sigil.json"), []byte(ovSigil), 0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	mSigil := initialModel(cat, []string{paths.WadsDir}, ClassicTheme, false, "sigil")
+	mSigil.customCatalogDir = paths.CatalogDir
+	newM, _ = mSigil.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	mSigil = newM.(model)
+	newM, _ = mSigil.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	mSigil = newM.(model)
+
+	_, savedOv, err := preset.LoadPresetBaseAndOverride(paths.CatalogDir, "sigil")
+	if err != nil || savedOv == nil || savedOv.Set == nil || savedOv.Set.Args == nil {
+		t.Fatalf("expected set.args preserved on sigil after Ctrl+S, got ov=%+v err=%v", savedOv, err)
+	}
+	if savedOv.Set.Engine != nil {
+		t.Errorf("expected unchanged engine to remain nil in set.engine, got %q", *savedOv.Set.Engine)
+	}
+	pSigil, err := mSigil.catalog.FindExact("sigil")
+	if err != nil || strings.Join(pSigil.Args, " ") != "-skill 4" {
+		t.Errorf("expected replacement Args=[-skill 4] on sigil without base -warp 5 1, got %v (err=%v)",
+			pSigil.Args, err)
+	}
+
+	// 3. Config Manager Tab 1 surgical save keeps default theme/nerd_fonts sources untouched,
+	// and Tab 2 warns before discarding unsaved engine edits
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	m = newM.(model)
+	m.cfgMgr.focusIdx = cliFieldBinDir
+	customBin := filepath.Join(paths.ConfigDir, "custom-bin")
+	m.cfgMgr.binDirInput.SetValue(customBin)
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	if m.themeSource != "default" || m.nerdFontsSource != "default" {
+		t.Errorf("expected untouched theme/nerdFonts sources to stay 'default', got %q / %q",
+			m.themeSource, m.nerdFontsSource)
+	}
+	loadedCfg, err := config.LoadConfig(paths)
+	if err != nil || loadedCfg.Theme != "" || loadedCfg.HasNerdFonts() {
+		t.Errorf("expected untouched theme/nerd_fonts omitted from config.json, got %+v (err=%v)",
+			loadedCfg, err)
+	}
+
+	// Tab 2 unsaved switch guard
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{']'}})
+	m = newM.(model)
+	m.cfgMgr.engBadgeInput.SetValue("CUST")
+	m.cfgMgr.focusIdx = engFieldSelect
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = newM.(model)
+	if m.cfgMgr.engineIdx != 0 || !strings.Contains(m.cfgMgr.statusMsg, "Unsaved") {
+		t.Errorf("expected first Right press with dirty Tab 2 to warn without switching, got idx=%d msg=%q",
+			m.cfgMgr.engineIdx, m.cfgMgr.statusMsg)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = newM.(model)
+	if m.cfgMgr.engineIdx == 0 {
+		t.Errorf("expected second Right press to confirm discard and switch engine")
 	}
 }

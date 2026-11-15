@@ -107,7 +107,8 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
     preset or form row using a `2`-column left quarter-block cursor bar (`▎ `, `U+258E` via `CursorBar`) paired with
     bold accent typography (`CursorText` and `ValueBold`, `SGR 1`) rather than full-row reverse video (`SGR 7`) or
     `[▸ item ◂]` bracket markers. In `Launch Options`, Boom-only fields (`-solonet` and `-complevel`) are dimmed via
-    `.Faint(true)` (`SGR 2`) whenever a ZDoom-family engine is selected.
+    `.Faint(true)` (`SGR 2`), skipped during focus navigation (`isFieldDisabled`), and omitted from synthesized launch
+    arguments whenever a ZDoom-family engine is selected.
 *   **Reason**: Preserves clean horizontal scan lines, right-aligned `[DSDA]` and `[UZDoom]` engine badges, and form
     value readability without full-row background blocks overpowering the `60-30-10` palette while maintaining a
     non-color glyph indicator (`▎ `) for accessibility (`§5.3` and `§9.6`).
@@ -139,17 +140,19 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 *   **Project rule**: In the primary launcher view (`!m.viewingReadme && !m.viewingHelp && !m.viewingLaunchOpts &&
     !m.viewingConfigMgr`), the fuzzy search `textinput.Model` (`m.input`) is focused by default (`§11.5`) so all
     printable characters immediately filter presets; modifier and special keys (`↑`, `↓`, `Ctrl+P`, `Ctrl+N`, `Ctrl+K`,
-    `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`, `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F1`,
-    `Enter`, `Esc`, and `Ctrl+C`, with `Home` and `End` moving the filter text cursor) work regardless of filter text.
-    In `Launch Options` (`m.viewingLaunchOpts`), `Ctrl+K`, `Ctrl+J`, `←`, `→`, and `Space` are gated behind
-    `!isTextField` so text inputs (`-warp`, `-record`, `-playdemo`, `-timedemo`, `-loadgame`, and `Extra Args`) never
-    swallow cursor movement or spaces, whereas `Configuration Manager` (`m.viewingConfigMgr`) binds `↑`, `Ctrl+P`,
-    `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` unconditionally across selector and action rows and
-    restores unsaved live theme and Nerd Fonts previews (`m.theme`, `m.styles`, and `m.nerdFonts`) on `Esc`. Inside the
-    viewport overlays (`m.viewingReadme`, `s.viewingDiff`, and `m.viewingHelp`), Vim and pager keys are bound
-    deliberately by case (`j` and `k`, `d` and `u`, `f` and `b`, `Space`, `g` and `Home` for top, `G` and `End` for
-    bottom, with `q`, `Q`, `Esc`, `Tab`, or `Ctrl+R` closing `m.viewingReadme`, `q`, `Q`, `Esc`, or `Enter` closing
-    `s.viewingDiff`, and `q`, `Q`, `Esc`, or `F1` closing `m.viewingHelp`).
+    `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`, `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F1`
+    or `Alt+?`, `Enter`, `Esc` to cancel an active `Ctrl+F` fetch or quit, and `Ctrl+C`, with `Home` and `End` moving
+    the filter text cursor) work regardless of filter text. In `Launch Options` (`m.viewingLaunchOpts`), `Ctrl+K`,
+    `Ctrl+J`, `←`, `→`, `Space`, and `?` are gated behind `!isTextField` so text inputs (`-warp`, `-record`,
+    `-playdemo`, `-timedemo`, `-loadgame`, and `Extra Args`) never swallow cursor movement, spaces, or `?`, whereas
+    `Configuration Manager` (`m.viewingConfigMgr`) binds `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`,
+    `Ctrl+J`, or `Tab` unconditionally across selector and action rows, guards unsaved Tab 2 engine edits with a
+    two-press confirmation (`confirmDiscardEng`) before switching engines on `←`, `→`, or `Space`, and restores unsaved
+    live theme and Nerd Fonts previews (`m.theme`, `m.styles`, and `m.nerdFonts`) on `Esc`. Inside the viewport overlays
+    (`m.viewingReadme`, `s.viewingDiff`, and `m.viewingHelp`), Vim and pager keys are bound deliberately by case (`j`
+    and `k`, `d` and `u`, `f` and `b`, `Space`, `g` and `Home` for top, `G` and `End` for bottom, `?` or `Alt+?` for
+    help, with `q`, `Q`, `Esc`, `Tab`, or `Ctrl+R` closing `m.viewingReadme`, `q`, `Q`, `Esc`, or `Enter` closing
+    `s.viewingDiff`, and `q`, `Q`, `Esc`, `F1`, `Alt+?`, or `?` closing `m.viewingHelp`).
 *   **Reason**: Matches `fzf` and Telescope ergonomics in the fuzzy finder, protects free-form text inputs in
     `Launch Options`, and preserves standard `less` and Vim navigation (`g` versus `G`) in document and diff readers.
 
@@ -222,11 +225,13 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 *   **Project rule**: `model` (`internal/tui/launcher.go`) must resolve IWAD, PWAD, and README paths exclusively
     through the pre-constructed `*preset.DirIndex` (`m.dirIndex`, including cached relative subdirectory entries) and
     cached README map (`m.readmeCache`), render the `Launch Options` command preview via the pure zero-I/O
-    `engine.FormatLaunchPreview` helper (never `engine.PrepareLaunch`), and render `Configuration Manager` port status
-    summaries using the cached `s.detectedRes` and `s.detectedRate` (`display.DetectDisplay()`) snapshot via
-    `templates.RenderAutoexecWithRate` and `templates.RenderDSDADoomWithRes` in `refreshPortConfigStatus`. Never perform
-    uncached `os.ReadDir` walks or spawn external display-detection subprocesses inside `View()` or per-keypress
-    `Update()` cycles.
+    `engine.FormatLaunchPreview` helper (never `engine.PrepareLaunch`), execute `Ctrl+F` asset acquisition
+    asynchronously via a cancellable `tea.Cmd` (`context.WithCancel`, `steam.DiscoverAndExtractContext`, and
+    `wad.Downloader{Ctx: ctx}`), and render or deploy `Configuration Manager` port configurations using the cached
+    `s.detectedRes` and `s.detectedRate` (`display.DetectDisplay()`) snapshot via `templates.RenderAutoexecWithRate`,
+    `templates.RenderDSDADoomWithRes`, `templates.DiffConfigsWithDisplay`, and `templates.DeployConfigsWithDisplay`.
+    Never perform uncached `os.ReadDir` walks, blocking network downloads, or external display-detection subprocesses
+    inside `View()` or per-keypress `Update()` cycles.
 *   **Reason**: Keeps fuzzy filtering, form editing, and scrolling responsive without frame stutter on large
     multi-directory WAD collections.
 

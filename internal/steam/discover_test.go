@@ -511,3 +511,70 @@ func TestRankRereleaseCandidates(t *testing.T) {
 		})
 	}
 }
+
+func TestDiscoverAndExtract_SkipsWadsDirSelfCopyBexAndDedupsIDKFA(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	// Nest destWads inside scanRoot to verify WalkDir skips destWads even under force=true.
+	scanRoot := filepath.Join(tmpDir, "Games")
+	gameDir := filepath.Join(scanRoot, "DoomPack")
+	destWads := filepath.Join(scanRoot, "wads")
+	if err := os.MkdirAll(gameDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(destWads, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(destWads, "DOOM2.WAD"), []byte("existing-dest-doom2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gameDir, "sunlust.bex"), []byte("bex-patch"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cat := &preset.Catalog{
+		Presets: []preset.Preset{
+			{
+				ID:     "sunlust-bex",
+				Name:   "Sunlust BEX",
+				Engine: "dsda-doom",
+				IWAD:   "DOOM2.WAD",
+				Files:  []preset.FileSpec{{Name: "sunlust.bex"}},
+			},
+		},
+	}
+
+	count, err := DiscoverAndExtract(cat, []string{scanRoot}, destWads, true, nil)
+	if err != nil {
+		t.Fatalf("DiscoverAndExtract(force=true) failed: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected only sunlust.bex extracted (skipping destWads self-copy), got %d", count)
+	}
+	if got, err := os.ReadFile(filepath.Join(destWads, "sunlust.bex")); err != nil || string(got) != "bex-patch" {
+		t.Errorf("sunlust.bex = %q (%v), want bex-patch", string(got), err)
+	}
+	if got, err := os.ReadFile(filepath.Join(destWads, "DOOM2.WAD")); err != nil ||
+		string(got) != "existing-dest-doom2" {
+		t.Errorf("DOOM2.WAD modified unexpectedly: %q (%v)", string(got), err)
+	}
+
+	// Duplicate H_E1M1 lumps in extras.wad are deduplicated cleanly in SynthesizeIDKFAWAD.
+	dupExtrasPath := filepath.Join(tmpDir, "extras.wad")
+	dupExtras := buildTestPWAD([]testWADLump{
+		{name: "H_E1M1", data: []byte("OggS-first")},
+		{name: "H_E1M1", data: []byte("OggS-duplicate")},
+	})
+	if err := os.WriteFile(dupExtrasPath, dupExtras, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	outIDKFA := filepath.Join(tmpDir, "idkfa 2024.wad")
+	tracks, err := SynthesizeIDKFAWAD(dupExtrasPath, outIDKFA)
+	if err != nil {
+		t.Fatalf("SynthesizeIDKFAWAD: %v", err)
+	}
+	if tracks != 1 {
+		t.Errorf("expected 1 deduplicated D_E1M1 track, got %d", tracks)
+	}
+}

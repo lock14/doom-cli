@@ -16,17 +16,19 @@ import (
 func newSetupCmd() *cobra.Command {
 	var force bool
 	setupCmd := &cobra.Command{
-		Use:   "setup",
-		Short: "Complete 1-command setup (engines, soundfont, configs, steam IWADs, and community megawads)",
-		Args:  cobra.NoArgs,
+		Use:          "setup",
+		Short:        "Complete 1-command setup (engines, soundfont, configs, steam IWADs, and community megawads)",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			paths, _, cat, err := loadAppState()
+			errOut := cmdErr(cmd)
+			paths, _, cat, err := loadAppStateWithErr(errOut)
 			if err != nil {
 				return err
 			}
 
 			out := cmdOut(cmd)
-			errOut := cmdErr(cmd)
+			ctx := cmd.Context()
 			fmt.Fprintln(out, "============================================================")
 			fmt.Fprintln(out, "  Initiating Doom Setup")
 			fmt.Fprintln(out, "============================================================")
@@ -38,41 +40,67 @@ func newSetupCmd() *cobra.Command {
 				return fmt.Errorf("error deploying configs: %w", err)
 			}
 			fmt.Fprintln(out)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 
 			var failedSteps []string
 
 			// 2. Engines
 			fmt.Fprintln(out, ">>> Step 2/5: Installing source ports (UZDoom, DSDA-Doom)...")
 			installer := engine.NewInstaller(paths.BinDir, out)
+			installer.Ctx = ctx
 			installer.Force = force
 			if err := installer.InstallCatalog(cat); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				fmt.Fprintf(errOut, "Warning: engine installer encountered: %v\n", err)
 				failedSteps = append(failedSteps, "engines")
 			}
 			fmt.Fprintln(out)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 
 			// 3. SoundFont
 			fmt.Fprintln(out, ">>> Step 3/5: Installing Roland SC-55 SoundFont...")
-			if _, err := wad.InstallSoundFont(paths.SoundFontsDir, force, out); err != nil {
+			if _, err := wad.InstallSoundFontContext(ctx, paths.SoundFontsDir, force, out); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				fmt.Fprintf(errOut, "Warning: soundfont installer encountered: %v\n", err)
 				failedSteps = append(failedSteps, "soundfont")
 			}
 			fmt.Fprintln(out)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 
 			// 4. Steam IWADs
 			fmt.Fprintln(out, ">>> Step 4/5: Auto-discovering official Steam and GOG game files...")
-			if _, err := steam.DiscoverAndExtract(
-				cat, nil, paths.WadsDir, force, out, paths.WadsDirs...,
+			if _, err := steam.DiscoverAndExtractContext(
+				ctx, cat, nil, paths.WadsDir, force, out, paths.WadsDirs...,
 			); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				fmt.Fprintf(errOut, "Warning: steam discoverer encountered: %v\n", err)
 				failedSteps = append(failedSteps, "steam extract")
 			}
 			fmt.Fprintln(out)
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 
 			// 5. Community megawads
 			fmt.Fprintln(out, ">>> Step 5/5: Downloading community megawads...")
 			dl := wad.NewDownloader(paths.WadRoots(), force, out)
+			dl.Ctx = ctx
 			if err := dl.DownloadAll(cat); err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
 				fmt.Fprintf(errOut, "Warning: some megawads failed to download: %v\n", err)
 				failedSteps = append(failedSteps, "megawad downloads")
 			}

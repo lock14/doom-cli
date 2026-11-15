@@ -20,7 +20,8 @@
   "release_date": "2022",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/overboard.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/overboard.zip",
+      "sha256": "9dddda5bb754192c97507646c65f214a378206015d5fa1995bf75269bb02356a"
     }
   ],
   "links": [

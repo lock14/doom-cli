@@ -20,7 +20,8 @@
   "release_date": "2015",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/valiant.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/valiant.zip",
+      "sha256": "067d649f2a845386ea20ad20b458125143ead3e6f1dbfb4e161ca0eb8f159121"
     }
   ],
   "links": [

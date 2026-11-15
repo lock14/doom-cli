@@ -23,7 +23,8 @@
   "release_date": "2021",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/dbp37_augzen.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/dbp37_augzen.zip",
+      "sha256": "7dfb36408a9cd33a6ef429ada3aa68b4745be6abba03b0a3236dacb03872aeb9"
     }
   ],
   "links": [

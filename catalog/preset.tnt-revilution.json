@@ -23,7 +23,8 @@
   "release_date": "2017",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/tntr.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/tntr.zip",
+      "sha256": "aa64d4f3e713e4c7349c86d02731428c19e1f403f87e7d589d22e663a446cba8"
     }
   ],
   "links": [

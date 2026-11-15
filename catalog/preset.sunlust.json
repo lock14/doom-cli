@@ -20,7 +20,8 @@
   "release_date": "2015",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunlust.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunlust.zip",
+      "sha256": "46bc1fe72abec5ad06739b91657f3ed2fed1fda967cd38e6faa4a1701999d64a"
     }
   ],
   "links": [

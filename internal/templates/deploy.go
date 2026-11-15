@@ -2,6 +2,7 @@
 package templates
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -31,25 +32,51 @@ func mustReadEmbedded(name string) []byte {
 }
 
 var (
-	reFluidPatchset = regexp.MustCompile(`fluid_patchset\s+".*"`)
-	reVidMaxFPS     = regexp.MustCompile(`vid_maxfps\s+\d+`)
-	reScreenRes     = regexp.MustCompile(`screen_resolution\s+"[0-9]+x[0-9]+"`)
-	reSndSoundfont  = regexp.MustCompile(`snd_soundfont\s+".*"`)
+	reFluidPatchset = regexp.MustCompile(`(?m)^(\s*fluid_patchset\s+)"[^"\r\n]*"`)
+	reVidMaxFPS     = regexp.MustCompile(`(?m)^(\s*vid_maxfps\s+)\d+`)
+	reScreenRes     = regexp.MustCompile(`(?m)^(\s*screen_resolution\s+)"[0-9]+x[0-9]+"`)
+	reSndSoundfont  = regexp.MustCompile(`(?m)^(\s*snd_soundfont\s+)"[^"\r\n]*"`)
 )
+
+func sanitizeCfgValue(val string, slashPaths bool) string {
+	clean := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\r' || r == '\n' || r == 0 {
+			return -1
+		}
+		return r
+	}, val)
+	if slashPaths {
+		clean = strings.ReplaceAll(filepath.ToSlash(clean), `\`, `/`)
+	}
+	return clean
+}
+
+func normalizeLineEndings(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	return strings.ReplaceAll(s, "\r", "\n")
+}
 
 // RenderAutoexecWithRate returns expected autoexec.cfg content for a given refresh rate and soundfont path.
 func RenderAutoexecWithRate(paths *config.Paths, rate int) string {
-	content := string(embeddedAutoexec)
+	var sfPath string
+	if paths != nil {
+		sfPath = sanitizeCfgValue(paths.SoundFontFile, true)
+	}
+	content := normalizeLineEndings(string(embeddedAutoexec))
 	content = strings.ReplaceAll(content, "__REFRESH_RATE__", strconv.Itoa(rate))
-	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
+	content = strings.ReplaceAll(content, "__SOUNDFONT__", sfPath)
 	return content
 }
 
 // RenderDSDADoomWithRes returns expected dsda-doom.cfg content for a given resolution and soundfont path.
 func RenderDSDADoomWithRes(paths *config.Paths, res string) string {
-	content := string(embeddedDSDADoom)
-	content = strings.ReplaceAll(content, "__RESOLUTION__", res)
-	content = strings.ReplaceAll(content, "__SOUNDFONT__", paths.SoundFontFile)
+	var sfPath string
+	if paths != nil {
+		sfPath = sanitizeCfgValue(paths.SoundFontFile, false)
+	}
+	content := normalizeLineEndings(string(embeddedDSDADoom))
+	content = strings.ReplaceAll(content, "__RESOLUTION__", sanitizeCfgValue(res, false))
+	content = strings.ReplaceAll(content, "__SOUNDFONT__", sfPath)
 	return content
 }
 
@@ -61,10 +88,25 @@ func DeployConfigsTo(paths *config.Paths, out io.Writer) error {
 // DeployConfigsWithOptions installs autoexec.cfg and dsda-doom.cfg. When force is false,
 // existing configuration files on disk are preserved without being overwritten.
 func DeployConfigsWithOptions(paths *config.Paths, force bool, out io.Writer) error {
+	res, rate := display.DetectDisplay()
+	return DeployConfigsWithDisplay(paths, res, rate, force, out)
+}
+
+// DeployConfigsWithDisplay installs autoexec.cfg and dsda-doom.cfg using pre-detected display
+// parameters so callers that already probed the display avoid spawning duplicate subprocesses.
+func DeployConfigsWithDisplay(paths *config.Paths, res string, rate int, force bool, out io.Writer) error {
+	if paths == nil {
+		return errors.New("nil configuration paths")
+	}
 	if out == nil {
 		out = io.Discard
 	}
-	res, rate := display.DetectDisplay()
+	if strings.TrimSpace(res) == "" {
+		res = "1920x1080"
+	}
+	if rate <= 0 {
+		rate = 60
+	}
 
 	// 1. Deploy UZDoom autoexec.cfg
 	if err := os.MkdirAll(paths.UZDoomDir, 0o755); err != nil {
@@ -137,10 +179,25 @@ func RenderDSDADoom(paths *config.Paths) string {
 
 // DiffConfigs compares installed system configs against embedded templates and prints differences.
 func DiffConfigs(paths *config.Paths, out io.Writer) error {
+	res, rate := display.DetectDisplay()
+	return DiffConfigsWithDisplay(paths, res, rate, out)
+}
+
+// DiffConfigsWithDisplay compares installed system configs against embedded templates using
+// pre-detected display parameters to avoid redundant display probes.
+func DiffConfigsWithDisplay(paths *config.Paths, res string, rate int, out io.Writer) error {
+	if paths == nil {
+		return errors.New("nil configuration paths")
+	}
 	if out == nil {
 		out = os.Stdout
 	}
-	res, rate := display.DetectDisplay()
+	if strings.TrimSpace(res) == "" {
+		res = "1920x1080"
+	}
+	if rate <= 0 {
+		rate = 60
+	}
 
 	fmt.Fprintln(out, "=== UZDoom Diff ===")
 	autoDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
@@ -160,8 +217,8 @@ func printDiff(title, expected, diskPath string, out io.Writer) {
 		return
 	}
 
-	expLines := strings.Split(strings.TrimSpace(expected), "\n")
-	actLines := strings.Split(strings.TrimSpace(string(diskData)), "\n")
+	expLines := strings.Split(strings.TrimSpace(normalizeLineEndings(expected)), "\n")
+	actLines := strings.Split(strings.TrimSpace(normalizeLineEndings(string(diskData))), "\n")
 
 	diffCount := 0
 	maxLines := len(expLines)
@@ -199,10 +256,12 @@ func printDiff(title, expected, diskPath string, out io.Writer) {
 
 // SyncConfigs normalizes live system configs and writes them back into repo templates if repo exists.
 func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
+	if paths == nil {
+		return errors.New("nil configuration paths")
+	}
 	if out == nil {
 		out = os.Stdout
 	}
-
 	if repoDir == "" {
 		repoDir = "."
 	}
@@ -210,9 +269,9 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 	// 1. Sync UZDoom
 	autoDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
 	if data, err := os.ReadFile(autoDest); err == nil {
-		text := string(data)
-		text = reFluidPatchset.ReplaceAllString(text, `fluid_patchset "__SOUNDFONT__"`)
-		text = reVidMaxFPS.ReplaceAllString(text, `vid_maxfps __REFRESH_RATE__`)
+		text := normalizeLineEndings(string(data))
+		text = reFluidPatchset.ReplaceAllString(text, `${1}"__SOUNDFONT__"`)
+		text = reVidMaxFPS.ReplaceAllString(text, `${1}__REFRESH_RATE__`)
 
 		repoAuto := filepath.Join(repoDir, "uzdoom", "autoexec.cfg")
 		if _, err := os.Stat(filepath.Dir(repoAuto)); err == nil {
@@ -227,7 +286,7 @@ func SyncConfigs(paths *config.Paths, repoDir string, out io.Writer) error {
 	// 2. Sync DSDA-Doom
 	dsdaDest := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
 	if data, err := os.ReadFile(dsdaDest); err == nil {
-		text := string(data)
+		text := normalizeLineEndings(string(data))
 		text = reScreenRes.ReplaceAllString(text, `screen_resolution               "__RESOLUTION__"`)
 		text = reSndSoundfont.ReplaceAllString(text, `snd_soundfont                   "__SOUNDFONT__"`)
 

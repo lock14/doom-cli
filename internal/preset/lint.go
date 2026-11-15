@@ -12,14 +12,15 @@ import (
 	"unicode"
 
 	"github.com/lock14/doom-cli"
+	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
 var (
 	personalPathRegex = regexp.MustCompile(
-		`(?i)(/home/[a-z0-9_-]+|/Users/[a-z0-9_-]+|C:\\Users\\|%USERPROFILE%)`,
+		`(?i)(/home/[a-z0-9_-]+|/Users/[a-z0-9_-]+|C:(?:\\+|/)Users(?:\\+|/)|%USERPROFILE%)`,
 	)
 	docPersonalPathRegex = regexp.MustCompile(
-		`(?i)(/home/[a-z0-9_-]+|/Users/[a-z0-9_-]+|C:\\Users\\[a-z0-9_-]+)`,
+		`(?i)(/home/[a-z0-9_-]+|/Users/[a-z0-9_-]+|C:(?:\\+|/)Users(?:\\+|/)[a-z0-9_-]+)`,
 	)
 	decorativeEmojiRegex = regexp.MustCompile(
 		`([\x{1F300}-\x{1FAFF}\x{26A1}\x{2705}\x{2728}\x{274C}]|:(?:white_check_mark|x):)`,
@@ -155,7 +156,7 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 			continue
 		}
 		for _, f := range te.ent.Preset.Files {
-			base := filepath.Base(strings.TrimSpace(f.Name))
+			base := slashBase(f.Name)
 			if norm := NormalizeFilename(base); norm != "" {
 				if _, exists := canonicalFiles[norm]; !exists {
 					canonicalFiles[norm] = base
@@ -165,13 +166,21 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 	}
 
 	validateFiles := func(where, ownerID, iwad string, files []FileSpec) {
-		iwadNorm := NormalizeFilename(iwad)
+		if trimmedIWAD := strings.TrimSpace(iwad); trimmedIWAD != "" {
+			if _, err := fsutil.CleanRel(trimmedIWAD); err != nil {
+				addErr(where, "preset %s has invalid iwad path %q: %v", ownerID, iwad, err)
+			}
+		}
+		iwadNorm := NormalizeFilename(slashBase(iwad))
 		for _, f := range files {
 			if strings.TrimSpace(f.Name) == "" {
 				addErr(where, "preset %s has an empty file name", ownerID)
 				continue
 			}
-			fileNorm := NormalizeFilename(filepath.Base(f.Name))
+			if _, err := fsutil.CleanRel(strings.TrimSpace(f.Name)); err != nil {
+				addErr(where, "preset %s file %q has invalid relative path: %v", ownerID, f.Name, err)
+			}
+			fileNorm := NormalizeFilename(slashBase(f.Name))
 			if iwadNorm != "" && fileNorm == iwadNorm {
 				addErr(where, "iwad %q must not be repeated in files", iwad)
 			}
@@ -230,8 +239,8 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 		}
 		eng := te.ent.Engine
 		where := te.ent.Path
-		if prev, exists := engineIDs[eng.ID]; exists && te.curated {
-			addErr(where, "duplicate engine id %q (already in %s)", eng.ID, prev)
+		if prev, exists := engineIDs[eng.ID]; exists {
+			addErr(where, "duplicate or conflicting engine id %q (already in %s)", eng.ID, prev)
 		}
 		engineIDs[eng.ID] = where
 		for _, al := range eng.Aliases {
@@ -295,6 +304,8 @@ func LintCatalog(rootDir, userDir string) ([]Diagnostic, error) {
 			}
 			if err := ValidateSHA256(s.SHA256); err != nil {
 				addErr(where, "source %s: %v", s.URL, err)
+			} else if te.curated && strings.TrimSpace(s.SHA256) == "" {
+				addErr(where, "curated preset %s source %s requires a non-empty sha256 digest", p.ID, s.URL)
 			}
 		}
 

@@ -20,7 +20,8 @@
   "release_date": "2024",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gdturbo.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/gdturbo.zip",
+      "sha256": "c3323c3eb2974ce652ed0678027bab7e601804c2ba4e21256b7971b0b1644e4a"
     }
   ],
   "links": [

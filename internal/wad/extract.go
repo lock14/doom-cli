@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -14,29 +15,45 @@ import (
 	"github.com/lock14/doom-cli/internal/preset"
 )
 
+const maxEmbeddedLumpBytes = 64 << 20
+
 // ExtractWADLump extracts the raw payload of the first non-empty lump matching lumpName
 // (case-insensitive, up to 8 ASCII characters) from an IWAD or PWAD byte slice.
 func ExtractWADLump(wadData []byte, lumpName string) ([]byte, bool) {
-	if len(wadData) < 12 {
+	return ExtractWADLumpFromReader(bytes.NewReader(wadData), int64(len(wadData)), lumpName)
+}
+
+// ExtractWADLumpFromReader extracts the raw payload of the first non-empty lump matching
+// lumpName from an io.ReaderAt without reading the entire WAD file into memory.
+func ExtractWADLumpFromReader(r io.ReaderAt, dataLen int64, lumpName string) ([]byte, bool) {
+	if r == nil || dataLen < 12 {
 		return nil, false
 	}
-	ident := string(wadData[0:4])
+	var hdr [12]byte
+	if _, err := r.ReadAt(hdr[:], 0); err != nil {
+		return nil, false
+	}
+	ident := string(hdr[0:4])
 	if ident != "PWAD" && ident != "IWAD" {
 		return nil, false
 	}
-	numLumps := int64(binary.LittleEndian.Uint32(wadData[4:8]))
-	dirOffset := int64(binary.LittleEndian.Uint32(wadData[8:12]))
-	dataLen := int64(len(wadData))
+	numLumps := int64(binary.LittleEndian.Uint32(hdr[4:8]))
+	dirOffset := int64(binary.LittleEndian.Uint32(hdr[8:12]))
 	if numLumps <= 0 || numLumps > 65536 || dirOffset < 12 || dirOffset+numLumps*16 > dataLen {
+		return nil, false
+	}
+
+	dirBuf := make([]byte, numLumps*16)
+	if _, err := r.ReadAt(dirBuf, dirOffset); err != nil {
 		return nil, false
 	}
 
 	want := strings.ToUpper(strings.TrimSpace(lumpName))
 	for i := int64(0); i < numLumps; i++ {
-		entry := wadData[dirOffset+i*16 : dirOffset+(i+1)*16]
+		entry := dirBuf[i*16 : (i+1)*16]
 		lumpPos := int64(binary.LittleEndian.Uint32(entry[0:4]))
 		lumpSize := int64(binary.LittleEndian.Uint32(entry[4:8]))
-		if lumpSize <= 0 || lumpPos < 12 || lumpPos+lumpSize > dataLen {
+		if lumpSize <= 0 || lumpSize > maxEmbeddedLumpBytes || lumpPos < 12 || lumpPos+lumpSize > dataLen {
 			continue
 		}
 		nameBytes := entry[8:16]
@@ -45,15 +62,17 @@ func ExtractWADLump(wadData []byte, lumpName string) ([]byte, bool) {
 		}
 		if strings.EqualFold(string(nameBytes), want) {
 			out := make([]byte, lumpSize)
-			copy(out, wadData[lumpPos:lumpPos+lumpSize])
+			if _, err := r.ReadAt(out, lumpPos); err != nil {
+				return nil, false
+			}
 			return out, true
 		}
 	}
 	return nil, false
 }
 
-func isZip(path string) bool {
-	f, err := os.Open(path)
+func isZip(filePath string) bool {
+	f, err := os.Open(filePath)
 	if err != nil {
 		return false
 	}
@@ -66,9 +85,22 @@ func isZip(path string) bool {
 	return bytes.Equal(buf[:], []byte{'P', 'K', 0x03, 0x04})
 }
 
+func zipBase(entryName string) string {
+	slash := strings.ReplaceAll(entryName, `\`, `/`)
+	return path.Base(path.Clean(slash))
+}
+
+func isSkippableZipEntry(zf *zip.File) bool {
+	if zf.FileInfo().IsDir() || zf.Mode()&os.ModeSymlink != 0 {
+		return true
+	}
+	slash := strings.ReplaceAll(zf.Name, `\`, `/`)
+	clean := path.Clean(slash)
+	return clean == "." || clean == ".." || strings.HasPrefix(clean, "../") || strings.Contains(slash, "/../")
+}
+
 func (d *Downloader) extractFromZip(
 	zipPath string,
-	_ int64,
 	expectedFiles []string,
 	presets ...preset.Preset,
 ) error {
@@ -86,18 +118,10 @@ func (d *Downloader) extractFromZip(
 	var dehFiles []*zip.File
 	var txtFiles []*zip.File
 	for _, zf := range zr.File {
-		if zf.FileInfo().IsDir() {
+		if isSkippableZipEntry(zf) {
 			continue
 		}
-		// CodeQL and Zip Slip defense: skip entries containing path traversal
-		cleanName := filepath.Clean(zf.Name)
-		if strings.HasPrefix(cleanName, "..") ||
-			strings.Contains(cleanName, "/../") ||
-			strings.Contains(cleanName, "\\..\\") {
-			continue
-		}
-
-		baseLower := strings.ToLower(filepath.Base(cleanName))
+		baseLower := strings.ToLower(zipBase(zf.Name))
 		if strings.HasSuffix(baseLower, ".wad") {
 			wadFiles = append(wadFiles, zf)
 		} else if strings.HasSuffix(baseLower, ".pk3") {
@@ -106,6 +130,19 @@ func (d *Downloader) extractFromZip(
 			dehFiles = append(dehFiles, zf)
 		} else if strings.HasSuffix(baseLower, ".txt") {
 			txtFiles = append(txtFiles, zf)
+		}
+	}
+
+	var wadExpCount, pk3ExpCount, dehExpCount int
+	for _, exp := range expectedFiles {
+		el := strings.ToLower(exp)
+		switch {
+		case strings.HasSuffix(el, ".wad"):
+			wadExpCount++
+		case strings.HasSuffix(el, ".pk3"):
+			pk3ExpCount++
+		case strings.HasSuffix(el, ".deh") || strings.HasSuffix(el, ".bex"):
+			dehExpCount++
 		}
 	}
 
@@ -123,10 +160,10 @@ func (d *Downloader) extractFromZip(
 
 		// 1. Exact case-insensitive match on base filename
 		for _, zf := range zr.File {
-			if zf.FileInfo().IsDir() {
+			if isSkippableZipEntry(zf) {
 				continue
 			}
-			if strings.ToLower(filepath.Base(zf.Name)) == expLower {
+			if strings.ToLower(zipBase(zf.Name)) == expLower {
 				match = zf
 				break
 			}
@@ -135,10 +172,10 @@ func (d *Downloader) extractFromZip(
 		// 2. Normalized match (ignoring spaces, underscores, dashes)
 		if match == nil {
 			for _, zf := range zr.File {
-				if zf.FileInfo().IsDir() {
+				if isSkippableZipEntry(zf) {
 					continue
 				}
-				if preset.NormalizeFilename(filepath.Base(zf.Name)) == expNorm {
+				if preset.NormalizeFilename(zipBase(zf.Name)) == expNorm {
 					match = zf
 					break
 				}
@@ -150,10 +187,10 @@ func (d *Downloader) extractFromZip(
 			for _, alias := range aliasCat.FileAliases(expBase) {
 				aliasNorm := preset.NormalizeFilename(alias)
 				for _, zf := range zr.File {
-					if zf.FileInfo().IsDir() {
+					if isSkippableZipEntry(zf) {
 						continue
 					}
-					zfBase := filepath.Base(zf.Name)
+					zfBase := zipBase(zf.Name)
 					if strings.EqualFold(zfBase, alias) || preset.NormalizeFilename(zfBase) == aliasNorm {
 						match = zf
 						break
@@ -165,14 +202,14 @@ func (d *Downloader) extractFromZip(
 			}
 		}
 
-		// 4. Single-file fallback
+		// 4. Single-file fallback when the preset expects exactly one file of that type
 		if match == nil {
-			if strings.HasSuffix(expLower, ".wad") && len(wadFiles) == 1 {
+			if strings.HasSuffix(expLower, ".wad") && wadExpCount == 1 && len(wadFiles) == 1 {
 				match = wadFiles[0]
-			} else if strings.HasSuffix(expLower, ".pk3") && len(pk3Files) == 1 {
+			} else if strings.HasSuffix(expLower, ".pk3") && pk3ExpCount == 1 && len(pk3Files) == 1 {
 				match = pk3Files[0]
 			} else if (strings.HasSuffix(expLower, ".deh") || strings.HasSuffix(expLower, ".bex")) &&
-				len(dehFiles) == 1 {
+				dehExpCount == 1 && len(dehFiles) == 1 {
 				match = dehFiles[0]
 			}
 		}
@@ -184,7 +221,7 @@ func (d *Downloader) extractFromZip(
 		if err := extractZipFile(match, cleanWadsDir, destPath); err != nil {
 			return fmt.Errorf("error extracting %s: %w", exp, err)
 		}
-		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", filepath.Base(match.Name), destPath)
+		fmt.Fprintf(d.Out, "    Installed: %s -> %s\n", zipBase(match.Name), destPath)
 	}
 
 	// Extract accompanying readme (.txt) if present in the archive, preferring entries
@@ -192,11 +229,10 @@ func (d *Downloader) extractFromZip(
 	// Generic fallback files (such as readme.txt) are saved as <primaryStem>.txt so
 	// DirIndex.ResolveReadme resolves them and archives never overwrite each other.
 	for _, tf := range orderReadmeCandidates(txtFiles, expectedFiles, aliasCat, presets) {
-		base := strings.ToLower(filepath.Base(tf.Name))
-		if strings.EqualFold(base, "license.txt") {
+		cleanName := zipBase(tf.Name)
+		if strings.EqualFold(cleanName, "license.txt") {
 			continue
 		}
-		cleanName := filepath.Base(filepath.Clean(tf.Name))
 		if cleanName == "." || cleanName == ".." || strings.Contains(cleanName, "..") {
 			continue
 		}
@@ -230,12 +266,13 @@ func collectReadmeStems(
 		seen[norm] = true
 		stems = append(stems, norm)
 	}
+
 	for _, exp := range expectedFiles {
-		expBase := filepath.Base(exp)
-		addStem(strings.TrimSuffix(expBase, filepath.Ext(expBase)))
+		expBase := path.Base(strings.ReplaceAll(exp, `\`, `/`))
+		addStem(strings.TrimSuffix(expBase, path.Ext(expBase)))
 		for _, al := range aliasCat.FileAliases(expBase) {
-			alBase := filepath.Base(al)
-			addStem(strings.TrimSuffix(alBase, filepath.Ext(alBase)))
+			alBase := path.Base(strings.ReplaceAll(al, `\`, `/`))
+			addStem(strings.TrimSuffix(alBase, path.Ext(alBase)))
 		}
 	}
 	for _, p := range presets {
@@ -251,7 +288,7 @@ func readmeDestName(
 	presets []preset.Preset,
 ) string {
 	stems := collectReadmeStems(expectedFiles, aliasCat, presets)
-	txtStem := preset.NormalizeFilename(strings.TrimSuffix(cleanName, filepath.Ext(cleanName)))
+	txtStem := preset.NormalizeFilename(strings.TrimSuffix(cleanName, path.Ext(cleanName)))
 	for _, stem := range stems {
 		if txtStem == stem {
 			return cleanName
@@ -260,18 +297,20 @@ func readmeDestName(
 			return cleanName
 		}
 	}
+
 	for _, exp := range expectedFiles {
-		expBase := filepath.Base(strings.TrimSpace(exp))
-		ext := filepath.Ext(expBase)
+		expBase := path.Base(strings.ReplaceAll(strings.TrimSpace(exp), `\`, `/`))
+		ext := path.Ext(expBase)
 		if strings.EqualFold(ext, ".wad") || strings.EqualFold(ext, ".pk3") {
 			if stem := strings.TrimSuffix(expBase, ext); stem != "" {
 				return stem + ".txt"
 			}
 		}
 	}
+
 	for _, exp := range expectedFiles {
-		expBase := filepath.Base(strings.TrimSpace(exp))
-		if stem := strings.TrimSuffix(expBase, filepath.Ext(expBase)); stem != "" {
+		expBase := path.Base(strings.ReplaceAll(strings.TrimSpace(exp), `\`, `/`))
+		if stem := strings.TrimSuffix(expBase, path.Ext(expBase)); stem != "" {
 			return stem + ".txt"
 		}
 	}
@@ -288,8 +327,8 @@ func orderReadmeCandidates(
 
 	var exact, readmePrefix, otherPrefix, rest []*zip.File
 	for _, tf := range txtFiles {
-		base := filepath.Base(filepath.Clean(tf.Name))
-		txtStem := preset.NormalizeFilename(strings.TrimSuffix(base, filepath.Ext(base)))
+		base := zipBase(tf.Name)
+		txtStem := preset.NormalizeFilename(strings.TrimSuffix(base, path.Ext(base)))
 		if txtStem == "" || txtStem == "license" {
 			continue
 		}
@@ -332,7 +371,11 @@ func orderReadmeCandidates(
 func extractZipFile(zf *zip.File, targetDir, destPath string) error {
 	cleanTargetDir := filepath.Clean(targetDir)
 	cleanDest := filepath.Clean(destPath)
-	if !strings.HasPrefix(cleanDest, cleanTargetDir+string(filepath.Separator)) {
+	prefix := cleanTargetDir
+	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
+		prefix += string(filepath.Separator)
+	}
+	if cleanDest == cleanTargetDir || !strings.HasPrefix(cleanDest, prefix) {
 		return fmt.Errorf("illegal file path in archive: %s", zf.Name)
 	}
 
@@ -346,6 +389,6 @@ func extractZipFile(zf *zip.File, targetDir, destPath string) error {
 	}
 	defer rc.Close()
 
-	_, _, err = fsutil.WriteReaderAtomic(cleanDest, rc, 0o644)
+	_, _, err = fsutil.WriteLimitedReaderAtomic(cleanDest, rc, fsutil.MaxExtractFileBytes, 0o644)
 	return err
 }

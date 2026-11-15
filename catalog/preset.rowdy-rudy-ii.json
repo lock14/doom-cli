@@ -23,7 +23,8 @@
   "release_date": "2020",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/rudy2.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/rudy2.zip",
+      "sha256": "e52eb5ea6247845c6591a27020b408a1bcf4664e11b755bec71240acaf0745aa"
     }
   ],
   "links": [

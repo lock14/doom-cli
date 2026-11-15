@@ -41,6 +41,16 @@ type resolvedFile struct {
 	isDeh    bool
 }
 
+func absPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
+}
+
 func newResolvedFile(path string, optional bool) resolvedFile {
 	lower := strings.ToLower(path)
 	return resolvedFile{
@@ -141,6 +151,9 @@ func buildEngineArgs(
 }
 
 // PrepareLaunch resolves engine binaries, files, and arguments to create a LaunchPlan.
+// Resolved binary and asset paths are canonicalized to absolute paths so child working
+// directory changes in Execute never break relative bin-dir or wads-dir configurations
+// and relative filenames starting with '-', '+', or '@' cannot inject engine flags.
 func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	out := opts.Out
 	if out == nil {
@@ -188,6 +201,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 			primaryDir,
 		)
 	}
+	iwadPath = absPath(iwadPath)
 
 	var resolved []resolvedFile
 	for _, f := range p.Files {
@@ -216,7 +230,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 			)
 		}
 
-		resolved = append(resolved, newResolvedFile(fpath, f.Optional))
+		resolved = append(resolved, newResolvedFile(absPath(fpath), f.Optional))
 	}
 
 	orderedFiles, args := buildEngineArgs(engCfg, p, iwadPath, resolved, opts.ExtraArgs)
@@ -255,48 +269,52 @@ func Execute(plan *LaunchPlan, out, errOut io.Writer) error {
 		return nil
 	}
 
-	cmd := exec.Command(plan.EngineBin, plan.Args...)
-	cmd.Dir = filepath.Dir(plan.EngineBin)
+	binPath := absPath(plan.EngineBin)
+	cmd := exec.Command(binPath, plan.Args...)
+	cmd.Dir = filepath.Dir(binPath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = out
 	cmd.Stderr = errOut
 	return cmd.Run()
 }
 
-// ResolveBinary searches for an engine executable in an explicit path, binDir, or system PATH.
+// ResolveBinary searches for an engine executable in an explicit path, binDir, or system PATH,
+// returning a canonicalized absolute path so callers can safely set cmd.Dir.
 func ResolveBinary(engine, binDir string) (string, error) {
 	if filepath.IsAbs(engine) || strings.ContainsRune(engine, filepath.Separator) ||
 		strings.ContainsRune(engine, '/') || strings.ContainsRune(engine, '\\') {
 		if fi, err := os.Stat(engine); err == nil && !fi.IsDir() {
-			return engine, nil
+			return absPath(engine), nil
 		}
 		if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(engine), ".exe") {
 			if fi, err := os.Stat(engine + ".exe"); err == nil && !fi.IsDir() {
-				return engine + ".exe", nil
+				return absPath(engine + ".exe"), nil
 			}
 		}
 		return "", fmt.Errorf("engine binary '%s' not found", engine)
 	}
 
-	candidates := []string{
-		filepath.Join(binDir, engine),
-	}
-	if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(engine), ".exe") {
-		candidates = append(candidates, filepath.Join(binDir, engine+".exe"))
-	}
+	if strings.TrimSpace(binDir) != "" {
+		candidates := []string{
+			filepath.Join(binDir, engine),
+		}
+		if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(engine), ".exe") {
+			candidates = append(candidates, filepath.Join(binDir, engine+".exe"))
+		}
 
-	for _, c := range candidates {
-		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
-			return c, nil
+		for _, c := range candidates {
+			if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
+				return absPath(c), nil
+			}
 		}
 	}
 
 	if p, err := exec.LookPath(engine); err == nil {
-		return p, nil
+		return absPath(p), nil
 	}
 	if runtime.GOOS == "windows" && !strings.HasSuffix(strings.ToLower(engine), ".exe") {
 		if p, err := exec.LookPath(engine + ".exe"); err == nil {
-			return p, nil
+			return absPath(p), nil
 		}
 	}
 

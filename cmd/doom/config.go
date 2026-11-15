@@ -15,12 +15,13 @@ import (
 
 func newConfigCmd() *cobra.Command {
 	configCmd := &cobra.Command{
-		Use:   "config",
-		Short: "Manage doom-cli user settings and TUI color themes",
-		Args:  cobra.NoArgs,
+		Use:          "config",
+		Short:        "Manage doom-cli user settings and TUI color themes",
+		Args:         cobra.NoArgs,
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
-				paths, cfg, cat, err := loadAppState()
+				paths, cfg, cat, err := loadAppStateWithErr(cmdErr(cmd))
 				if err != nil {
 					return err
 				}
@@ -69,7 +70,7 @@ func newConfigCmd() *cobra.Command {
 }
 
 func runConfigShow(cmd *cobra.Command, _ []string) error {
-	paths, cfg, _, err := loadAppState()
+	paths, cfg, _, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
 	}
@@ -107,7 +108,7 @@ func runConfigShow(cmd *cobra.Command, _ []string) error {
 }
 
 func runConfigGet(cmd *cobra.Command, args []string) error {
-	paths, cfg, _, err := loadAppState()
+	paths, cfg, _, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
 	}
@@ -192,11 +193,11 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 		}
 		val := lower
 		if _, ok := tui.GetBuiltinTheme(lower); !ok {
-			if _, statErr := os.Stat(filepath.Join(paths.ThemesDir, lower+".json")); statErr == nil {
+			if isRegularFile(filepath.Join(paths.ThemesDir, lower+".json")) {
 				val = lower
-			} else if _, statErr := os.Stat(filepath.Join(paths.ThemesDir, trimmed+".json")); statErr == nil {
+			} else if isRegularFile(filepath.Join(paths.ThemesDir, trimmed+".json")) {
 				val = trimmed
-			} else if _, pathErr := os.Stat(trimmed); pathErr == nil {
+			} else if isRegularFile(trimmed) {
 				val = trimmed
 			} else {
 				return fmt.Errorf("unknown theme %q. Run 'doom config themes' to see available themes", trimmed)
@@ -250,7 +251,7 @@ func runConfigSet(cmd *cobra.Command, args []string) error {
 }
 
 func runConfigThemes(cmd *cobra.Command, _ []string) error {
-	paths, cfg, _, err := loadAppState()
+	paths, cfg, _, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
 	}
@@ -324,6 +325,11 @@ func resolveThemeWithSource(cfg *config.AppConfig) (string, string) {
 		return strings.TrimSpace(cfg.Theme), "config"
 	}
 	return tui.ClassicTheme.Name, "default"
+}
+
+func isRegularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func resolveNerdFontsWithSource(cfg *config.AppConfig) (bool, string) {

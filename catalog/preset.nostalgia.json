@@ -24,7 +24,8 @@
   "release_date": "2022",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/nostalgia.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/nostalgia.zip",
+      "sha256": "01c8b6911f906267c92bdb4fdfb049389deb2f1fc0bf8f42c42e2ba3e6902da5"
     }
   ],
   "links": [

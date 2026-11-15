@@ -20,7 +20,8 @@
   "release_date": "2019",
   "sources": [
     {
-      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternity.zip"
+      "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/eviternity.zip",
+      "sha256": "ad2f8b73108df7e4d3843d46a9e903238ac7e321ae9281f8c61f67fb92983656"
     }
   ],
   "links": [

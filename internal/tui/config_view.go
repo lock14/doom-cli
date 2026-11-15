@@ -93,6 +93,7 @@ type configManagerState struct {
 	initialEngPrefix  string
 	initialEngBadge   string
 	initialEngDisplay string
+	confirmDiscardEng bool
 
 	// Tab 3: Port Configs
 	detectedRes  string
@@ -154,7 +155,8 @@ func detectSourceBadge(cfgSet bool) string {
 	return "default"
 }
 
-func (m *model) openConfigManager() {
+func (m *model) openConfigManager() tea.Cmd {
+	m.input.Blur()
 	m.ensurePathsAndConfig()
 
 	themes := append([]Theme(nil), ListBuiltinThemes()...)
@@ -200,7 +202,10 @@ func (m *model) openConfigManager() {
 	}
 
 	engines := m.availableEngines()
-	res, rate := display.DetectDisplay()
+	if m.detectedRes == "" || m.detectedRate <= 0 {
+		m.detectedRes, m.detectedRate = display.DetectDisplay()
+	}
+	res, rate := m.detectedRes, m.detectedRate
 
 	s := &configManagerState{
 		activeTab:        configTabCLI,
@@ -233,10 +238,11 @@ func (m *model) openConfigManager() {
 
 	s.loadEngineFields(0, m.styles)
 	s.refreshPortConfigStatus(m.paths)
-	s.syncFocus()
+	cmd := s.syncFocus()
 
 	m.cfgMgr = s
 	m.viewingConfigMgr = true
+	return cmd
 }
 
 func (s *configManagerState) loadEngineFields(idx int, styles ThemeStyles) {
@@ -269,6 +275,7 @@ func (s *configManagerState) loadEngineFields(idx int, styles ThemeStyles) {
 	s.initialEngPrefix = prefArgs
 	s.initialEngBadge = badge
 	s.initialEngDisplay = dispName
+	s.confirmDiscardEng = false
 }
 
 func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
@@ -348,7 +355,7 @@ func (s *configManagerState) isTextFieldFocused() bool {
 	}
 }
 
-func (s *configManagerState) syncFocus() {
+func (s *configManagerState) syncFocus() tea.Cmd {
 	s.wadsDirInput.Blur()
 	s.extraDirsInput.Blur()
 	s.binDirInput.Blur()
@@ -363,28 +370,29 @@ func (s *configManagerState) syncFocus() {
 	case configTabCLI:
 		switch s.focusIdx {
 		case cliFieldWadsDir:
-			s.wadsDirInput.Focus()
+			return s.wadsDirInput.Focus()
 		case cliFieldExtraWadsDirs:
-			s.extraDirsInput.Focus()
+			return s.extraDirsInput.Focus()
 		case cliFieldBinDir:
-			s.binDirInput.Focus()
+			return s.binDirInput.Focus()
 		case cliFieldSoundFontsDir:
-			s.sfDirInput.Focus()
+			return s.sfDirInput.Focus()
 		}
 	case configTabEngines:
 		switch s.focusIdx {
 		case engFieldBinary:
-			s.engBinaryInput.Focus()
+			return s.engBinaryInput.Focus()
 		case engFieldDefaultArgs:
-			s.engDefaultInput.Focus()
+			return s.engDefaultInput.Focus()
 		case engFieldPrefixArgs:
-			s.engPrefixInput.Focus()
+			return s.engPrefixInput.Focus()
 		case engFieldBadge:
-			s.engBadgeInput.Focus()
+			return s.engBadgeInput.Focus()
 		case engFieldDisplayName:
-			s.engDisplayInput.Focus()
+			return s.engDisplayInput.Focus()
 		}
 	}
+	return nil
 }
 
 func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -403,13 +411,19 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 			s.diffViewport.Width = vpWidth
 			s.diffViewport.Height = vpHeight
+			if s.diffViewport.PastBottom() {
+				s.diffViewport.GotoBottom()
+			}
 			return m, nil
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "ctrl+c":
+				if m.fetchCancel != nil {
+					m.fetchCancel()
+				}
 				m.quitting = true
 				return m, tea.Quit
-			case "f1":
+			case "f1", "alt+?", "?":
 				m.openHelp(helpModeConfigManager)
 				return m, nil
 			case "esc", "q", "Q", "enter":
@@ -441,6 +455,9 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch keyStr {
 		case "ctrl+c":
+			if m.fetchCancel != nil {
+				m.fetchCancel()
+			}
 			m.quitting = true
 			return m, tea.Quit
 
@@ -455,53 +472,53 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quitting = true
 				return m, tea.Quit
 			}
-			return m, nil
+			return m, m.input.Focus()
 
-		case "f1":
+		case "f1", "alt+?":
 			m.openHelp(helpModeConfigManager)
 			return m, nil
+
+		case "?":
+			if !isText {
+				m.openHelp(helpModeConfigManager)
+				return m, nil
+			}
 
 		case "[":
 			s.activeTab = (s.activeTab + 2) % 3
 			s.focusIdx = 0
-			s.syncFocus()
-			return m, nil
+			return m, s.syncFocus()
 
 		case "]":
 			s.activeTab = (s.activeTab + 1) % 3
 			s.focusIdx = 0
-			s.syncFocus()
-			return m, nil
+			return m, s.syncFocus()
 
 		case "1", "2", "3":
 			if !isText {
 				s.activeTab = int(keyStr[0] - '1')
 				s.focusIdx = 0
-				s.syncFocus()
-				return m, nil
+				return m, s.syncFocus()
 			}
 
 		case "ctrl+s":
-			m.saveActiveConfigTab()
-			return m, nil
+			return m, m.saveActiveConfigTab()
 
 		case "ctrl+r":
 			if s.activeTab == configTabEngines {
-				m.resetEngineConfigOverride()
+				return m, m.resetEngineConfigOverride()
 			}
 			return m, nil
 
 		case "up", "ctrl+p", "ctrl+k", "shift+tab":
 			count := s.fieldCountForTab()
 			s.focusIdx = (s.focusIdx - 1 + count) % count
-			s.syncFocus()
-			return m, nil
+			return m, s.syncFocus()
 
 		case "down", "ctrl+n", "ctrl+j", "tab":
 			count := s.fieldCountForTab()
 			s.focusIdx = (s.focusIdx + 1) % count
-			s.syncFocus()
-			return m, nil
+			return m, s.syncFocus()
 
 		case "left":
 			if !isText {
@@ -559,6 +576,7 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case engFieldDisplayName:
 			s.engDisplayInput, cmd = s.engDisplayInput.Update(msg)
 		}
+		s.confirmDiscardEng = false
 	}
 	return m, cmd
 }
@@ -586,10 +604,17 @@ func (m *model) adjustConfigField(delta int) {
 		switch s.focusIdx {
 		case engFieldSelect:
 			if len(s.engines) > 0 {
+				if s.isTab2Dirty() && !s.confirmDiscardEng {
+					s.confirmDiscardEng = true
+					s.statusMsg = "Unsaved engine edits: press ←/→ again to discard, or Ctrl+S to save"
+					return
+				}
+				s.statusMsg = ""
 				nextIdx := (s.engineIdx + delta + len(s.engines)) % len(s.engines)
 				s.loadEngineFields(nextIdx, m.styles)
 			}
 		case engFieldArgsStyle:
+			s.confirmDiscardEng = false
 			if s.engArgsStyle == "boom" {
 				s.engArgsStyle = "zdoom"
 			} else {
@@ -610,14 +635,16 @@ func (m *model) activatePortConfigAction() {
 	switch s.focusIdx {
 	case portFieldViewDiff:
 		var buf bytes.Buffer
-		_ = templates.DiffConfigs(m.paths, &buf)
+		_ = templates.DiffConfigsWithDisplay(m.paths, s.detectedRes, s.detectedRate, &buf)
 		_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
 		s.diffViewport = viewport.New(vpWidth, vpHeight)
 		s.diffViewport.SetContent(buf.String())
 		s.viewingDiff = true
 	case portFieldDeploy:
 		var buf bytes.Buffer
-		if err := templates.DeployConfigsTo(m.paths, &buf); err != nil {
+		if err := templates.DeployConfigsWithDisplay(
+			m.paths, s.detectedRes, s.detectedRate, true, &buf,
+		); err != nil {
 			s.statusMsg = fmt.Sprintf("✗ Deploy failed: %v", err)
 			return
 		}
@@ -627,17 +654,29 @@ func (m *model) activatePortConfigAction() {
 	}
 }
 
-func (m *model) saveActiveConfigTab() {
+func (m *model) saveActiveConfigTab() tea.Cmd {
 	s := m.cfgMgr
 	if s == nil {
-		return
+		return nil
 	}
 	m.ensurePathsAndConfig()
 
 	switch s.activeTab {
 	case configTabCLI:
-		m.appConfig.Theme = m.theme.Name
-		m.appConfig.SetNerdFonts(m.nerdFonts)
+		themeChanged := !strings.EqualFold(m.theme.Name, s.initialThemeName)
+		if themeChanged || s.themeSource == "config" {
+			m.appConfig.Theme = m.theme.Name
+			if themeChanged && s.themeSource == "default" {
+				s.themeSource = "config"
+			}
+		}
+		nerdChanged := m.nerdFonts != s.initialNerdFonts
+		if nerdChanged || s.nerdFontsSource == "config" {
+			m.appConfig.SetNerdFonts(m.nerdFonts)
+			if nerdChanged && s.nerdFontsSource == "default" {
+				s.nerdFontsSource = "config"
+			}
+		}
 
 		defPaths := config.GetPaths()
 		wadsVal := strings.TrimSpace(s.wadsDirInput.Value())
@@ -706,7 +745,7 @@ func (m *model) saveActiveConfigTab() {
 
 		if err := config.SaveConfig(m.paths, m.appConfig); err != nil {
 			s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
-			return
+			return nil
 		}
 
 		s.savedTheme = m.theme
@@ -717,12 +756,6 @@ func (m *model) saveActiveConfigTab() {
 		s.initialExtraDirs = extraVal
 		s.initialBinDir = binVal
 		s.initialSFDir = sfVal
-		if s.themeSource == "default" {
-			s.themeSource = "config"
-		}
-		if s.nerdFontsSource == "default" {
-			s.nerdFontsSource = "config"
-		}
 
 		m.themeSource = s.themeSource
 		m.nerdFontsSource = s.nerdFontsSource
@@ -736,10 +769,11 @@ func (m *model) saveActiveConfigTab() {
 		s.refreshPortConfigStatus(m.paths)
 		s.statusMsg = fmt.Sprintf("✓ Saved CLI settings to %s", filepath.Base(m.paths.ConfigFile))
 		m.statusMsg = s.statusMsg
+		return nil
 
 	case configTabEngines:
 		if len(s.engines) == 0 {
-			return
+			return nil
 		}
 		eng := s.engines[s.engineIdx]
 		bin := strings.TrimSpace(s.engBinaryInput.Value())
@@ -750,49 +784,73 @@ func (m *model) saveActiveConfigTab() {
 		dispName := strings.TrimSpace(s.engDisplayInput.Value())
 		emptyAppend := []string{}
 
-		opts := preset.EngineOverrideOptions{
-			Binary:      &bin,
-			ArgsStyle:   &style,
-			DefaultArgs: &defArgs,
-			AppendArgs:  &emptyAppend,
-			PrefixArgs:  &prefArgs,
-			Badge:       &badge,
-			DisplayName: &dispName,
+		var opts preset.EngineOverrideOptions
+		if bin != strings.TrimSpace(s.initialEngBinary) {
+			opts.Binary = &bin
 		}
+		if style != strings.TrimSpace(s.initialEngStyle) {
+			opts.ArgsStyle = &style
+		}
+		if strings.Join(defArgs, " ") != strings.Join(strings.Fields(s.initialEngDefault), " ") {
+			opts.DefaultArgs = &defArgs
+			opts.AppendArgs = &emptyAppend
+		}
+		if strings.Join(prefArgs, " ") != strings.Join(strings.Fields(s.initialEngPrefix), " ") {
+			opts.PrefixArgs = &prefArgs
+		}
+		if badge != strings.TrimSpace(s.initialEngBadge) {
+			opts.Badge = &badge
+		}
+		if dispName != strings.TrimSpace(s.initialEngDisplay) {
+			opts.DisplayName = &dispName
+		}
+
 		catDir := m.catalogDir()
-		if _, err := preset.ConfigEngine(catDir, m.catalog, eng.ID, opts); err != nil {
-			s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
-			return
+		if opts.Binary != nil ||
+			opts.ArgsStyle != nil ||
+			opts.DefaultArgs != nil ||
+			opts.PrefixArgs != nil ||
+			opts.Badge != nil ||
+			opts.DisplayName != nil ||
+			eng.Overridden {
+			if _, err := preset.ConfigEngine(catDir, m.catalog, eng.ID, opts); err != nil {
+				s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
+				return nil
+			}
 		}
 		m.reloadCatalogAndIndex()
 		s.engines = m.availableEngines()
 		s.loadEngineFields(s.engineIdx, m.styles)
-		s.syncFocus()
+		cmd := s.syncFocus()
 		s.statusMsg = fmt.Sprintf("✓ Saved engine override for %s", eng.ID)
 		m.statusMsg = s.statusMsg
+		return cmd
 
 	case configTabPorts:
 		m.activatePortConfigAction()
+		return nil
 	}
+	return nil
 }
 
-func (m *model) resetEngineConfigOverride() {
+func (m *model) resetEngineConfigOverride() tea.Cmd {
 	s := m.cfgMgr
 	if s == nil || len(s.engines) == 0 {
-		return
+		return nil
 	}
 	eng := s.engines[s.engineIdx]
 	catDir := m.catalogDir()
 	if err := preset.ResetEngineOverride(catDir, m.catalog, eng.ID); err != nil {
 		s.statusMsg = fmt.Sprintf("✗ Reset failed: %v", err)
-		return
+		return nil
 	}
 	m.reloadCatalogAndIndex()
 	s.engines = m.availableEngines()
 	s.loadEngineFields(s.engineIdx, m.styles)
-	s.syncFocus()
+	cmd := s.syncFocus()
 	s.statusMsg = fmt.Sprintf("✓ Reset engine override for %s", eng.ID)
 	m.statusMsg = s.statusMsg
+	return cmd
 }
 
 func (m model) renderConfigManagerView() string {
@@ -1113,11 +1171,13 @@ func (m model) renderConfigManagerFooter() string {
 		{"↑/↓/Tab", "Field"},
 	}
 	if s != nil && s.activeTab == configTabPorts {
-		items = append(items,
-			keyHelp{"Enter/Space", "Run Action"},
-			keyHelp{"F1", "Help"},
-			keyHelp{"Esc", "Close"},
-		)
+		items = []keyHelp{
+			{"1/2/3/[/]", "Tab"},
+			{"↑/↓/←/→", "Action"},
+			{"Enter/Space", "Run"},
+			{"F1", "Help"},
+			{"Esc", "Close"},
+		}
 	} else {
 		items = append(items,
 			keyHelp{"←/→/Space", "Adjust"},
