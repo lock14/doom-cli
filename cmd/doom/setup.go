@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/lock14/doom-cli/internal/engine"
+	"github.com/lock14/doom-cli/internal/portcfg"
 	"github.com/lock14/doom-cli/internal/steam"
-	"github.com/lock14/doom-cli/internal/templates"
 	"github.com/lock14/doom-cli/internal/wad"
 )
 
@@ -36,7 +36,7 @@ func newSetupCmd() *cobra.Command {
 
 			// 1. Configs
 			fmt.Fprintln(out, ">>> Step 1/5: Deploying platform configurations...")
-			if err := templates.DeployConfigsWithOptions(paths, force, out); err != nil {
+			if err := portcfg.DeployConfigsWithOptions(paths, force, out); err != nil {
 				return fmt.Errorf("error deploying configs: %w", err)
 			}
 			fmt.Fprintln(out)

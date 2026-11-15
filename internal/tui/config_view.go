@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,10 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/display"
-	"github.com/lock14/doom-cli/internal/preset"
-	"github.com/lock14/doom-cli/internal/templates"
+	"github.com/lock14/doom-cli/internal/portcfg"
 )
 
 const (
@@ -79,7 +78,7 @@ type configManagerState struct {
 	sfDirSource      string
 
 	// Tab 2: Engine Overrides
-	engines           []preset.EngineConfig
+	engines           []catalog.EngineConfig
 	engineIdx         int
 	engBinaryInput    textinput.Model
 	engArgsStyle      string
@@ -148,13 +147,6 @@ func (m *model) ensurePathsAndConfig() {
 	}
 }
 
-func detectSourceBadge(cfgSet bool) string {
-	if cfgSet {
-		return "config"
-	}
-	return "default"
-}
-
 func (m *model) openConfigManager() tea.Cmd {
 	m.input.Blur()
 	m.ensurePathsAndConfig()
@@ -178,27 +170,27 @@ func (m *model) openConfigManager() tea.Cmd {
 
 	themeSrc := m.themeSource
 	if themeSrc == "" {
-		themeSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.Theme) != "")
+		themeSrc = config.DirSource(m.appConfig.Theme)
 	}
 	nerdSrc := m.nerdFontsSource
 	if nerdSrc == "" {
-		nerdSrc = detectSourceBadge(m.appConfig.HasNerdFonts())
+		_, nerdSrc = config.ResolveNerdFontsWithSource(m.appConfig)
 	}
 	wadsSrc := m.wadsDirSource
 	if wadsSrc == "" {
-		wadsSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.WadsDir) != "")
+		wadsSrc = config.DirSource(m.appConfig.WadsDir)
 	}
 	extraSrc := m.wadsDirsSource
 	if extraSrc == "" {
-		extraSrc = detectSourceBadge(len(m.appConfig.WadsDirs) > 0)
+		extraSrc = config.WadsDirsSource(m.appConfig)
 	}
 	binSrc := m.binDirSource
 	if binSrc == "" {
-		binSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.BinDir) != "")
+		binSrc = config.DirSource(m.appConfig.BinDir)
 	}
 	sfSrc := m.soundFontsSource
 	if sfSrc == "" {
-		sfSrc = detectSourceBadge(strings.TrimSpace(m.appConfig.SoundFontsDir) != "")
+		sfSrc = config.DirSource(m.appConfig.SoundFontsDir)
 	}
 
 	engines := m.availableEngines()
@@ -288,7 +280,7 @@ func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
 	if diskData, err := os.ReadFile(autoDest); err != nil {
 		s.uzdoomStatus = "[✗ Not Installed]"
 	} else {
-		expected := templates.RenderAutoexecWithRate(paths, s.detectedRate)
+		expected := portcfg.RenderAutoexecWithRate(paths, s.detectedRate)
 		if strings.TrimSpace(string(diskData)) == strings.TrimSpace(expected) {
 			s.uzdoomStatus = "[✓ In Sync]"
 		} else {
@@ -300,7 +292,7 @@ func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
 	if diskData, err := os.ReadFile(dsdaDest); err != nil {
 		s.dsdaStatus = "[✗ Not Installed]"
 	} else {
-		expected := templates.RenderDSDADoomWithRes(paths, s.detectedRes)
+		expected := portcfg.RenderDSDADoomWithRes(paths, s.detectedRes)
 		if strings.TrimSpace(string(diskData)) == strings.TrimSpace(expected) {
 			s.dsdaStatus = "[✓ In Sync]"
 		} else {
@@ -581,278 +573,6 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m *model) adjustConfigField(delta int) {
-	s := m.cfgMgr
-	if s == nil {
-		return
-	}
-	switch s.activeTab {
-	case configTabCLI:
-		switch s.focusIdx {
-		case cliFieldTheme:
-			if len(s.themes) > 0 {
-				s.themeIdx = (s.themeIdx + delta + len(s.themes)) % len(s.themes)
-				m.theme = s.themes[s.themeIdx]
-				m.styles = CompileStyles(m.theme)
-				m.input.PlaceholderStyle = m.styles.Placeholder
-				s.applyStyles(m.styles)
-			}
-		case cliFieldNerdFonts:
-			m.nerdFonts = !m.nerdFonts
-		}
-	case configTabEngines:
-		switch s.focusIdx {
-		case engFieldSelect:
-			if len(s.engines) > 0 {
-				if s.isTab2Dirty() && !s.confirmDiscardEng {
-					s.confirmDiscardEng = true
-					s.statusMsg = "Unsaved engine edits: press ←/→ again to discard, or Ctrl+S to save"
-					return
-				}
-				s.statusMsg = ""
-				nextIdx := (s.engineIdx + delta + len(s.engines)) % len(s.engines)
-				s.loadEngineFields(nextIdx, m.styles)
-			}
-		case engFieldArgsStyle:
-			s.confirmDiscardEng = false
-			if s.engArgsStyle == "boom" {
-				s.engArgsStyle = "zdoom"
-			} else {
-				s.engArgsStyle = "boom"
-			}
-		}
-	case configTabPorts:
-		s.focusIdx = (s.focusIdx + delta + portFieldCount) % portFieldCount
-	}
-}
-
-func (m *model) activatePortConfigAction() {
-	s := m.cfgMgr
-	if s == nil {
-		return
-	}
-	m.ensurePathsAndConfig()
-	switch s.focusIdx {
-	case portFieldViewDiff:
-		var buf bytes.Buffer
-		_ = templates.DiffConfigsWithDisplay(m.paths, s.detectedRes, s.detectedRate, &buf)
-		_, vpWidth, vpHeight := calculateReadmeDimensions(m.width, m.height)
-		s.diffViewport = viewport.New(vpWidth, vpHeight)
-		s.diffViewport.SetContent(buf.String())
-		s.viewingDiff = true
-	case portFieldDeploy:
-		var buf bytes.Buffer
-		if err := templates.DeployConfigsWithDisplay(
-			m.paths, s.detectedRes, s.detectedRate, true, &buf,
-		); err != nil {
-			s.statusMsg = fmt.Sprintf("✗ Deploy failed: %v", err)
-			return
-		}
-		s.refreshPortConfigStatus(m.paths)
-		s.statusMsg = "✓ Deployed curated autoexec.cfg and dsda-doom.cfg"
-		m.statusMsg = s.statusMsg
-	}
-}
-
-func (m *model) saveActiveConfigTab() tea.Cmd {
-	s := m.cfgMgr
-	if s == nil {
-		return nil
-	}
-	m.ensurePathsAndConfig()
-
-	switch s.activeTab {
-	case configTabCLI:
-		themeChanged := !strings.EqualFold(m.theme.Name, s.initialThemeName)
-		if themeChanged || s.themeSource == "config" {
-			m.appConfig.Theme = m.theme.Name
-			if themeChanged && s.themeSource == "default" {
-				s.themeSource = "config"
-			}
-		}
-		nerdChanged := m.nerdFonts != s.initialNerdFonts
-		if nerdChanged || s.nerdFontsSource == "config" {
-			m.appConfig.SetNerdFonts(m.nerdFonts)
-			if nerdChanged && s.nerdFontsSource == "default" {
-				s.nerdFontsSource = "config"
-			}
-		}
-
-		defPaths := config.GetPaths()
-		wadsVal := strings.TrimSpace(s.wadsDirInput.Value())
-		extraVal := strings.TrimSpace(s.extraDirsInput.Value())
-		binVal := strings.TrimSpace(s.binDirInput.Value())
-		sfVal := strings.TrimSpace(s.sfDirInput.Value())
-
-		if wadsVal != strings.TrimSpace(s.initialWadsDir) {
-			m.appConfig.WadsDir = wadsVal
-			if wadsVal != "" {
-				m.paths.WadsDir = wadsVal
-				if s.wadsDirSource == "default" {
-					s.wadsDirSource = "config"
-				}
-			} else {
-				m.paths.WadsDir = defPaths.WadsDir
-				s.wadsDirInput.SetValue(defPaths.WadsDir)
-				wadsVal = defPaths.WadsDir
-				if s.wadsDirSource == "config" {
-					s.wadsDirSource = "default"
-				}
-			}
-		}
-		if extraVal != strings.TrimSpace(s.initialExtraDirs) {
-			parsed := config.ParsePathList(extraVal)
-			m.appConfig.WadsDirs = parsed
-			m.paths.WadsDirs = parsed
-			if len(parsed) > 0 && s.extraDirsSource == "default" {
-				s.extraDirsSource = "config"
-			} else if len(parsed) == 0 && s.extraDirsSource == "config" {
-				s.extraDirsSource = "default"
-			}
-		}
-		if binVal != strings.TrimSpace(s.initialBinDir) {
-			m.appConfig.BinDir = binVal
-			if binVal != "" {
-				m.paths.SetBinDir(binVal)
-				if s.binDirSource == "default" {
-					s.binDirSource = "config"
-				}
-			} else {
-				m.paths.SetBinDir(defPaths.BinDir)
-				s.binDirInput.SetValue(defPaths.BinDir)
-				binVal = defPaths.BinDir
-				if s.binDirSource == "config" {
-					s.binDirSource = "default"
-				}
-			}
-		}
-		if sfVal != strings.TrimSpace(s.initialSFDir) {
-			m.appConfig.SoundFontsDir = sfVal
-			if sfVal != "" {
-				m.paths.SetSoundFontsDir(sfVal)
-				if s.sfDirSource == "default" {
-					s.sfDirSource = "config"
-				}
-			} else {
-				m.paths.SetSoundFontsDir(defPaths.SoundFontsDir)
-				s.sfDirInput.SetValue(defPaths.SoundFontsDir)
-				sfVal = defPaths.SoundFontsDir
-				if s.sfDirSource == "config" {
-					s.sfDirSource = "default"
-				}
-			}
-		}
-
-		if err := config.SaveConfig(m.paths, m.appConfig); err != nil {
-			s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
-			return nil
-		}
-
-		s.savedTheme = m.theme
-		s.savedNerdFonts = m.nerdFonts
-		s.initialThemeName = m.theme.Name
-		s.initialNerdFonts = m.nerdFonts
-		s.initialWadsDir = wadsVal
-		s.initialExtraDirs = extraVal
-		s.initialBinDir = binVal
-		s.initialSFDir = sfVal
-
-		m.themeSource = s.themeSource
-		m.nerdFontsSource = s.nerdFontsSource
-		m.wadsDirSource = s.wadsDirSource
-		m.wadsDirsSource = s.extraDirsSource
-		m.binDirSource = s.binDirSource
-		m.soundFontsSource = s.sfDirSource
-
-		m.wadRoots = m.paths.WadRoots()
-		m.rebuildIndexAndTargets()
-		s.refreshPortConfigStatus(m.paths)
-		s.statusMsg = fmt.Sprintf("✓ Saved CLI settings to %s", filepath.Base(m.paths.ConfigFile))
-		m.statusMsg = s.statusMsg
-		return nil
-
-	case configTabEngines:
-		if len(s.engines) == 0 {
-			return nil
-		}
-		eng := s.engines[s.engineIdx]
-		bin := strings.TrimSpace(s.engBinaryInput.Value())
-		style := strings.TrimSpace(s.engArgsStyle)
-		defArgs := strings.Fields(s.engDefaultInput.Value())
-		prefArgs := strings.Fields(s.engPrefixInput.Value())
-		badge := strings.TrimSpace(s.engBadgeInput.Value())
-		dispName := strings.TrimSpace(s.engDisplayInput.Value())
-		emptyAppend := []string{}
-
-		var opts preset.EngineOverrideOptions
-		if bin != strings.TrimSpace(s.initialEngBinary) {
-			opts.Binary = &bin
-		}
-		if style != strings.TrimSpace(s.initialEngStyle) {
-			opts.ArgsStyle = &style
-		}
-		if strings.Join(defArgs, " ") != strings.Join(strings.Fields(s.initialEngDefault), " ") {
-			opts.DefaultArgs = &defArgs
-			opts.AppendArgs = &emptyAppend
-		}
-		if strings.Join(prefArgs, " ") != strings.Join(strings.Fields(s.initialEngPrefix), " ") {
-			opts.PrefixArgs = &prefArgs
-		}
-		if badge != strings.TrimSpace(s.initialEngBadge) {
-			opts.Badge = &badge
-		}
-		if dispName != strings.TrimSpace(s.initialEngDisplay) {
-			opts.DisplayName = &dispName
-		}
-
-		catDir := m.catalogDir()
-		if opts.Binary != nil ||
-			opts.ArgsStyle != nil ||
-			opts.DefaultArgs != nil ||
-			opts.PrefixArgs != nil ||
-			opts.Badge != nil ||
-			opts.DisplayName != nil ||
-			eng.Overridden {
-			if _, err := preset.ConfigEngine(catDir, m.catalog, eng.ID, opts); err != nil {
-				s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
-				return nil
-			}
-		}
-		m.reloadCatalogAndIndex()
-		s.engines = m.availableEngines()
-		s.loadEngineFields(s.engineIdx, m.styles)
-		cmd := s.syncFocus()
-		s.statusMsg = fmt.Sprintf("✓ Saved engine override for %s", eng.ID)
-		m.statusMsg = s.statusMsg
-		return cmd
-
-	case configTabPorts:
-		m.activatePortConfigAction()
-		return nil
-	}
-	return nil
-}
-
-func (m *model) resetEngineConfigOverride() tea.Cmd {
-	s := m.cfgMgr
-	if s == nil || len(s.engines) == 0 {
-		return nil
-	}
-	eng := s.engines[s.engineIdx]
-	catDir := m.catalogDir()
-	if err := preset.ResetEngineOverride(catDir, m.catalog, eng.ID); err != nil {
-		s.statusMsg = fmt.Sprintf("✗ Reset failed: %v", err)
-		return nil
-	}
-	m.reloadCatalogAndIndex()
-	s.engines = m.availableEngines()
-	s.loadEngineFields(s.engineIdx, m.styles)
-	cmd := s.syncFocus()
-	s.statusMsg = fmt.Sprintf("✓ Reset engine override for %s", eng.ID)
-	m.statusMsg = s.statusMsg
-	return cmd
-}
-
 func (m model) renderConfigManagerView() string {
 	s := m.cfgMgr
 	if s.viewingDiff {
@@ -964,236 +684,4 @@ func (m model) renderConfigManagerView() string {
 	box := renderBoxWithTitle(boxContent, boxWidth, "Doom CLI & Engine Configuration", true, m.styles)
 	footer := m.renderConfigManagerFooter()
 	return "\n" + header + box + footer + "\n"
-}
-
-func (m model) renderConfigTabCLI() []string {
-	s := m.cfgMgr
-	nerdText := "[ ] Disabled"
-	if m.nerdFonts {
-		nerdText = "[X] Enabled"
-	}
-
-	type cliRow struct {
-		label  string
-		value  string
-		source string
-		isText bool
-	}
-	rows := []cliRow{
-		{
-			label:  "Theme:",
-			value:  fmt.Sprintf("< %s > (%s)", m.theme.Name, m.theme.Description),
-			source: s.themeSource,
-		},
-		{
-			label:  "Nerd Fonts:",
-			value:  nerdText,
-			source: s.nerdFontsSource,
-		},
-		{
-			label:  "WADs Dir:",
-			value:  s.wadsDirInput.View(),
-			source: s.wadsDirSource,
-			isText: true,
-		},
-		{
-			label:  "Extra WADs Dirs:",
-			value:  s.extraDirsInput.View(),
-			source: s.extraDirsSource,
-			isText: true,
-		},
-		{
-			label:  "Bin Dir:",
-			value:  s.binDirInput.View(),
-			source: s.binDirSource,
-			isText: true,
-		},
-		{
-			label:  "SoundFonts Dir:",
-			value:  s.sfDirInput.View(),
-			source: s.sfDirSource,
-			isText: true,
-		},
-	}
-
-	var out []string
-	for idx, r := range rows {
-		paddedLabel := padOrTruncateName(r.label, 18)
-		prefix := "  "
-		labelStr := m.styles.Label.Render(paddedLabel)
-		valStr := r.value
-		if idx == s.focusIdx {
-			prefix = m.styles.CursorBar.Render("▎ ")
-			labelStr = m.styles.CursorText.Render(paddedLabel)
-			if !r.isText {
-				valStr = m.styles.ValueBold.Render(r.value)
-			}
-		}
-		srcBadge := m.styles.Help.Render(fmt.Sprintf("[%s]", r.source))
-		out = append(out, fmt.Sprintf("%s%s %s %s", prefix, labelStr, valStr, srcBadge))
-	}
-	if m.paths != nil && m.paths.ConfigFile != "" {
-		out = append(out, "", m.styles.Help.Render("  Config File: "+m.paths.ConfigFile))
-	}
-	return out
-}
-
-func (m model) renderConfigTabEngines() []string {
-	s := m.cfgMgr
-	engID := "dsda-doom"
-	engDisp := "DSDA-Doom"
-	if len(s.engines) > 0 && s.engineIdx >= 0 && s.engineIdx < len(s.engines) {
-		engID = s.engines[s.engineIdx].ID
-		engDisp = s.engines[s.engineIdx].EffectiveDisplayName()
-	}
-
-	type engRow struct {
-		label  string
-		value  string
-		isText bool
-	}
-	rows := []engRow{
-		{
-			label: "Engine:",
-			value: fmt.Sprintf("< %s (%s) >", engDisp, engID),
-		},
-		{
-			label:  "Binary:",
-			value:  s.engBinaryInput.View(),
-			isText: true,
-		},
-		{
-			label: "Args Style:",
-			value: fmt.Sprintf("< %s >", s.engArgsStyle),
-		},
-		{
-			label:  "Default Args:",
-			value:  s.engDefaultInput.View(),
-			isText: true,
-		},
-		{
-			label:  "Prefix Args:",
-			value:  s.engPrefixInput.View(),
-			isText: true,
-		},
-		{
-			label:  "Badge:",
-			value:  s.engBadgeInput.View(),
-			isText: true,
-		},
-		{
-			label:  "Display Name:",
-			value:  s.engDisplayInput.View(),
-			isText: true,
-		},
-	}
-
-	var out []string
-	for idx, r := range rows {
-		paddedLabel := padOrTruncateName(r.label, 18)
-		prefix := "  "
-		labelStr := m.styles.Label.Render(paddedLabel)
-		valStr := r.value
-		if idx == s.focusIdx {
-			prefix = m.styles.CursorBar.Render("▎ ")
-			labelStr = m.styles.CursorText.Render(paddedLabel)
-			if !r.isText {
-				valStr = m.styles.ValueBold.Render(r.value)
-			}
-		}
-		out = append(out, fmt.Sprintf("%s%s %s", prefix, labelStr, valStr))
-	}
-	return out
-}
-
-func (m model) stylePortStatus(status string) string {
-	switch status {
-	case "[✓ In Sync]":
-		return m.styles.StatusReady.Render(status)
-	case "[● Modified]":
-		return m.styles.TagDSDA.Render(status)
-	default:
-		return m.styles.StatusMissing.Render(status)
-	}
-}
-
-func (m model) renderConfigTabPorts() []string {
-	s := m.cfgMgr
-	autoPath := "autoexec.cfg"
-	dsdaPath := "dsda-doom.cfg"
-	if m.paths != nil {
-		autoPath = filepath.Join(m.paths.UZDoomDir, "autoexec.cfg")
-		dsdaPath = filepath.Join(m.paths.DSDADir, "dsda-doom.cfg")
-	}
-
-	out := []string{
-		fmt.Sprintf(
-			"  %s %s @ %dHz",
-			m.styles.Label.Render(padOrTruncateName("Detected Display:", 18)),
-			s.detectedRes,
-			s.detectedRate,
-		),
-		fmt.Sprintf(
-			"  %s %s %s",
-			m.styles.Label.Render(padOrTruncateName("UZDoom Config:", 18)),
-			m.stylePortStatus(s.uzdoomStatus),
-			m.styles.Help.Render(autoPath),
-		),
-		fmt.Sprintf(
-			"  %s %s %s",
-			m.styles.Label.Render(padOrTruncateName("DSDA-Doom Config:", 18)),
-			m.stylePortStatus(s.dsdaStatus),
-			m.styles.Help.Render(dsdaPath),
-		),
-		"",
-	}
-
-	actions := []string{
-		"< View Diff >",
-		"< Deploy Curated Configs >",
-	}
-	for idx, act := range actions {
-		prefix := "  "
-		text := m.styles.Label.Render(act)
-		if idx == s.focusIdx {
-			prefix = m.styles.CursorBar.Render("▎ ")
-			text = m.styles.CursorText.Render(act)
-		}
-		out = append(out, prefix+text)
-	}
-	return out
-}
-
-func (m model) renderConfigManagerFooter() string {
-	s := m.cfgMgr
-	items := []keyHelp{
-		{"1/2/3/[/]", "Tab"},
-		{"↑/↓/Tab", "Field"},
-	}
-	if s != nil && s.activeTab == configTabPorts {
-		items = []keyHelp{
-			{"1/2/3/[/]", "Tab"},
-			{"↑/↓/←/→", "Action"},
-			{"Enter/Space", "Run"},
-			{"F1", "Help"},
-			{"Esc", "Close"},
-		}
-	} else {
-		items = append(items,
-			keyHelp{"←/→/Space", "Adjust"},
-			keyHelp{"Ctrl+S", "Save"},
-		)
-		if s != nil && s.activeTab == configTabEngines {
-			items = append(items, keyHelp{"Ctrl+R", "Reset"})
-		}
-		items = append(items,
-			keyHelp{"F1", "Help"},
-			keyHelp{"Esc", "Cancel"},
-		)
-	}
-	footer := m.styles.FormatKeyHelp(items)
-	if m.width > 0 {
-		return "\n\n" + truncateANSI(strings.TrimPrefix(footer, "\n\n"), m.width)
-	}
-	return footer
 }

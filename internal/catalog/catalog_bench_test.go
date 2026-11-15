@@ -1,4 +1,4 @@
-package preset
+package catalog
 
 import (
 	"os"
@@ -9,9 +9,9 @@ import (
 func BenchmarkLoadCuratedCatalog(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
-		cat, err := LoadCuratedCatalog()
+		cat, err := LoadCurated()
 		if err != nil || len(cat.Presets) == 0 {
-			b.Fatalf("LoadCuratedCatalog failed: %v", err)
+			b.Fatalf("LoadCurated failed: %v", err)
 		}
 	}
 }
@@ -26,7 +26,6 @@ func BenchmarkDecodeText_ASCII(b *testing.B) {
 }
 
 func BenchmarkDecodeText_CP437(b *testing.B) {
-	// Raw CP437 box-drawing (0xC9, 0xCD, 0xBB, 0xBA, 0xC8, 0xBC) and block-fill bytes
 	sample := []byte("\xc9\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xbb\n" +
 		"\xba  DOOM CP437  \xba\n" +
 		"\xc8\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xcd\xbc\n" +

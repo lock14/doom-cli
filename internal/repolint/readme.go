@@ -1,4 +1,4 @@
-package preset
+package repolint
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
@@ -16,7 +17,7 @@ var readmeTableRegex = regexp.MustCompile(
 
 // GenerateReadmeTable constructs the markdown table for README.md using each
 // preset's resolved engine display name, genre, difficulty, quality, and primary link from the catalog.
-func GenerateReadmeTable(cat *Catalog) string {
+func GenerateReadmeTable(cat *catalog.Catalog) string {
 	lines := []string{
 		"| Megawad or expansion | Engine | Genre | Difficulty | Quality | Compatibility and details |",
 		"| :--- | :--- | :--- | :--- | :--- | :--- |",
@@ -50,7 +51,7 @@ func SyncReadme(rootDir string) error {
 		rootDir = "."
 	}
 	catalogDir := filepath.Join(rootDir, "catalog")
-	cat, err := LoadCatalogFromDir(catalogDir)
+	cat, err := catalog.LoadFromDir(catalogDir)
 	if err != nil {
 		return fmt.Errorf("loading curated catalog from %s: %w", catalogDir, err)
 	}
@@ -71,7 +72,6 @@ func SyncReadme(rootDir string) error {
 	updated := text[:loc[4]] + table + text[loc[5]:]
 	_, err = fsutil.WriteFileAtomic(readmeFile, []byte(updated), 0o644)
 	if err == nil {
-		// Remove any .bak file created for README.md in the git checkout
 		fsutil.RemoveBackups(readmeFile)
 	}
 	return err

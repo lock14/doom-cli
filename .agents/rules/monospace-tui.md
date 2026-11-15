@@ -34,10 +34,11 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 *   **Screen archetype**: `§11.5` fuzzy finder (`model` in `internal/tui/launcher.go`) paired with a responsive
     `Master-Detail` split view (`renderPanels` in `internal/tui/render.go` with the `Presets` list pane on the left
     and the `Preset Details` preview pane on the right) and `Expand-to-Focus` full-pane views for the CP437 document
-    viewer (`viewingReadme` in `internal/tui/render.go`), the `§11.2` settings form for launch options and per-preset
+    viewer (`viewingReadme` in `internal/tui/modals.go`), the `§11.2` settings form for launch options and per-preset
     configuration (`viewingLaunchOpts` in `internal/tui/options.go`), the 3-tab configuration manager and live
-    configuration diff viewer (`viewingConfigMgr` and `s.viewingDiff` in `internal/tui/config_view.go`), and contextual
-    help (`viewingHelp` in `internal/tui/render.go`).
+    configuration diff viewer (`viewingConfigMgr` and `s.viewingDiff` in `internal/tui/config_view.go`,
+    `internal/tui/config_actions.go`, and `internal/tui/config_tabs.go`), and contextual help (`viewingHelp` in
+    `internal/tui/modals.go`).
 *   **Workflow archetype**: `§12.4` search-act and `§12.2` inspect-configure. Typing filters presets in real time across
     `Name`, `Engine`, `Category`, `Compatibility`, and installation readiness (`ready`, `installed`, `missing`);
     highlighting a preset previews its IWAD, PWADs, DeHackEd patches, and documentation status; pressing `Enter`
@@ -126,11 +127,11 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 
 *   **Original**: Format: `F1 Help  F5 Refresh  / Filter  q Quit` — key name followed by action label, separated by 2+ spaces. (CUA §1 function key area, Norton Commander F-key bar)
 *   **Project rule**: `ThemeStyles.FormatKeyHelp` in `internal/tui/theme.go` joins `keyHelp` pairs across all six footer
-    renderers (`renderFooter`, `renderReadmeFooter`, and `renderHelpFooter` in `internal/tui/render.go`,
-    `renderLaunchOptionsFooter` in `internal/tui/options.go`, and `renderConfigManagerFooter` plus the inline
-    `viewingDiff` footer in `internal/tui/config_view.go`) using a muted bullet separator (`"  •  "`, `U+2022` via
-    `Bullet`) rather than whitespace alone, and clamps every footer line with `truncateANSI(..., m.width)` so narrow
-    terminals (`80` columns) never wrap a footer onto a third terminal row.
+    renderers (`renderFooter` in `internal/tui/render.go`, `renderReadmeFooter` and `renderHelpFooter` in
+    `internal/tui/modals.go`, `renderLaunchOptionsFooter` in `internal/tui/options.go`, `renderConfigManagerFooter` in
+    `internal/tui/config_tabs.go`, and the inline `viewingDiff` footer in `internal/tui/config_view.go`) using a muted
+    bullet separator (`"  •  "`, `U+2022` via `Bullet`) rather than whitespace alone, and clamps every footer line with
+    `truncateANSI(..., m.width)` so narrow terminals (`80` columns) never wrap a footer onto a third terminal row.
 *   **Reason**: Clearly delineates compound key labels (such as `↑/↓/PgUp/PgDn Navigate` and `Esc/Ctrl+C Quit`) from
     adjacent action descriptions across all terminal widths while guaranteeing a strict 2-row footer height.
 
@@ -165,7 +166,7 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
     from `<ConfigDir>/themes/<name>.json`. TrueColor text tokens adhere to `§9.5` WCAG AA contrast thresholds while 30%
     structural border tokens (`BorderActive` and `BorderInactive`) use intentional atmospheric contrast, and
     `MonochromeTheme.StatusMissing` uses bold reverse video (`SGR 1;7`, `§R3.4`). Never hardcode raw ANSI color numbers
-    or hex strings in `render.go`, `options.go`, `config_view.go`, or `launcher.go`.
+    or hex strings in `render.go`, `modals.go`, `options.go`, `config_view.go`, `config_tabs.go`, or `launcher.go`.
 *   **Reason**: Preserves Doom-inspired episode and source-port palettes alongside an ANSI-16 default (`classic`) and
     high-contrast accessibility (`monochrome`).
 
@@ -223,13 +224,13 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 ### [P3] cached multi-root directory index on the UI thread
 
 *   **Project rule**: `model` (`internal/tui/launcher.go`) must resolve IWAD, PWAD, and README paths exclusively
-    through the pre-constructed `*preset.DirIndex` (`m.dirIndex`, including cached relative subdirectory entries) and
+    through the pre-constructed `*catalog.DirIndex` (`m.dirIndex`, including cached relative subdirectory entries) and
     cached README map (`m.readmeCache`), render the `Launch Options` command preview via the pure zero-I/O
     `engine.FormatLaunchPreview` helper (never `engine.PrepareLaunch`), execute `Ctrl+F` asset acquisition
     asynchronously via a cancellable `tea.Cmd` (`context.WithCancel`, `steam.DiscoverAndExtractContext`, and
     `wad.Downloader{Ctx: ctx}`), and render or deploy `Configuration Manager` port configurations using the cached
-    `s.detectedRes` and `s.detectedRate` (`display.DetectDisplay()`) snapshot via `templates.RenderAutoexecWithRate`,
-    `templates.RenderDSDADoomWithRes`, `templates.DiffConfigsWithDisplay`, and `templates.DeployConfigsWithDisplay`.
+    `s.detectedRes` and `s.detectedRate` (`display.DetectDisplay()`) snapshot via `portcfg.RenderAutoexecWithRate`,
+    `portcfg.RenderDSDADoomWithRes`, `portcfg.DiffConfigsWithDisplay`, and `portcfg.DeployConfigsWithDisplay`.
     Never perform uncached `os.ReadDir` walks, blocking network downloads, or external display-detection subprocesses
     inside `View()` or per-keypress `Update()` cycles.
 *   **Reason**: Keeps fuzzy filtering, form editing, and scrolling responsive without frame stutter on large

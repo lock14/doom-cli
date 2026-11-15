@@ -14,9 +14,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/config"
 	"github.com/lock14/doom-cli/internal/engine"
-	"github.com/lock14/doom-cli/internal/preset"
 	"github.com/lock14/doom-cli/internal/tui"
 )
 
@@ -275,39 +275,21 @@ func cmdErr(cmd *cobra.Command) io.Writer {
 	return os.Stderr
 }
 
-func applyConfigPaths(p *config.Paths, cfg *config.AppConfig) {
-	if cfg == nil {
-		return
-	}
-	if s := strings.TrimSpace(cfg.WadsDir); s != "" {
-		p.WadsDir = s
-	}
-	if len(cfg.WadsDirs) > 0 {
-		p.WadsDirs = append([]string(nil), cfg.WadsDirs...)
-	}
-	if s := strings.TrimSpace(cfg.BinDir); s != "" {
-		p.SetBinDir(s)
-	}
-	if s := strings.TrimSpace(cfg.SoundFontsDir); s != "" {
-		p.SetSoundFontsDir(s)
-	}
-}
-
 func resolveAppPaths() *config.Paths {
 	p := config.GetPaths()
 	cfg, cfgErr := config.LoadConfig(p)
 	if cfgErr != nil {
 		cfg = &config.AppConfig{}
 	}
-	applyConfigPaths(p, cfg)
+	config.ApplyConfigPaths(p, cfg)
 	return p
 }
 
-func loadAppState() (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
+func loadAppState() (*config.Paths, *config.AppConfig, *catalog.Catalog, error) {
 	return loadAppStateWithErr(os.Stderr)
 }
 
-func loadAppStateWithErr(errOut io.Writer) (*config.Paths, *config.AppConfig, *preset.Catalog, error) {
+func loadAppStateWithErr(errOut io.Writer) (*config.Paths, *config.AppConfig, *catalog.Catalog, error) {
 	if errOut == nil {
 		errOut = os.Stderr
 	}
@@ -318,9 +300,9 @@ func loadAppStateWithErr(errOut io.Writer) (*config.Paths, *config.AppConfig, *p
 		cfg = &config.AppConfig{}
 	}
 
-	applyConfigPaths(p, cfg)
+	config.ApplyConfigPaths(p, cfg)
 
-	cat, err := preset.LoadLayeredCatalog(p.CatalogDir, false)
+	cat, err := catalog.LoadLayered(p.CatalogDir, false)
 	if err != nil {
 		return p, cfg, nil, err
 	}
@@ -414,20 +396,6 @@ func splitCommandArgs(raw string) ([]string, error) {
 	return args, nil
 }
 
-func wadsDirsSource(cfg *config.AppConfig) string {
-	if cfg != nil && len(cfg.WadsDirs) > 0 {
-		return "config"
-	}
-	return "default"
-}
-
-func dirSource(cfgVal string) string {
-	if strings.TrimSpace(cfgVal) != "" {
-		return "config"
-	}
-	return "default"
-}
-
 func buildLauncherOptions(
 	paths *config.Paths,
 	cfg *config.AppConfig,
@@ -449,7 +417,7 @@ func buildLauncherOptions(
 
 	theme := tui.ResolveTheme(cfgTheme, themesDir)
 	_, themeSrc := resolveThemeWithSource(cfg)
-	nerdFonts, nfSrc := resolveNerdFontsWithSource(cfg)
+	nerdFonts, nfSrc := config.ResolveNerdFontsWithSource(cfg)
 
 	opts := tui.LauncherOptions{
 		Paths:            paths,
@@ -458,10 +426,10 @@ func buildLauncherOptions(
 		ExtraArgs:        extraArgs,
 		ThemeSource:      themeSrc,
 		NerdFontsSource:  nfSrc,
-		WadsDirSource:    dirSource(cfgWads),
-		WadsDirsSource:   wadsDirsSource(cfg),
-		BinDirSource:     dirSource(cfgBin),
-		SoundFontsSource: dirSource(cfgSF),
+		WadsDirSource:    config.DirSource(cfgWads),
+		WadsDirsSource:   config.WadsDirsSource(cfg),
+		BinDirSource:     config.DirSource(cfgBin),
+		SoundFontsSource: config.DirSource(cfgSF),
 		InitialMode:      initialMode,
 	}
 	return theme, nerdFonts, opts

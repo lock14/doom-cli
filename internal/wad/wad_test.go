@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -14,29 +13,24 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/catalog"
+	"github.com/lock14/doom-cli/internal/wadfmt"
 )
 
-func buildTestPWADWithDehacked(dehPayload string) []byte {
-	data := []byte(dehPayload)
-	var out bytes.Buffer
-	_, _ = out.WriteString("PWAD")
-	var hdr [8]byte
-	binary.LittleEndian.PutUint32(hdr[0:4], 1)
-	binary.LittleEndian.PutUint32(hdr[4:8], uint32(12+len(data)))
-	_, _ = out.Write(hdr[:])
-	_, _ = out.Write(data)
-	var entry [16]byte
-	binary.LittleEndian.PutUint32(entry[0:4], 12)
-	binary.LittleEndian.PutUint32(entry[4:8], uint32(len(data)))
-	copy(entry[8:16], "DEHACKED")
-	_, _ = out.Write(entry[:])
-	return out.Bytes()
+func buildTestPWADWithDehacked(t *testing.T, dehPayload string) []byte {
+	t.Helper()
+	b, err := wadfmt.BuildBytes("PWAD", []wadfmt.Lump{
+		{Name: "DEHACKED", Data: []byte(dehPayload)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 func TestFilterExpectedFiles(t *testing.T) {
 	t.Parallel()
-	files := []preset.FileSpec{
+	files := []catalog.FileSpec{
 		{Name: "map.wad"},
 		{Name: "idkfa 2024.wad", Optional: true},
 		{Name: "patch.deh"},
@@ -107,8 +101,8 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	wadsDir := filepath.Join(tmpDir, "wads")
 	dl := NewDownloader([]string{wadsDir}, false, nil)
 
-	customPreset := preset.Preset{
-		Files: []preset.FileSpec{
+	customPreset := catalog.Preset{
+		Files: []catalog.FileSpec{
 			{Name: "custom_v2.wad", Aliases: []string{"custom_short.wad"}},
 		},
 	}
@@ -183,7 +177,7 @@ func TestDownloader_ExtractFromZip(t *testing.T) {
 	if err := sunderDL.extractFromZip(
 		sunderZipPath,
 		[]string{"Sunder 2512.wad"},
-		preset.Preset{Name: "Sunder"},
+		catalog.Preset{Name: "Sunder"},
 	); err != nil {
 		t.Fatalf("unexpected sunder extract error: %v", err)
 	}
@@ -228,7 +222,7 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 			_, _ = w.Write([]byte("PWAD-DIRECT"))
 		case "/doomzero.wad":
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(buildTestPWADWithDehacked("Patch File for DeHackEd v3.0"))
+			_, _ = w.Write(buildTestPWADWithDehacked(t, "Patch File for DeHackEd v3.0"))
 		case "/archive.7z":
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("7z-content"))
@@ -242,12 +236,12 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
 		dl := NewDownloader([]string{wadsDir}, false, nil)
-		p := preset.Preset{
+		p := catalog.Preset{
 			Name:   "Alien Vendetta",
 			Engine: "dsda-doom",
 			IWAD:   "doom2.wad",
-			Files:  []preset.FileSpec{{Name: "alienvendetta.wad"}, {Name: "av.deh"}},
-			Sources: []preset.Source{
+			Files:  []catalog.FileSpec{{Name: "alienvendetta.wad"}, {Name: "av.deh"}},
+			Sources: []catalog.Source{
 				{URL: fmt.Sprintf("%s/alienv.zip", server.URL), SHA256: zipHex},
 			},
 		}
@@ -263,12 +257,12 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
 		dl := NewDownloader([]string{wadsDir}, false, nil)
-		p := preset.Preset{
+		p := catalog.Preset{
 			Name:   "Bad Digest",
 			Engine: "dsda-doom",
 			IWAD:   "doom2.wad",
-			Files:  []preset.FileSpec{{Name: "alienvendetta.wad"}},
-			Sources: []preset.Source{
+			Files:  []catalog.FileSpec{{Name: "alienvendetta.wad"}},
+			Sources: []catalog.Source{
 				{URL: fmt.Sprintf("%s/alienv.zip", server.URL), SHA256: strings.Repeat("0", 64)},
 			},
 		}
@@ -281,12 +275,12 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
 		dl := NewDownloader([]string{wadsDir}, false, nil)
-		p := preset.Preset{
+		p := catalog.Preset{
 			Name:    "Direct PK3",
 			Engine:  "uzdoom",
 			IWAD:    "doom2.wad",
-			Files:   []preset.FileSpec{{Name: "mod.pk3"}},
-			Sources: []preset.Source{{URL: fmt.Sprintf("%s/mod.pk3", server.URL)}},
+			Files:   []catalog.FileSpec{{Name: "mod.pk3"}},
+			Sources: []catalog.Source{{URL: fmt.Sprintf("%s/mod.pk3", server.URL)}},
 		}
 		if err := dl.DownloadPreset(p); err != nil {
 			t.Fatalf("direct .pk3 DownloadPreset failed: %v", err)
@@ -301,12 +295,12 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
 		dl := NewDownloader([]string{wadsDir}, false, nil)
-		p := preset.Preset{
+		p := catalog.Preset{
 			Name:    "Unsupported 7z",
 			Engine:  "dsda-doom",
 			IWAD:    "doom2.wad",
-			Files:   []preset.FileSpec{{Name: "pack.wad"}},
-			Sources: []preset.Source{{URL: fmt.Sprintf("%s/archive.7z", server.URL)}},
+			Files:   []catalog.FileSpec{{Name: "pack.wad"}},
+			Sources: []catalog.Source{{URL: fmt.Sprintf("%s/archive.7z", server.URL)}},
 		}
 		if err := dl.DownloadPreset(p); err == nil || !strings.Contains(err.Error(), "unsupported archive format") {
 			t.Fatalf("expected unsupported archive format error, got: %v", err)
@@ -317,15 +311,15 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		t.Parallel()
 		wadsDir := filepath.Join(t.TempDir(), "wads")
 		dl := NewDownloader([]string{wadsDir}, false, nil)
-		p := preset.Preset{
+		p := catalog.Preset{
 			Name:   "Doom Zero",
 			Engine: "dsda-doom",
 			IWAD:   "DOOM2.WAD",
-			Files: []preset.FileSpec{
+			Files: []catalog.FileSpec{
 				{Name: "DOOMZERO.DEH"},
 				{Name: "DoomZero.wad"},
 			},
-			Sources: []preset.Source{{URL: fmt.Sprintf("%s/doomzero.wad", server.URL)}},
+			Sources: []catalog.Source{{URL: fmt.Sprintf("%s/doomzero.wad", server.URL)}},
 		}
 		if err := dl.DownloadPreset(p); err != nil {
 			t.Fatalf("direct .wad with embedded DEHACKED failed: %v", err)
@@ -344,12 +338,12 @@ func TestDownloader_DownloadPresetAndSecurity(t *testing.T) {
 		baseDir := t.TempDir()
 		wadsDir := filepath.Join(baseDir, "wads")
 		dl := NewDownloader([]string{wadsDir}, false, nil)
-		p := preset.Preset{
+		p := catalog.Preset{
 			Name:    "Traversal",
 			Engine:  "dsda-doom",
 			IWAD:    "doom2.wad",
-			Files:   []preset.FileSpec{{Name: "../evil.wad"}},
-			Sources: []preset.Source{{URL: fmt.Sprintf("%s/direct.wad", server.URL)}},
+			Files:   []catalog.FileSpec{{Name: "../evil.wad"}},
+			Sources: []catalog.Source{{URL: fmt.Sprintf("%s/direct.wad", server.URL)}},
 		}
 		if err := dl.DownloadPreset(p); err == nil {
 			t.Fatal("expected path traversal in Files[0].Name to be rejected")
@@ -437,9 +431,9 @@ func TestDownloader_FallbackReadmeRenamedToPrimaryStem(t *testing.T) {
 
 	wadsDir := filepath.Join(tmpDir, "wads")
 	dl := NewDownloader([]string{wadsDir}, false, nil)
-	p := preset.Preset{
+	p := catalog.Preset{
 		Name:  "My Megawad",
-		Files: []preset.FileSpec{{Name: "MyMegawad.wad"}},
+		Files: []catalog.FileSpec{{Name: "MyMegawad.wad"}},
 	}
 	if err := dl.extractFromZip(zipPath, []string{"MyMegawad.wad"}, p); err != nil {
 		t.Fatalf("extractFromZip failed: %v", err)
@@ -450,7 +444,7 @@ func TestDownloader_FallbackReadmeRenamedToPrimaryStem(t *testing.T) {
 	if err != nil || string(data) != "generic readme content" {
 		t.Fatalf("expected %s with generic readme content, got %q (err=%v)", wantTxt, string(data), err)
 	}
-	idx := preset.NewDirIndex(wadsDir)
+	idx := catalog.NewDirIndex(wadsDir)
 	if resolved, ok := idx.ResolveReadme(p); !ok || resolved != wantTxt {
 		t.Errorf("ResolveReadme = (%q, %v), want (%q, true)", resolved, ok, wantTxt)
 	}
@@ -502,10 +496,10 @@ func TestDownloader_ExtractPK3AndReadmeFromZip(t *testing.T) {
 
 			wadsDir := filepath.Join(tmpDir, "wads")
 			dl := NewDownloader([]string{wadsDir}, false, nil)
-			p := preset.Preset{
+			p := catalog.Preset{
 				ID:    "myhouse",
 				Name:  "MyHouse.pk3",
-				Files: []preset.FileSpec{{Name: tc.expected}},
+				Files: []catalog.FileSpec{{Name: tc.expected}},
 			}
 			if err := dl.extractFromZip(zipPath, []string{tc.expected}, p); err != nil {
 				t.Fatalf("extractFromZip failed: %v", err)
@@ -519,7 +513,7 @@ func TestDownloader_ExtractPK3AndReadmeFromZip(t *testing.T) {
 				t.Errorf("expected inner myhouse.zip not to be extracted to wadsDir")
 			}
 
-			idx := preset.NewDirIndex(wadsDir)
+			idx := catalog.NewDirIndex(wadsDir)
 			readmePath, ok := idx.ResolveReadme(p)
 			if !ok {
 				t.Fatalf("expected ResolveReadme to locate extracted myhouse.txt")
@@ -534,7 +528,7 @@ func TestDownloader_ExtractPK3AndReadmeFromZip(t *testing.T) {
 
 func TestExtractWADLumpFromReaderAndZipSymlinkSkipped(t *testing.T) {
 	t.Parallel()
-	wadBytes := buildTestPWADWithDehacked("Patch File for DeHackEd v3.0\nDoom version = 19\n")
+	wadBytes := buildTestPWADWithDehacked(t, "Patch File for DeHackEd v3.0\nDoom version = 19\n")
 	r := bytes.NewReader(wadBytes)
 	got, ok := ExtractWADLumpFromReader(r, int64(len(wadBytes)), "DEHACKED")
 	if !ok || !strings.Contains(string(got), "Doom version = 19") {

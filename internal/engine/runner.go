@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/catalog"
 )
 
 // LaunchOptions contains options and overrides for preset execution.
@@ -21,12 +21,12 @@ type LaunchOptions struct {
 	DryRun         bool
 	ExtraArgs      []string
 	Out            io.Writer
-	Catalog        *preset.Catalog
+	Catalog        *catalog.Catalog
 }
 
 // LaunchPlan contains the resolved engine binary and constructed arguments ready for execution.
 type LaunchPlan struct {
-	Preset       preset.Preset
+	Preset       catalog.Preset
 	Engine       string
 	EngineBin    string
 	IWADPath     string
@@ -62,9 +62,9 @@ func newResolvedFile(path string, optional bool) resolvedFile {
 
 func resolveEngineConfig(
 	name string,
-	cat *preset.Catalog,
+	cat *catalog.Catalog,
 	strict bool,
-) (preset.EngineConfig, error) {
+) (catalog.EngineConfig, error) {
 	clean := strings.TrimSpace(name)
 	if clean == "" {
 		clean = "dsda-doom"
@@ -74,19 +74,19 @@ func resolveEngineConfig(
 		return eng, nil
 	}
 	if strict && cat != nil {
-		return preset.EngineConfig{}, fmt.Errorf("unknown engine %q", clean)
+		return catalog.EngineConfig{}, fmt.Errorf("unknown engine %q", clean)
 	}
 
-	return preset.EngineConfig{
+	return catalog.EngineConfig{
 		ID:        clean,
 		Binary:    clean,
-		ArgsStyle: preset.GuessArgsStyle(clean, ""),
+		ArgsStyle: catalog.GuessArgsStyle(clean, ""),
 	}, nil
 }
 
 func buildEngineArgs(
-	engCfg preset.EngineConfig,
-	p preset.Preset,
+	engCfg catalog.EngineConfig,
+	p catalog.Preset,
 	iwadPath string,
 	resolved []resolvedFile,
 	extraArgs []string,
@@ -154,7 +154,7 @@ func buildEngineArgs(
 // Resolved binary and asset paths are canonicalized to absolute paths so child working
 // directory changes in Execute never break relative bin-dir or wads-dir configurations
 // and relative filenames starting with '-', '+', or '@' cannot inject engine flags.
-func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
+func PrepareLaunch(p catalog.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	out := opts.Out
 	if out == nil {
 		out = io.Discard
@@ -185,7 +185,7 @@ func PrepareLaunch(p preset.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 	if len(roots) > 0 {
 		primaryDir = roots[0]
 	}
-	idx := preset.NewDirIndex(roots...)
+	idx := catalog.NewDirIndex(roots...)
 	if opts.Catalog != nil {
 		idx = idx.WithCatalog(opts.Catalog)
 	} else {
@@ -330,9 +330,9 @@ func ResolveBinary(engine, binDir string) (string, error) {
 // using the pre-constructed idx and catalog, falling back to raw filenames when required
 // files are not resolved in idx and omitting missing optional files when idx is non-nil.
 func FormatLaunchPreview(
-	p preset.Preset,
-	cat *preset.Catalog,
-	idx *preset.DirIndex,
+	p catalog.Preset,
+	cat *catalog.Catalog,
+	idx *catalog.DirIndex,
 	extraArgs []string,
 ) string {
 	engCfg, _ := resolveEngineConfig(p.Engine, cat, false)

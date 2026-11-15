@@ -3,22 +3,22 @@
 *   **Declarative entity catalog and single source of truth**:
     *   `catalog/*.json` (`engine.<id>.json` and `preset.<id>.json`) is the sole source of truth for all curated engine
         and preset definitions, IWAD mappings, PWAD file lists, DeHackEd orderings, metadata, and download URLs.
-    *   **Single root embed**: All embedded assets (`catalog/*.json`, `dsda-doom/dsda-doom.cfg`, `uzdoom/autoexec.cfg`)
-        are embedded once at the repository root in `embed.go` (`doomcli.FS`). Do not create duplicate asset copies
-        under `internal/*/data/`.
+    *   **Single root embed**: All embedded assets (`catalog/*.json`, `configs/dsda-doom/dsda-doom.cfg`,
+        `configs/uzdoom/autoexec.cfg`) are embedded once at the repository root in `embed.go` (`doomcli.FS`). Do not
+        create duplicate asset copies under `internal/*/data/`.
     *   **Synchronize and lint**: Run `doom wads build` to synchronize `catalog/*.json` into `README.md`, and run
         `doom wads lint` to validate strict schema rules, engine references, SHA-256 digests, personal path checks,
         and `README.md` table parity.
-    *   **Parity verification**: Run `make check` (or `go test -v ./internal/preset ./internal/templates`) to verify
-        that `README.md` matches `catalog/*.json` and all files comply with path invariants.
+    *   **Parity verification**: Run `make check` (or `go test -v ./internal/catalog ./internal/repolint ./internal/portcfg`)
+        to verify that `README.md` matches `catalog/*.json` and all files comply with path invariants.
 *   **Portability and path invariants**:
     *   **Never commit personal user paths, display resolutions, or refresh rates**: Never commit absolute personal
         paths like `/home/<username>/`, hardcoded local display resolutions, or fixed monitor refresh rates into
         configuration files, catalog entities, or code.
     *   **Use standard placeholder tokens**:
-        *   In `dsda-doom/dsda-doom.cfg`, `screen_resolution` must use `__RESOLUTION__` and `snd_soundfont` must
+        *   In `configs/dsda-doom/dsda-doom.cfg`, `screen_resolution` must use `__RESOLUTION__` and `snd_soundfont` must
             use `__SOUNDFONT__`.
-        *   In `uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use
+        *   In `configs/uzdoom/autoexec.cfg`, `fluid_patchset` must use `__SOUNDFONT__` and `vid_maxfps` must use
             `__REFRESH_RATE__`.
         *   Deployment tooling (`doom engines cfg install`, `doom engines install`, `doom setup`) dynamically
             substitutes `__RESOLUTION__` (via native display detection), `__REFRESH_RATE__`, and `__SOUNDFONT__` at
@@ -51,7 +51,7 @@
         and `os.Rename`, so failed or corrupt writes never create spurious `.bak.*` files. When deleting user entities
         or resetting overrides (`doom engines remove`, `doom engines reset`, `doom wads remove`, `doom wads reset`, and
         `Ctrl+R` in the TUI `Launch Options` and `Configuration Manager` views), clean up `.bak.*` files via
-        `fsutil.RemoveBackups`. `doom engines cfg sync` (`templates.SyncConfigs`) also calls `fsutil.RemoveBackups` on
+        `fsutil.RemoveBackups`. `doom engines cfg sync` (`portcfg.SyncConfigs`) also calls `fsutil.RemoveBackups` on
         repository template files so `.bak.*` files never dirty the Git working tree.
     *   **Preserve unrelated configuration**: When adding new engine variables, aliases, or keybindings, avoid
         modifying or removing unrelated settings unless explicitly requested. `config.json` preserves unknown top-level
@@ -109,13 +109,13 @@
         optional assets like `idkfa 2024.wad` are missing, with all `FileSpec` lookups routed through
         `DirIndex.ResolveFileSpec`.
     *   **Filename normalization and declarative catalog aliases**: Case-insensitive and whitespace-, dash-, and
-        underscore-normalized matching (`preset.NormalizeFilename`) across configured WAD roots (`wads_dir` and
+        underscore-normalized matching (`catalog.NormalizeFilename`) across configured WAD roots (`wads_dir` and
         `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
         Steam and GOG extraction ensures maps and patches resolve without redundant case or punctuation entries. When
         upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `sigil.wad` for
         `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`, and `sunder.wad` for
         `Sunder 2512.wad`), declare `"aliases"` directly on the `FileSpec` in `catalog/preset.<id>.json`. Both
-        `preset.DirIndex` and `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog
+        `catalog.DirIndex` and `steam.DefaultTargetPatterns()` derive their mappings automatically from the catalog
         rather than maintaining separate hardcoded filename tables.
     *   **Embedded DeHackEd extraction**: When a preset declares both a `.wad` and `.deh` file and its direct `.wad`
         download source embeds a `DEHACKED` lump (such as `DoomZero.wad`), `wad.Downloader` extracts the embedded
@@ -131,8 +131,8 @@
     *   **Visual aesthetic and frame pacing**: Maintain UZDoom's curated Nightdive "Software-Plus" visual profile
         (Vulkan backend preference `vid_preferbackend 1`, software light mode `gl_lightmode 0`, banded stepping
         `gl_bandedsw 1`, palette tonemapping `gl_tonemap 3`, and nearest-neighbor texture sampling with 16x anisotropic
-        filtering) without personal movement or weapon `bind` statements in `uzdoom/autoexec.cfg` so user rebinds in
-        `uzdoom.ini` persist across launches (retaining `F5`, `F6`, and `F9` quick save and load utilities). In
+        filtering) without personal movement or weapon `bind` statements in `configs/uzdoom/autoexec.cfg` so user
+        rebinds in `uzdoom.ini` persist across launches (retaining `F5`, `F6`, and `F9` quick save and load utilities). In
         DSDA-Doom, maintain classic software lightmaps (`render_doom_lightmaps 1`), banded sector fading
         (`gl_fade_mode 1`), textured widescreen status bar borders (`sts_solid_bg_color 0`), standard WASD movement and
         `1` through `9` weapon slot defaults in Profile 0, and `dsda_fps_limit 0`, `render_vsync 1`, and
@@ -155,9 +155,11 @@
 The repository features a unified, zero-dependency Go CLI (`doom`) that compiles to a single static binary on
 Linux, macOS, and Windows:
 
-*   `embed.go`: Root `embed.FS` (`doomcli.FS`) embedding `catalog/*.json`, `dsda-doom/dsda-doom.cfg`, and
-    `uzdoom/autoexec.cfg`.
+*   `embed.go`: Root `embed.FS` (`doomcli.FS`) embedding `catalog/*.json`, `configs/dsda-doom/dsda-doom.cfg`, and
+    `configs/uzdoom/autoexec.cfg`.
 *   `catalog/`: Curated one-entity-per-file JSON catalog (`engine.<id>.json`, `preset.<id>.json`).
+*   `configs/`: Curated source port configuration templates with runtime placeholder tokens
+    (`configs/dsda-doom/dsda-doom.cfg`, `configs/uzdoom/autoexec.cfg`).
 *   `cmd/doom/`: Modular Cobra CLI command implementations:
     *   `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path and catalog
         helpers.
@@ -167,46 +169,66 @@ Linux, macOS, and Windows:
         `reset`, `remove`, and `cfg` with `install`, `diff`, and hidden `sync`).
     *   `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
     *   `setup.go`: `doom setup` automated turnkey workflow command.
-*   `internal/config/`:
-    *   `paths.go`: Platform path resolvers (`ResolveFor`, `WadRoots`, `ParsePathList`) adhering strictly to XDG
-        (Linux), Library (macOS), and AppData (Windows).
-    *   `settings.go`: Settings-only user configuration persistence (`config.json` via `AppConfig`), explicit
-        `nerd_fonts` state tracking, and unknown top-level key preservation.
-*   `internal/display/`: Native display resolution and refresh rate auto-detection.
-*   `internal/engine/`:
-    *   `runner.go`: Engine execution argument synthesis (`PrepareLaunch`, including `.deh` and `.bex` ordering), pure
-        zero-I/O command preview formatting (`FormatLaunchPreview`), and process lifecycle management.
-    *   `installer.go`: Declarative source port asset downloading, SHA-256 verification, and portable binary
-        installation (Zip Slip hardened).
-*   `internal/fsutil/`:
-    *   `fsutil.go`: Atomic file writing (`WriteFileAtomic`, `WriteReaderAtomic`, `CopyFileAtomic`), SHA-256 verified
-        HTTP downloading (`DownloadVerified`), non-clobbering timestamped backups (`BackupFile`, retaining at most
-        `MaxBackupsPerFile = 3` per file, and `RemoveBackups`), and path-containment validation (`CleanRel`,
-        `SafeJoin`).
-*   `internal/preset/`:
-    *   `preset.go`: Declarative entity types, strict JSON decoder, two-layer catalog loader with quarantine
-        (`LoadLayeredCatalog`, `MergeUserDir`, `LoadPresetBaseAndOverride`), and query normalization
-        (`NormalizePresetQuery`).
+*   `internal/catalog/`:
+    *   `entity.go`: Declarative `EngineConfig`, `Preset`, `FileSpec`, `SourceSpec`, `LinkSpec`, `Diagnostic`, and
+        `Catalog` models.
+    *   `codec.go`: Strict single-document JSON entity decoder and personal-path scanner (`DecodeEntityBytes`,
+        `ScanFS`).
+    *   `loader.go`: Two-layer catalog loader with quarantine (`LoadCurated`, `LoadLayered`, `MergeUserDir`,
+        `LoadPresetBaseAndOverride`).
+    *   `query.go`: Tiered preset and engine query normalization and lookup (`NormalizePresetQuery`, `Find`,
+        `FindExact`, `FindEngine`).
     *   `store.go`: User `catalog.d` write operations (`AddEngine`, `ConfigEngine`, `ResetEngineOverride`,
         `RemoveEngine`, `AddPreset`, `ConfigPreset`, `ResetPresetOverride`, `RemovePreset`).
-    *   `lint.go`: Catalog schema, reference, digest, personal-path, `README.md` parity, and documentation typography,
-        link, anchor, and JSON code block linter (`LintCatalog`, `lintDocumentation`).
     *   `resolve.go`: Multi-root cached `DirIndex`, case-insensitive and whitespace-tolerant file resolution, safe
         relative sub-paths, 1-level child directory scan, catalog alias matching (`ResolveFileSpec`), preset readiness
         checking (`IsPresetInstalled`, `ArePresetFilesInstalled`, `NeedsSteamDiscovery`), and version-aware README
         resolution (`ResolveReadme`, `IsReadmeSuffix`).
     *   `decode.go`: Document decoding with DOS Code Page 437 (CP437) box-drawing detection.
-    *   `compiler.go`: `README.md` preset table generator and synchronizer (`doom wads build`).
-*   `internal/steam/`: Multi-library `libraryfolders.vdf` parsing, catalog-driven target synthesis
-    (`TargetPatternsForCatalog`), game file extraction, and `idkfa 2024.wad` synthesis from `extras.wad`
-    (`SynthesizeIDKFAWAD`).
-*   `internal/templates/`: Embedded engine configuration templates and timestamped backup deployer.
+*   `internal/config/`:
+    *   `paths.go`: Platform path resolvers (`ResolveFor`, `WadRoots`, `ParsePathList`) adhering strictly to XDG
+        (Linux), Library (macOS), and AppData (Windows).
+    *   `settings.go`: Settings-only user configuration persistence (`config.json` via `AppConfig`), two-tier path and
+        provenance helpers (`ApplyConfigPaths`, `DirSource`, `WadsDirsSource`, `ResolveNerdFontsWithSource`), explicit
+        `nerd_fonts` state tracking, and unknown top-level key preservation.
+*   `internal/display/`: Native display resolution and refresh rate auto-detection.
+*   `internal/engine/`:
+    *   `runner.go`: Engine execution argument synthesis (`PrepareLaunch`, including `.deh` and `.bex` ordering), pure
+        zero-I/O command preview formatting (`FormatLaunchPreview`), and process lifecycle management.
+    *   `installer.go`: Declarative source port asset downloading, SHA-256 verification, and `os.OpenRoot`-jailed
+        portable binary installation (Zip Slip hardened).
+    *   `macapp.go`: macOS `.app` bundle extraction and ad-hoc codesign helper.
+*   `internal/fsutil/`:
+    *   `fsutil.go`: Atomic file writing (`WriteFileAtomic`, `WriteReaderAtomic`, `CopyFileAtomic`), SHA-256 verified
+        HTTP downloading (`DownloadVerified`), non-clobbering timestamped backups (`BackupFile`, retaining at most
+        `MaxBackupsPerFile = 3` per file, and `RemoveBackups`), and path-containment validation (`CleanRel`,
+        `SafeJoin`).
+*   `internal/portcfg/`:
+    *   `render.go`: Embedded engine configuration template rendering (`RenderAutoexecWithRate`,
+        `RenderDSDADoomWithRes`).
+    *   `deploy.go`: Configuration diffing and timestamped backup deployment (`DiffConfigsWithDisplay`,
+        `DeployConfigsWithDisplay`).
+    *   `sync.go`: Maintainer reverse template synchronization (`SyncConfigs`).
+*   `internal/repolint/`:
+    *   `lint_catalog.go`: Curated and user catalog schema, reference, digest, personal-path, and template linter
+        (`LintCatalog`, `HasErrors`).
+    *   `lint_docs.go`: Repository documentation typography, link, anchor, and JSON code block linter
+        (`lintDocumentation`).
+    *   `readme.go`: `README.md` preset table generator and synchronizer (`SyncReadme`, `GenerateReadmeTable`).
+*   `internal/steam/`:
+    *   `vdf.go`: Multi-library `libraryfolders.vdf` parser (`ParseLibraryFolders`).
+    *   `discover.go`: Steam and GOG search roots, catalog-driven target synthesis (`TargetPatternsForCatalog`), and
+        game file extraction (`DiscoverAndExtractContext`).
+    *   `idkfa.go`: Streaming `idkfa 2024.wad` synthesis from `extras.wad` (`SynthesizeIDKFAWAD`).
 *   `internal/tui/`: Interactive Bubble Tea fuzzy launcher:
     *   `launcher.go`: State machine, update loop, in-TUI asset acquisition (`Ctrl+F`), and message routing.
     *   `options.go`: Unified launch options and per-preset configuration view (`Ctrl+O` or `F4`).
-    *   `config_view.go`: 3-tab in-TUI configuration manager (`Ctrl+G` or `F2`).
+    *   `config_view.go`: 3-tab in-TUI configuration manager state, navigation, and diff viewport (`Ctrl+G` or `F2`).
+    *   `config_actions.go`: Configuration manager persistence, engine override resets, and port config actions.
+    *   `config_tabs.go`: Tab content and footer rendering for the 3-tab configuration manager.
     *   `layout.go`: Dynamic responsive layout geometry and dimension clamping.
-    *   `render.go`: UI view rendering, badges, status lines, contextual help (`F1`), and key help formatting.
+    *   `render.go`: Split-pane UI rendering, badges, status lines, and ANSI truncation helpers.
+    *   `modals.go`: Expanded CP437 README viewer (`Tab` or `Ctrl+R`) and contextual help (`F1`) modals.
     *   `menu.go`: Fallback numbered terminal menu for basic or non-TTY environments.
     *   `theme.go`: Theme loader, custom JSON theme parser, and style builders.
     *   `builtin_themes.go`: Curated 60-30-10 color palettes.
@@ -215,6 +237,9 @@ Linux, macOS, and Windows:
     *   `extract.go`: Zip Slip hardened archive extractor, embedded `DEHACKED` lump extractor (`ExtractWADLump`), and
         ranked README (`.txt`) extractor with `<primaryStem>.txt` fallback normalization.
     *   `soundfont.go`: Roland SC-55 SoundFont downloader and installer.
+*   `internal/wadfmt/`:
+    *   `wadfmt.go`: Shared binary Doom `IWAD` and `PWAD` lump directory reader, lump extractor, streaming `PWAD`
+        builder, and serializer.
 
 # Naming and code style conventions
 
@@ -378,10 +403,10 @@ Linux, macOS, and Windows:
     files inside Steam Proton prefixes (`compatdata/<id>/pfx/...`). `doom setup` emits step warnings to `stderr`
     (`cmdErr(cmd)`) and exits non-zero if any step fails.
 *   **Catalog-driven WAD aliases and Steam target synthesis**: Never duplicate WAD filenames or alias tables across
-    `internal/preset/resolve.go` and `internal/steam/discover.go`, and never add aliases that only differ by case,
-    spaces, dashes, or underscores (which `preset.NormalizeFilename` matches automatically and `LintCatalog` rejects).
+    `internal/catalog/resolve.go` and `internal/steam/discover.go`, and never add aliases that only differ by case,
+    spaces, dashes, or underscores (which `catalog.NormalizeFilename` matches automatically and `LintCatalog` rejects).
     Declare true alternate filename stems once in `files[].aliases` inside `catalog/preset.<id>.json`;
-    `preset.DirIndex` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog.
+    `catalog.DirIndex` and `steam.DefaultTargetPatterns()` synthesize their lookup tables directly from the catalog.
 *   **Canonical upstream archive filenames and README hygiene**:
     *   `files[].name` in `catalog/preset.<id>.json` must match the exact canonical filename inside the upstream `.zip`
         archive (`Eviternity II.wad`, `Sunder 2512.wad`, `SODfinal.wad`, `aaliens.wad`, `scythe.wad`, `TNTR.WAD`).

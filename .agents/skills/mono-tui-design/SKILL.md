@@ -69,12 +69,12 @@ Always resolve rules in this order (higher overrides lower):
      or `Files:` rows.
    * Measure strings with `lipgloss.Width` (`padOrTruncateName`) and truncate with `truncateANSI` (`…`,
      `[OVERRIDE] §R1.7`).
-   * Query WAD and README availability through `m.dirIndex` (`*preset.DirIndex`) and `m.readmeCache`, render the
+   * Query WAD and README availability through `m.dirIndex` (`*catalog.DirIndex`) and `m.readmeCache`, render the
      `Launch Options` command preview via pure zero-I/O `engine.FormatLaunchPreview`, and render `Configuration Manager`
-     port status summaries using cached `s.detectedRes` and `s.detectedRate` (`templates.RenderAutoexecWithRate` and
-     `templates.RenderDSDADoomWithRes` in `refreshPortConfigStatus`) rather than performing uncached filesystem scans or
+     port status summaries using cached `s.detectedRes` and `s.detectedRate` (`portcfg.RenderAutoexecWithRate` and
+     `portcfg.RenderDSDADoomWithRes` in `refreshPortConfigStatus`) rather than performing uncached filesystem scans or
      display-detection subprocess calls inside `View()`.
 5. **Verify with tests and benchmarks**:
-   * Add or update table-driven unit tests in `internal/tui/launcher_test.go` and benchmarks in
+   * Add or update table-driven unit tests in `internal/tui/*_test.go` and benchmarks in
      `internal/tui/launcher_bench_test.go`.
    * Run `make check` to validate formatting, `revive` linting, race-enabled tests, and documentation invariants.

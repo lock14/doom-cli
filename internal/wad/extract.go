@@ -3,7 +3,6 @@ package wad
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -11,8 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/fsutil"
-	"github.com/lock14/doom-cli/internal/preset"
+	"github.com/lock14/doom-cli/internal/wadfmt"
 )
 
 const maxEmbeddedLumpBytes = 64 << 20
@@ -26,49 +26,7 @@ func ExtractWADLump(wadData []byte, lumpName string) ([]byte, bool) {
 // ExtractWADLumpFromReader extracts the raw payload of the first non-empty lump matching
 // lumpName from an io.ReaderAt without reading the entire WAD file into memory.
 func ExtractWADLumpFromReader(r io.ReaderAt, dataLen int64, lumpName string) ([]byte, bool) {
-	if r == nil || dataLen < 12 {
-		return nil, false
-	}
-	var hdr [12]byte
-	if _, err := r.ReadAt(hdr[:], 0); err != nil {
-		return nil, false
-	}
-	ident := string(hdr[0:4])
-	if ident != "PWAD" && ident != "IWAD" {
-		return nil, false
-	}
-	numLumps := int64(binary.LittleEndian.Uint32(hdr[4:8]))
-	dirOffset := int64(binary.LittleEndian.Uint32(hdr[8:12]))
-	if numLumps <= 0 || numLumps > 65536 || dirOffset < 12 || dirOffset+numLumps*16 > dataLen {
-		return nil, false
-	}
-
-	dirBuf := make([]byte, numLumps*16)
-	if _, err := r.ReadAt(dirBuf, dirOffset); err != nil {
-		return nil, false
-	}
-
-	want := strings.ToUpper(strings.TrimSpace(lumpName))
-	for i := int64(0); i < numLumps; i++ {
-		entry := dirBuf[i*16 : (i+1)*16]
-		lumpPos := int64(binary.LittleEndian.Uint32(entry[0:4]))
-		lumpSize := int64(binary.LittleEndian.Uint32(entry[4:8]))
-		if lumpSize <= 0 || lumpSize > maxEmbeddedLumpBytes || lumpPos < 12 || lumpPos+lumpSize > dataLen {
-			continue
-		}
-		nameBytes := entry[8:16]
-		if nul := bytes.IndexByte(nameBytes, 0); nul >= 0 {
-			nameBytes = nameBytes[:nul]
-		}
-		if strings.EqualFold(string(nameBytes), want) {
-			out := make([]byte, lumpSize)
-			if _, err := r.ReadAt(out, lumpPos); err != nil {
-				return nil, false
-			}
-			return out, true
-		}
-	}
-	return nil, false
+	return wadfmt.ExtractLump(r, dataLen, lumpName, maxEmbeddedLumpBytes)
 }
 
 func isZip(filePath string) bool {
@@ -102,7 +60,7 @@ func isSkippableZipEntry(zf *zip.File) bool {
 func (d *Downloader) extractFromZip(
 	zipPath string,
 	expectedFiles []string,
-	presets ...preset.Preset,
+	presets ...catalog.Preset,
 ) error {
 	zr, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -111,7 +69,7 @@ func (d *Downloader) extractFromZip(
 	defer zr.Close()
 
 	cleanWadsDir := filepath.Clean(d.WadsDir)
-	aliasCat := &preset.Catalog{Presets: presets}
+	aliasCat := &catalog.Catalog{Presets: presets}
 
 	var wadFiles []*zip.File
 	var pk3Files []*zip.File
@@ -154,7 +112,7 @@ func (d *Downloader) extractFromZip(
 
 		expBase := filepath.Base(destPath)
 		expLower := strings.ToLower(expBase)
-		expNorm := preset.NormalizeFilename(expBase)
+		expNorm := catalog.NormalizeFilename(expBase)
 
 		var match *zip.File
 
@@ -175,7 +133,7 @@ func (d *Downloader) extractFromZip(
 				if isSkippableZipEntry(zf) {
 					continue
 				}
-				if preset.NormalizeFilename(zipBase(zf.Name)) == expNorm {
+				if catalog.NormalizeFilename(zipBase(zf.Name)) == expNorm {
 					match = zf
 					break
 				}
@@ -185,13 +143,13 @@ func (d *Downloader) extractFromZip(
 		// 3. Known aliases (curated and preset-defined)
 		if match == nil {
 			for _, alias := range aliasCat.FileAliases(expBase) {
-				aliasNorm := preset.NormalizeFilename(alias)
+				aliasNorm := catalog.NormalizeFilename(alias)
 				for _, zf := range zr.File {
 					if isSkippableZipEntry(zf) {
 						continue
 					}
 					zfBase := zipBase(zf.Name)
-					if strings.EqualFold(zfBase, alias) || preset.NormalizeFilename(zfBase) == aliasNorm {
+					if strings.EqualFold(zfBase, alias) || catalog.NormalizeFilename(zfBase) == aliasNorm {
 						match = zf
 						break
 					}
@@ -253,13 +211,13 @@ func (d *Downloader) extractFromZip(
 
 func collectReadmeStems(
 	expectedFiles []string,
-	aliasCat *preset.Catalog,
-	presets []preset.Preset,
+	aliasCat *catalog.Catalog,
+	presets []catalog.Preset,
 ) []string {
 	var stems []string
 	seen := make(map[string]bool)
 	addStem := func(raw string) {
-		norm := preset.NormalizeFilename(raw)
+		norm := catalog.NormalizeFilename(raw)
 		if norm == "" || seen[norm] {
 			return
 		}
@@ -284,16 +242,16 @@ func collectReadmeStems(
 func readmeDestName(
 	cleanName string,
 	expectedFiles []string,
-	aliasCat *preset.Catalog,
-	presets []preset.Preset,
+	aliasCat *catalog.Catalog,
+	presets []catalog.Preset,
 ) string {
 	stems := collectReadmeStems(expectedFiles, aliasCat, presets)
-	txtStem := preset.NormalizeFilename(strings.TrimSuffix(cleanName, path.Ext(cleanName)))
+	txtStem := catalog.NormalizeFilename(strings.TrimSuffix(cleanName, path.Ext(cleanName)))
 	for _, stem := range stems {
 		if txtStem == stem {
 			return cleanName
 		}
-		if strings.HasPrefix(txtStem, stem) && preset.IsReadmeSuffix(strings.TrimPrefix(txtStem, stem)) {
+		if strings.HasPrefix(txtStem, stem) && catalog.IsReadmeSuffix(strings.TrimPrefix(txtStem, stem)) {
 			return cleanName
 		}
 	}
@@ -320,15 +278,15 @@ func readmeDestName(
 func orderReadmeCandidates(
 	txtFiles []*zip.File,
 	expectedFiles []string,
-	aliasCat *preset.Catalog,
-	presets []preset.Preset,
+	aliasCat *catalog.Catalog,
+	presets []catalog.Preset,
 ) []*zip.File {
 	stems := collectReadmeStems(expectedFiles, aliasCat, presets)
 
 	var exact, readmePrefix, otherPrefix, rest []*zip.File
 	for _, tf := range txtFiles {
 		base := zipBase(tf.Name)
-		txtStem := preset.NormalizeFilename(strings.TrimSuffix(base, path.Ext(base)))
+		txtStem := catalog.NormalizeFilename(strings.TrimSuffix(base, path.Ext(base)))
 		if txtStem == "" || txtStem == "license" {
 			continue
 		}
@@ -341,7 +299,7 @@ func orderReadmeCandidates(
 				break
 			}
 			if strings.HasPrefix(txtStem, stem) {
-				if preset.IsReadmeSuffix(strings.TrimPrefix(txtStem, stem)) {
+				if catalog.IsReadmeSuffix(strings.TrimPrefix(txtStem, stem)) {
 					matchedReadmePrefix = true
 				} else {
 					matchedOtherPrefix = true

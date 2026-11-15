@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/fsutil"
-	"github.com/lock14/doom-cli/internal/preset"
 )
 
 // Downloader manages downloading and extracting WAD presets.
@@ -62,7 +62,7 @@ func (d *Downloader) roots() []string {
 }
 
 // FilterExpectedFiles returns the required file names from files, omitting optional entries.
-func FilterExpectedFiles(files []preset.FileSpec) []string {
+func FilterExpectedFiles(files []catalog.FileSpec) []string {
 	var filtered []string
 	for _, f := range files {
 		if f.Optional {
@@ -74,17 +74,17 @@ func FilterExpectedFiles(files []preset.FileSpec) []string {
 }
 
 // IsPresetInstalled checks whether all required files for the preset are present across configured WAD roots.
-func (d *Downloader) IsPresetInstalled(p preset.Preset) bool {
-	return preset.NewDirIndex(d.roots()...).WithPresets(p).ArePresetFilesInstalled(p)
+func (d *Downloader) IsPresetInstalled(p catalog.Preset) bool {
+	return catalog.NewDirIndex(d.roots()...).WithPresets(p).ArePresetFilesInstalled(p)
 }
 
 // DownloadPreset downloads and extracts the required files for a specific preset.
-func (d *Downloader) DownloadPreset(p preset.Preset) error {
+func (d *Downloader) DownloadPreset(p catalog.Preset) error {
 	_, err := d.downloadPresetWithIndex(p, nil)
 	return err
 }
 
-func (d *Downloader) downloadPresetWithIndex(p preset.Preset, idx *preset.DirIndex) (bool, error) {
+func (d *Downloader) downloadPresetWithIndex(p catalog.Preset, idx *catalog.DirIndex) (bool, error) {
 	expected := FilterExpectedFiles(p.Files)
 	if len(p.Sources) == 0 {
 		if len(expected) == 0 {
@@ -155,7 +155,7 @@ func (d *Downloader) downloadPresetWithIndex(p preset.Preset, idx *preset.DirInd
 			continue
 		}
 
-		if !preset.IsSupportedSourceURL(cleanURL) {
+		if !catalog.IsSupportedSourceURL(cleanURL) {
 			lastErr = fmt.Errorf(
 				"unsupported archive format in source URL %q (only .zip, .wad, and .pk3 are supported)",
 				cleanURL,
@@ -188,7 +188,7 @@ func urlExtension(rawURL string) string {
 	return filepath.Ext(lower)
 }
 
-func (d *Downloader) downloadAndExtract(src preset.Source, expectedFiles []string, p preset.Preset) error {
+func (d *Downloader) downloadAndExtract(src catalog.Source, expectedFiles []string, p catalog.Preset) error {
 	tmpDir, err := os.MkdirTemp("", "doom_dl_*")
 	if err != nil {
 		return err
@@ -288,13 +288,13 @@ func extractWADLumpFromFile(wadPath, lumpName string) ([]byte, bool, error) {
 }
 
 // DownloadAll downloads all downloadable community megawads in the catalog.
-func (d *Downloader) DownloadAll(catalog *preset.Catalog) error {
+func (d *Downloader) DownloadAll(cat *catalog.Catalog) error {
 	fmt.Fprintf(d.Out, "=== Doom Community Megawad Downloader ===\n")
 	fmt.Fprintf(d.Out, "Target directory: %s\n\n", d.WadsDir)
 
-	idx := preset.NewDirIndex(d.roots()...).WithCatalog(catalog)
+	idx := catalog.NewDirIndex(d.roots()...).WithCatalog(cat)
 	var failures []string
-	for _, p := range catalog.Presets {
+	for _, p := range cat.Presets {
 		if len(p.Sources) == 0 {
 			continue
 		}
@@ -307,7 +307,7 @@ func (d *Downloader) DownloadAll(catalog *preset.Catalog) error {
 			continue
 		}
 		if downloaded {
-			idx = preset.NewDirIndex(d.roots()...).WithCatalog(catalog)
+			idx = catalog.NewDirIndex(d.roots()...).WithCatalog(cat)
 		}
 	}
 

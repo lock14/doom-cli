@@ -1,4 +1,4 @@
-package templates
+package portcfg
 
 import (
 	"bytes"
@@ -28,7 +28,6 @@ func TestDeployConfigs_And_Diff(t *testing.T) {
 		t.Fatalf("DeployConfigsTo failed: %v", err)
 	}
 
-	// Verify autoexec.cfg
 	autoexecPath := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
 	dataAuto, err := os.ReadFile(autoexecPath)
 	if err != nil {
@@ -41,7 +40,6 @@ func TestDeployConfigs_And_Diff(t *testing.T) {
 		t.Errorf("autoexec.cfg still contains __SOUNDFONT__ placeholder")
 	}
 
-	// Verify dsda-doom.cfg
 	dsdaPath := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
 	dataDSDA, err := os.ReadFile(dsdaPath)
 	if err != nil {
@@ -54,7 +52,6 @@ func TestDeployConfigs_And_Diff(t *testing.T) {
 		t.Errorf("dsda-doom.cfg still contains __SOUNDFONT__ placeholder")
 	}
 
-	// Verify DiffConfigs shows in sync
 	var diffOut bytes.Buffer
 	if err := DiffConfigs(paths, &diffOut); err != nil {
 		t.Fatalf("DiffConfigs failed: %v", err)
@@ -68,7 +65,6 @@ func TestSyncConfigs(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 
-	// 1. Mock system config dirs
 	paths := &config.Paths{
 		UZDoomDir: filepath.Join(tmpDir, "sys_uzdoom"),
 		DSDADir:   filepath.Join(tmpDir, "sys_dsda"),
@@ -76,25 +72,22 @@ func TestSyncConfigs(t *testing.T) {
 	_ = os.MkdirAll(paths.UZDoomDir, 0o755)
 	_ = os.MkdirAll(paths.DSDADir, 0o755)
 
-	// Live system configs with modified settings
 	liveAuto := "fluid_patchset \"/custom/soundfont.sf2\"\nvid_maxfps 144\n"
 	_ = os.WriteFile(filepath.Join(paths.UZDoomDir, "autoexec.cfg"), []byte(liveAuto), 0o644)
 
 	liveDSDA := "screen_resolution \"2560x1440\"\nsnd_soundfont \"/custom/soundfont.sf2\"\n"
 	_ = os.WriteFile(filepath.Join(paths.DSDADir, "dsda-doom.cfg"), []byte(liveDSDA), 0o644)
 
-	// 2. Mock repo dirs
 	repoDir := filepath.Join(tmpDir, "repo")
-	_ = os.MkdirAll(filepath.Join(repoDir, "uzdoom"), 0o755)
-	_ = os.MkdirAll(filepath.Join(repoDir, "dsda-doom"), 0o755)
+	_ = os.MkdirAll(filepath.Join(repoDir, "configs", "uzdoom"), 0o755)
+	_ = os.MkdirAll(filepath.Join(repoDir, "configs", "dsda-doom"), 0o755)
 
 	var out bytes.Buffer
 	if err := SyncConfigs(paths, repoDir, &out); err != nil {
 		t.Fatalf("SyncConfigs failed: %v", err)
 	}
 
-	// Verify root template uzdoom/autoexec.cfg
-	syncedAuto, err := os.ReadFile(filepath.Join(repoDir, "uzdoom", "autoexec.cfg"))
+	syncedAuto, err := os.ReadFile(filepath.Join(repoDir, "configs", "uzdoom", "autoexec.cfg"))
 	if err != nil {
 		t.Fatalf("failed reading synced uzdoom autoexec: %v", err)
 	}
@@ -105,8 +98,7 @@ func TestSyncConfigs(t *testing.T) {
 		t.Errorf("expected __REFRESH_RATE__ token in synced autoexec, got: %s", string(syncedAuto))
 	}
 
-	// Verify root template dsda-doom/dsda-doom.cfg
-	syncedDSDA, err := os.ReadFile(filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg"))
+	syncedDSDA, err := os.ReadFile(filepath.Join(repoDir, "configs", "dsda-doom", "dsda-doom.cfg"))
 	if err != nil {
 		t.Fatalf("failed reading synced dsda-doom cfg: %v", err)
 	}
@@ -130,7 +122,7 @@ func TestTemplateInvariants(t *testing.T) {
 	}{
 		{
 			name:         "dsda-doom.cfg",
-			rootFile:     filepath.Join(rootDir, "dsda-doom", "dsda-doom.cfg"),
+			rootFile:     filepath.Join(rootDir, "configs", "dsda-doom", "dsda-doom.cfg"),
 			embeddedData: embeddedDSDADoom,
 			requiredTokens: []string{
 				"__RESOLUTION__",
@@ -142,7 +134,7 @@ func TestTemplateInvariants(t *testing.T) {
 		},
 		{
 			name:           "autoexec.cfg",
-			rootFile:       filepath.Join(rootDir, "uzdoom", "autoexec.cfg"),
+			rootFile:       filepath.Join(rootDir, "configs", "uzdoom", "autoexec.cfg"),
 			embeddedData:   embeddedAutoexec,
 			requiredTokens: []string{"__REFRESH_RATE__", "__SOUNDFONT__"},
 		},
@@ -233,7 +225,6 @@ func TestDeployConfigsWithOptions_PreservesExistingWhenNotForced(t *testing.T) {
 		t.Errorf("expected existing autoexec.cfg preserved when force=false, got %q (err=%v)", string(gotAuto), err)
 	}
 
-	// With force=true, existing autoexec.cfg is backed up and overwritten
 	buf.Reset()
 	if err := DeployConfigsWithOptions(paths, true, &buf); err != nil {
 		t.Fatalf("DeployConfigsWithOptions(force=true) failed: %v", err)
@@ -249,12 +240,10 @@ func TestDeployConfigsWithOptions_PreservesExistingWhenNotForced(t *testing.T) {
 
 func TestRenderWindowsBackslashAndCRLFNormalization(t *testing.T) {
 	t.Parallel()
-	// Nil paths guard returns cleanly without panicking.
 	if got := RenderAutoexecWithRate(nil, 144); len(got) == 0 {
 		t.Fatal("expected non-empty default render when paths == nil")
 	}
 
-	// Windows backslash SoundFont path is normalized to forward slashes in UZDoom autoexec.cfg.
 	winPaths := &config.Paths{
 		SoundFontFile: `D:\Games\Doom\soundfonts\GeneralUser-GS.sf2`,
 	}
@@ -266,7 +255,6 @@ func TestRenderWindowsBackslashAndCRLFNormalization(t *testing.T) {
 		t.Errorf("expected vid_preferbackend 1 (Vulkan) in autoexec.cfg")
 	}
 
-	// CRLF line endings on disk do not produce false-positive diffs or dirty synced templates.
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
 		SoundFontFile: filepath.Join(tmpDir, "sf", "GeneralUser-GS.sf2"),
@@ -295,12 +283,12 @@ func TestRenderWindowsBackslashAndCRLFNormalization(t *testing.T) {
 	}
 
 	repoDir := filepath.Join(tmpDir, "repo")
-	_ = os.MkdirAll(filepath.Join(repoDir, "uzdoom"), 0o755)
-	_ = os.MkdirAll(filepath.Join(repoDir, "dsda-doom"), 0o755)
+	_ = os.MkdirAll(filepath.Join(repoDir, "configs", "uzdoom"), 0o755)
+	_ = os.MkdirAll(filepath.Join(repoDir, "configs", "dsda-doom"), 0o755)
 	if err := SyncConfigs(paths, repoDir, io.Discard); err != nil {
 		t.Fatalf("SyncConfigs: %v", err)
 	}
-	syncedDSDA, err := os.ReadFile(filepath.Join(repoDir, "dsda-doom", "dsda-doom.cfg"))
+	syncedDSDA, err := os.ReadFile(filepath.Join(repoDir, "configs", "dsda-doom", "dsda-doom.cfg"))
 	if err != nil {
 		t.Fatal(err)
 	}

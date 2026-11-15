@@ -17,8 +17,8 @@ All contributions must respect the core repository invariants:
         `/home/<username>/`, hardcoded display resolutions, or fixed monitor refresh rates into configurations, presets,
         or code.
     *   **Use placeholder tokens**: Use `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` in
-        engine configuration templates (`dsda-doom/dsda-doom.cfg`, `uzdoom/autoexec.cfg`). The CLI deployment tooling
-        dynamically substitutes these based on runtime display and filesystem detection.
+        engine configuration templates (`configs/dsda-doom/dsda-doom.cfg`, `configs/uzdoom/autoexec.cfg`). The CLI
+        deployment tooling dynamically substitutes these based on runtime display and filesystem detection.
     *   **Standard directory structures**: Respect platform standard directories (XDG on Linux,
         `~/Library/Application Support/` on macOS, and `%LOCALAPPDATA%` and `%USERPROFILE%\Games\Doom\` on Windows).
 *   **Destructive safety and backup policy**: Any configuration or catalog write (`doom engines cfg install`,
@@ -73,11 +73,11 @@ All contributions must respect the core repository invariants:
         optional assets like `idkfa 2024.wad` are missing, with all `FileSpec` lookups routed through
         `DirIndex.ResolveFileSpec`.
     *   **Filename and preset query normalization and declarative aliases**: Maintain case-insensitive and dash-,
-        underscore-, and space-tolerant file resolution (`preset.NormalizeFilename`) across WAD roots, archive
+        underscore-, and space-tolerant file resolution (`catalog.NormalizeFilename`) across WAD roots, archive
         extraction, and Steam and GOG discovery, alongside tiered preset query resolution (`Catalog.Find`,
-        `Catalog.FindExact`, and `preset.NormalizePresetQuery`) across WAD stems, Roman numerals, implicit `doom`
+        `Catalog.FindExact`, and `catalog.NormalizePresetQuery`) across WAD stems, Roman numerals, implicit `doom`
         prefixes, and multi-word initialisms. When an upstream archive or rerelease uses a distinct filename stem,
-        declare `"aliases"` on the `FileSpec` in `catalog/preset.<id>.json` so both `preset.DirIndex` and
+        declare `"aliases"` on the `FileSpec` in `catalog/preset.<id>.json` so both `catalog.DirIndex` and
         `steam.DefaultTargetPatterns()` derive from a single source of truth.
     *   **Two-layer catalog**: Curated defaults in `catalog/*.json` are immutable; user engines, presets, and overrides
         layer cleanly as individual drop-in files in `<ConfigDir>/catalog.d/*.json`, while `<ConfigDir>/config.json`
@@ -133,8 +133,11 @@ The repository features a unified, zero-dependency Go CLI (`doom`) that compiles
 
 ```
 doom-cli/
-├── embed.go                # Single root embed.FS (catalog/*.json, dsda-doom/*.cfg, uzdoom/*.cfg)
+├── embed.go                # Single root embed.FS (catalog/*.json, configs/dsda-doom/*.cfg, configs/uzdoom/*.cfg)
 ├── catalog/                # One-entity-per-file curated catalog (engine.<id>.json, preset.<id>.json)
+├── configs/                # Source port configuration templates with runtime placeholder tokens
+│   ├── dsda-doom/          # DSDA-Doom configuration template (dsda-doom.cfg)
+│   └── uzdoom/             # UZDoom autoexec configuration template (autoexec.cfg)
 ├── cmd/doom/               # Command-line interface definitions using Cobra
 │   ├── main.go             # Entrypoint, root direct game launcher, path and catalog helpers
 │   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, scan, add, set, reset, remove, lint, build)
@@ -142,39 +145,53 @@ doom-cli/
 │   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, themes)
 │   └── setup.go            # 'doom setup' turnkey installation workflow
 ├── internal/
+│   ├── catalog/            # Runtime two-layer entity catalog, store, file resolver, and CP437 decoder
+│   │   ├── entity.go       # EngineConfig, Preset, FileSpec, SourceSpec, LinkSpec, and Catalog models
+│   │   ├── codec.go        # Strict single-document JSON entity decoder and personal-path scanner
+│   │   ├── loader.go       # Embedded curated loader, user catalog.d quarantine, and layered merge
+│   │   ├── query.go        # Tiered preset and engine query normalization and lookup
+│   │   ├── store.go        # User catalog.d write operations (AddEngine, ConfigEngine, AddPreset, ConfigPreset)
+│   │   ├── resolve.go      # Multi-root DirIndex, relative sub-path, 1-level subdir, readiness, and README resolver
+│   │   └── decode.go       # Robust text decoding with CP437 and DOS box-drawing character detection
 │   ├── config/             # Platform path resolvers (paths.go) and settings-only config.json (settings.go)
 │   ├── display/            # Native display resolution and refresh rate auto-detection
 │   ├── engine/             # Source port runners, argument synthesis, declarative binary installers
 │   │   ├── runner.go       # Launch synthesis (PrepareLaunch), zero-I/O preview (FormatLaunchPreview), and execution
-│   │   └── installer.go    # Declarative GitHub release and pinned fallback binary installer
+│   │   ├── installer.go    # Declarative GitHub release and pinned fallback binary installer
+│   │   └── macapp.go       # macOS .app bundle extraction and codesign helper
 │   ├── fsutil/             # Atomic writes, backups, SHA-256 verified HTTP downloads (DownloadVerified), and SafeJoin
-│   ├── preset/             # Two-layer entity catalog, store, linter, file resolver, README compiler
-│   │   ├── preset.go       # Entity models, strict decoding, layered catalog loader, quarantine
-│   │   ├── store.go        # User catalog.d write operations (AddEngine, ConfigEngine, AddPreset, ConfigPreset)
-│   │   ├── lint.go         # Schema, invariant, personal-path, README parity, and documentation linter
-│   │   ├── resolve.go      # Multi-root DirIndex, relative sub-path, 1-level subdir, readiness, and README resolver
-│   │   ├── decode.go       # Robust text decoding with CP437 and DOS box-drawing character detection
-│   │   └── compiler.go     # Synchronizes curated catalog/*.json into README.md
+│   ├── portcfg/            # Source port configuration rendering, diffing, backup deployment, and reverse sync
+│   │   ├── render.go       # Placeholder token substitution for UZDoom and DSDA-Doom templates
+│   │   ├── deploy.go       # Configuration diffing and atomic timestamped backup deployment
+│   │   └── sync.go         # Maintainer reverse template synchronization (doom engines cfg sync)
+│   ├── repolint/           # Maintainer catalog, documentation, and README table synchronization tooling
+│   │   ├── lint_catalog.go # Schema, reference, digest, personal-path, and template linter
+│   │   ├── lint_docs.go    # Documentation typography, relative link, anchor, and JSON block linter
+│   │   └── readme.go       # Synchronizes curated catalog/*.json into README.md (doom wads build)
 │   ├── steam/              # Steam and GOG discovery, catalog target synthesis, and idkfa 2024.wad synthesis
-│   ├── templates/          # Embedded engine configuration templates and backup deployer
+│   │   ├── vdf.go          # Valve Data Format (libraryfolders.vdf) parser
+│   │   ├── discover.go     # Multi-library search roots, target synthesis, and rerelease-first extraction
+│   │   └── idkfa.go        # Streaming idkfa 2024.wad soundtrack synthesis from extras.wad
 │   ├── tui/                # Terminal user interface components powered by Bubble Tea and Lip Gloss
 │   │   ├── launcher.go     # Bubble Tea state machine, update loop, in-TUI asset fetch, and message routing
 │   │   ├── options.go      # Unified launch options and per-preset configuration view (Ctrl+O or F4)
-│   │   ├── config_view.go  # 3-tab in-TUI configuration manager (Ctrl+G or F2)
+│   │   ├── config_view.go  # 3-tab in-TUI configuration manager state, navigation, and diff viewport (Ctrl+G or F2)
+│   │   ├── config_actions.go # Configuration manager persistence, override resets, and port config actions
+│   │   ├── config_tabs.go  # Tab content and footer rendering for the 3-tab configuration manager
 │   │   ├── layout.go       # Dynamic viewport and responsive pane geometry calculations
-│   │   ├── render.go       # Split-pane UI rendering, badges, contextual help (F1), and key help formatting
+│   │   ├── render.go       # Split-pane UI rendering, badges, status lines, and ANSI truncation helpers
+│   │   ├── modals.go       # Expanded CP437 README viewer (Tab or Ctrl+R) and contextual help (F1) modals
 │   │   ├── menu.go         # Fallback numbered terminal menu for basic or non-TTY environments
 │   │   ├── theme.go        # Theme loading, custom JSON theme decoding, and ANSI and TrueColor styles
 │   │   └── builtin_themes.go # Curated color palettes adhering to the 60-30-10 design principle
-│   └── wad/                # WAD downloading, archive extraction, and SoundFont deployment
-│       ├── downloader.go   # Multi-mirror SHA-256 verified downloader for community megawads
-│       ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README extractor
-│       └── soundfont.go    # Roland SC-55 SoundFont installer
-├── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
-│   ├── rules/              # Project overrides and conventions (monospace-tui.md)
-│   └── skills/             # TUI design and audit skills (mono-tui-design/, mono-tui-audit/)
-├── dsda-doom/              # DSDA-Doom configuration template with placeholder tokens
-└── uzdoom/                 # UZDoom autoexec configuration template with placeholder tokens
+│   ├── wad/                # WAD downloading, archive extraction, and SoundFont deployment
+│   │   ├── downloader.go   # Multi-mirror SHA-256 verified downloader for community megawads
+│   │   ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README extractor
+│   │   └── soundfont.go    # Roland SC-55 SoundFont installer
+│   └── wadfmt/             # Shared binary Doom IWAD and PWAD lump container parser and streaming builder
+└── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
+    ├── rules/              # Project overrides and conventions (monospace-tui.md)
+    └── skills/             # TUI design and audit skills (mono-tui-design/, mono-tui-audit/)
 ```
 
 ## Developer how-to guides
@@ -243,7 +260,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
    ```
 3. Verify catalog invariant tests pass:
    ```bash
-   go test -v -race ./internal/preset/...
+   go test -v -race ./internal/catalog/... ./internal/repolint/...
    ```
 
 ### Adding or promoting a curated engine
@@ -273,15 +290,15 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 
 ### Synchronizing engine configuration templates
 
-When refining the curated engine configurations (`uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg`) after testing
-in-game settings on a local machine, use the hidden maintainer command `doom engines cfg sync`:
+When refining the curated engine configurations (`configs/uzdoom/autoexec.cfg` and `configs/dsda-doom/dsda-doom.cfg`)
+after testing in-game settings on a local machine, use the hidden maintainer command `doom engines cfg sync`:
 
 1. Inspect differences between the repository templates and your installed system configurations:
    ```bash
    go run ./cmd/doom engines cfg diff
    ```
-2. Pull live tweaks back into `uzdoom/autoexec.cfg` and `dsda-doom/dsda-doom.cfg` (automatically restoring
-   `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholder tokens):
+2. Pull live tweaks back into `configs/uzdoom/autoexec.cfg` and `configs/dsda-doom/dsda-doom.cfg` (automatically
+   restoring `__RESOLUTION__`, `__REFRESH_RATE__`, and `__SOUNDFONT__` placeholder tokens):
    ```bash
    go run ./cmd/doom engines cfg sync
    ```

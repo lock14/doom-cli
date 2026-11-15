@@ -134,3 +134,46 @@ func SaveConfig(paths *Paths, cfg *AppConfig) error {
 	_, err := fsutil.WriteFileAtomic(paths.ConfigFile, buf.Bytes(), 0o644)
 	return err
 }
+
+// ApplyConfigPaths applies non-empty directory overrides from cfg onto p.
+func ApplyConfigPaths(p *Paths, cfg *AppConfig) {
+	if p == nil || cfg == nil {
+		return
+	}
+	if s := strings.TrimSpace(cfg.WadsDir); s != "" {
+		p.WadsDir = s
+	}
+	if len(cfg.WadsDirs) > 0 {
+		p.WadsDirs = append([]string(nil), cfg.WadsDirs...)
+	}
+	if s := strings.TrimSpace(cfg.BinDir); s != "" {
+		p.SetBinDir(s)
+	}
+	if s := strings.TrimSpace(cfg.SoundFontsDir); s != "" {
+		p.SetSoundFontsDir(s)
+	}
+}
+
+// DirSource returns "config" when cfgVal is non-empty, or "default" otherwise.
+func DirSource(cfgVal string) string {
+	if strings.TrimSpace(cfgVal) != "" {
+		return "config"
+	}
+	return "default"
+}
+
+// WadsDirsSource returns "config" when cfg defines one or more WadsDirs, or "default" otherwise.
+func WadsDirsSource(cfg *AppConfig) string {
+	if cfg != nil && len(cfg.WadsDirs) > 0 {
+		return "config"
+	}
+	return "default"
+}
+
+// ResolveNerdFontsWithSource returns the effective nerd_fonts flag and its provenance ("config" or "default").
+func ResolveNerdFontsWithSource(cfg *AppConfig) (bool, string) {
+	if cfg != nil && cfg.HasNerdFonts() {
+		return cfg.NerdFonts, "config"
+	}
+	return false, "default"
+}

@@ -42,9 +42,10 @@ Use this skill when auditing or reviewing `internal/tui/`, `cmd/doom/wads.go`, `
      `Launch Options — <Name>`, `Doom CLI & Engine Configuration`, `Configuration Diff`, and `Keybindings & Features`,
      `[WAIVE] §6.4` and `§6.5`).
 3. **Theme and color token discipline**:
-   * Confirm all styles in `internal/tui/render.go`, `internal/tui/options.go`, and `internal/tui/config_view.go` derive
-     from `ThemeStyles` (`internal/tui/theme.go`) and work across all 10 built-in palettes in
-     `internal/tui/builtin_themes.go` (`[OVERRIDE] §R3.2`, including `classic` ANSI-16 and `monochrome`).
+   * Confirm all styles in `internal/tui/render.go`, `internal/tui/modals.go`, `internal/tui/options.go`,
+     `internal/tui/config_view.go`, and `internal/tui/config_tabs.go` derive from `ThemeStyles`
+     (`internal/tui/theme.go`) and work across all 10 built-in palettes in `internal/tui/builtin_themes.go`
+     (`[OVERRIDE] §R3.2`, including `classic` ANSI-16 and `monochrome`).
 4. **Width math, truncation, and resize safety**:
    * Confirm `computeLayout` (`internal/tui/layout.go`, with `availHeight := m.height - 6` and
      `sideBySideMinWidth = 90`), `renderFooter` (using the same `m.width >= sideBySideMinWidth` breakpoint), and
@@ -64,12 +65,12 @@ Use this skill when auditing or reviewing `internal/tui/`, `cmd/doom/wads.go`, `
      and `§R4.11`).
 6. **UI thread performance**:
    * Confirm `View()`, `renderPreviewLines`, `renderLaunchOptionsView`, `renderConfigManagerView`, and
-     `refreshPortConfigStatus` use `m.dirIndex` (`*preset.DirIndex`), `m.readmeCache`, pure zero-I/O
-     `engine.FormatLaunchPreview`, and cached `s.detectedRes` and `s.detectedRate` (`templates.RenderAutoexecWithRate`
-     and `templates.RenderDSDADoomWithRes`) with zero uncached filesystem directory scans or display-detection
+     `refreshPortConfigStatus` use `m.dirIndex` (`*catalog.DirIndex`), `m.readmeCache`, pure zero-I/O
+     `engine.FormatLaunchPreview`, and cached `s.detectedRes` and `s.detectedRate` (`portcfg.RenderAutoexecWithRate`
+     and `portcfg.RenderDSDADoomWithRes`) with zero uncached filesystem directory scans or display-detection
      subprocess spawns (`[P3]`).
 7. **Override freshness**:
-   * Run `go test -v ./internal/preset -run TestMonospaceTUIOverridesNotStale` to verify every `### [OVERRIDE]` and
+   * Run `go test -v ./internal/repolint -run TestMonospaceTUIOverridesNotStale` to verify every `### [OVERRIDE]` and
      `### [WAIVE]` section in `.agents/rules/monospace-tui.md` includes a verbatim `- **Original**:` quote from
      `standard.md`, `rendering.md`, or `patterns.md`.
 

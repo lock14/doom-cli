@@ -5,8 +5,8 @@ package doomcli
 import "embed"
 
 // FS holds the embedded curated catalog entities (`catalog/*.json`) and the
-// default source-port configuration templates (`dsda-doom/dsda-doom.cfg` and
-// `uzdoom/autoexec.cfg`).
+// default source-port configuration templates (`configs/dsda-doom/dsda-doom.cfg`
+// and `configs/uzdoom/autoexec.cfg`).
 //
-//go:embed catalog/*.json dsda-doom/dsda-doom.cfg uzdoom/autoexec.cfg
+//go:embed catalog/*.json configs/dsda-doom/dsda-doom.cfg configs/uzdoom/autoexec.cfg
 var FS embed.FS

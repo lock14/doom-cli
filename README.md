@@ -701,8 +701,8 @@ tier, quality rating, and primary documentation link. *Going Down Turbo* (`gdtur
 
 ### UZDoom ("Software-Plus" profile)
 
-Configured in [`uzdoom/autoexec.cfg`](uzdoom/autoexec.cfg) to reproduce the crisp Nightdive Remaster aesthetic while
-leaving movement, weapon, and mouse sensitivity bindings to your personal `uzdoom.ini`:
+Configured in [`configs/uzdoom/autoexec.cfg`](configs/uzdoom/autoexec.cfg) to reproduce the crisp Nightdive Remaster
+aesthetic while leaving movement, weapon, and mouse sensitivity bindings to your personal `uzdoom.ini`:
 - **Vulkan renderer and software sector lighting**: Vulkan backend preference (`vid_preferbackend 1`) and software light
   mode (`gl_lightmode 0`) with light stepping (`gl_bandedsw 1`).
 - **Tonemapping**: 256-color palette tonemapping (`gl_tonemap 3`).
@@ -714,7 +714,7 @@ leaving movement, weapon, and mouse sensitivity bindings to your personal `uzdoo
 
 ### DSDA-Doom (speedrunning and demo accuracy)
 
-Configured in [`dsda-doom/dsda-doom.cfg`](dsda-doom/dsda-doom.cfg):
+Configured in [`configs/dsda-doom/dsda-doom.cfg`](configs/dsda-doom/dsda-doom.cfg):
 - **Compatibility**: Default `complevel 21` (MBF21 standard) with standard WASD movement, `E` and `Space` use, and `1`
   through `9` weapon slot defaults.
 - **Video and lighting**: OpenGL mode with classic Doom software lightmaps (`render_doom_lightmaps 1`), banded sector
