@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "deathless",
   "name": "Deathless",
@@ -14,14 +14,15 @@
       "optional": true
     }
   ],
+  "complevel": 3,
   "category": "Community Megawad",
   "genre": "Classic Run-and-Gun",
   "difficulty": "Casual",
   "quality": "A-Tier (8.5/10)",
-  "compatibility": "Vanilla",
+  "compatibility": "Limit-Removing",
   "description": "Modern Ultimate Doom episode replacement",
   "author": "James \"Jimmy\" Paddock",
-  "release_date": "2018",
+  "release-date": "2018",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom/Ports/megawads/deathless.zip",

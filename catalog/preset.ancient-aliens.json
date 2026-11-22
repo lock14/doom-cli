@@ -1,23 +1,24 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "ancient-aliens",
   "name": "Ancient Aliens",
-  "engine": "uzdoom",
+  "engine": "dsda-doom",
   "iwad": "DOOM2.WAD",
   "files": [
     {
       "name": "aaliens.wad"
     }
   ],
+  "complevel": 9,
   "category": "Community Megawad",
   "genre": "Sci-Fi Run-and-Gun",
   "difficulty": "Hard",
   "quality": "S-Tier (10/10)",
-  "compatibility": "MBF",
-  "description": "MBF complevel 11 megawad with custom color palette",
+  "compatibility": "Boom",
+  "description": "Boom megawad with custom neon color palette",
   "author": "Paul \"skillsaw\" DeBruyne",
-  "release_date": "2016",
+  "release-date": "2016",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/aaliens.zip",

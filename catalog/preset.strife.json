@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "strife",
   "name": "Strife: Quest for the Sigil",
+  "game": "strife",
   "engine": "uzdoom",
   "iwad": "STRIFE1.WAD",
   "files": [
@@ -18,7 +19,7 @@
   "compatibility": "Rogue Entertainment",
   "description": "Rogue Entertainment sci-fi fantasy FPS and RPG hybrid",
   "author": "Rogue Entertainment",
-  "release_date": "1996",
+  "release-date": "1996",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/Strife:_Quest_for_the_Sigil",

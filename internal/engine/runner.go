@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/lock14/doom-cli/internal/catalog"
@@ -84,6 +85,15 @@ func resolveEngineConfig(
 	}, nil
 }
 
+func hasComplevelFlag(args []string) bool {
+	for _, tok := range args {
+		if strings.EqualFold(strings.TrimSpace(tok), "-complevel") {
+			return true
+		}
+	}
+	return false
+}
+
 func buildEngineArgs(
 	engCfg catalog.EngineConfig,
 	p catalog.Preset,
@@ -124,7 +134,8 @@ func buildEngineArgs(
 		args = append(args, "-iwad", iwadPath)
 	}
 
-	if engCfg.EffectiveArgsStyle() == "boom" {
+	style := engCfg.EffectiveArgsStyle()
+	if style == "boom" {
 		if len(wads) > 0 {
 			args = append(args, "-file")
 			args = append(args, wads...)
@@ -140,6 +151,16 @@ func buildEngineArgs(
 
 	if len(engCfg.DefaultArgs) > 0 {
 		args = append(args, engCfg.DefaultArgs...)
+	}
+	engineArgs := p.ArgsForEngine(engCfg.ID)
+	if style == "boom" && p.Complevel != nil &&
+		!hasComplevelFlag(engineArgs) &&
+		!hasComplevelFlag(p.Args) &&
+		!hasComplevelFlag(extraArgs) {
+		args = append(args, "-complevel", strconv.Itoa(*p.Complevel))
+	}
+	if len(engineArgs) > 0 {
+		args = append(args, engineArgs...)
 	}
 	if len(p.Args) > 0 {
 		args = append(args, p.Args...)
@@ -194,11 +215,22 @@ func PrepareLaunch(p catalog.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 
 	iwadPath, ok := idx.ResolveFile(p.IWAD)
 	if !ok {
+		if !p.IsCoreGame() {
+			return nil, fmt.Errorf(
+				"base IWAD '%s' not found in %s.\n"+
+					"Run 'doom wads scan --games %s' or 'doom wads fetch %s' if you own the game on Steam or GOG",
+				p.IWAD,
+				primaryDir,
+				p.EffectiveGame(),
+				p.ID,
+			)
+		}
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
-				"Run 'doom wads scan' or 'doom wads fetch' if you own the game on Steam or GOG",
+				"Run 'doom wads scan' or 'doom wads fetch %s' if you own the game on Steam or GOG",
 			p.IWAD,
 			primaryDir,
+			p.ID,
 		)
 	}
 	iwadPath = absPath(iwadPath)

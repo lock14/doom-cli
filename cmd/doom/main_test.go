@@ -356,8 +356,17 @@ func TestSubcommandFlagScoping(t *testing.T) {
 
 	// 4. --force is scoped locally to setup, wads fetch, wads scan, and engines install
 	setupCmd := newSetupCmd()
-	if setupCmd.Flags().Lookup("force") == nil {
-		t.Error("expected setupCmd to have local --force flag")
+	for _, want := range []string{"force", "games", "wads"} {
+		if setupCmd.Flags().Lookup(want) == nil {
+			t.Errorf("expected setupCmd to have local --%s flag", want)
+		}
+	}
+	if wadsCmd.Flags().Lookup("all") == nil {
+		t.Error("expected wadsCmd to have local --all flag")
+	}
+	listWadCmd, _, err := wadsCmd.Find([]string{"list"})
+	if err != nil || listWadCmd.Flags().Lookup("all") == nil {
+		t.Errorf("expected wads list to have local --all flag (err=%v)", err)
 	}
 	for _, sub := range []string{"fetch", "scan"} {
 		subCmd, _, findErr := wadsCmd.Find([]string{sub})
@@ -366,6 +375,9 @@ func TestSubcommandFlagScoping(t *testing.T) {
 		}
 		if subCmd.Flags().Lookup("force") == nil {
 			t.Errorf("expected wads %s to have local --force flag", sub)
+		}
+		if subCmd.Flags().Lookup("games") == nil {
+			t.Errorf("expected wads %s to have local --games flag", sub)
 		}
 	}
 	instEngCmd, _, err := enginesCmd.Find([]string{"install"})

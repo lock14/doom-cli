@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "hexen",
   "name": "Hexen",
+  "game": "hexen",
   "engine": "uzdoom",
   "iwad": "HEXEN.WAD",
   "files": [],
@@ -13,7 +14,7 @@
   "compatibility": "Raven Software",
   "description": "Raven Software hub-based fantasy shooter",
   "author": "Raven Software",
-  "release_date": "1995",
+  "release-date": "1995",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/Hexen:_Beyond_Heretic",

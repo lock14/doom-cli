@@ -3,12 +3,24 @@ package repolint
 import (
 	"encoding/json"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 )
+
+// MaxRootAgentsLines caps the line count of root AGENTS.md so always-on instructions stay lean.
+const MaxRootAgentsLines = 150
+
+// MaxScopedRuleBytes caps .agents/rules/*.md files below the 24,000-byte per-file truncation limit.
+const MaxScopedRuleBytes = 24000
+
+const forbiddenRepolintPkg = "github.com/lock14/doom-cli/internal/repolint"
 
 var (
 	docPersonalPathRegex = regexp.MustCompile(
@@ -42,7 +54,7 @@ func GitHubHeadingSlug(heading string) string {
 	return b.String()
 }
 
-func lintDocumentation(rootDir string, addErr func(where, format string, a ...any)) {
+func discoverDocFiles(rootDir string) []string {
 	docFiles := []string{
 		"README.md",
 		"CONTRIBUTING.md",
@@ -50,10 +62,29 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 		"SECURITY.md",
 		"llms.txt",
 		filepath.Join(".github", "PULL_REQUEST_TEMPLATE.md"),
-		filepath.Join(".agents", "rules", "monospace-tui.md"),
-		filepath.Join(".agents", "skills", "mono-tui-design", "SKILL.md"),
-		filepath.Join(".agents", "skills", "mono-tui-audit", "SKILL.md"),
 	}
+	var agentDocs []string
+	for _, pattern := range []string{
+		filepath.Join(rootDir, ".agents", "rules", "*.md"),
+		filepath.Join(rootDir, ".agents", "skills", "*", "SKILL.md"),
+	} {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			continue
+		}
+		for _, m := range matches {
+			if rel, relErr := filepath.Rel(rootDir, m); relErr == nil {
+				agentDocs = append(agentDocs, rel)
+			}
+		}
+	}
+	sort.Strings(agentDocs)
+	return append(docFiles, agentDocs...)
+}
+
+func lintDocumentation(rootDir string, addErr func(where, format string, a ...any)) {
+	lintImportBoundaries(rootDir, addErr)
+	docFiles := discoverDocFiles(rootDir)
 	yamlFiles := []string{
 		filepath.Join(".github", "ISSUE_TEMPLATE", "bug_report.yml"),
 		filepath.Join(".github", "ISSUE_TEMPLATE", "feature_request.yml"),
@@ -96,7 +127,32 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 		}
 
 		lines := strings.Split(text, "\n")
-		isAgentDoc := strings.HasPrefix(filepath.ToSlash(relDoc), ".agents/")
+		slashRel := filepath.ToSlash(relDoc)
+		isAgentDoc := strings.HasPrefix(slashRel, ".agents/")
+		if relDoc == "AGENTS.md" {
+			trimmedText := strings.TrimRight(text, "\r\n")
+			lineCount := 0
+			if trimmedText != "" {
+				lineCount = strings.Count(trimmedText, "\n") + 1
+			}
+			if lineCount > MaxRootAgentsLines {
+				addErr(
+					where,
+					"exceeds %d-line root AGENTS.md budget (%d lines); move domain detail to .agents/rules/",
+					MaxRootAgentsLines, lineCount,
+				)
+			}
+		}
+		if strings.HasPrefix(slashRel, ".agents/rules/") && len(rawBytes) > MaxScopedRuleBytes {
+			addErr(
+				where,
+				"exceeds %d-byte scoped rule limit (%d bytes); split or tighten to prevent truncation",
+				MaxScopedRuleBytes, len(rawBytes),
+			)
+		}
+		if isAgentDoc {
+			lintAgentFrontmatter(where, slashRel, lines, addErr)
+		}
 		inFrontmatter := false
 		inFence := false
 		fenceLang := ""
@@ -125,7 +181,8 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 					fenceStartLine = lineNum
 					fenceBuf.Reset()
 				} else {
-					if fenceLang == "json" && (relDoc == "README.md" || relDoc == "CONTRIBUTING.md") {
+					if fenceLang == "json" &&
+						(relDoc == "README.md" || relDoc == "CONTRIBUTING.md" || relDoc == "AGENTS.md" || isAgentDoc) {
 						if !json.Valid([]byte(fenceBuf.String())) {
 							addErr(where, "invalid JSON code block starting at line %d", fenceStartLine)
 						}
@@ -184,7 +241,7 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 			}
 		}
 
-		if relDoc == "README.md" || relDoc == "CONTRIBUTING.md" || isAgentDoc {
+		if relDoc == "README.md" || relDoc == "CONTRIBUTING.md" || relDoc == "AGENTS.md" || isAgentDoc {
 			inFrontmatter = false
 			inFence = false
 			docDir := filepath.Dir(docPath)
@@ -393,4 +450,138 @@ func extractMarkdownLinkTargets(line string) []string {
 		pos = j + 1
 	}
 	return targets
+}
+
+func isQuotedYAMLString(s string) bool {
+	if len(s) < 2 {
+		return false
+	}
+	return (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')
+}
+
+func lintAgentFrontmatter(where, slashRel string, lines []string, addErr func(where, format string, a ...any)) {
+	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
+		addErr(where, "missing YAML frontmatter block")
+		return
+	}
+	closeIdx := -1
+	for i := 1; i < len(lines); i++ {
+		if strings.TrimSpace(lines[i]) == "---" {
+			closeIdx = i
+			break
+		}
+	}
+	if closeIdx < 0 {
+		addErr(where, "unclosed YAML frontmatter block")
+		return
+	}
+
+	rawFields := make(map[string]string)
+	cleanFields := make(map[string]string)
+	lastKey := ""
+	for _, fmLine := range lines[1:closeIdx] {
+		trimmed := strings.TrimSpace(fmLine)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if (strings.HasPrefix(fmLine, " ") || strings.HasPrefix(fmLine, "\t")) && lastKey != "" {
+			prev := cleanFields[lastKey]
+			if prev == ">-" || prev == ">" || prev == "|" {
+				cleanFields[lastKey] = trimmed
+			} else if prev != "" {
+				cleanFields[lastKey] = prev + " " + trimmed
+			} else {
+				cleanFields[lastKey] = trimmed
+			}
+			continue
+		}
+		colon := strings.IndexByte(fmLine, ':')
+		if colon <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(fmLine[:colon])
+		rawVal := strings.TrimSpace(fmLine[colon+1:])
+		rawFields[key] = rawVal
+		cleanFields[key] = strings.TrimSpace(strings.Trim(rawVal, `"'`))
+		lastKey = key
+	}
+
+	isScalarPlaceholder := func(v string) bool {
+		return v == "" || v == ">-" || v == ">" || v == "|"
+	}
+
+	if strings.HasPrefix(slashRel, ".agents/rules/") {
+		trig := cleanFields["trigger"]
+		switch trig {
+		case "always_on", "model_decision", "glob", "manual":
+		default:
+			addErr(
+				where,
+				"invalid or missing frontmatter trigger %q (want always_on, model_decision, glob, or manual)",
+				trig,
+			)
+		}
+		if isScalarPlaceholder(cleanFields["description"]) {
+			addErr(where, "missing frontmatter description")
+		}
+		if trig == "glob" {
+			rawGlobs := rawFields["globs"]
+			if rawGlobs == "" {
+				rawGlobs = rawFields["glob"]
+			}
+			if strings.TrimSpace(strings.Trim(rawGlobs, `"'`)) == "" {
+				addErr(where, "glob rule missing globs pattern")
+			} else if strings.Contains(rawGlobs, "*") && !isQuotedYAMLString(rawGlobs) {
+				addErr(where, "frontmatter globs containing '*' must be quoted")
+			}
+		}
+	}
+
+	if strings.HasPrefix(slashRel, ".agents/skills/") {
+		if isScalarPlaceholder(cleanFields["name"]) {
+			addErr(where, "missing frontmatter name")
+		}
+		if isScalarPlaceholder(cleanFields["description"]) {
+			addErr(where, "missing frontmatter description")
+		}
+	}
+}
+
+func lintImportBoundaries(rootDir string, addErr func(where, format string, a ...any)) {
+	internalDir := filepath.Join(rootDir, "internal")
+	entries, err := os.ReadDir(internalDir)
+	if err != nil {
+		return
+	}
+	fset := token.NewFileSet()
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == "repolint" {
+			continue
+		}
+		pkgName := entry.Name()
+		goFiles, globErr := filepath.Glob(filepath.Join(internalDir, pkgName, "*.go"))
+		if globErr != nil {
+			continue
+		}
+		sort.Strings(goFiles)
+		for _, goFile := range goFiles {
+			f, parseErr := parser.ParseFile(fset, goFile, nil, parser.ImportsOnly)
+			if parseErr != nil {
+				continue
+			}
+			for _, imp := range f.Imports {
+				impPath, unqErr := strconv.Unquote(imp.Path.Value)
+				if unqErr != nil {
+					impPath = strings.Trim(imp.Path.Value, `"`)
+				}
+				if impPath == forbiddenRepolintPkg || strings.HasPrefix(impPath, forbiddenRepolintPkg+"/") {
+					addErr(
+						filepath.ToSlash(goFile),
+						"runtime package internal/%s must not import internal/repolint",
+						pkgName,
+					)
+				}
+			}
+		}
+	}
 }

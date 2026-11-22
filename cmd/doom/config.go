@@ -54,7 +54,7 @@ func newConfigCmd() *cobra.Command {
 	setCmd := &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Set a persistent doom-cli setting (theme, nerd-fonts, wads-dir, wads-dirs, bin-dir, soundfonts-dir)",
-		Args:  cobra.ExactArgs(2),
+		Args:  exactArgsWithHint(2, "specify a setting key and value (e.g. 'doom config set theme blood')"),
 		RunE:  runConfigSet,
 	}
 
@@ -289,17 +289,17 @@ func runConfigThemes(cmd *cobra.Command, _ []string) error {
 func canonicalConfigKey(raw string) (string, error) {
 	k := strings.ToLower(strings.TrimSpace(raw))
 	switch k {
-	case "nerd-fonts", "nerd_fonts":
+	case "nerd-fonts":
 		return "nerd-fonts", nil
 	case "theme":
 		return "theme", nil
-	case "wads-dir", "wads_dir":
+	case "wads-dir":
 		return "wads-dir", nil
-	case "wads-dirs", "wads_dirs":
+	case "wads-dirs":
 		return "wads-dirs", nil
-	case "bin-dir", "bin_dir":
+	case "bin-dir":
 		return "bin-dir", nil
-	case "soundfonts-dir", "soundfonts_dir":
+	case "soundfonts-dir":
 		return "soundfonts-dir", nil
 	default:
 		return "", fmt.Errorf(

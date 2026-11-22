@@ -1,8 +1,9 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "heretic",
   "name": "Heretic",
+  "game": "heretic",
   "engine": "uzdoom",
   "iwad": "HERETIC.WAD",
   "files": [],
@@ -13,7 +14,7 @@
   "compatibility": "Raven Software",
   "description": "Raven Software classic fantasy shooter",
   "author": "Raven Software",
-  "release_date": "1994",
+  "release-date": "1994",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/Heretic",

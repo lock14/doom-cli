@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "myhouse",
   "name": "MyHouse.pk3",
@@ -14,10 +14,10 @@
   "genre": "Psychological Horror",
   "difficulty": "Casual",
   "quality": "S-Tier (9.5/10)",
-  "compatibility": "GZDoom",
+  "compatibility": "UZDoom / GZDoom",
   "description": "Non-euclidean psychological horror showcase",
   "author": "Veddge",
-  "release_date": "2023",
+  "release-date": "2023",
   "sources": [
     {
       "url": "https://archive.org/download/my-house-20250505-t-011956-z-1-001/MyHouse-20250505T011956Z-1-001.zip",

@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A unified, cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom
-source ports ([DSDA-Doom](https://github.com/kraflab/dsda-doom) and [UZDoom](https://github.com/UZDoom/uzdoom)) across
+source ports ([DSDA-Doom](https://github.com/dsda-org/dsda-doom) and [UZDoom](https://github.com/UZDoom/uzdoom)) across
 Linux, macOS, and Windows.
 
 ## Table of contents
@@ -63,12 +63,13 @@ Get from zero to playing classic Doom in three commands:
 # 1. Install doom CLI to ~/.local/bin/doom
 make install
 
-# 2. Run turnkey setup (downloads engines, configs, soundfont, Steam IWADs, and megawads)
+# 2. Run turnkey core setup (deploys configs, engines, soundfont, and Steam or GOG Doom IWADs)
 doom setup
 
-# 3. Play The Ultimate Doom immediately, or open the interactive WAD browser
+# 3. Play The Ultimate Doom immediately, open the WAD browser, or fetch community megawads
 doom
 doom wads
+doom wads fetch eviternity-ii
 ```
 
 ## Installation
@@ -110,26 +111,35 @@ go build -o $HOME/bin/doom.exe ./cmd/doom
 
 ## Automated setup (`doom setup`)
 
-Configure engines, templates, audio, and game files in a single step (or pass `doom setup --force` to re-download and
-overwrite existing assets):
+Configure engines, templates, audio, and official Doom game files in a single step (with optional `--wads`, `--games`,
+and `--force` flags):
 
 ```bash
+# Core 4-step setup (configs, engines, soundfont, and Steam or GOG Doom IWADs)
 doom setup
+
+# Include community megawads (--wads all or comma-separated preset names) and optional games
+doom setup --wads all
+doom setup --wads eviternity-ii,ancient-aliens --games heretic,hexen
 ```
 
-`doom setup` performs five automated steps:
+By default (`--wads none`), `doom setup` performs four core steps scoped to classic Doom plus any optional non-Doom
+id Tech 1 games (`heretic`, `hexen`, `strife`) whose base IWAD is already present on disk:
 1. **Deploys engine configurations**: Installs curated configurations for UZDoom and DSDA-Doom, auto-detecting your
    display resolution and native monitor refresh rate while preserving existing configuration files unless `--force` is
    passed.
 2. **Installs source ports**: Downloads portable binaries for UZDoom and DSDA-Doom into your local binary path.
 3. **Deploys MIDI SoundFont**: Downloads and installs the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth
    MIDI playback.
-4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*,
-   *Heretic*, and *Hexen*, importing commercial IWADs (prioritizing Nightdive `rerelease/` widescreen IWADs over legacy
-   `base/` files) and synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into your WADs directory.
-5. **Downloads community megawads**: Fetches and extracts free community megawads (*Eviternity I & II*,
-   *Back to Saturn X*, *Ancient Aliens*, *Doom Zero*, *Sunder*, *Sunlust*, and others) and DeHackEd patches from
-   idgames, DSDA, and community mirrors.
+4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*
+   (plus *Heretic*, *Hexen*, or *Strife* when already installed or requested via `--games`), importing commercial IWADs
+   and official expansions (prioritizing Nightdive `rerelease/` widescreen IWADs over legacy `base/` files) and
+   synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into your WADs directory.
+
+Passing `--wads all` or `--wads <name[,name...]>` adds a fifth step (**Downloads community megawads**) that fetches and
+extracts SHA-256 verified community megawads (*Eviternity I & II*, *Back to Saturn X*, *Ancient Aliens*, *Doom Zero*,
+*Sunder*, *Sunlust*, and others) and DeHackEd patches from idgames, DSDA, and community mirrors (skipping presets whose
+base IWAD is missing during bulk downloads).
 
 ## CLI command reference
 
@@ -137,7 +147,10 @@ The `doom` CLI is organized around five primary commands. `doom [wad]` accepts p
 names (`doom Doom II`, `doom Ancient Aliens -skill 4`), Roman or Arabic numerals (`doom doom2`, `doom 2`,
 `doom sigil2`), WAD stems and filenames (`doom av`, `doom plutonia`, `doom sunlust.wad`), and multi-word acronyms
 (`doom btsx1`, `doom d2twid`, `doom nrftl`). Engine flags and console commands passed to `doom [wad]` (such as
-`-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine:
+`-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine. Preset browsers and
+listings (`doom wads` and `doom wads list`) show installed presets by default and accept `--all` to display the full
+curated catalog, while `doom setup`, `doom wads scan`, and `doom wads fetch all` accept `--games <list|all>` to include
+optional non-Doom games (`heretic`, `hexen`, `strife`):
 
 ### Core commands
 
@@ -146,22 +159,26 @@ names (`doom Doom II`, `doom Ancient Aliens -skill 4`), Roman or Arabic numerals
 | `doom [wad] [flags]` | Directly launches a WAD preset (defaults to *The Ultimate Doom* when `<wad>` is omitted) |
 | `doom [wad] -e <engine>` | Launches a WAD preset with an explicit engine override (`--engine` or `-e`) |
 | `doom [wad] --dry-run` | Prints the synthesized launch command without starting the game |
-| `doom wads` | Opens the interactive TUI WAD browser powered by Bubble Tea |
+| `doom wads [--all]` | Opens the interactive TUI WAD browser (installed library by default, or full catalog with `--all`) |
 | `doom engines` | Opens the interactive TUI engine manager (or lists engines when piped on non-TTY stdout) |
 | `doom config` | Opens the interactive TUI CLI settings editor (or displays settings on non-TTY stdout) |
-| `doom setup` | Runs turnkey installation of engines, configurations, SoundFonts, and game files |
-| `doom setup --force` | Re-downloads and overwrites existing engines, configurations, SoundFonts, and game files |
+| `doom setup` | Runs 4-step turnkey core installation of configurations, engines, SoundFont, and Doom game files |
+| `doom setup --wads <none\|all\|names>` | Controls community megawad downloads during setup (`none` by default, `all`, or preset names) |
+| `doom setup --games <list\|all>` | Includes optional non-Doom games (`heretic`, `hexen`, `strife`, or `all`) during setup |
+| `doom setup --force` | Re-downloads and overwrites existing engines, configurations, SoundFont, and game files |
 
 ### WADs and preset management
 
 | Command | Description |
 | :--- | :--- |
-| `doom wads` | Opens the interactive TUI WAD browser powered by Bubble Tea |
-| `doom wads list` | Lists presets with badges and readiness (`[✓ Ready]` or `[✗ Missing]`) |
-| `doom wads show <name>` | Displays resolved engine, IWAD, PWADs, `Launch Cmd:` preview, sources, links, and status |
-| `doom wads fetch [name\|all]` | Downloads and extracts community megawads from idgames mirrors |
-| `doom wads fetch --force` | Re-downloads and overwrites existing WAD files |
-| `doom wads scan` | Imports Steam and GOG IWADs and expansions, and synthesizes `idkfa 2024.wad` from `extras.wad` |
+| `doom wads [--all]` | Opens the interactive TUI WAD browser (`--all` opens in full catalog mode) |
+| `doom wads list [--all]` | Lists installed presets by default, or all curated and custom presets with `--all` |
+| `doom wads show <name>` | Displays resolved game, engine, IWAD, PWADs, `Launch Cmd:` preview, sources, links, and status |
+| `doom wads fetch <name[,name...]\|all>` | Downloads community megawads or extracts Steam and GOG files for named presets or `all` |
+| `doom wads fetch <target> --games <list\|all>` | Scopes `doom wads fetch all` to include optional non-Doom games (`heretic`, `hexen`, `strife`, or `all`) |
+| `doom wads fetch <target> --force` | Re-downloads and overwrites existing WAD files for the specified target |
+| `doom wads uninstall <name[,name...]>` | Removes preset-exclusive PWAD, PK3, DeHackEd, and `.txt` files from `wads-dir` (preserving base IWADs and shared assets) |
+| `doom wads scan [--games <list\|all>]` | Imports Steam and GOG IWADs and expansions, and synthesizes `idkfa 2024.wad` from `extras.wad` |
 | `doom wads scan --force` | Re-extracts and overwrites existing IWADs and expansions in the destination directory |
 | `doom wads add <name> [flags]` | Registers a custom WAD or mapset preset in `catalog.d/preset.<id>.json` |
 | `doom wads set <name> [flags]` | Sets per-WAD overrides in `catalog.d/override.preset.<id>.json` |
@@ -219,13 +236,18 @@ interface powered by Bubble Tea:
 
 ![Interactive preset browser](assets/tui-presets.png)
 
-- **Fuzzy search**: Type characters to filter presets immediately by name, WAD filename, engine, category, genre,
-  difficulty, quality, compatibility (`MBF21`, `Boom`, `Vanilla`, `ID24`), or readiness (`ready`, `installed`,
-  `missing`), use `Home` and `End` to move the filter text cursor, use `↑`, `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or
-  `Ctrl+J` to move the selection cursor, page through the preset list with `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`,
-  and press `Enter` to launch the selected preset.
+- **Installed library and catalog toggle**: Shows installed presets (plus custom user presets) by default so unowned
+  games and uninstalled megawads stay out of your way, automatically opens the full catalog (`Catalog (37 • 0 ready)`)
+  when zero presets are installed on a fresh setup, dims uninstalled presets in catalog mode, and switches between
+  `Installed` and `Catalog` views at any time with `F3` or `Ctrl+T` (or starts in catalog mode via `doom wads --all`).
+- **Fuzzy search**: Type characters to filter presets immediately by name, WAD filename, game (`doom`, `heretic`,
+  `hexen`, `strife`), engine, category, genre, difficulty, quality, compatibility (`MBF21`, `Boom`, `Vanilla`, `ID24`),
+  or readiness (`ready`, `installed`, `missing`), use `Home` and `End` to move the filter text cursor, use `↑`,
+  `Ctrl+P`, or `Ctrl+K` and `↓`, `Ctrl+N`, or `Ctrl+J` to move the selection cursor, page through the preset list with
+  `PgUp` or `Ctrl+U` and `PgDn` or `Ctrl+D`, and press `Enter` to launch the selected preset.
 - **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, genre,
-  difficulty, quality rating, documentation link, and release metadata.
+  difficulty, quality rating, optional non-Doom game badge (`[Optional Game]`), documentation link, and release
+  metadata.
 - **File readiness indicators**: Displays `[✓ Found]` when required files resolve on disk, `[✗ Missing]` when required
   files are absent, and `[Optional]` when optional files are absent.
 - **Launch options and preset configuration**: Press `Ctrl+O` or `F4` to configure target engine, skill level
@@ -250,7 +272,7 @@ interface powered by Bubble Tea:
 
 | Key | Action |
 | :--- | :--- |
-| Character keys | Filter presets by name, WAD filename, engine, category, genre, difficulty, quality, compatibility, or readiness |
+| Character keys | Filter presets by name, WAD filename, game, engine, category, genre, difficulty, quality, compatibility, or readiness |
 | `Home` or `End` | Move text cursor to start or end of filter input |
 | `↑`, `Ctrl+P`, or `Ctrl+K` | Move selection up |
 | `↓`, `Ctrl+N`, or `Ctrl+J` | Move selection down |
@@ -261,6 +283,7 @@ interface powered by Bubble Tea:
 | `Ctrl+G` or `F2` | Open 3-tab configuration manager |
 | `Ctrl+F` | Fetch or extract missing WADs asynchronously for selected preset |
 | `Tab` or `Ctrl+R` | Open bundled README in document viewer |
+| `F3` or `Ctrl+T` | Toggle between installed library and full preset catalog |
 | `F1` or `Alt+?` | Open contextual help |
 | `Esc` or `Ctrl+C` | Cancel an active `Ctrl+F` download (`Esc`) or quit launcher |
 
@@ -362,33 +385,33 @@ doom config set theme blood
 
 ### Custom JSON themes
 
-Create custom themes in `<config_dir>/themes/<theme_name>.json` (for example,
+Create custom themes in `<config-dir>/themes/<theme-name>.json` (for example,
 `~/.config/doom-cli/themes/solarized.json`):
 
 ```json
 {
   "name": "solarized",
   "description": "Solarized dark palette",
-  "brand_cap": "#CB4B16",
-  "brand_text": "#FDF6E3",
-  "brand_bg": "#CB4B16",
-  "stats_cap": "#073642",
-  "stats_text": "#93A1A1",
-  "stats_bg": "#073642",
+  "brand-cap": "#CB4B16",
+  "brand-text": "#FDF6E3",
+  "brand-bg": "#CB4B16",
+  "stats-cap": "#073642",
+  "stats-text": "#93A1A1",
+  "stats-bg": "#073642",
   "prompt": "#268BD2",
-  "cursor_bar": "#268BD2",
-  "cursor_text": "#FDF6E3",
-  "border_active": "#268BD2",
-  "border_inactive": "#073642",
-  "title_active": "#268BD2",
-  "title_inactive": "#586E75",
+  "cursor-bar": "#268BD2",
+  "cursor-text": "#FDF6E3",
+  "border-active": "#268BD2",
+  "border-inactive": "#073642",
+  "title-active": "#268BD2",
+  "title-inactive": "#586E75",
   "label": "#2AA198",
   "keycap": "#B58900",
-  "key_desc": "#586E75",
-  "tag_dsda": "#859900",
-  "tag_uzdoom": "#B58900",
-  "status_ready": "#859900",
-  "status_missing": "#DC322F",
+  "key-desc": "#586E75",
+  "tag-dsda": "#859900",
+  "tag-uzdoom": "#B58900",
+  "status-ready": "#859900",
+  "status-missing": "#DC322F",
   "muted": "#586E75"
 }
 ```
@@ -403,7 +426,7 @@ By default, the launcher uses universal rectangular badges (` DOOM `) and standa
 cleanly in standard terminal emulators without patched fonts.
 
 If your terminal font includes Nerd Fonts glyphs (such as JetBrains Mono NF, MesloLGS NF, or FiraCode NF), you can
-enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `nerd_fonts: true`:
+enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `nerd-fonts: true`:
 
 ```bash
 # Enable or disable in user configuration
@@ -414,7 +437,7 @@ doom config set nerd-fonts off
 ## Extensibility
 
 `doom-cli` uses a two-layer entity catalog: immutable curated defaults embedded from `catalog/*.json` and per-entity
-user drop-in files in `<config_dir>/catalog.d/*.json`.
+user drop-in files in `<config-dir>/catalog.d/*.json`.
 
 ### Add custom engines
 
@@ -456,8 +479,8 @@ doom engines reset dsda-doom
 ### Add custom WADs and presets
 
 Add custom mapsets or community mods to your personal catalog (`catalog.d/preset.<id>.json`) with `--id`, `-e` or
-`--engine`, `--iwad`, `--files`, `--args`, and `--description`. They integrate into `doom wads` fuzzy search and direct
-execution (`doom <wad>`):
+`--engine`, `--iwad`, `--files`, `--complevel`, `--engine-args`, `--args`, and `--description`. They integrate into
+`doom wads` fuzzy search and direct execution (`doom <wad>`):
 
 ```bash
 # Add a custom mapset with required IWAD and PWADs
@@ -472,16 +495,17 @@ doom "KDiZD"
 
 ### Configure per-WAD launch options
 
-Customize engine (`-e` or `--engine`), IWAD (`--iwad`), additional files (`--files`), excluded optional files
-(`--exclude-file`), or launch arguments (`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear
-overrides with `doom wads reset`, without modifying repository defaults:
+Customize engine (`-e` or `--engine`), compatibility level (`--complevel`), per-engine arguments (`--engine-args`),
+IWAD (`--iwad`), additional files (`--files`), excluded optional files (`--exclude-file`), or universal launch arguments
+(`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear overrides with `doom wads reset`, without
+modifying repository defaults:
 
 ```bash
-# Always launch Sunlust in Woof! with ultra-violence skill
+# Always launch Sunlust in Woof! with ultra-violence skill (inherits complevel 9 automatically)
 doom wads set "Sunlust" -e woof --args "-skill 4"
 
-# Set Ancient Aliens to always run with Boom complevel 11
-doom wads set "Ancient Aliens" --args "-complevel 11"
+# Add DSDA-Doom specific flags or override complevel on a preset
+doom wads set "Sunlust" --engine-args dsda-doom="-solonet" --complevel 9
 
 # Disable optional soundtrack WAD for a preset
 doom wads set "Doom II" --exclude-file "idkfa 2024.wad"
@@ -500,13 +524,13 @@ User settings are persisted in `~/.config/doom-cli/config.json` (Linux),
 ```json
 {
   "theme": "blood",
-  "nerd_fonts": false,
-  "wads_dir": "E:\\DOOM\\WADS",
-  "wads_dirs": [
+  "nerd-fonts": false,
+  "wads-dir": "E:\\DOOM\\WADS",
+  "wads-dirs": [
     "E:\\DOOM\\MEGAWADS"
   ],
-  "bin_dir": "E:\\DOOM\\bin",
-  "soundfonts_dir": "E:\\DOOM\\soundfonts"
+  "bin-dir": "E:\\DOOM\\bin",
+  "soundfonts-dir": "E:\\DOOM\\soundfonts"
 }
 ```
 
@@ -533,24 +557,24 @@ doom config show
 
 ### User entity catalog (`catalog.d/*.json`)
 
-Custom engines, presets, and overrides are stored one entity per file inside `<config_dir>/catalog.d/`:
+Custom engines, presets, and overrides are stored one entity per file inside `<config-dir>/catalog.d/`:
 
 - `catalog.d/engine.woof.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "engine",
     "id": "woof",
-    "display_name": "Woof!",
+    "display-name": "Woof!",
     "description": "Woof! MBF21 port",
-    "args_style": "boom",
+    "args-style": "boom",
     "binary": "woof"
   }
   ```
 - `catalog.d/override.engine.dsda-doom.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "override",
     "target": {
       "kind": "engine",
@@ -559,7 +583,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
     "set": {
       "binary": "/opt/doom/dsda-doom",
       "badge": "DSDA+",
-      "default_args": [
+      "default-args": [
         "-complevel",
         "21"
       ]
@@ -569,7 +593,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 - `catalog.d/preset.kdizd.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "preset",
     "id": "kdizd",
     "name": "KDiZD",
@@ -585,7 +609,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 - `catalog.d/override.preset.sunlust.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "override",
     "target": {
       "kind": "preset",
@@ -594,11 +618,16 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
     "set": {
       "engine": "woof"
     },
-    "append_args": [
+    "append-args": [
       "-skill",
       "4"
     ],
-    "exclude_files": [
+    "append-engine-args": {
+      "woof": [
+        "-solonet"
+      ]
+    },
+    "exclude-files": [
       "idkfa 2024.wad"
     ]
   }
@@ -634,11 +663,12 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 > [!IMPORTANT]
 > Commercial game files are not tracked in Git. This repository contains configuration files, launcher presets, and
 > automated fetch tools. You must provide your own legally acquired game files:
-> - **Commercial IWADs and official expansions**: Acquire `DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, `TNT.WAD`,
->   `HERETIC.WAD`, `HEXEN.WAD`, and `STRIFE1.WAD` from digital storefronts, and run `doom wads scan` to auto-discover
->   and import commercial IWADs, official expansions (*Legacy of Rust*, *No Rest for the Living*, *Master Levels*,
->   *Sigil*, *Sigil II*, and `VOICES.WAD` for *Strife*), and the synthesized `idkfa 2024.wad` soundtrack (extracted from
->   `extras.wad`) directly from your Steam and GOG libraries:
+> - **Commercial IWADs and official expansions**: Acquire `DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, and `TNT.WAD` (plus
+>   optional `HERETIC.WAD`, `HEXEN.WAD`, and `STRIFE1.WAD`) from digital storefronts, and run `doom wads scan` (or
+>   `doom wads scan --games all` to include *Heretic*, *Hexen*, and *Strife*) to auto-discover and import commercial
+>   IWADs, official expansions (*Legacy of Rust*, *No Rest for the Living*, *Master Levels*, *Sigil*, *Sigil II*, and
+>   `VOICES.WAD` for *Strife*), and the synthesized `idkfa 2024.wad` soundtrack (extracted from `extras.wad`) directly
+>   from your Steam and GOG libraries:
 >   - *Doom + Doom II*: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) or
 >     [GOG](https://www.gog.com/en/game/doom_doom_ii)
 >   - *Heretic + Hexen*: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) or
@@ -647,23 +677,26 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 >     [Steam](https://store.steampowered.com/app/317040/The_Original_Strife_Veteran_Edition/) or
 >     [GOG](https://www.gog.com/en/game/strife_veteran_edition)
 > - **Community megawads and expansions**: Fetch *Ancient Aliens*, *Eviternity I & II*, *Back to Saturn X*, *Sunlust*,
->   *Sunder*, and other mapsets automatically via `doom wads fetch` or download them from the
->   [Doomworld idgames archive](https://www.doomworld.com/idgames/).
+>   *Sunder*, and other mapsets individually via `doom wads fetch <name>`, in bulk via `doom wads fetch all`, or from
+>   the [Doomworld idgames archive](https://www.doomworld.com/idgames/), and remove installed PWAD files cleanly with
+>   `doom wads uninstall <name>`.
 
 ## Preconfigured presets
 
 All presets are declaratively managed in [`catalog/`](catalog/) with their paired engine, gameplay genre, difficulty
-tier, quality rating, and primary documentation link. *Going Down Turbo* (`gdturbo.wad`) is curated as the canonical
-10th-anniversary rebalanced edition of *Going Down*, and launching `doom gd` or `doom going-down` resolves directly to
-`going-down-turbo`:
+tier, quality rating, and primary documentation link. `doom wads` and `doom wads list` display installed presets by
+default; pass `--all` or press `F3` in the TUI to browse all 37 curated presets (including optional non-Doom id Tech 1
+games *Heretic*, *Hexen*, and *Strife: Quest for the Sigil*). *Going Down Turbo* (`gdturbo.wad`) is curated as the
+canonical 10th-anniversary rebalanced edition of *Going Down*, and launching `doom gd` or `doom going-down` resolves
+directly to `going-down-turbo`:
 
 | Megawad or expansion | Engine | Genre | Difficulty | Quality | Compatibility and details |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| [Alien Vendetta](https://www.doomworld.com/idgames/levels/doom2/megawads/av) | DSDA-Doom | Run-and-Gun and Slaughter | Very Hard | S-Tier (9.5/10) | Classic Boom megawad with DeHackEd patch |
-| [Ancient Aliens](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens) | UZDoom | Sci-Fi Run-and-Gun | Hard | S-Tier (10/10) | MBF complevel 11 megawad with custom color palette |
+| [Alien Vendetta](https://www.doomworld.com/idgames/levels/doom2/megawads/av) | DSDA-Doom | Run-and-Gun and Slaughter | Very Hard | S-Tier (9.5/10) | Classic limit-removing megawad with DeHackEd patch |
+| [Ancient Aliens](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens) | DSDA-Doom | Sci-Fi Run-and-Gun | Hard | S-Tier (10/10) | Boom megawad with custom neon color palette |
 | [AUGER;ZENITH](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/dbp37_augzen) | DSDA-Doom | Cyberpunk Adventure | Moderate | S-Tier (9.5/10) | Neon-soaked cyberpunk city megawad with custom palette |
-| [Back to Saturn X: Episode 1](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1) | DSDA-Doom | Techbase Run-and-Gun | Hard | S-Tier (9.5/10) | Vanilla and Boom megawad with custom soundtrack and palettes |
-| [Back to Saturn X: Episode 2](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2) | DSDA-Doom | Gothic Adventure | Hard | S-Tier (9.5/10) | Vanilla and Boom megawad with custom soundtrack and palettes |
+| [Back to Saturn X: Episode 1](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1) | DSDA-Doom | Techbase Run-and-Gun | Hard | S-Tier (9.5/10) | Vanilla Doom II megawad with custom soundtrack and palettes |
+| [Back to Saturn X: Episode 2](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2) | DSDA-Doom | Gothic Adventure | Hard | S-Tier (9.5/10) | Vanilla Doom II megawad with custom soundtrack and palettes |
 | [Deathless](https://www.doomworld.com/idgames/levels/doom/Ports/megawads/deathless) | DSDA-Doom | Classic Run-and-Gun | Casual | A-Tier (8.5/10) | Modern Ultimate Doom episode replacement |
 | [Doom](https://doomwiki.org/wiki/The_Ultimate_Doom) | DSDA-Doom | Classic Campaign | Casual | S-Tier (9.5/10) | Classic IWAD with modern MIDI audio |
 | [Doom II](https://doomwiki.org/wiki/Doom_II) | DSDA-Doom | Classic Campaign | Moderate | S-Tier (9.5/10) | Classic IWAD with modern MIDI audio |
@@ -671,14 +704,14 @@ tier, quality rating, and primary documentation link. *Going Down Turbo* (`gdtur
 | [Doom: The Way ID Did](https://www.doomworld.com/idgames/levels/doom/megawads/dtwid) | DSDA-Doom | Classic id Homage | Casual | B-Tier (7.5/10) | Classic vanilla-style homage megawad |
 | [Doom II: The Way ID Did](https://www.doomworld.com/idgames/levels/doom2/megawads/d2twid) | DSDA-Doom | Classic id Homage | Moderate | B-Tier (7.5/10) | Classic vanilla-style homage megawad |
 | [Eviternity](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity) | UZDoom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack and custom monsters |
-| [Eviternity II](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity2) | UZDoom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack, MBF21 features, and custom monsters |
+| [Eviternity II](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity2) | DSDA-Doom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack, MBF21 features, and custom monsters |
 | [Going Down Turbo](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/gdturbo) | DSDA-Doom | Set-Piece Chaos | Hard | S-Tier (9.5/10) | 10th-anniversary rebalanced edition of Going Down |
 | [Heretic](https://doomwiki.org/wiki/Heretic) | UZDoom | Dark Fantasy FPS | Moderate | A-Tier (8.5/10) | Raven Software classic fantasy shooter |
 | [Hexen](https://doomwiki.org/wiki/Hexen:_Beyond_Heretic) | UZDoom | Hub-Based Fantasy | Moderate | A-Tier (8.0/10) | Raven Software hub-based fantasy shooter |
 | [Legacy of Rust](https://doomwiki.org/wiki/Legacy_of_Rust) | DSDA-Doom | Official ID24 Episode | Hard | A-Tier (8.5/10) | Official ID24 episode with custom weapons and monsters |
 | [Master Levels](https://doomwiki.org/wiki/Master_Levels_for_Doom_II) | DSDA-Doom | 90s Anthology | Moderate | C-Tier (6.0/10) | Full 20-level classic collection |
 | [MyHouse.pk3](https://www.doomworld.com/forum/topic/134292-myhousewad/) | UZDoom | Psychological Horror | Casual | S-Tier (9.5/10) | Non-euclidean psychological horror showcase |
-| [Nostalgia](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/nostalgia) | DSDA-Doom | Compact Run-and-Gun | Casual | A-Tier (8.5/10) | Vanilla-compatible megawad |
+| [Nostalgia](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/nostalgia) | DSDA-Doom | Compact Run-and-Gun | Casual | A-Tier (8.5/10) | Limit-removing classic-style megawad |
 | [No End In Sight](https://www.doomworld.com/idgames/levels/doom/Ports/megawads/neis) | DSDA-Doom | Atmospheric Adventure | Hard | A-Tier (8.5/10) | Classic 4-episode expansion for Ultimate Doom |
 | [No Rest for the Living](https://doomwiki.org/wiki/No_Rest_for_the_Living) | DSDA-Doom | Classic Techbase and Hell | Moderate | A-Tier (8.5/10) | Official 9-level expansion for Doom II |
 | [Overboard](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/overboard) | DSDA-Doom | Set-Piece Adventure | Moderate | S-Tier (9.0/10) | Island-hopping vacation episode with New Game+ remix |
@@ -695,7 +728,7 @@ tier, quality rating, and primary documentation link. *Going Down Turbo* (`gdtur
 | [Plutonia 2](https://www.doomworld.com/idgames/levels/doom2/megawads/pl2) | DSDA-Doom | Tactical and Slaughter | Very Hard | S-Tier (9.5/10) | Community sequel to The Plutonia Experiment |
 | [TNT: Evilution](https://doomwiki.org/wiki/TNT:_Evilution) | DSDA-Doom | Adventure Techbase | Moderate | B-Tier (7.0/10) | Classic Final Doom IWAD with modern soundtrack |
 | [TNT: Revilution](https://www.doomworld.com/idgames/levels/doom2/megawads/tntr) | DSDA-Doom | Sci-Fi Adventure | Moderate | A-Tier (8.5/10) | Community sequel to TNT: Evilution |
-| [Valiant](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant) | UZDoom | DeHackEd Action | Hard | S-Tier (9.5/10) | MBF megawad with custom weapons and DeHackEd patch |
+| [Valiant](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant) | DSDA-Doom | DeHackEd Action | Hard | S-Tier (9.5/10) | MBF megawad with custom weapons and DeHackEd patch |
 
 ## Engine profiles and customizations
 

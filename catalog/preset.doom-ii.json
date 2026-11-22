@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "doom-ii",
   "name": "Doom II",
@@ -11,6 +11,7 @@
       "optional": true
     }
   ],
+  "complevel": 2,
   "category": "Official IWAD",
   "genre": "Classic Campaign",
   "difficulty": "Moderate",
@@ -18,7 +19,7 @@
   "compatibility": "Vanilla",
   "description": "Classic IWAD with modern MIDI audio",
   "author": "id Software",
-  "release_date": "1994",
+  "release-date": "1994",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/Doom_II",

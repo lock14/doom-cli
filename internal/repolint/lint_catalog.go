@@ -252,8 +252,18 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		if _, ok := engineIDs[engKey]; !ok {
 			addErr(where, "preset %s references unknown engine %q", p.ID, p.Engine)
 		}
+		for eaKey := range p.EngineArgs {
+			if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(eaKey))]; !ok {
+				addErr(where, "preset %s engine-args references unknown engine %q", p.ID, eaKey)
+			}
+		}
 
 		validateFiles(where, p.ID, p.IWAD, p.Files)
+		if p.Game != "" {
+			if err := catalog.ValidateID(p.Game); err != nil {
+				addErr(where, "preset %s has invalid game %q: %v", p.ID, p.Game, err)
+			}
+		}
 
 		for _, s := range p.Sources {
 			if !strings.HasPrefix(s.URL, "https://") {
@@ -276,6 +286,20 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		}
 
 		if te.curated {
+			inferredGame := catalog.InferGameFromIWAD(p.IWAD)
+			if inferredGame != catalog.CoreGame && strings.TrimSpace(p.Game) == "" {
+				addErr(
+					where,
+					"curated non-Doom preset %s (iwad %s) must explicitly declare \"game\": %q",
+					p.ID, p.IWAD, inferredGame,
+				)
+			} else if strings.TrimSpace(p.Game) != "" && p.Game != inferredGame {
+				addErr(
+					where,
+					"curated preset %s declares game %q which conflicts with iwad %q (inferred %q)",
+					p.ID, p.Game, p.IWAD, inferredGame,
+				)
+			}
 			if strings.TrimSpace(p.Author) == "" ||
 				strings.TrimSpace(p.ReleaseDate) == "" ||
 				strings.TrimSpace(p.Category) == "" ||
@@ -285,7 +309,7 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 				p.PrimaryURL() == "" {
 				addErr(
 					where,
-					"curated preset %s requires author, release_date, category, genre, difficulty, quality, and links",
+					"curated preset %s requires author, release-date, category, genre, difficulty, quality, and links",
 					p.ID,
 				)
 			}
@@ -312,6 +336,11 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 			}
 			ovIWAD := presetIWADs[ov.Target.ID]
 			if ov.Set != nil {
+				if ov.Set.Game != nil && *ov.Set.Game != "" {
+					if err := catalog.ValidateID(*ov.Set.Game); err != nil {
+						addErr(where, "override preset %s has invalid game %q: %v", ov.Target.ID, *ov.Set.Game, err)
+					}
+				}
 				if ov.Set.IWAD != nil && *ov.Set.IWAD != "" {
 					ovIWAD = *ov.Set.IWAD
 				}
@@ -324,7 +353,17 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 			}
 			for _, ex := range ov.ExcludeFiles {
 				if strings.TrimSpace(ex) == "" {
-					addErr(where, "preset %s has an empty exclude_files entry", ov.Target.ID)
+					addErr(where, "preset %s has an empty exclude-files entry", ov.Target.ID)
+				}
+			}
+			for eaKey := range ov.AppendEngineArgs {
+				if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(eaKey))]; !ok {
+					addErr(
+						where,
+						"override preset %s append-engine-args references unknown engine %q",
+						ov.Target.ID,
+						eaKey,
+					)
 				}
 			}
 		case catalog.KindEngine:
@@ -335,6 +374,13 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		if ov.Set != nil && ov.Set.Engine != nil && *ov.Set.Engine != "" {
 			if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(*ov.Set.Engine))]; !ok {
 				addErr(where, "override engine %q does not exist", *ov.Set.Engine)
+			}
+		}
+		if ov.Set != nil && ov.Set.EngineArgs != nil {
+			for eaKey := range *ov.Set.EngineArgs {
+				if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(eaKey))]; !ok {
+					addErr(where, "override engine-args references unknown engine %q", eaKey)
+				}
 			}
 		}
 	}

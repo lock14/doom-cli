@@ -1,11 +1,11 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "engine",
   "id": "dsda-doom",
-  "display_name": "DSDA-Doom",
+  "display-name": "DSDA-Doom",
   "description": "DSDA-Doom (MBF21 and speedrunning)",
   "family": "PrBoom",
-  "args_style": "boom",
+  "args-style": "boom",
   "binary": "dsda-doom",
   "aliases": [
     "dsda",

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "alien-vendetta",
   "name": "Alien Vendetta",
@@ -13,14 +13,15 @@
       "name": "AV.DEH"
     }
   ],
+  "complevel": 2,
   "category": "Community Megawad",
   "genre": "Run-and-Gun and Slaughter",
   "difficulty": "Very Hard",
   "quality": "S-Tier (9.5/10)",
-  "compatibility": "Boom",
-  "description": "Classic Boom megawad with DeHackEd patch",
+  "compatibility": "Limit-Removing",
+  "description": "Classic limit-removing megawad with DeHackEd patch",
   "author": "Anders Johnsen, Brad Spencer, et al.",
-  "release_date": "2002",
+  "release-date": "2002",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/av.zip",

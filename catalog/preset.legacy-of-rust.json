@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "legacy-of-rust",
   "name": "Legacy of Rust",
@@ -10,22 +10,10 @@
       "name": "id24res.wad"
     },
     {
-      "name": "id1-res.wad"
-    },
-    {
-      "name": "id1-weap.wad"
-    },
-    {
       "name": "id1.wad"
-    },
-    {
-      "name": "extras.wad"
-    },
-    {
-      "name": "idkfa 2024.wad",
-      "optional": true
     }
   ],
+  "complevel": 21,
   "category": "Official Expansion",
   "genre": "Official ID24 Episode",
   "difficulty": "Hard",
@@ -33,7 +21,7 @@
   "compatibility": "ID24",
   "description": "Official ID24 episode with custom weapons and monsters",
   "author": "id Software & Nightdive Studios",
-  "release_date": "2024",
+  "release-date": "2024",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/Legacy_of_Rust",

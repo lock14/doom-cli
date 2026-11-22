@@ -150,10 +150,35 @@ func TestModel_80x24_AllCuratedPresetsShowIWADAndFiles(t *testing.T) {
 	}
 
 	tmpDir := t.TempDir()
-	// Create a readme for Legacy of Rust (6 files) to test worst-case 80x24 file density
+	// Create a readme for Legacy of Rust and a synthetic 6-file preset to test worst-case 80x24 file density
 	if err := os.WriteFile(filepath.Join(tmpDir, "id1.txt"), []byte("Legacy of Rust readme"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "dense1.txt"), []byte("Dense readme"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cl21 := 21
+	cat.Presets = append(cat.Presets, catalog.Preset{
+		ID:            "dense-six-pack",
+		Name:          "Dense Six Pack",
+		Engine:        "dsda-doom",
+		IWAD:          "DOOM2.WAD",
+		Complevel:     &cl21,
+		Category:      "Community Megawad",
+		Genre:         "Run-and-Gun",
+		Difficulty:    "Hard",
+		Quality:       "A-Tier",
+		Compatibility: "MBF21",
+		Description:   "Six-file layout stress test",
+		Files: []catalog.FileSpec{
+			{Name: "dense1.wad"},
+			{Name: "dense2.wad"},
+			{Name: "dense3.wad"},
+			{Name: "dense4.wad"},
+			{Name: "dense5.deh"},
+			{Name: "idkfa 2024.wad", Optional: true},
+		},
+	})
 
 	m := initialModel(cat, []string{tmpDir}, ClassicTheme, false)
 	newM, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -175,8 +200,8 @@ func TestModel_80x24_AllCuratedPresetsShowIWADAndFiles(t *testing.T) {
 				}
 			}
 		}
-		if p.ID == "legacy-of-rust" && !strings.Contains(view, "[✓ Readme]") {
-			t.Errorf("expected Legacy of Rust at 80x24 to show [✓ Readme], got:\n%s", view)
+		if (p.ID == "legacy-of-rust" || p.ID == "dense-six-pack") && !strings.Contains(view, "[✓ Readme]") {
+			t.Errorf("expected %s at 80x24 to show [✓ Readme], got:\n%s", p.ID, view)
 		}
 	}
 }

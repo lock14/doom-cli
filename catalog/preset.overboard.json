@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "overboard",
   "name": "Overboard",
@@ -10,6 +10,7 @@
       "name": "overboard.wad"
     }
   ],
+  "complevel": 9,
   "category": "Community Episode",
   "genre": "Set-Piece Adventure",
   "difficulty": "Moderate",
@@ -17,7 +18,7 @@
   "compatibility": "Boom",
   "description": "Island-hopping vacation episode with New Game+ remix",
   "author": "mouldy",
-  "release_date": "2022",
+  "release-date": "2022",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/overboard.zip",

@@ -54,6 +54,7 @@ type LauncherOptions struct {
 	BinDirSource     string
 	SoundFontsSource string
 	InitialMode      int
+	ShowAllPresets   bool
 }
 
 type model struct {
@@ -74,6 +75,12 @@ type model struct {
 	binDirSource     string
 	soundFontsSource string
 	initialMode      int
+	showAllPresets   bool
+	autoCatalog      bool
+	explicitAllSet   bool
+	visiblePresets   []catalog.Preset
+	hiddenCount      int
+	installedCount   int
 	steamSearchRoots []string
 	httpClient       *http.Client
 	dirIndex         *catalog.DirIndex
@@ -137,10 +144,14 @@ func buildSearchTarget(p catalog.Preset, dirIndex *catalog.DirIndex) string {
 		files.WriteByte(' ')
 		files.WriteString(base)
 	}
+	complevelToken := ""
+	if p.Complevel != nil {
+		complevelToken = fmt.Sprintf(" complevel %d cl%d", *p.Complevel, *p.Complevel)
+	}
 	return strings.TrimSpace(fmt.Sprintf(
-		"%s %s %s %s %s %s %s%s %s",
-		p.Name, p.Engine, p.Category, p.Genre, p.Difficulty, p.Quality,
-		p.Compatibility, files.String(), readiness,
+		"%s %s %s %s %s %s %s %s%s%s %s",
+		p.Name, p.EffectiveGame(), p.Engine, p.Category, p.Genre, p.Difficulty, p.Quality,
+		p.Compatibility, complevelToken, files.String(), readiness,
 	))
 }
 
@@ -211,9 +222,23 @@ func (m *model) rebuildIndexAndTargets() {
 	}
 
 	m.dirIndex = catalog.NewDirIndex(m.effectiveWadRoots()...).WithCatalog(m.catalog)
-	m.readmeCache = make(map[string]string, len(m.catalog.Presets))
-	m.searchTargets = make([]string, 0, len(m.catalog.Presets))
-	for _, p := range m.catalog.Presets {
+	libPresets, hidden := m.catalog.LibraryPresets(m.dirIndex)
+	m.installedCount = len(libPresets)
+	if !m.explicitAllSet && !m.showAllPresets && len(libPresets) == 0 && len(m.catalog.Presets) > 0 {
+		m.showAllPresets = true
+		m.autoCatalog = true
+	}
+	if m.showAllPresets {
+		m.visiblePresets = m.catalog.Presets
+		m.hiddenCount = 0
+	} else {
+		m.visiblePresets = libPresets
+		m.hiddenCount = hidden
+	}
+
+	m.readmeCache = make(map[string]string, len(m.visiblePresets))
+	m.searchTargets = make([]string, 0, len(m.visiblePresets))
+	for _, p := range m.visiblePresets {
 		m.searchTargets = append(m.searchTargets, buildSearchTarget(p, m.dirIndex))
 		if path, ok := m.dirIndex.ResolveReadme(p); ok {
 			m.readmeCache[readmeCacheKey(p)] = path
@@ -277,44 +302,27 @@ func initialModel(
 	ti.CharLimit = 100
 	ti.Width = calculateSearchWidth(w)
 
-	cursor := 0
+	m := model{
+		theme:       theme,
+		styles:      styles,
+		nerdFonts:   nerdFonts,
+		catalog:     cat,
+		baseCatalog: cat.Clone(),
+		wadRoots:    append([]string(nil), wadRoots...),
+		input:       ti,
+		width:       w,
+		height:      h,
+	}
+	m.rebuildIndexAndTargets()
 	if len(initialPreset) > 0 && initialPreset[0] != "" {
-		for i, p := range cat.Presets {
+		for i, p := range m.filtered {
 			if strings.EqualFold(p.Name, initialPreset[0]) || strings.EqualFold(p.ID, initialPreset[0]) {
-				cursor = i
+				m.cursor = i
 				break
 			}
 		}
 	}
-
-	dirIndex := catalog.NewDirIndex(wadRoots...).WithCatalog(cat)
-	readmeCache := make(map[string]string, len(cat.Presets))
-	searchTargets := make([]string, 0, len(cat.Presets))
-	for _, p := range cat.Presets {
-		searchTargets = append(searchTargets, buildSearchTarget(p, dirIndex))
-		if path, ok := dirIndex.ResolveReadme(p); ok {
-			readmeCache[readmeCacheKey(p)] = path
-		} else {
-			readmeCache[readmeCacheKey(p)] = ""
-		}
-	}
-
-	return model{
-		theme:         theme,
-		styles:        styles,
-		nerdFonts:     nerdFonts,
-		catalog:       cat,
-		baseCatalog:   cat.Clone(),
-		wadRoots:      append([]string(nil), wadRoots...),
-		dirIndex:      dirIndex,
-		readmeCache:   readmeCache,
-		searchTargets: searchTargets,
-		input:         ti,
-		filtered:      cat.Presets,
-		cursor:        cursor,
-		width:         w,
-		height:        h,
-	}
+	return m
 }
 
 type fetchCompleteMsg struct {
@@ -390,11 +398,13 @@ func (m *model) handleFetchAssets() tea.Cmd {
 	reqID := m.fetchID
 	m.fetching = true
 	m.fetchCancel = cancel
+	m.explicitAllSet = true
+	m.autoCatalog = false
 	m.statusMsg = fmt.Sprintf("Fetching %s... (Esc to cancel)", cur.Name)
 
-	var catClone *catalog.Catalog
+	var singleCat *catalog.Catalog
 	if m.catalog != nil {
-		catClone = m.catalog.Clone()
+		singleCat = m.catalog.ForPresets(cur)
 	}
 	presetCopy := cur
 	presetCopy.Files = append([]catalog.FileSpec(nil), cur.Files...)
@@ -410,7 +420,7 @@ func (m *model) handleFetchAssets() tea.Cmd {
 		var steamErr error
 		if needsSteam {
 			_, steamErr = steam.DiscoverAndExtractContext(
-				ctx, catClone, searchRoots, writeDir, false, &buf, extraRoots...,
+				ctx, singleCat, searchRoots, writeDir, false, &buf, extraRoots...,
 			)
 		}
 
@@ -615,6 +625,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+f":
 			return m, m.handleFetchAssets()
 
+		case "f3", "ctrl+t":
+			totalPresets := 0
+			if m.catalog != nil {
+				totalPresets = len(m.catalog.Presets)
+			}
+			if totalPresets > 0 && m.installedCount == totalPresets {
+				m.statusMsg = "✓ All catalog presets are installed"
+				return m, nil
+			}
+			m.explicitAllSet = true
+			m.autoCatalog = false
+			m.showAllPresets = !m.showAllPresets
+			m.rebuildIndexAndTargets()
+			if m.showAllPresets {
+				m.statusMsg = "Showing full catalog (Ctrl+F to fetch)"
+			} else {
+				m.statusMsg = fmt.Sprintf("Showing installed library (%d ready)", m.installedCount)
+			}
+			return m, nil
+
 		case "enter":
 			if len(m.filtered) > 0 && m.cursor >= 0 && m.cursor < len(m.filtered) {
 				cur := m.filtered[m.cursor]
@@ -717,14 +747,14 @@ func (m *model) updateFiltered(query string) {
 	}
 	query = strings.TrimSpace(query)
 	if query == "" {
-		m.filtered = m.catalog.Presets
+		m.filtered = m.visiblePresets
 		return
 	}
 
 	targets := m.searchTargets
-	if len(targets) != len(m.catalog.Presets) {
-		targets = make([]string, 0, len(m.catalog.Presets))
-		for _, p := range m.catalog.Presets {
+	if len(targets) != len(m.visiblePresets) {
+		targets = make([]string, 0, len(m.visiblePresets))
+		for _, p := range m.visiblePresets {
 			targets = append(targets, buildSearchTarget(p, m.dirIndex))
 		}
 	}
@@ -732,7 +762,7 @@ func (m *model) updateFiltered(query string) {
 	matches := fuzzy.Find(query, targets)
 	var result []catalog.Preset
 	for _, match := range matches {
-		result = append(result, m.catalog.Presets[match.Index])
+		result = append(result, m.visiblePresets[match.Index])
 	}
 	m.filtered = result
 }
@@ -749,6 +779,12 @@ func (m *model) applyOptions(opts LauncherOptions) {
 	m.binDirSource = opts.BinDirSource
 	m.soundFontsSource = opts.SoundFontsSource
 	m.initialMode = opts.InitialMode
+	if opts.ShowAllPresets {
+		m.showAllPresets = true
+		m.autoCatalog = false
+		m.explicitAllSet = true
+		m.rebuildIndexAndTargets()
+	}
 
 	switch opts.InitialMode {
 	case InitialModeConfig:
@@ -814,7 +850,14 @@ func RunInteractiveLauncherWithOptions(
 		if opts.InitialMode != InitialModeWads {
 			return nil, nil
 		}
-		return RunNumberedMenu(cat, os.Stdin, os.Stdout)
+		menuCat := cat
+		if !opts.ShowAllPresets && cat != nil {
+			dirIdx := catalog.NewDirIndex(wadRoots...).WithCatalog(cat)
+			if libCat, _ := cat.FilterLibrary(dirIdx); libCat != nil && len(libCat.Presets) > 0 {
+				menuCat = libCat
+			}
+		}
+		return RunNumberedMenu(menuCat, os.Stdin, os.Stdout)
 	}
 
 	m := initialModel(cat, wadRoots, theme, nerdFonts)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -168,6 +169,23 @@ func (m model) availableEngines() []catalog.EngineConfig {
 	return out
 }
 
+func clonePresetShallowSlices(src catalog.Preset) catalog.Preset {
+	cp := src
+	cp.Files = append([]catalog.FileSpec(nil), src.Files...)
+	cp.Args = append([]string(nil), src.Args...)
+	if src.Complevel != nil {
+		cl := *src.Complevel
+		cp.Complevel = &cl
+	}
+	if len(src.EngineArgs) > 0 {
+		cp.EngineArgs = make(map[string][]string, len(src.EngineArgs))
+		for k, v := range src.EngineArgs {
+			cp.EngineArgs[k] = append([]string(nil), v...)
+		}
+	}
+	return cp
+}
+
 func (m *model) openLaunchOptions() tea.Cmd {
 	if len(m.filtered) == 0 || m.cursor < 0 || m.cursor >= len(m.filtered) {
 		return nil
@@ -179,16 +197,12 @@ func (m *model) openLaunchOptions() tea.Cmd {
 	base, ov, err := catalog.LoadPresetBaseAndOverride(catDir, cur.ID)
 	if m.baseCatalog != nil {
 		if bp, findErr := m.baseCatalog.FindExact(cur.ID); findErr == nil && bp != nil && !bp.Overridden {
-			baseCopy := *bp
-			baseCopy.Files = append([]catalog.FileSpec(nil), bp.Files...)
-			baseCopy.Args = append([]string(nil), bp.Args...)
+			baseCopy := clonePresetShallowSlices(*bp)
 			base = &baseCopy
 		}
 	}
 	if err != nil || base == nil {
-		baseCopy := cur
-		baseCopy.Files = append([]catalog.FileSpec(nil), cur.Files...)
-		baseCopy.Args = append([]string(nil), cur.Args...)
+		baseCopy := clonePresetShallowSlices(cur)
 		base = &baseCopy
 	}
 	if ov == nil && catDir != "" {
@@ -276,6 +290,30 @@ func (m *model) openLaunchOptions() tea.Cmd {
 		overrideArgs = cur.Args[len(base.Args):]
 	}
 	state.parseArgsIntoFields(overrideArgs)
+	if ov != nil {
+		if ov.Set != nil && ov.Set.Complevel != nil && *ov.Set.Complevel >= 0 {
+			valStr := strconv.Itoa(*ov.Set.Complevel)
+			for idx, opt := range complevelOptions {
+				if opt.value == valStr {
+					state.complevelIdx = idx
+					break
+				}
+			}
+		}
+		engKey := strings.ToLower(state.selectedEngine().ID)
+		for k, slice := range ov.AppendEngineArgs {
+			if strings.EqualFold(k, engKey) && containsFlag(slice, "-solonet") {
+				state.soloNet = true
+			}
+		}
+		if ov.Set != nil && ov.Set.EngineArgs != nil {
+			for k, slice := range *ov.Set.EngineArgs {
+				if strings.EqualFold(k, engKey) && containsFlag(slice, "-solonet") {
+					state.soloNet = true
+				}
+			}
+		}
+	}
 	cmd := state.syncInputFocus()
 
 	m.launchOpts = state
@@ -360,6 +398,78 @@ func (s *launchOptionsState) parseArgsIntoFields(args []string) {
 	s.extraInput.SetValue(strings.Join(extra, " "))
 }
 
+func containsFlag(args []string, flag string) bool {
+	for _, tok := range args {
+		if strings.EqualFold(strings.TrimSpace(tok), flag) {
+			return true
+		}
+	}
+	return false
+}
+
+func filterOutFlag(args []string, flag string) []string {
+	var out []string
+	for _, tok := range args {
+		if !strings.EqualFold(strings.TrimSpace(tok), flag) {
+			out = append(out, tok)
+		}
+	}
+	return out
+}
+
+func (s *launchOptionsState) selectedComplevelOverride() (*int, bool) {
+	if !s.isBoomEngine() || s.complevelIdx <= 0 || s.complevelIdx >= len(complevelOptions) {
+		return nil, true
+	}
+	cl, err := strconv.Atoi(complevelOptions[s.complevelIdx].value)
+	if err != nil {
+		return nil, true
+	}
+	if s.base.Complevel != nil && *s.base.Complevel == cl {
+		return nil, true
+	}
+	return &cl, false
+}
+
+func (s *launchOptionsState) complevelDisplayLabel() string {
+	if s.complevelIdx == 0 && s.base.Complevel != nil {
+		return fmt.Sprintf("Default (%s)", catalog.ComplevelLabel(*s.base.Complevel))
+	}
+	if s.complevelIdx >= 0 && s.complevelIdx < len(complevelOptions) {
+		return complevelOptions[s.complevelIdx].label
+	}
+	return complevelOptions[0].label
+}
+
+func (s *launchOptionsState) synthesizeAppendEngineArgs() map[string][]string {
+	out := make(map[string][]string)
+	engID := s.selectedEngine().ID
+	if s.existingOv != nil {
+		for k, slice := range s.existingOv.AppendEngineArgs {
+			if strings.EqualFold(k, engID) {
+				kept := filterOutFlag(slice, "-solonet")
+				if len(kept) > 0 {
+					out[engID] = kept
+				}
+			} else if len(slice) > 0 {
+				out[k] = append([]string(nil), slice...)
+			}
+		}
+	}
+	if s.isBoomEngine() && s.soloNet {
+		out[engID] = append(out[engID], "-solonet")
+	} else if s.existingOv != nil {
+		for k, slice := range s.existingOv.AppendEngineArgs {
+			if strings.EqualFold(k, engID) && containsFlag(slice, "-solonet") {
+				if _, exists := out[engID]; !exists {
+					out[engID] = []string{}
+				}
+			}
+		}
+	}
+	return out
+}
+
 func (s *launchOptionsState) synthesizeAppendArgs() []string {
 	var args []string
 	if s.skillIdx > 0 && s.skillIdx < len(skillOptions) {
@@ -380,14 +490,6 @@ func (s *launchOptionsState) synthesizeAppendArgs() []string {
 	}
 	if s.respawn {
 		args = append(args, "-respawn")
-	}
-	if s.isBoomEngine() {
-		if s.soloNet {
-			args = append(args, "-solonet")
-		}
-		if s.complevelIdx > 0 && s.complevelIdx < len(complevelOptions) {
-			args = append(args, "-complevel", complevelOptions[s.complevelIdx].value)
-		}
 	}
 	if extraFields := strings.Fields(s.extraInput.Value()); len(extraFields) > 0 {
 		args = append(args, extraFields...)
@@ -416,9 +518,7 @@ func (s *launchOptionsState) excludedFileNames() []string {
 }
 
 func (s *launchOptionsState) buildLaunchPreset() catalog.Preset {
-	p := s.base
-	p.Files = append([]catalog.FileSpec(nil), s.base.Files...)
-	p.Args = append([]string(nil), s.base.Args...)
+	p := clonePresetShallowSlices(s.base)
 
 	if s.existingOv != nil {
 		if s.existingOv.Set != nil {
@@ -427,6 +527,18 @@ func (s *launchOptionsState) buildLaunchPreset() catalog.Preset {
 			}
 			if s.existingOv.Set.Files != nil {
 				p.Files = append([]catalog.FileSpec(nil), (*s.existingOv.Set.Files)...)
+			}
+			if s.existingOv.Set.EngineArgs != nil {
+				if p.EngineArgs == nil {
+					p.EngineArgs = make(map[string][]string)
+				}
+				for k, v := range *s.existingOv.Set.EngineArgs {
+					if len(v) == 0 {
+						delete(p.EngineArgs, k)
+					} else {
+						p.EngineArgs[k] = append([]string(nil), v...)
+					}
+				}
 			}
 			if s.existingOv.Set.Args != nil {
 				p.Args = nil
@@ -440,6 +552,20 @@ func (s *launchOptionsState) buildLaunchPreset() catalog.Preset {
 	eng := s.selectedEngine()
 	p.Engine = eng.ID
 	p.EngineOverridden = true
+	if clOverride, clearCL := s.selectedComplevelOverride(); !clearCL && clOverride != nil {
+		cl := *clOverride
+		p.Complevel = &cl
+	}
+	appendEngArgs := s.synthesizeAppendEngineArgs()
+	for k, slice := range appendEngArgs {
+		if len(slice) == 0 {
+			continue
+		}
+		if p.EngineArgs == nil {
+			p.EngineArgs = make(map[string][]string)
+		}
+		p.EngineArgs[k] = append(append([]string(nil), p.EngineArgs[k]...), slice...)
+	}
 
 	excluded := s.excludedFileNames()
 	if len(excluded) > 0 {
@@ -621,10 +747,24 @@ func (m *model) saveLaunchOptionsOverride() {
 	catDir := m.catalogDir()
 	engID := s.selectedEngine().ID
 	appendArgs := s.synthesizeAppendArgs()
+	appendEngArgs := s.synthesizeAppendEngineArgs()
 	excludeFiles := s.excludedFileNames()
 
 	req := catalog.OverridePatchRequest{
 		ExcludeFiles: &excludeFiles,
+	}
+	if len(appendEngArgs) > 0 {
+		req.AppendEngineArgs = &appendEngArgs
+	}
+	if s.isBoomEngine() {
+		clOverride, clearCL := s.selectedComplevelOverride()
+		if clearCL {
+			if s.existingOv != nil && s.existingOv.Set != nil && s.existingOv.Set.Complevel != nil {
+				req.ClearComplevel = true
+			}
+		} else {
+			req.Complevel = clOverride
+		}
 	}
 	if !strings.EqualFold(engID, s.base.Engine) {
 		req.Engine = &engID
@@ -749,7 +889,7 @@ func (m model) renderLaunchOptionsView() string {
 		},
 		{
 			label: "Complevel (-complevel):",
-			value: fmt.Sprintf("< %s >", complevelOptions[s.complevelIdx].label),
+			value: fmt.Sprintf("< %s >", s.complevelDisplayLabel()),
 			dim:   !isBoom,
 		},
 	}

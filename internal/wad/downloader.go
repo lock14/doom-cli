@@ -287,7 +287,36 @@ func extractWADLumpFromFile(wadPath, lumpName string) ([]byte, bool, error) {
 	return data, ok, nil
 }
 
-// DownloadAll downloads all downloadable community megawads in the catalog.
+// DownloadSelected downloads an explicit slice of user-requested presets,
+// reusing a single DirIndex across downloads.
+func (d *Downloader) DownloadSelected(presets []catalog.Preset, cat *catalog.Catalog) error {
+	idx := catalog.NewDirIndex(d.roots()...).WithCatalog(cat).WithPresets(presets...)
+	var failures []string
+	for _, p := range presets {
+		if err := d.ctx().Err(); err != nil {
+			return err
+		}
+		downloaded, err := d.downloadPresetWithIndex(p, idx)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s (%v)", p.Name, err))
+			continue
+		}
+		if downloaded {
+			idx = catalog.NewDirIndex(d.roots()...).WithCatalog(cat).WithPresets(presets...)
+		}
+	}
+	if len(failures) > 0 {
+		return fmt.Errorf(
+			"failed downloading %d presets:\n - %s",
+			len(failures),
+			strings.Join(failures, "\n - "),
+		)
+	}
+	return nil
+}
+
+// DownloadAll downloads all downloadable community megawads in the catalog whose base IWAD
+// resolves across configured WAD roots.
 func (d *Downloader) DownloadAll(cat *catalog.Catalog) error {
 	fmt.Fprintf(d.Out, "=== Doom Community Megawad Downloader ===\n")
 	fmt.Fprintf(d.Out, "Target directory: %s\n\n", d.WadsDir)
@@ -300,6 +329,17 @@ func (d *Downloader) DownloadAll(cat *catalog.Catalog) error {
 		}
 		if err := d.ctx().Err(); err != nil {
 			return err
+		}
+		if strings.TrimSpace(p.IWAD) != "" {
+			if _, ok := idx.ResolveFile(p.IWAD); !ok {
+				fmt.Fprintf(
+					d.Out,
+					"↷ Skipping %s (base IWAD %s not installed)\n",
+					p.Name,
+					p.IWAD,
+				)
+				continue
+			}
 		}
 		downloaded, err := d.downloadPresetWithIndex(p, idx)
 		if err != nil {

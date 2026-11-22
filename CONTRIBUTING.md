@@ -25,12 +25,15 @@ All contributions must respect the core repository invariants:
     `doom engines install`, `doom setup`, `doom config set`, `doom engines add`, `doom engines set`, `doom wads add`,
     `doom wads set`, and `Ctrl+S` in the TUI `Launch Options` and `Configuration Manager` views) must write atomically
     and generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per
-    file and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion, in-TUI `Ctrl+R` resets, and
-    repository templates during `doom engines cfg sync`) before overwriting any existing user file.
-    `fsutil.WriteFileAtomic`, `fsutil.WriteReaderAtomic`, `fsutil.CopyFileAtomic`, and `fsutil.DownloadVerified` share
-    `writeReaderTempAndRename`, which streams to a same-directory `.doom-tmp-*` file, applies `Chmod`, `Sync`, and
-    `Close`, and runs any validation callback (including SHA-256 verification) before calling `fsutil.BackupFile` and
-    `os.Rename` so failed or corrupt writes never create spurious `.bak.*` files.
+    file and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion, `doom wads uninstall`,
+    in-TUI `Ctrl+R` resets, and repository templates during `doom engines cfg sync`) before overwriting any existing
+    user file. `fsutil.WriteFileAtomic`, `fsutil.WriteReaderAtomic`, `fsutil.CopyFileAtomic`, and
+    `fsutil.DownloadVerified` share `writeReaderTempAndRename`, which streams to a same-directory `.doom-tmp-*` file,
+    applies `Chmod`, `Sync`, and `Close`, and runs any validation callback (including SHA-256 verification) before
+    calling `fsutil.BackupFile` and `os.Rename` so failed or corrupt writes never create spurious `.bak.*` files.
+    `doom wads uninstall` (`wad.UninstallPreset`) removes only preset-exclusive PWAD, PK3, DeHackEd, companion `.txt`,
+    and `.bak.*` files inside primary `wads-dir`, refusing to delete base IWADs, shared files (`idkfa 2024.wad`,
+    `VOICES.WAD`), symlinks escaping `wads-dir`, or files inside secondary read-only `wads-dirs`.
 *   **Verified HTTP downloads and archive security**: All outbound HTTP downloads (`engine.Installer`,
     `wad.Downloader`, and `wad.InstallSoundFontContext`) must use `fsutil.DownloadVerified` or
     `fsutil.DownloadVerifiedContext` and `fsutil.UserAgent` (`"doom-cli/2.0"`), enforcing bounded stream sizes and
@@ -39,16 +42,39 @@ All contributions must respect the core repository invariants:
     with `DefaultSoundFontSHA256`. All archive extractions (`archive/zip`), direct downloads, and relative sub-path
     resolutions must sanitize entry paths via `fsutil.CleanRel` and `fsutil.SafeJoin` and verify containment before any
     filesystem write.
-*   **Two-tier settings precedence**: CLI settings (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, and
-    `soundfonts-dir`) resolve in a strict two-tier hierarchy (`config` in `config.json` takes precedence over platform
-    `default` values), with `DOOM_CONFIG_DIR` as the sole application environment variable and zero global persistent
-    flags or per-setting `DOOM_*` environment variables.
+*   **Two-tier settings precedence and disk-as-state separation**: CLI settings (`theme`, `nerd-fonts`, `wads-dir`,
+    `wads-dirs`, `bin-dir`, and `soundfonts-dir`) resolve in a strict two-tier hierarchy (`config` in `config.json`
+    takes precedence over platform `default` values), with `DOOM_CONFIG_DIR` as the sole application environment
+    variable and zero global persistent flags or per-setting `DOOM_*` environment variables. Never store installed-game
+    state in `config.json`; derive installed optional games (`heretic`, `hexen`, `strife`) directly from IWADs on disk
+    via `Catalog.InstalledOptionalGames` (with explicit `--games` overrides on `doom setup`, `doom wads scan`, and
+    `doom wads fetch all`), default `doom setup` to 4 core steps (`--wads none`), require an explicit preset target or
+    `all` on `doom wads fetch`, gate bulk `DownloadAll` runs on base IWAD presence, default `doom wads` and
+    `doom wads list` to installed presets (plus `LayerUser` custom presets, with `--all` and TUI `F3` or `Ctrl+T` for
+    the full catalog), and provide actionable usage hints via `exactArgsWithHint` when positional arguments are omitted.
 *   **Doom engine selection and preset hygiene**:
-    *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
-        and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
-        *Overboard*, *Rowdy Rudy II*, *Sunder*, *Sunlust*, *Legacy of Rust*, and *Sigil*).
-    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom scripting (*MyHouse.pk3*), high-resolution texture packs
-        like OTEX (*Eviternity I & II*), or Raven Software and Rogue Entertainment games (*Heretic*, *Hexen*, *Strife*).
+    *   **DSDA-Doom**: Default for all classic vanilla (`complevel` `2`, `3`, `4`), limit-removing (`2`, `3`), Boom
+        (`9`), MBF (`11`), MBF21 (`21`), and ID24 (`21`) Doom presets where demo accuracy, standard physics, custom
+        256-color software palettes, and speedrunning precision are desired (such as *Alien Vendetta*, *Ancient Aliens*,
+        *AUGER;ZENITH*, *BTSX*, *Eviternity II*, *Going Down Turbo*, *Legacy of Rust*, *Overboard*, *Rowdy Rudy II*,
+        *Sigil*, *Sunder*, *Sunlust*, and *Valiant*). OTEX is a standard-resolution, 8-bit paletted texture pack and
+        runs natively in DSDA-Doom.
+    *   **UZDoom**: Reserved for mapsets requiring ZScript or UDMF scripting (*MyHouse.pk3*), pre-`UMAPINFO` mapsets
+        relying on ZDoom `ZMAPINFO` and `ACS` for chapter menus and weather effects (*Eviternity*, which also declares
+        `"complevel": 11` for Boom-port overrides), and Raven Software or Rogue Entertainment games (*Heretic*, *Hexen*,
+        *Strife*).
+    *   **Hyphenated kebab-case JSON keys and three-tier launch model**: Standardize all `doom-cli` JSON keys across
+        `config.json`, `catalog/*.json`, `<ConfigDir>/catalog.d/*.json`, and `themes/*.json` on hyphenated `kebab-case`
+        (`schema-version`, `display-name`, `args-style`, `prefix-args`, `default-args`, `engine-args`, `release-date`,
+        `load-maps-after-mods`, `append-files`, `append-args`, `append-engine-args`, `exclude-files`, `nerd-fonts`,
+        `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and `brand-cap`) with `DisallowUnknownFields()` on entity
+        and theme decoders, separating typed WAD `complevel` integers (`0..17` or `21`), per-engine `engine-args` maps,
+        and universal `args` slices rather than scraping or stripping flag strings across engine families at runtime.
+    *   **Exact vs fuzzy lookup safety and soundtrack hygiene**: Read and launch commands (`doom <wad>`, `wads show`,
+        `wads fetch`) use 4-tier `Catalog.Find`, whereas mutating or destructive commands (`wads set`, `reset`,
+        `remove`, `uninstall`, and `engines set`, `reset`, `remove`) must use `Catalog.FindExact` or `FindEngine`
+        without substring guessing. Attach optional `idkfa 2024.wad` only to presets using stock Doom or Doom II MIDI
+        slots (never mapsets with bespoke soundtracks like `legacy-of-rust`).
     *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
         declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
         `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
@@ -58,12 +84,15 @@ All contributions must respect the core repository invariants:
         GZDoom 4.14 and UZDoom), curate the definitive edition rather than duplicating versions or keeping incompatible
         older mirrors, and route shorthand queries (`doom gd`, `doom going-down`) to the canonical preset via
         `NormalizePresetQuery`.
-    *   **No duplicate IWADs**: Never include the base game IWAD in `files`. The IWAD must only be specified in `iwad`.
+    *   **No duplicate IWADs and DRY game classification**: Never include the base game IWAD in `files`. The IWAD must
+        only be specified in `iwad`. Doom-family IWADs (`DOOM.WAD`, `DOOM2.WAD`, `TNT.WAD`, `PLUTONIA.WAD`) infer
+        `"doom"` automatically via `catalog.InferGameFromIWAD` and omit `"game"`, whereas non-Doom curated presets must
+        explicitly declare `"game"` (`"heretic"`, `"hexen"`, `"strife"`).
     *   **Unified launch argument and preview synthesis**: `PrepareLaunch` and `FormatLaunchPreview` share
         `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
-        `DefaultArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods` sorting, and missing optional file omission
-        (when `idx != nil`) never diverge between live execution, `doom wads show`, and the TUI `Launch Options`
-        command preview.
+        `DefaultArgs`, Boom `Complevel`, per-engine `EngineArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods`
+        sorting, and missing optional file omission (when `idx != nil`) never diverge between live execution,
+        `doom wads show`, and the TUI `Launch Options` command preview.
     *   **Four-tier preset readiness and acquisition predicates**: `DirIndex.IsPresetInstalled` checks the base IWAD
         plus required files for launch readiness and search indexing; `DirIndex.ArePresetFilesInstalled` checks
         required files only for `wad.Downloader` (reusing a single `DirIndex` across `DownloadAll` and rebuilding only
@@ -110,7 +139,7 @@ flowchart TD
 
     subgraph Engines ["Target Source Ports"]
         DSDA["DSDA-Doom\n(MBF21 / Vanilla / Demo-Accurate)"]
-        UZDoom["UZDoom\n(ZDoom / OTEX / Raven Software)"]
+        UZDoom["UZDoom\n(ZScript / UDMF / ZMAPINFO / Raven)"]
         CustomEngines["Custom Ports\n(Woof!, GZDoom, Crispy, etc.)"]
     end
 
@@ -140,13 +169,15 @@ doom-cli/
 │   └── uzdoom/             # UZDoom autoexec configuration template (autoexec.cfg)
 ├── cmd/doom/               # Command-line interface definitions using Cobra
 │   ├── main.go             # Entrypoint, root direct game launcher, path and catalog helpers
-│   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, scan, add, set, reset, remove, lint, build)
+│   ├── games.go            # Game-scope (--games), megawad (--wads), target list, and missing-arg hint helpers
+│   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, uninstall, scan, add, set, reset, remove, lint, build)
 │   ├── engines.go          # 'doom engines' TUI manager (list, install, add, set, reset, remove, cfg)
 │   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, themes)
 │   └── setup.go            # 'doom setup' turnkey installation workflow
 ├── internal/
 │   ├── catalog/            # Runtime two-layer entity catalog, store, file resolver, and CP437 decoder
 │   │   ├── entity.go       # EngineConfig, Preset, FileSpec, SourceSpec, LinkSpec, and Catalog models
+│   │   ├── games.go        # Game inference (InferGameFromIWAD), optional game scoping, and LibraryPresets helpers
 │   │   ├── codec.go        # Strict single-document JSON entity decoder and personal-path scanner
 │   │   ├── loader.go       # Embedded curated loader, user catalog.d quarantine, and layered merge
 │   │   ├── query.go        # Tiered preset and engine query normalization and lookup
@@ -184,13 +215,14 @@ doom-cli/
 │   │   ├── menu.go         # Fallback numbered terminal menu for basic or non-TTY environments
 │   │   ├── theme.go        # Theme loading, custom JSON theme decoding, and ANSI and TrueColor styles
 │   │   └── builtin_themes.go # Curated color palettes adhering to the 60-30-10 design principle
-│   ├── wad/                # WAD downloading, archive extraction, and SoundFont deployment
+│   ├── wad/                # WAD downloading, archive extraction, uninstallation, and SoundFont deployment
 │   │   ├── downloader.go   # Multi-mirror SHA-256 verified downloader for community megawads
 │   │   ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README extractor
+│   │   ├── uninstall.go    # Safe preset PWAD uninstaller protecting base IWADs, shared files, and read-only roots
 │   │   └── soundfont.go    # Roland SC-55 SoundFont installer
 │   └── wadfmt/             # Shared binary Doom IWAD and PWAD lump container parser and streaming builder
-└── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
-    ├── rules/              # Project overrides and conventions (monospace-tui.md)
+└── .agents/                # Glob-scoped domain rules and mono-tui v0.2.5 design and audit skills
+    ├── rules/              # Domain rules (catalog-curation.md, documentation-style.md, monospace-tui.md)
     └── skills/             # TUI design and audit skills (mono-tui-design/, mono-tui-audit/)
 ```
 
@@ -204,7 +236,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 1. Add and test the preset locally using the CLI, or create `catalog/preset.<id>.json` directly:
    ```json
    {
-     "schema_version": 1,
+     "schema-version": 1,
      "kind": "preset",
      "id": "my-mapset",
      "name": "My Mapset",
@@ -215,6 +247,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
        { "name": "mymap.deh" },
        { "name": "idkfa 2024.wad", "optional": true }
      ],
+     "complevel": 9,
      "category": "Community Megawad",
      "genre": "Run-and-Gun",
      "difficulty": "Hard",
@@ -222,7 +255,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      "compatibility": "Boom",
      "description": "Short description of the mapset and compatibility",
      "author": "Author Name",
-     "release_date": "2024",
+     "release-date": "2024",
      "sources": [
        {
          "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/mymap.zip",
@@ -242,9 +275,11 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      ```bash
      cp ~/.config/doom-cli/catalog.d/preset.my-mapset.json catalog/preset.my-mapset.json
      ```
-     Then ensure `author`, `release_date`, `category`, `genre`, `difficulty`, `quality`, `links`, and a unique positive
+     Then ensure `author`, `release-date`, `category`, `genre`, `difficulty`, `quality`, `links`, and a unique positive
      `sort` integer (spaced by 10s in display order) are set.
-   - **IWAD separation**: Do not include the base game IWAD in `files`.
+   - **IWAD separation and optional game metadata**: Do not include the base game IWAD in `files`. Omit `"game"` on
+     Doom-family presets (inferred automatically from `iwad` as `"doom"`), and set `"game"` explicitly (`"heretic"`,
+     `"hexen"`, `"strife"`) on non-Doom id Tech 1 presets.
    - **Canonical archive filenames and aliases**: `files[].name` must match the exact canonical filename inside the
      upstream `.zip` archive (`Eviternity II.wad`, `Sunder 2512.wad`, `SODfinal.wad`, `aaliens.wad`, `scythe.wad`,
      `TNTR.WAD`), while `files[].aliases` is reserved strictly for genuine external distribution or Steam and GOG
@@ -266,7 +301,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 ### Adding or promoting a curated engine
 
 1. Create `catalog/engine.<id>.json` (or copy from `~/.config/doom-cli/catalog.d/engine.<id>.json`) with
-   `kind: "engine"`, `id`, `display_name`, `description`, `family`, `args_style` (`"boom"` or `"zdoom"`), `binary`,
+   `kind: "engine"`, `id`, `display-name`, `description`, `family`, `args-style` (`"boom"` or `"zdoom"`), `binary`,
    `badge`, and optional `install` recipe.
 2. Run `go run ./cmd/doom wads lint` and `go test -v -race ./...`.
 
@@ -350,6 +385,10 @@ The repository includes a `Makefile` for developer verification and local builds
     `clear`, `copy`, `close`, `delete`). Use descriptive identifiers such as `maxVal`, `count`, or `limit`.
 *   **Documentation comments**: All exported packages, types, interfaces, constants, and functions must have
     comprehensive Go doc comments starting with the symbol name and adhering to standard Go and `revive` conventions.
+*   **Package boundaries and file-size discipline**: Keep player-facing runtime packages strictly separated from
+    maintainer-only `internal/repolint` (runtime packages must never import `internal/repolint`), use singular domain
+    package names (`portcfg`, `wadfmt`, `fsutil`), share binary WAD lump primitives via `internal/wadfmt`, and decompose
+    `.go` and co-located `*_test.go` files before they exceed roughly `900` to `1,000` lines.
 *   **Static analysis**: Code must pass `go vet ./...` and `revive -config revive.toml -formatter friendly ./...`
     with zero warnings.
 
@@ -371,8 +410,9 @@ The repository includes a `Makefile` for developer verification and local builds
     catalogs, visual profiles, and `doom` CLI usage. Must not contain internal developer commands or compiler details.
 *   **Contributor-facing documentation**: `CONTRIBUTING.md` covers developer setup, `make` targets, code style,
     modular package maps, how-to guides, and pull request guidelines.
-*   **Agent and architectural invariants**: `AGENTS.md` encodes canonical design invariants, path tokens, safety
-    rules, technical writing and typography conventions, and automated verification checklists.
+*   **Agent and architectural invariants**: `AGENTS.md` encodes core architectural invariants, path tokens, safety
+    rules, and automated verification checklists at the repository root alongside glob-scoped rules in `.agents/rules/`
+    (`catalog-curation.md`, `documentation-style.md`, `monospace-tui.md`).
 *   **Mandatory synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
     mechanics are modified, all relevant documentation (Go doc comments, `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
     and `llms.txt`) must be updated within the same pull request, and `doom wads lint` validates documentation

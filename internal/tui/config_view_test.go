@@ -130,9 +130,9 @@ func TestConfigManager_DigitInputAndFlagPreservationAndEngineAppendArgs(t *testi
 		t.Fatal(err)
 	}
 
-	// Pre-populate engine override with display_name and append_args
+	// Pre-populate engine override with display-name and append-args
 	engOv := `{"kind":"override","target":{"kind":"engine","id":"dsda-doom"},` +
-		`"set":{"display_name":"Custom DSDA"},"append_args":["-complevel","21"]}`
+		`"set":{"display-name":"Custom DSDA"},"append-args":["-complevel","21"]}`
 	if err := os.WriteFile(
 		filepath.Join(userCatDir, "override.engine.dsda-doom.json"), []byte(engOv), 0o644,
 	); err != nil {

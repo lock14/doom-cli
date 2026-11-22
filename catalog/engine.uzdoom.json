@@ -1,11 +1,11 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "engine",
   "id": "uzdoom",
-  "display_name": "UZDoom",
+  "display-name": "UZDoom",
   "description": "UZDoom (Software-Plus and advanced scripting)",
   "family": "ZDoom",
-  "args_style": "zdoom",
+  "args-style": "zdoom",
   "binary": "uzdoom",
   "aliases": [
     "zdoom"
