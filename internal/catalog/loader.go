@@ -337,6 +337,7 @@ func Build(curatedEnts, userEnts []Entity) *Catalog {
 			if eng, ok := findEngineInMap(cat.Engines, strings.ToLower(strings.TrimSpace(p.Engine))); ok {
 				p.Engine = eng.ID
 			}
+			p.EngineArgs = canonicalizeEngineArgsMap(cat.Engines, p.EngineArgs)
 			if idx, exists := presetIndex[p.ID]; exists {
 				cat.Presets[idx] = p
 			} else {
@@ -388,6 +389,44 @@ func presetSortKey(p Preset) int {
 	return math.MaxInt
 }
 
+func canonicalEngineKey(engines map[string]EngineConfig, raw string) string {
+	clean := strings.ToLower(strings.TrimSpace(raw))
+	if eng, ok := findEngineInMap(engines, clean); ok {
+		return eng.ID
+	}
+	return clean
+}
+
+func canonicalizeEngineArgsMap(
+	engines map[string]EngineConfig,
+	in map[string][]string,
+) map[string][]string {
+	if len(in) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(in))
+	for k := range in {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make(map[string][]string, len(in))
+	for _, k := range keys {
+		slice := in[k]
+		if len(slice) == 0 {
+			continue
+		}
+		canon := canonicalEngineKey(engines, k)
+		if canon == "" {
+			continue
+		}
+		out[canon] = append(out[canon], slice...)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 	if ov.Set != nil {
 		s := ov.Set
@@ -407,6 +446,38 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 		}
 		if s.Files != nil {
 			p.Files = cloneFileSpecs(*s.Files)
+		}
+		if s.Complevel != nil {
+			if *s.Complevel == ComplevelUnset {
+				p.Complevel = nil
+			} else {
+				p.Complevel = cloneIntPtr(s.Complevel)
+			}
+		}
+		if s.EngineArgs != nil {
+			if p.EngineArgs == nil {
+				p.EngineArgs = make(map[string][]string)
+			}
+			keys := make([]string, 0, len(*s.EngineArgs))
+			for k := range *s.EngineArgs {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				canon := canonicalEngineKey(cat.Engines, k)
+				if canon == "" {
+					continue
+				}
+				slice := (*s.EngineArgs)[k]
+				if len(slice) == 0 {
+					delete(p.EngineArgs, canon)
+				} else {
+					p.EngineArgs[canon] = append([]string(nil), slice...)
+				}
+			}
+			if len(p.EngineArgs) == 0 {
+				p.EngineArgs = nil
+			}
 		}
 		if s.Args != nil {
 			p.Args = append([]string(nil), (*s.Args)...)
@@ -471,6 +542,30 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 	}
 	if len(ov.AppendArgs) > 0 {
 		p.Args = append(append([]string(nil), p.Args...), ov.AppendArgs...)
+	}
+	if len(ov.AppendEngineArgs) > 0 {
+		if p.EngineArgs == nil {
+			p.EngineArgs = make(map[string][]string)
+		}
+		keys := make([]string, 0, len(ov.AppendEngineArgs))
+		for k := range ov.AppendEngineArgs {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			slice := ov.AppendEngineArgs[k]
+			if len(slice) == 0 {
+				continue
+			}
+			canon := canonicalEngineKey(cat.Engines, k)
+			if canon == "" {
+				continue
+			}
+			p.EngineArgs[canon] = append(append([]string(nil), p.EngineArgs[canon]...), slice...)
+		}
+		if len(p.EngineArgs) == 0 {
+			p.EngineArgs = nil
+		}
 	}
 	p.Overridden = true
 }
@@ -542,6 +637,7 @@ func LoadPresetBaseAndOverride(catalogDir string, id string) (*Preset, *Override
 						ov.Path = filepath.ToSlash(ovPath)
 						ov.AppendFiles = cloneFileSpecs(ent.Override.AppendFiles)
 						ov.AppendArgs = append([]string(nil), ent.Override.AppendArgs...)
+						ov.AppendEngineArgs = cloneEngineArgsMap(ent.Override.AppendEngineArgs)
 						ov.ExcludeFiles = append([]string(nil), ent.Override.ExcludeFiles...)
 						return base, &ov, nil
 					}

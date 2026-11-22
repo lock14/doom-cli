@@ -210,7 +210,7 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
     (`internal/tui/theme.go`) as well as the `Launch Options` and `Configuration Manager` header pills
     (`renderLaunchOptionsView` in `internal/tui/options.go` and `renderConfigManagerView` in
     `internal/tui/config_view.go`) must only call `renderCapsule` (`internal/tui/render.go`) with rounded Powerlevel10k
-    capsule caps (`U+E0B6` and `U+E0B4`) when `nerd_fonts: true` (`doom config set nerd-fonts on`) is active
+    capsule caps (`U+E0B6` and `U+E0B4`) when `nerd-fonts: true` (`doom config set nerd-fonts on`) is active
     (`m.nerdFonts`).
 *   **Reason**: Guarantees zero tofu (`□` or `?`) in 100% of out-of-the-box system fonts while supporting opt-in
     powerline styling. See [AGENTS.md](../../AGENTS.md).

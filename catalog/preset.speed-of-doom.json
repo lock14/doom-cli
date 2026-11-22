@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "speed-of-doom",
   "name": "Speed of Doom",
@@ -10,6 +10,7 @@
       "name": "SODfinal.wad"
     }
   ],
+  "complevel": 9,
   "category": "Community Megawad",
   "genre": "Run-and-Gun and Slaughter",
   "difficulty": "Very Hard",
@@ -17,7 +18,7 @@
   "compatibility": "Boom",
   "description": "33-level intense challenge megawad",
   "author": "Joshy & Darkwave0000",
-  "release_date": "2010",
+  "release-date": "2010",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sodfinal.zip",

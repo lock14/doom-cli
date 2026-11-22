@@ -115,13 +115,15 @@ func TestWadsCommands(t *testing.T) {
 		"-e", "woof",
 		"--iwad", "DOOM2.WAD",
 		"--files", "custom.wad",
+		"--complevel", "21",
+		"--engine-args", "woof=-solonet",
 		"--description", "My Custom Map",
 	})
 	if err := wadsCmd.Execute(); err != nil {
 		t.Fatalf("wads add failed: %v", err)
 	}
 
-	// 4. wads show custom displays both DisplayName and Description via FormatLabel
+	// 4. wads show custom displays DisplayName, Description, Complevel, and Engine Args
 	var showOut bytes.Buffer
 	wadsCmd = newWadsCmd()
 	wadsCmd.SetOut(&showOut)
@@ -129,23 +131,27 @@ func TestWadsCommands(t *testing.T) {
 	if err := wadsCmd.Execute(); err != nil {
 		t.Fatalf("wads show CustomMap failed: %v", err)
 	}
-	if !strings.Contains(showOut.String(), "Engine:        Woof! (MBF21 port)") {
-		t.Errorf(
-			"expected wads show CustomMap to display 'Engine:        Woof! (MBF21 port)', got:\n%s",
-			showOut.String(),
-		)
+	for _, wantLine := range []string{
+		"Engine:        Woof! (MBF21 port)",
+		"Complevel:     21: MBF21",
+		"- woof:        -solonet",
+		"-complevel 21 -solonet",
+	} {
+		if !strings.Contains(showOut.String(), wantLine) {
+			t.Errorf("expected wads show CustomMap to contain %q, got:\n%s", wantLine, showOut.String())
+		}
 	}
 
-	// 5. wads set across multiple calls preserves prior fields (and supports Roman numeral / filename query doom2)
+	// 5. wads set across multiple calls preserves prior fields (including --complevel and --engine-args)
 	wadsCmd = newWadsCmd()
-	wadsCmd.SetArgs([]string{"set", "Sunlust", "-e", "uzdoom"})
+	wadsCmd.SetArgs([]string{"set", "Sunlust", "-e", "uzdoom", "--engine-args", "uzdoom=+gl_tonemap 3"})
 	if err := wadsCmd.Execute(); err != nil {
-		t.Fatalf("wads set -e failed: %v", err)
+		t.Fatalf("wads set -e/--engine-args failed: %v", err)
 	}
 	wadsCmd = newWadsCmd()
-	wadsCmd.SetArgs([]string{"set", "Sunlust", "--args", "-skill 4"})
+	wadsCmd.SetArgs([]string{"set", "Sunlust", "--args", "-skill 4", "--complevel", "11"})
 	if err := wadsCmd.Execute(); err != nil {
-		t.Fatalf("wads set --args failed: %v", err)
+		t.Fatalf("wads set --args/--complevel failed: %v", err)
 	}
 	wadsCmd = newWadsCmd()
 	wadsCmd.SetArgs([]string{"set", "doom2", "-e", "uzdoom"})
@@ -186,7 +192,11 @@ func TestWadsCommands(t *testing.T) {
 		t.Fatalf("loadAppState failed: %v", err)
 	}
 	sunlust := cat.Find("sunlust")
-	if sunlust == nil || sunlust.Engine != "uzdoom" || !reflect.DeepEqual(sunlust.Args, []string{"-skill", "4"}) {
+	if sunlust == nil ||
+		sunlust.Engine != "uzdoom" ||
+		sunlust.Complevel == nil || *sunlust.Complevel != 11 ||
+		!reflect.DeepEqual(sunlust.ArgsForEngine("uzdoom"), []string{"+gl_tonemap", "3"}) ||
+		!reflect.DeepEqual(sunlust.Args, []string{"-skill", "4"}) {
 		t.Fatalf("expected Sunlust override in catalog, got %+v", sunlust)
 	}
 
@@ -198,8 +208,12 @@ func TestWadsCommands(t *testing.T) {
 	}
 	_, _, cat, _ = loadAppState()
 	sunlust = cat.Find("sunlust")
-	if sunlust == nil || sunlust.Engine != "dsda-doom" || len(sunlust.Args) != 0 {
-		t.Fatalf("expected Sunlust launch options cleared, got %+v", sunlust)
+	if sunlust == nil ||
+		sunlust.Engine != "dsda-doom" ||
+		sunlust.Complevel == nil || *sunlust.Complevel != 9 ||
+		len(sunlust.EngineArgs) != 0 ||
+		len(sunlust.Args) != 0 {
+		t.Fatalf("expected Sunlust launch options reverted to curated defaults, got %+v", sunlust)
 	}
 
 	// 7. wads remove rejects built-in curated presets (including via substring lookup) and removes custom presets

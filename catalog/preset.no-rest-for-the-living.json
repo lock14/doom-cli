@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "no-rest-for-the-living",
   "name": "No Rest for the Living",
@@ -14,6 +14,7 @@
       "optional": true
     }
   ],
+  "complevel": 2,
   "category": "Official Expansion",
   "genre": "Classic Techbase and Hell",
   "difficulty": "Moderate",
@@ -21,7 +22,7 @@
   "compatibility": "Vanilla",
   "description": "Official 9-level expansion for Doom II",
   "author": "Nerve Software",
-  "release_date": "2010",
+  "release-date": "2010",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/No_Rest_for_the_Living",

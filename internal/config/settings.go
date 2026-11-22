@@ -14,17 +14,17 @@ import (
 // User-defined engines, presets, and overrides live in <ConfigDir>/catalog.d/*.json.
 type AppConfig struct {
 	Theme         string   `json:"theme,omitempty"`
-	NerdFonts     bool     `json:"nerd_fonts,omitempty"`
-	WadsDir       string   `json:"wads_dir,omitempty"`
-	WadsDirs      []string `json:"wads_dirs,omitempty"`
-	BinDir        string   `json:"bin_dir,omitempty"`
-	SoundFontsDir string   `json:"soundfonts_dir,omitempty"`
+	NerdFonts     bool     `json:"nerd-fonts,omitempty"`
+	WadsDir       string   `json:"wads-dir,omitempty"`
+	WadsDirs      []string `json:"wads-dirs,omitempty"`
+	BinDir        string   `json:"bin-dir,omitempty"`
+	SoundFontsDir string   `json:"soundfonts-dir,omitempty"`
 
 	nerdFontsSet bool
 	extra        map[string]json.RawMessage
 }
 
-// HasNerdFonts reports whether nerd_fonts was explicitly configured in config.json or set via SetNerdFonts.
+// HasNerdFonts reports whether nerd-fonts was explicitly configured in config.json or set via SetNerdFonts.
 func (c *AppConfig) HasNerdFonts() bool {
 	return c != nil && (c.NerdFonts || c.nerdFontsSet)
 }
@@ -40,11 +40,11 @@ func (c *AppConfig) SetNerdFonts(v bool) {
 
 var knownConfigKeys = map[string]bool{
 	"theme":          true,
-	"nerd_fonts":     true,
-	"wads_dir":       true,
-	"wads_dirs":      true,
-	"bin_dir":        true,
-	"soundfonts_dir": true,
+	"nerd-fonts":     true,
+	"wads-dir":       true,
+	"wads-dirs":      true,
+	"bin-dir":        true,
+	"soundfonts-dir": true,
 }
 
 // LoadConfig reads the user configuration file if present, returning defaults if not found.
@@ -74,7 +74,7 @@ func LoadConfig(paths *Paths) (*AppConfig, error) {
 	}
 	for k, v := range rawMap {
 		lowerKey := strings.ToLower(k)
-		if lowerKey == "nerd_fonts" {
+		if lowerKey == "nerd-fonts" {
 			cfg.nerdFontsSet = true
 		}
 		if !knownConfigKeys[lowerKey] {
@@ -108,19 +108,19 @@ func SaveConfig(paths *Paths, cfg *AppConfig) error {
 		merged["theme"] = cfg.Theme
 	}
 	if cfg.NerdFonts || cfg.nerdFontsSet {
-		merged["nerd_fonts"] = cfg.NerdFonts
+		merged["nerd-fonts"] = cfg.NerdFonts
 	}
 	if cfg.WadsDir != "" {
-		merged["wads_dir"] = cfg.WadsDir
+		merged["wads-dir"] = cfg.WadsDir
 	}
 	if len(cfg.WadsDirs) > 0 {
-		merged["wads_dirs"] = cfg.WadsDirs
+		merged["wads-dirs"] = cfg.WadsDirs
 	}
 	if cfg.BinDir != "" {
-		merged["bin_dir"] = cfg.BinDir
+		merged["bin-dir"] = cfg.BinDir
 	}
 	if cfg.SoundFontsDir != "" {
-		merged["soundfonts_dir"] = cfg.SoundFontsDir
+		merged["soundfonts-dir"] = cfg.SoundFontsDir
 	}
 
 	var buf bytes.Buffer
@@ -170,7 +170,7 @@ func WadsDirsSource(cfg *AppConfig) string {
 	return "default"
 }
 
-// ResolveNerdFontsWithSource returns the effective nerd_fonts flag and its provenance ("config" or "default").
+// ResolveNerdFontsWithSource returns the effective nerd-fonts flag and its provenance ("config" or "default").
 func ResolveNerdFontsWithSource(cfg *AppConfig) (bool, string) {
 	if cfg != nil && cfg.HasNerdFonts() {
 		return cfg.NerdFonts, "config"

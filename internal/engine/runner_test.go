@@ -407,3 +407,70 @@ func TestExecute_RelativePathsAndDashPrefixedWAD(t *testing.T) {
 		t.Errorf("recorded args missing absolute -tricky.wad path:\n%s", string(recorded))
 	}
 }
+
+func TestBuildEngineArgs_ComplevelAndEngineArgsIsolation(t *testing.T) {
+	t.Parallel()
+	wadsDir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
+	_ = os.WriteFile(filepath.Join(wadsDir, "Eviternity.wad"), []byte("pwad"), 0o644)
+
+	cat, err := catalog.LoadCurated()
+	if err != nil {
+		t.Fatalf("LoadCurated: %v", err)
+	}
+	cat.Engines["woof"] = catalog.EngineConfig{
+		ID:        "woof",
+		Binary:    "woof",
+		ArgsStyle: "boom",
+	}
+
+	cl11 := 11
+	p := catalog.Preset{
+		ID:        "eviternity",
+		Name:      "Eviternity",
+		Engine:    "uzdoom",
+		IWAD:      "DOOM2.WAD",
+		Files:     []catalog.FileSpec{{Name: "Eviternity.wad"}},
+		Complevel: &cl11,
+		EngineArgs: map[string][]string{
+			"dsda-doom": {"-solonet"},
+			"uzdoom":    {"+gl_tonemap", "3"},
+		},
+		Args: []string{"-skill", "4"},
+	}
+	idx := catalog.NewDirIndex(wadsDir).WithCatalog(cat)
+
+	// 1. Default uzdoom omits -complevel and dsda-doom engine-args, includes uzdoom engine-args + universal args
+	uzPreview := FormatLaunchPreview(p, cat, idx, nil)
+	if strings.Contains(uzPreview, "-complevel") || strings.Contains(uzPreview, "-solonet") {
+		t.Errorf("expected uzdoom preview to omit Boom complevel/solonet, got %q", uzPreview)
+	}
+	if !strings.Contains(uzPreview, "+gl_tonemap 3 -skill 4") {
+		t.Errorf("expected uzdoom preview to contain uzdoom engine-args and universal args, got %q", uzPreview)
+	}
+
+	// 2. Switching to dsda-doom emits -complevel 11 + dsda-doom engine-args (-solonet) + universal args
+	pDSDA := p
+	pDSDA.Engine = "dsda-doom"
+	dsdaPreview := FormatLaunchPreview(pDSDA, cat, idx, nil)
+	if !strings.Contains(dsdaPreview, "-complevel 11 -solonet -skill 4") {
+		t.Errorf("expected dsda-doom preview to include '-complevel 11 -solonet -skill 4', got %q", dsdaPreview)
+	}
+	if strings.Contains(dsdaPreview, "+gl_tonemap") {
+		t.Errorf("expected dsda-doom preview to omit uzdoom engine-args, got %q", dsdaPreview)
+	}
+
+	// 3. Switching to custom Boom engine woof automatically inherits -complevel 11 without dsda-doom's -solonet
+	pWoof := p
+	pWoof.Engine = "woof"
+	woofPreview := FormatLaunchPreview(pWoof, cat, idx, nil)
+	if !strings.Contains(woofPreview, "-complevel 11 -skill 4") || strings.Contains(woofPreview, "-solonet") {
+		t.Errorf("expected woof preview to inherit '-complevel 11' without dsda-doom '-solonet', got %q", woofPreview)
+	}
+
+	// 4. Explicit CLI extraArgs -complevel overrides p.Complevel without duplicating -complevel
+	overridePreview := FormatLaunchPreview(pDSDA, cat, idx, []string{"-complevel", "21"})
+	if strings.Contains(overridePreview, "-complevel 11") || !strings.Contains(overridePreview, "-complevel 21") {
+		t.Errorf("expected CLI -complevel 21 to supersede base -complevel 11, got %q", overridePreview)
+	}
+}

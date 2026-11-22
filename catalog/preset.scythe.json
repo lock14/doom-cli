@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "scythe",
   "name": "Scythe",
@@ -10,6 +10,7 @@
       "name": "scythe.wad"
     }
   ],
+  "complevel": 2,
   "category": "Community Megawad",
   "genre": "Speedrun Action",
   "difficulty": "Hard",
@@ -17,7 +18,7 @@
   "compatibility": "Vanilla",
   "description": "Iconic fast-paced speedrunning megawad",
   "author": "Erik Alm",
-  "release_date": "2003",
+  "release-date": "2003",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/scythe.zip",

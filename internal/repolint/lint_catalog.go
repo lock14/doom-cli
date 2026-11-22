@@ -252,6 +252,11 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		if _, ok := engineIDs[engKey]; !ok {
 			addErr(where, "preset %s references unknown engine %q", p.ID, p.Engine)
 		}
+		for eaKey := range p.EngineArgs {
+			if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(eaKey))]; !ok {
+				addErr(where, "preset %s engine-args references unknown engine %q", p.ID, eaKey)
+			}
+		}
 
 		validateFiles(where, p.ID, p.IWAD, p.Files)
 		if p.Game != "" {
@@ -304,7 +309,7 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 				p.PrimaryURL() == "" {
 				addErr(
 					where,
-					"curated preset %s requires author, release_date, category, genre, difficulty, quality, and links",
+					"curated preset %s requires author, release-date, category, genre, difficulty, quality, and links",
 					p.ID,
 				)
 			}
@@ -348,7 +353,17 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 			}
 			for _, ex := range ov.ExcludeFiles {
 				if strings.TrimSpace(ex) == "" {
-					addErr(where, "preset %s has an empty exclude_files entry", ov.Target.ID)
+					addErr(where, "preset %s has an empty exclude-files entry", ov.Target.ID)
+				}
+			}
+			for eaKey := range ov.AppendEngineArgs {
+				if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(eaKey))]; !ok {
+					addErr(
+						where,
+						"override preset %s append-engine-args references unknown engine %q",
+						ov.Target.ID,
+						eaKey,
+					)
 				}
 			}
 		case catalog.KindEngine:
@@ -359,6 +374,13 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		if ov.Set != nil && ov.Set.Engine != nil && *ov.Set.Engine != "" {
 			if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(*ov.Set.Engine))]; !ok {
 				addErr(where, "override engine %q does not exist", *ov.Set.Engine)
+			}
+		}
+		if ov.Set != nil && ov.Set.EngineArgs != nil {
+			for eaKey := range *ov.Set.EngineArgs {
+				if _, ok := engineIDs[strings.ToLower(strings.TrimSpace(eaKey))]; !ok {
+					addErr(where, "override engine-args references unknown engine %q", eaKey)
+				}
 			}
 		}
 	}

@@ -5,12 +5,44 @@ package catalog
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 )
 
 // SchemaVersion is the supported entity schema version for catalog JSON files.
 const SchemaVersion = 1
+
+// ComplevelUnset is an override sentinel value (-1) that clears an inherited preset complevel.
+const ComplevelUnset = -1
+
+// ValidateComplevel verifies that cl is a supported Boom/PrBoom+/MBF21 compatibility level (0..17 or 21).
+func ValidateComplevel(cl int) error {
+	if (cl >= 0 && cl <= 17) || cl == 21 {
+		return nil
+	}
+	return fmt.Errorf("invalid complevel %d (expected 0..17 or 21)", cl)
+}
+
+// ComplevelLabel formats a compatibility level integer with its common standard name when known.
+func ComplevelLabel(cl int) string {
+	switch cl {
+	case 2:
+		return "2: Vanilla"
+	case 3:
+		return "3: Ult. Doom"
+	case 4:
+		return "4: Final Doom"
+	case 9:
+		return "9: Boom"
+	case 11:
+		return "11: MBF"
+	case 21:
+		return "21: MBF21"
+	default:
+		return strconv.Itoa(cl)
+	}
+}
 
 // Kind discriminates the entity types stored in catalog files.
 type Kind string
@@ -84,16 +116,16 @@ type InstallRecipe struct {
 
 // EngineConfig describes a Doom source port engine entity.
 type EngineConfig struct {
-	SchemaVersion int            `json:"schema_version,omitempty"`
+	SchemaVersion int            `json:"schema-version,omitempty"`
 	Kind          Kind           `json:"kind"`
 	ID            string         `json:"id"`
-	DisplayName   string         `json:"display_name,omitempty"`
+	DisplayName   string         `json:"display-name,omitempty"`
 	Description   string         `json:"description,omitempty"`
 	Family        string         `json:"family,omitempty"`
-	ArgsStyle     string         `json:"args_style,omitempty"` // "boom" or "zdoom"
+	ArgsStyle     string         `json:"args-style,omitempty"` // "boom" or "zdoom"
 	Binary        string         `json:"binary,omitempty"`
-	PrefixArgs    []string       `json:"prefix_args,omitempty"`
-	DefaultArgs   []string       `json:"default_args,omitempty"`
+	PrefixArgs    []string       `json:"prefix-args,omitempty"`
+	DefaultArgs   []string       `json:"default-args,omitempty"`
 	Aliases       []string       `json:"aliases,omitempty"`
 	Badge         string         `json:"badge,omitempty"`
 	Install       *InstallRecipe `json:"install,omitempty"`
@@ -213,32 +245,54 @@ type Link struct {
 
 // Preset defines a single launchable Doom mapset or game configuration.
 type Preset struct {
-	SchemaVersion     int        `json:"schema_version,omitempty"`
-	Kind              Kind       `json:"kind"`
-	ID                string     `json:"id"`
-	Name              string     `json:"name"`
-	Game              string     `json:"game,omitempty"`
-	Engine            string     `json:"engine"`
-	IWAD              string     `json:"iwad"`
-	Files             []FileSpec `json:"files,omitempty"`
-	Args              []string   `json:"args,omitempty"`
-	Category          string     `json:"category,omitempty"`
-	Genre             string     `json:"genre,omitempty"`
-	Difficulty        string     `json:"difficulty,omitempty"`
-	Quality           string     `json:"quality,omitempty"`
-	Compatibility     string     `json:"compatibility,omitempty"`
-	Description       string     `json:"description,omitempty"`
-	Author            string     `json:"author,omitempty"`
-	ReleaseDate       string     `json:"release_date,omitempty"`
-	Sources           []Source   `json:"sources,omitempty"`
-	Links             []Link     `json:"links,omitempty"`
-	LoadMapsAfterMods bool       `json:"load_maps_after_mods,omitempty"`
-	Sort              int        `json:"sort,omitempty"`
+	SchemaVersion     int                 `json:"schema-version,omitempty"`
+	Kind              Kind                `json:"kind"`
+	ID                string              `json:"id"`
+	Name              string              `json:"name"`
+	Game              string              `json:"game,omitempty"`
+	Engine            string              `json:"engine"`
+	IWAD              string              `json:"iwad"`
+	Files             []FileSpec          `json:"files,omitempty"`
+	Complevel         *int                `json:"complevel,omitempty"`
+	EngineArgs        map[string][]string `json:"engine-args,omitempty"`
+	Args              []string            `json:"args,omitempty"`
+	Category          string              `json:"category,omitempty"`
+	Genre             string              `json:"genre,omitempty"`
+	Difficulty        string              `json:"difficulty,omitempty"`
+	Quality           string              `json:"quality,omitempty"`
+	Compatibility     string              `json:"compatibility,omitempty"`
+	Description       string              `json:"description,omitempty"`
+	Author            string              `json:"author,omitempty"`
+	ReleaseDate       string              `json:"release-date,omitempty"`
+	Sources           []Source            `json:"sources,omitempty"`
+	Links             []Link              `json:"links,omitempty"`
+	LoadMapsAfterMods bool                `json:"load-maps-after-mods,omitempty"`
+	Sort              int                 `json:"sort,omitempty"`
 
 	Layer            Layer  `json:"-"`
 	Overridden       bool   `json:"-"`
 	EngineOverridden bool   `json:"-"`
 	Path             string `json:"-"`
+}
+
+// ArgsForEngine returns a copy of the engine-specific arguments declared for engineID, or nil.
+func (p Preset) ArgsForEngine(engineID string) []string {
+	if len(p.EngineArgs) == 0 {
+		return nil
+	}
+	clean := strings.ToLower(strings.TrimSpace(engineID))
+	if clean == "" {
+		return nil
+	}
+	if exact, ok := p.EngineArgs[clean]; ok && len(exact) > 0 {
+		return append([]string(nil), exact...)
+	}
+	for k, v := range p.EngineArgs {
+		if strings.EqualFold(strings.TrimSpace(k), clean) && len(v) > 0 {
+			return append([]string(nil), v...)
+		}
+	}
+	return nil
 }
 
 // IsCustom reports whether the preset originated from the user layer.
@@ -286,28 +340,30 @@ type OverrideTarget struct {
 
 // OverrideSet holds optional replacement fields for a preset or engine override.
 type OverrideSet struct {
-	Game              *string     `json:"game,omitempty"`
-	Engine            *string     `json:"engine,omitempty"`
-	IWAD              *string     `json:"iwad,omitempty"`
-	Files             *[]FileSpec `json:"files,omitempty"`
-	Args              *[]string   `json:"args,omitempty"`
-	Category          *string     `json:"category,omitempty"`
-	Genre             *string     `json:"genre,omitempty"`
-	Difficulty        *string     `json:"difficulty,omitempty"`
-	Quality           *string     `json:"quality,omitempty"`
-	Compatibility     *string     `json:"compatibility,omitempty"`
-	Description       *string     `json:"description,omitempty"`
-	Author            *string     `json:"author,omitempty"`
-	ReleaseDate       *string     `json:"release_date,omitempty"`
-	Sources           *[]Source   `json:"sources,omitempty"`
-	Links             *[]Link     `json:"links,omitempty"`
-	LoadMapsAfterMods *bool       `json:"load_maps_after_mods,omitempty"`
-	Binary            *string     `json:"binary,omitempty"`
-	ArgsStyle         *string     `json:"args_style,omitempty"`
-	DefaultArgs       *[]string   `json:"default_args,omitempty"`
-	PrefixArgs        *[]string   `json:"prefix_args,omitempty"`
-	Badge             *string     `json:"badge,omitempty"`
-	DisplayName       *string     `json:"display_name,omitempty"`
+	Game              *string              `json:"game,omitempty"`
+	Engine            *string              `json:"engine,omitempty"`
+	IWAD              *string              `json:"iwad,omitempty"`
+	Files             *[]FileSpec          `json:"files,omitempty"`
+	Complevel         *int                 `json:"complevel,omitempty"`
+	EngineArgs        *map[string][]string `json:"engine-args,omitempty"`
+	Args              *[]string            `json:"args,omitempty"`
+	Category          *string              `json:"category,omitempty"`
+	Genre             *string              `json:"genre,omitempty"`
+	Difficulty        *string              `json:"difficulty,omitempty"`
+	Quality           *string              `json:"quality,omitempty"`
+	Compatibility     *string              `json:"compatibility,omitempty"`
+	Description       *string              `json:"description,omitempty"`
+	Author            *string              `json:"author,omitempty"`
+	ReleaseDate       *string              `json:"release-date,omitempty"`
+	Sources           *[]Source            `json:"sources,omitempty"`
+	Links             *[]Link              `json:"links,omitempty"`
+	LoadMapsAfterMods *bool                `json:"load-maps-after-mods,omitempty"`
+	Binary            *string              `json:"binary,omitempty"`
+	ArgsStyle         *string              `json:"args-style,omitempty"`
+	DefaultArgs       *[]string            `json:"default-args,omitempty"`
+	PrefixArgs        *[]string            `json:"prefix-args,omitempty"`
+	Badge             *string              `json:"badge,omitempty"`
+	DisplayName       *string              `json:"display-name,omitempty"`
 }
 
 // IsEmpty reports whether every replacement pointer on s is nil.
@@ -319,6 +375,8 @@ func (s *OverrideSet) IsEmpty() bool {
 		s.Engine == nil &&
 		s.IWAD == nil &&
 		s.Files == nil &&
+		s.Complevel == nil &&
+		s.EngineArgs == nil &&
 		s.Args == nil &&
 		s.Category == nil &&
 		s.Genre == nil &&
@@ -341,13 +399,14 @@ func (s *OverrideSet) IsEmpty() bool {
 
 // Override patches a lower-layer preset or engine without replacing its base file.
 type Override struct {
-	SchemaVersion int            `json:"schema_version,omitempty"`
-	Kind          Kind           `json:"kind"`
-	Target        OverrideTarget `json:"target"`
-	Set           *OverrideSet   `json:"set,omitempty"`
-	AppendFiles   []FileSpec     `json:"append_files,omitempty"`
-	AppendArgs    []string       `json:"append_args,omitempty"`
-	ExcludeFiles  []string       `json:"exclude_files,omitempty"`
+	SchemaVersion    int                 `json:"schema-version,omitempty"`
+	Kind             Kind                `json:"kind"`
+	Target           OverrideTarget      `json:"target"`
+	Set              *OverrideSet        `json:"set,omitempty"`
+	AppendFiles      []FileSpec          `json:"append-files,omitempty"`
+	AppendArgs       []string            `json:"append-args,omitempty"`
+	AppendEngineArgs map[string][]string `json:"append-engine-args,omitempty"`
+	ExcludeFiles     []string            `json:"exclude-files,omitempty"`
 
 	Path string `json:"-"`
 }
@@ -402,9 +461,30 @@ func cloneEngineConfig(e EngineConfig) EngineConfig {
 	return ec
 }
 
+func cloneIntPtr(v *int) *int {
+	if v == nil {
+		return nil
+	}
+	cp := *v
+	return &cp
+}
+
+func cloneEngineArgsMap(m map[string][]string) map[string][]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(m))
+	for k, v := range m {
+		out[k] = append([]string(nil), v...)
+	}
+	return out
+}
+
 func clonePreset(p Preset) *Preset {
 	pc := p
 	pc.Files = cloneFileSpecs(p.Files)
+	pc.Complevel = cloneIntPtr(p.Complevel)
+	pc.EngineArgs = cloneEngineArgsMap(p.EngineArgs)
 	pc.Args = append([]string(nil), p.Args...)
 	pc.Sources = append([]Source(nil), p.Sources...)
 	pc.Links = append([]Link(nil), p.Links...)

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "sunder",
   "name": "Sunder",
@@ -13,14 +13,15 @@
       ]
     }
   ],
+  "complevel": 9,
   "category": "Community Megawad",
   "genre": "Architectural Slaughter",
   "difficulty": "Extreme",
   "quality": "S-Tier (9.5/10)",
-  "compatibility": "MBF21 / Boom",
+  "compatibility": "Boom",
   "description": "Monumental architectural slaughter megawad",
   "author": "Insane_Gazebo",
-  "release_date": "2009",
+  "release-date": "2009",
   "sources": [
     {
       "url": "https://dsdarchive.com/files/wads/doom2/5016/Sunder_2512.zip",

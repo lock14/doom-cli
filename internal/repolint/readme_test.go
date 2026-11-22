@@ -21,20 +21,21 @@ func TestGenerateReadmeTableAndSyncReadme(t *testing.T) {
 		t.Fatal(err)
 	}
 	engineJSON := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "engine",
   "id": "dsda-doom",
-  "display_name": "DSDA-Doom",
-  "args_style": "boom"
+  "display-name": "DSDA-Doom",
+  "args-style": "boom"
 }`
 	presetJSON := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "sunlust",
   "name": "Sunlust",
   "engine": "dsda-doom",
   "iwad": "DOOM2.WAD",
   "files": [{"name": "sunlust.wad"}],
+  "complevel": 9,
   "genre": "Slaughter",
   "difficulty": "Extreme",
   "quality": "S-Tier (9.5/10)",

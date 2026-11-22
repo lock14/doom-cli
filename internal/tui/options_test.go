@@ -134,9 +134,9 @@ func TestLaunchOptions_PreExistingOverride_IdempotentSaveAndReset(t *testing.T) 
 	wadsDir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644)
 
-	// Write an override with set.args and exclude_files before starting initialModel
+	// Write an override with set.args and exclude-files before starting initialModel
 	ovJSON := `{"kind":"override","target":{"kind":"preset","id":"doom-ii"},` +
-		`"set":{"args":["-skill","3"]},"exclude_files":["idkfa 2024.wad"]}`
+		`"set":{"args":["-skill","3"]},"exclude-files":["idkfa 2024.wad"]}`
 	if err := os.WriteFile(
 		filepath.Join(userDir, "override.preset.doom-ii.json"), []byte(ovJSON), 0o644,
 	); err != nil {
@@ -201,8 +201,8 @@ func TestLaunchOptions_BoomFieldSkipping_SetArgs_And_SurgicalConfigSave(t *testi
 		t.Fatalf("LoadLayered: %v", err)
 	}
 
-	// 1. On UZDoom preset ("eviternity-ii"), Solo-Net and Complevel are skipped by focus and omitted from args
-	m := initialModel(cat, []string{paths.WadsDir}, ClassicTheme, false, "eviternity-ii")
+	// 1. On UZDoom preset ("eviternity"), Solo-Net and Complevel are skipped by focus and omitted from args
+	m := initialModel(cat, []string{paths.WadsDir}, ClassicTheme, false, "eviternity")
 	m.paths = paths
 	m.appConfig = &config.AppConfig{}
 	m.customCatalogDir = paths.CatalogDir
@@ -237,8 +237,8 @@ func TestLaunchOptions_BoomFieldSkipping_SetArgs_And_SurgicalConfigSave(t *testi
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = newM.(model)
 
-	// 2. Preset with non-empty base.Args ("sigil" has ["-warp", "5", "1"]) and pre-existing set.args
-	// preserves replacement set.args on Ctrl+S and omits redundant set.engine
+	// 2. Preset with curated complevel ("sigil" has complevel 3) displays Default (3: Ult. Doom)
+	// and pre-existing set.args preserves replacement set.args on Ctrl+S and omits redundant set.engine
 	ovSigil := `{"kind":"override","target":{"kind":"preset","id":"sigil"},"set":{"args":["-skill","4"]}}`
 	if err := os.WriteFile(
 		filepath.Join(paths.CatalogDir, "override.preset.sigil.json"), []byte(ovSigil), 0o644,
@@ -249,6 +249,9 @@ func TestLaunchOptions_BoomFieldSkipping_SetArgs_And_SurgicalConfigSave(t *testi
 	mSigil.customCatalogDir = paths.CatalogDir
 	newM, _ = mSigil.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
 	mSigil = newM.(model)
+	if !strings.Contains(mSigil.View(), "Default (3: Ult. Doom)") {
+		t.Errorf("expected sigil Launch Options to display 'Default (3: Ult. Doom)', got:\n%s", mSigil.View())
+	}
 	newM, _ = mSigil.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
 	mSigil = newM.(model)
 

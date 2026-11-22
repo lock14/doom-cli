@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "sigil",
   "name": "Sigil",
@@ -13,14 +13,15 @@
       ]
     }
   ],
+  "complevel": 3,
   "category": "Community Episode",
   "genre": "Gothic Hell",
   "difficulty": "Moderate",
   "quality": "A-Tier (8.0/10)",
-  "compatibility": "Vanilla",
+  "compatibility": "Limit-Removing",
   "description": "John Romero's unofficial 5th episode for Ultimate Doom",
   "author": "John Romero",
-  "release_date": "2019",
+  "release-date": "2019",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/SIGIL",

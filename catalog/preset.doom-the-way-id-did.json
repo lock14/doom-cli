@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "doom-the-way-id-did",
   "name": "Doom: The Way ID Did",
@@ -17,6 +17,7 @@
       "optional": true
     }
   ],
+  "complevel": 3,
   "category": "Community Megawad",
   "genre": "Classic id Homage",
   "difficulty": "Casual",
@@ -24,7 +25,7 @@
   "compatibility": "Vanilla",
   "description": "Classic vanilla-style homage megawad",
   "author": "NoisyVelvet, Jason Baker, et al.",
-  "release_date": "2011",
+  "release-date": "2011",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom/megawads/dtwid.zip",

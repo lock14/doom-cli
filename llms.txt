@@ -22,7 +22,8 @@ doom setup --wads all --games heretic,hexen
 doom
 doom wads fetch eviternity-ii
 doom eviternity-ii
-doom "Ancient Aliens" -e dsda-doom -skill 4
+doom "Eviternity" -e dsda-doom
+doom "Ancient Aliens" -skill 4
 
 # Interactive terminal WAD browser with fuzzy search and preview pane
 doom wads
@@ -82,9 +83,9 @@ doom wads
 Settings resolve in two-tier precedence order (`config.json` takes precedence over platform defaults):
 
 - Subcommand flags: `--engine` (`-e`) and `--dry-run` on root `doom`; `--all` on `doom wads` and `doom wads list`;
-  `--engine` (`-e`) on `doom wads add` and `doom wads set`; `--games` on `doom setup`, `doom wads scan`, and
-  `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`, `doom wads fetch`, `doom wads scan`, and
-  `doom engines install`.
+  `--engine` (`-e`), `--complevel`, and `--engine-args` on `doom wads add` and `doom wads set`; `--games` on
+  `doom setup`, `doom wads scan`, and `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`,
+  `doom wads fetch`, `doom wads scan`, and `doom engines install`.
 - Environment variables: `DOOM_CONFIG_DIR` overrides the `doom-cli` configuration directory (which holds `config.json`,
   `catalog.d/`, and `themes/`), alongside standard OS directory variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `HOME`,
   `LOCALAPPDATA`, `USERPROFILE`).
@@ -157,5 +158,5 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
 
 - Repository: https://github.com/lock14/doom-cli
 - Issues: https://github.com/lock14/doom-cli/issues
-- DSDA-Doom: https://github.com/kraflab/dsda-doom
+- DSDA-Doom: https://github.com/dsda-org/dsda-doom
 - UZDoom: https://github.com/UZDoom/uzdoom

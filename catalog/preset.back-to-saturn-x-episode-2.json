@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "back-to-saturn-x-episode-2",
   "name": "Back to Saturn X: Episode 2",
@@ -16,14 +16,15 @@
       "name": "btsx_e2.deh"
     }
   ],
+  "complevel": 2,
   "category": "Community Megawad",
   "genre": "Gothic Adventure",
   "difficulty": "Hard",
   "quality": "S-Tier (9.5/10)",
-  "compatibility": "Vanilla / Boom",
-  "description": "Vanilla and Boom megawad with custom soundtrack and palettes",
+  "compatibility": "Vanilla",
+  "description": "Vanilla Doom II megawad with custom soundtrack and palettes",
   "author": "Esselfortium et al.",
-  "release_date": "2014",
+  "release-date": "2014",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/btsx_e2.zip",

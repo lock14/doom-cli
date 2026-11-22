@@ -18,8 +18,9 @@ func TestDecodeEntityStrictValidation(t *testing.T) {
 	}{
 		{
 			name: "valid preset with UTF-8 BOM",
-			raw: "\xef\xbb\xbf{\"schema_version\":1,\"kind\":\"preset\",\"id\":\"my-wad\"," +
-				"\"name\":\"My WAD\",\"engine\":\"dsda-doom\",\"iwad\":\"DOOM2.WAD\"}",
+			raw: "\xef\xbb\xbf{\"schema-version\":1,\"kind\":\"preset\",\"id\":\"my-wad\"," +
+				"\"name\":\"My WAD\",\"engine\":\"dsda-doom\",\"iwad\":\"DOOM2.WAD\",\"complevel\":9," +
+				"\"engine-args\":{\"dsda-doom\":[\"-solonet\"]}}",
 			wantErr: "",
 		},
 		{
@@ -29,16 +30,22 @@ func TestDecodeEntityStrictValidation(t *testing.T) {
 			wantErr: "unknown field",
 		},
 		{
+			name: "legacy snake_case key rejected",
+			raw: `{"schema_version":1,"kind":"preset","id":"my-wad",` +
+				`"name":"My WAD","engine":"dsda-doom","iwad":"DOOM2.WAD"}`,
+			wantErr: "unknown field",
+		},
+		{
 			name: "schema key rejected",
 			raw: `{"$schema":"foo","kind":"preset","id":"my-wad",` +
 				`"name":"My WAD","engine":"dsda-doom","iwad":"DOOM2.WAD"}`,
 			wantErr: "unknown field",
 		},
 		{
-			name: "unsupported schema_version",
-			raw: `{"schema_version":2,"kind":"preset","id":"my-wad",` +
+			name: "unsupported schema-version",
+			raw: `{"schema-version":2,"kind":"preset","id":"my-wad",` +
 				`"name":"My WAD","engine":"dsda-doom","iwad":"DOOM2.WAD"}`,
-			wantErr: "unsupported schema_version 2",
+			wantErr: "unsupported schema-version 2",
 		},
 		{
 			name: "trailing token rejected",
@@ -52,9 +59,21 @@ func TestDecodeEntityStrictValidation(t *testing.T) {
 			wantErr: "invalid id",
 		},
 		{
-			name:    "invalid engine args_style",
-			raw:     `{"kind":"engine","id":"woof","args_style":"invalid"}`,
-			wantErr: "args_style",
+			name:    "invalid engine args-style",
+			raw:     `{"kind":"engine","id":"woof","args-style":"invalid"}`,
+			wantErr: "args-style",
+		},
+		{
+			name: "invalid preset complevel",
+			raw: `{"kind":"preset","id":"my-wad","name":"My WAD",` +
+				`"engine":"dsda-doom","iwad":"DOOM2.WAD","complevel":99}`,
+			wantErr: "invalid complevel",
+		},
+		{
+			name: "invalid engine-args key",
+			raw: `{"kind":"preset","id":"my-wad","name":"My WAD","engine":"dsda-doom","iwad":"DOOM2.WAD",` +
+				`"engine-args":{"bad_key":["-fast"]}}`,
+			wantErr: "engine-args key",
 		},
 	}
 
