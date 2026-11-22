@@ -34,14 +34,14 @@ func DecodeEntity(data []byte) (Entity, error) {
 	}
 
 	var head struct {
-		SchemaVersion *int `json:"schema_version"`
+		SchemaVersion *int `json:"schema-version"`
 		Kind          Kind `json:"kind"`
 	}
 	if err := json.Unmarshal(data, &head); err != nil {
 		return Entity{}, err
 	}
 	if head.SchemaVersion != nil && *head.SchemaVersion != SchemaVersion {
-		return Entity{}, fmt.Errorf("unsupported schema_version %d (want %d)", *head.SchemaVersion, SchemaVersion)
+		return Entity{}, fmt.Errorf("unsupported schema-version %d (want %d)", *head.SchemaVersion, SchemaVersion)
 	}
 
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -94,6 +94,16 @@ func DecodeEntity(data []byte) (Entity, error) {
 	return ent, nil
 }
 
+func validateEngineArgsKeys(m map[string][]string) error {
+	for k := range m {
+		clean := strings.ToLower(strings.TrimSpace(k))
+		if err := ValidateID(clean); err != nil {
+			return fmt.Errorf("engine-args key %q: %w", k, err)
+		}
+	}
+	return nil
+}
+
 func validateDecodedEntity(ent Entity) error {
 	switch {
 	case ent.Engine != nil:
@@ -102,7 +112,7 @@ func validateDecodedEntity(ent Entity) error {
 		}
 		if ent.Engine.ArgsStyle != "" && ent.Engine.ArgsStyle != "boom" && ent.Engine.ArgsStyle != "zdoom" {
 			return fmt.Errorf(
-				"engine %s: args_style %q must be \"boom\" or \"zdoom\"",
+				"engine %s: args-style %q must be \"boom\" or \"zdoom\"",
 				ent.Engine.ID, ent.Engine.ArgsStyle,
 			)
 		}
@@ -124,6 +134,14 @@ func validateDecodedEntity(ent Entity) error {
 		if strings.TrimSpace(ent.Preset.Engine) == "" {
 			return fmt.Errorf("preset %s: missing engine", ent.Preset.ID)
 		}
+		if ent.Preset.Complevel != nil {
+			if err := ValidateComplevel(*ent.Preset.Complevel); err != nil {
+				return fmt.Errorf("preset %s: %w", ent.Preset.ID, err)
+			}
+		}
+		if err := validateEngineArgsKeys(ent.Preset.EngineArgs); err != nil {
+			return fmt.Errorf("preset %s: %w", ent.Preset.ID, err)
+		}
 	case ent.Override != nil:
 		if ent.Override.Target.Kind != KindPreset && ent.Override.Target.Kind != KindEngine {
 			return fmt.Errorf("override target kind %q must be \"preset\" or \"engine\"", ent.Override.Target.Kind)
@@ -139,11 +157,36 @@ func validateDecodedEntity(ent Entity) error {
 				)
 			}
 		}
+		if ent.Override.Set != nil && ent.Override.Set.Complevel != nil {
+			cl := *ent.Override.Set.Complevel
+			if cl != ComplevelUnset {
+				if err := ValidateComplevel(cl); err != nil {
+					return fmt.Errorf(
+						"override %s/%s: %w",
+						ent.Override.Target.Kind, ent.Override.Target.ID, err,
+					)
+				}
+			}
+		}
+		if ent.Override.Set != nil && ent.Override.Set.EngineArgs != nil {
+			if err := validateEngineArgsKeys(*ent.Override.Set.EngineArgs); err != nil {
+				return fmt.Errorf(
+					"override %s/%s: %w",
+					ent.Override.Target.Kind, ent.Override.Target.ID, err,
+				)
+			}
+		}
+		if err := validateEngineArgsKeys(ent.Override.AppendEngineArgs); err != nil {
+			return fmt.Errorf(
+				"override %s/%s: %w",
+				ent.Override.Target.Kind, ent.Override.Target.ID, err,
+			)
+		}
 		if ent.Override.Set != nil && ent.Override.Set.ArgsStyle != nil {
 			style := *ent.Override.Set.ArgsStyle
 			if style != "" && style != "boom" && style != "zdoom" {
 				return fmt.Errorf(
-					"override %s/%s: args_style %q must be \"boom\" or \"zdoom\"",
+					"override %s/%s: args-style %q must be \"boom\" or \"zdoom\"",
 					ent.Override.Target.Kind, ent.Override.Target.ID, style,
 				)
 			}

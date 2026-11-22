@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "tnt-revilution",
   "name": "TNT: Revilution",
@@ -13,6 +13,7 @@
       "name": "TNTR.deh"
     }
   ],
+  "complevel": 4,
   "category": "Community Megawad",
   "genre": "Sci-Fi Adventure",
   "difficulty": "Moderate",
@@ -20,7 +21,7 @@
   "compatibility": "Vanilla",
   "description": "Community sequel to TNT: Evilution",
   "author": "TeamTNT & Various",
-  "release_date": "2017",
+  "release-date": "2017",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/tntr.zip",

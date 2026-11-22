@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "doom-ii-the-way-id-did",
   "name": "Doom II: The Way ID Did",
@@ -17,6 +17,7 @@
       "optional": true
     }
   ],
+  "complevel": 2,
   "category": "Community Megawad",
   "genre": "Classic id Homage",
   "difficulty": "Moderate",
@@ -24,7 +25,7 @@
   "compatibility": "Vanilla",
   "description": "Classic vanilla-style homage megawad",
   "author": "Various",
-  "release_date": "2013",
+  "release-date": "2013",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/d2twid.zip",

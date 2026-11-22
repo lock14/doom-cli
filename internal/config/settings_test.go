@@ -119,7 +119,7 @@ func TestConfigCaseInsensitiveKnownKeysDeduped(t *testing.T) {
 	configPath := filepath.Join(tmpDir, "config.json")
 	p := &Paths{ConfigFile: configPath}
 
-	raw := "{\n  \"Theme\": \"nord\",\n  \"Wads_Dir\": \"/data/wads\",\n  \"custom_extra\": 42\n}\n"
+	raw := "{\n  \"Theme\": \"nord\",\n  \"Wads-Dir\": \"/data/wads\",\n  \"custom_extra\": 42\n}\n"
 	if err := os.WriteFile(configPath, []byte(raw), 0o644); err != nil {
 		t.Fatal(err)
 	}

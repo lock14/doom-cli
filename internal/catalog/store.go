@@ -93,7 +93,7 @@ func AddEngine(userDir string, curated *Catalog, eng EngineConfig) (string, erro
 	eng.Kind = KindEngine
 	eng.ArgsStyle = eng.EffectiveArgsStyle()
 	if eng.ArgsStyle != "boom" && eng.ArgsStyle != "zdoom" {
-		return "", fmt.Errorf("invalid args_style %q (must be \"boom\" or \"zdoom\")", eng.ArgsStyle)
+		return "", fmt.Errorf("invalid args-style %q (must be \"boom\" or \"zdoom\")", eng.ArgsStyle)
 	}
 	if strings.TrimSpace(eng.Binary) == "" {
 		eng.Binary = eng.ID
@@ -142,7 +142,7 @@ func ConfigEngine(userDir string, layered *Catalog, key string, opts EngineOverr
 	if opts.ArgsStyle != nil {
 		style := strings.ToLower(strings.TrimSpace(*opts.ArgsStyle))
 		if style != "boom" && style != "zdoom" {
-			return "", fmt.Errorf("invalid args_style %q (must be \"boom\" or \"zdoom\")", *opts.ArgsStyle)
+			return "", fmt.Errorf("invalid args-style %q (must be \"boom\" or \"zdoom\")", *opts.ArgsStyle)
 		}
 		opts.ArgsStyle = &style
 	}
@@ -356,6 +356,18 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 		}
 		p.Engine = eng.ID
 	}
+	if p.Complevel != nil {
+		if err := ValidateComplevel(*p.Complevel); err != nil {
+			return "", err
+		}
+	}
+	if len(p.EngineArgs) > 0 {
+		normalizedEngArgs, err := resolveStoreEngineArgs(layered, p.EngineArgs, false)
+		if err != nil {
+			return "", err
+		}
+		p.EngineArgs = normalizedEngArgs
+	}
 	if strings.TrimSpace(p.Category) == "" {
 		p.Category = "Custom"
 	}
@@ -378,14 +390,55 @@ func AddPreset(userDir string, curated, layered *Catalog, p Preset) (string, err
 	return targetPath, nil
 }
 
+func resolveStoreEngineArgs(
+	layered *Catalog,
+	raw map[string][]string,
+	keepEmpty bool,
+) (map[string][]string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make(map[string][]string, len(raw))
+	for k, slice := range raw {
+		clean := strings.ToLower(strings.TrimSpace(k))
+		if layered != nil {
+			eng, ok := layered.FindEngine(clean)
+			if !ok {
+				return nil, fmt.Errorf(
+					"unknown engine %q in engine-args (register it first with `doom engines add`)",
+					k,
+				)
+			}
+			clean = eng.ID
+		} else if err := ValidateID(clean); err != nil {
+			return nil, fmt.Errorf("invalid engine-args key %q: %w", k, err)
+		}
+		if len(slice) == 0 {
+			if keepEmpty {
+				out[clean] = []string{}
+			}
+			continue
+		}
+		out[clean] = append([]string(nil), slice...)
+	}
+	if len(out) == 0 && !keepEmpty {
+		return nil, nil
+	}
+	return out, nil
+}
+
 // OverridePatchRequest specifies the fields to update on a preset override.
 type OverridePatchRequest struct {
-	Engine       *string
-	IWAD         *string
-	SetArgs      *[]string
-	AppendArgs   *[]string
-	AppendFiles  *[]FileSpec
-	ExcludeFiles *[]string
+	Engine           *string
+	IWAD             *string
+	Complevel        *int
+	ClearComplevel   bool
+	SetEngineArgs    *map[string][]string
+	AppendEngineArgs *map[string][]string
+	SetArgs          *[]string
+	AppendArgs       *[]string
+	AppendFiles      *[]FileSpec
+	ExcludeFiles     *[]string
 }
 
 // ConfigPreset creates or updates <userDir>/override.preset.<id>.json for the
@@ -422,6 +475,27 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 		}
 		canonical := eng.ID
 		req.Engine = &canonical
+	}
+	if req.Complevel != nil && *req.Complevel != ComplevelUnset {
+		if err := ValidateComplevel(*req.Complevel); err != nil {
+			return "", nil, err
+		}
+	}
+	var resolvedSetEngArgs map[string][]string
+	if req.SetEngineArgs != nil {
+		var err error
+		resolvedSetEngArgs, err = resolveStoreEngineArgs(layered, *req.SetEngineArgs, true)
+		if err != nil {
+			return "", nil, err
+		}
+	}
+	var resolvedAppendEngArgs map[string][]string
+	if req.AppendEngineArgs != nil {
+		var err error
+		resolvedAppendEngArgs, err = resolveStoreEngineArgs(layered, *req.AppendEngineArgs, true)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 
 	overridePath := filepath.Join(userDir, fmt.Sprintf("override.preset.%s.json", target.ID))
@@ -460,6 +534,56 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 			} else {
 				ov.Set.IWAD = req.IWAD
 			}
+		}
+	}
+	if req.Complevel != nil || req.ClearComplevel {
+		if ov.Set == nil {
+			ov.Set = &OverrideSet{}
+		}
+		if req.ClearComplevel {
+			ov.Set.Complevel = nil
+		} else {
+			ov.Set.Complevel = cloneIntPtr(req.Complevel)
+		}
+	}
+	if req.SetEngineArgs != nil {
+		if ov.Set == nil {
+			ov.Set = &OverrideSet{}
+		}
+		mergedMap := make(map[string][]string)
+		if ov.Set.EngineArgs != nil {
+			for k, v := range *ov.Set.EngineArgs {
+				mergedMap[k] = append([]string(nil), v...)
+			}
+		}
+		for k, v := range resolvedSetEngArgs {
+			mergedMap[k] = append([]string(nil), v...)
+			if len(ov.AppendEngineArgs) > 0 {
+				delete(ov.AppendEngineArgs, k)
+			}
+		}
+		if len(mergedMap) == 0 {
+			ov.Set.EngineArgs = nil
+		} else {
+			ov.Set.EngineArgs = &mergedMap
+		}
+		if len(ov.AppendEngineArgs) == 0 {
+			ov.AppendEngineArgs = nil
+		}
+	}
+	if req.AppendEngineArgs != nil {
+		if ov.AppendEngineArgs == nil {
+			ov.AppendEngineArgs = make(map[string][]string)
+		}
+		for k, v := range resolvedAppendEngArgs {
+			if len(v) == 0 {
+				delete(ov.AppendEngineArgs, k)
+			} else {
+				ov.AppendEngineArgs[k] = append([]string(nil), v...)
+			}
+		}
+		if len(ov.AppendEngineArgs) == 0 {
+			ov.AppendEngineArgs = nil
 		}
 	}
 	if req.SetArgs != nil {

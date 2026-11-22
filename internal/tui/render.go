@@ -223,9 +223,12 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	cur := m.filtered[m.cursor]
 	readmePath, hasReadme := m.resolveReadme(cur)
 	engStr := m.catalog.EngineDisplayName(cur.Engine)
+	activeArgsStyle := catalog.GuessArgsStyle(cur.Engine, "")
 	if eng, ok := m.catalog.FindEngine(cur.Engine); ok {
 		engStr = eng.FormatLabel()
+		activeArgsStyle = eng.EffectiveArgsStyle()
 	}
+	effectiveArgs := append(cur.ArgsForEngine(cur.Engine), cur.Args...)
 
 	iwadStatus := m.styles.StatusMissing.Render("[✗ Missing]")
 	if _, ok := m.resolveFile(cur.IWAD); ok {
@@ -278,9 +281,14 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	previewLines = append(previewLines,
 		fmt.Sprintf("%s%s", m.styles.Label.Render("Engine:        "), engStr),
 	)
-	if len(cur.Args) > 0 {
+	if activeArgsStyle == "boom" && cur.Complevel != nil {
 		previewLines = append(previewLines,
-			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(cur.Args, " ")),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Complevel:     "), catalog.ComplevelLabel(*cur.Complevel)),
+		)
+	}
+	if len(effectiveArgs) > 0 {
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(effectiveArgs, " ")),
 		)
 	}
 	if cur.Category != "" {
@@ -335,7 +343,7 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 	}
 	if maxLines > 0 && len(previewLines) > maxLines {
 		return m.condensePreviewLines(
-			cur, engStr, iwadStatus, fileEntries, detailsWidth, maxLines, hasReadme,
+			cur, engStr, activeArgsStyle, effectiveArgs, iwadStatus, fileEntries, detailsWidth, maxLines, hasReadme,
 		), hasReadme
 	}
 
@@ -345,6 +353,8 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 func (m model) condensePreviewLines(
 	cur catalog.Preset,
 	engStr string,
+	activeArgsStyle string,
+	effectiveArgs []string,
 	iwadStatus string,
 	fileEntries []previewFileEntry,
 	detailsWidth int,
@@ -397,9 +407,14 @@ func (m model) condensePreviewLines(
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Game:          "), gameVal),
 		)
 	}
-	if len(cur.Args) > 0 {
+	if activeArgsStyle == "boom" && cur.Complevel != nil {
 		metaCandidates = append(metaCandidates,
-			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(cur.Args, " ")),
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Complevel:     "), catalog.ComplevelLabel(*cur.Complevel)),
+		)
+	}
+	if len(effectiveArgs) > 0 {
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(effectiveArgs, " ")),
 		)
 	}
 	var profileParts []string

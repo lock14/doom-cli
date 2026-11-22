@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "plutonia-2",
   "name": "Plutonia 2",
@@ -13,6 +13,7 @@
       "name": "PL2.DEH"
     }
   ],
+  "complevel": 4,
   "category": "Community Megawad",
   "genre": "Tactical and Slaughter",
   "difficulty": "Very Hard",
@@ -20,7 +21,7 @@
   "compatibility": "Vanilla",
   "description": "Community sequel to The Plutonia Experiment",
   "author": "Plutonia 2 Team",
-  "release_date": "2008",
+  "release-date": "2008",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/megawads/pl2.zip",

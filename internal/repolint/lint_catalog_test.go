@@ -73,12 +73,15 @@ func TestLintCatalog_FileAliasesValidation(t *testing.T) {
 	// Redundant alias, path-separator alias, cross-IWAD alias (HERETIC.WAD on DOOM2 preset),
 	// and canonical target collision (scythe.wad)
 	badPreset := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "custom-alias-test",
   "name": "Custom Alias Test",
   "engine": "dsda-doom",
   "iwad": "DOOM2.WAD",
+  "engine-args": {
+    "nonexistent-port": ["-fast"]
+  },
   "files": [
     {
       "name": "my_map.wad",
@@ -93,10 +96,10 @@ func TestLintCatalog_FileAliasesValidation(t *testing.T) {
 
 	// Override with invalid alias
 	badOverride := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "override",
   "target": { "kind": "preset", "id": "scythe" },
-  "append_files": [
+  "append-files": [
     {
       "name": "extra_mod.wad",
       "aliases": ["EXTRA-MOD.WAD"]
@@ -127,6 +130,7 @@ func TestLintCatalog_FileAliasesValidation(t *testing.T) {
 		"must not match iwad \"HERETIC.WAD\"",
 		"conflicts with canonical target \"scythe.wad\"",
 		"file extra_mod.wad alias \"EXTRA-MOD.WAD\" is redundant",
+		"engine-args references unknown engine \"nonexistent-port\"",
 	} {
 		if !strings.Contains(out, wantSub) {
 			t.Errorf("expected lint diagnostics to contain %q, got:\n%s", wantSub, out)
@@ -160,12 +164,12 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
 	_ = os.MkdirAll(lintCatDir, 0o755)
 	_ = os.WriteFile(
 		filepath.Join(lintCatDir, "engine.dsda-doom.json"),
-		[]byte(`{"schema_version":1,"kind":"engine","id":"dsda-doom","args_style":"boom"}`),
+		[]byte(`{"schema-version":1,"kind":"engine","id":"dsda-doom","args-style":"boom"}`),
 		0o644,
 	)
 	winEscaped := "C:" + `\\Users\\` + "alice"
 	unpinnedCurated := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "unpinned-test",
   "name": "Unpinned Test",
@@ -177,7 +181,7 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
   "difficulty": "Moderate",
   "quality": "A-Tier",
   "author": "Tester",
-  "release_date": "2024",
+  "release-date": "2024",
   "description": "` + winEscaped + `",
   "sources": [{"url": "https://example.com/map.zip"}],
   "links": [{"url": "https://example.com/info"}],
@@ -185,7 +189,7 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
 }`
 	_ = os.WriteFile(filepath.Join(lintCatDir, "preset.unpinned-test.json"), []byte(unpinnedCurated), 0o644)
 	missingGameHeretic := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "heretic-no-game",
   "name": "Heretic No Game",
@@ -196,13 +200,13 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
   "difficulty": "Moderate",
   "quality": "A-Tier",
   "author": "Raven",
-  "release_date": "1994",
+  "release-date": "1994",
   "links": [{"url": "https://example.com/heretic"}],
   "sort": 20
 }`
 	_ = os.WriteFile(filepath.Join(lintCatDir, "preset.heretic-no-game.json"), []byte(missingGameHeretic), 0o644)
 	conflictingGame := `{
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "conflict-game",
   "name": "Conflict Game",
@@ -214,7 +218,7 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
   "difficulty": "Moderate",
   "quality": "A-Tier",
   "author": "id",
-  "release_date": "1994",
+  "release-date": "1994",
   "links": [{"url": "https://example.com/doom2"}],
   "sort": 30
 }`

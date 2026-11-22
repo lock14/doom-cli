@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "sunlust",
   "name": "Sunlust",
@@ -10,6 +10,7 @@
       "name": "sunlust.wad"
     }
   ],
+  "complevel": 9,
   "category": "Community Megawad",
   "genre": "Combat Puzzle and Slaughter",
   "difficulty": "Extreme",
@@ -17,7 +18,7 @@
   "compatibility": "Boom",
   "description": "32-level visual and gameplay masterpiece",
   "author": "Ribbiks & Dannebubinga",
-  "release_date": "2015",
+  "release-date": "2015",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/sunlust.zip",

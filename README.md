@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 A unified, cross-platform CLI tool and curated collection of configurations and launcher presets for classic Doom
-source ports ([DSDA-Doom](https://github.com/kraflab/dsda-doom) and [UZDoom](https://github.com/UZDoom/uzdoom)) across
+source ports ([DSDA-Doom](https://github.com/dsda-org/dsda-doom) and [UZDoom](https://github.com/UZDoom/uzdoom)) across
 Linux, macOS, and Windows.
 
 ## Table of contents
@@ -385,33 +385,33 @@ doom config set theme blood
 
 ### Custom JSON themes
 
-Create custom themes in `<config_dir>/themes/<theme_name>.json` (for example,
+Create custom themes in `<config-dir>/themes/<theme-name>.json` (for example,
 `~/.config/doom-cli/themes/solarized.json`):
 
 ```json
 {
   "name": "solarized",
   "description": "Solarized dark palette",
-  "brand_cap": "#CB4B16",
-  "brand_text": "#FDF6E3",
-  "brand_bg": "#CB4B16",
-  "stats_cap": "#073642",
-  "stats_text": "#93A1A1",
-  "stats_bg": "#073642",
+  "brand-cap": "#CB4B16",
+  "brand-text": "#FDF6E3",
+  "brand-bg": "#CB4B16",
+  "stats-cap": "#073642",
+  "stats-text": "#93A1A1",
+  "stats-bg": "#073642",
   "prompt": "#268BD2",
-  "cursor_bar": "#268BD2",
-  "cursor_text": "#FDF6E3",
-  "border_active": "#268BD2",
-  "border_inactive": "#073642",
-  "title_active": "#268BD2",
-  "title_inactive": "#586E75",
+  "cursor-bar": "#268BD2",
+  "cursor-text": "#FDF6E3",
+  "border-active": "#268BD2",
+  "border-inactive": "#073642",
+  "title-active": "#268BD2",
+  "title-inactive": "#586E75",
   "label": "#2AA198",
   "keycap": "#B58900",
-  "key_desc": "#586E75",
-  "tag_dsda": "#859900",
-  "tag_uzdoom": "#B58900",
-  "status_ready": "#859900",
-  "status_missing": "#DC322F",
+  "key-desc": "#586E75",
+  "tag-dsda": "#859900",
+  "tag-uzdoom": "#B58900",
+  "status-ready": "#859900",
+  "status-missing": "#DC322F",
   "muted": "#586E75"
 }
 ```
@@ -426,7 +426,7 @@ By default, the launcher uses universal rectangular badges (` DOOM `) and standa
 cleanly in standard terminal emulators without patched fonts.
 
 If your terminal font includes Nerd Fonts glyphs (such as JetBrains Mono NF, MesloLGS NF, or FiraCode NF), you can
-enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `nerd_fonts: true`:
+enable Powerlevel10k-style rounded capsule badges (` DOOM `) via `nerd-fonts: true`:
 
 ```bash
 # Enable or disable in user configuration
@@ -437,7 +437,7 @@ doom config set nerd-fonts off
 ## Extensibility
 
 `doom-cli` uses a two-layer entity catalog: immutable curated defaults embedded from `catalog/*.json` and per-entity
-user drop-in files in `<config_dir>/catalog.d/*.json`.
+user drop-in files in `<config-dir>/catalog.d/*.json`.
 
 ### Add custom engines
 
@@ -479,8 +479,8 @@ doom engines reset dsda-doom
 ### Add custom WADs and presets
 
 Add custom mapsets or community mods to your personal catalog (`catalog.d/preset.<id>.json`) with `--id`, `-e` or
-`--engine`, `--iwad`, `--files`, `--args`, and `--description`. They integrate into `doom wads` fuzzy search and direct
-execution (`doom <wad>`):
+`--engine`, `--iwad`, `--files`, `--complevel`, `--engine-args`, `--args`, and `--description`. They integrate into
+`doom wads` fuzzy search and direct execution (`doom <wad>`):
 
 ```bash
 # Add a custom mapset with required IWAD and PWADs
@@ -495,16 +495,17 @@ doom "KDiZD"
 
 ### Configure per-WAD launch options
 
-Customize engine (`-e` or `--engine`), IWAD (`--iwad`), additional files (`--files`), excluded optional files
-(`--exclude-file`), or launch arguments (`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear
-overrides with `doom wads reset`, without modifying repository defaults:
+Customize engine (`-e` or `--engine`), compatibility level (`--complevel`), per-engine arguments (`--engine-args`),
+IWAD (`--iwad`), additional files (`--files`), excluded optional files (`--exclude-file`), or universal launch arguments
+(`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear overrides with `doom wads reset`, without
+modifying repository defaults:
 
 ```bash
-# Always launch Sunlust in Woof! with ultra-violence skill
+# Always launch Sunlust in Woof! with ultra-violence skill (inherits complevel 9 automatically)
 doom wads set "Sunlust" -e woof --args "-skill 4"
 
-# Set Ancient Aliens to always run with Boom complevel 11
-doom wads set "Ancient Aliens" --args "-complevel 11"
+# Add DSDA-Doom specific flags or override complevel on a preset
+doom wads set "Sunlust" --engine-args dsda-doom="-solonet" --complevel 9
 
 # Disable optional soundtrack WAD for a preset
 doom wads set "Doom II" --exclude-file "idkfa 2024.wad"
@@ -523,13 +524,13 @@ User settings are persisted in `~/.config/doom-cli/config.json` (Linux),
 ```json
 {
   "theme": "blood",
-  "nerd_fonts": false,
-  "wads_dir": "E:\\DOOM\\WADS",
-  "wads_dirs": [
+  "nerd-fonts": false,
+  "wads-dir": "E:\\DOOM\\WADS",
+  "wads-dirs": [
     "E:\\DOOM\\MEGAWADS"
   ],
-  "bin_dir": "E:\\DOOM\\bin",
-  "soundfonts_dir": "E:\\DOOM\\soundfonts"
+  "bin-dir": "E:\\DOOM\\bin",
+  "soundfonts-dir": "E:\\DOOM\\soundfonts"
 }
 ```
 
@@ -556,24 +557,24 @@ doom config show
 
 ### User entity catalog (`catalog.d/*.json`)
 
-Custom engines, presets, and overrides are stored one entity per file inside `<config_dir>/catalog.d/`:
+Custom engines, presets, and overrides are stored one entity per file inside `<config-dir>/catalog.d/`:
 
 - `catalog.d/engine.woof.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "engine",
     "id": "woof",
-    "display_name": "Woof!",
+    "display-name": "Woof!",
     "description": "Woof! MBF21 port",
-    "args_style": "boom",
+    "args-style": "boom",
     "binary": "woof"
   }
   ```
 - `catalog.d/override.engine.dsda-doom.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "override",
     "target": {
       "kind": "engine",
@@ -582,7 +583,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
     "set": {
       "binary": "/opt/doom/dsda-doom",
       "badge": "DSDA+",
-      "default_args": [
+      "default-args": [
         "-complevel",
         "21"
       ]
@@ -592,7 +593,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 - `catalog.d/preset.kdizd.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "preset",
     "id": "kdizd",
     "name": "KDiZD",
@@ -608,7 +609,7 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 - `catalog.d/override.preset.sunlust.json`:
   ```json
   {
-    "schema_version": 1,
+    "schema-version": 1,
     "kind": "override",
     "target": {
       "kind": "preset",
@@ -617,11 +618,16 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
     "set": {
       "engine": "woof"
     },
-    "append_args": [
+    "append-args": [
       "-skill",
       "4"
     ],
-    "exclude_files": [
+    "append-engine-args": {
+      "woof": [
+        "-solonet"
+      ]
+    },
+    "exclude-files": [
       "idkfa 2024.wad"
     ]
   }
@@ -686,11 +692,11 @@ directly to `going-down-turbo`:
 
 | Megawad or expansion | Engine | Genre | Difficulty | Quality | Compatibility and details |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| [Alien Vendetta](https://www.doomworld.com/idgames/levels/doom2/megawads/av) | DSDA-Doom | Run-and-Gun and Slaughter | Very Hard | S-Tier (9.5/10) | Classic Boom megawad with DeHackEd patch |
-| [Ancient Aliens](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens) | UZDoom | Sci-Fi Run-and-Gun | Hard | S-Tier (10/10) | MBF complevel 11 megawad with custom color palette |
+| [Alien Vendetta](https://www.doomworld.com/idgames/levels/doom2/megawads/av) | DSDA-Doom | Run-and-Gun and Slaughter | Very Hard | S-Tier (9.5/10) | Classic limit-removing megawad with DeHackEd patch |
+| [Ancient Aliens](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/aaliens) | DSDA-Doom | Sci-Fi Run-and-Gun | Hard | S-Tier (10/10) | Boom megawad with custom neon color palette |
 | [AUGER;ZENITH](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/dbp37_augzen) | DSDA-Doom | Cyberpunk Adventure | Moderate | S-Tier (9.5/10) | Neon-soaked cyberpunk city megawad with custom palette |
-| [Back to Saturn X: Episode 1](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1) | DSDA-Doom | Techbase Run-and-Gun | Hard | S-Tier (9.5/10) | Vanilla and Boom megawad with custom soundtrack and palettes |
-| [Back to Saturn X: Episode 2](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2) | DSDA-Doom | Gothic Adventure | Hard | S-Tier (9.5/10) | Vanilla and Boom megawad with custom soundtrack and palettes |
+| [Back to Saturn X: Episode 1](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e1) | DSDA-Doom | Techbase Run-and-Gun | Hard | S-Tier (9.5/10) | Vanilla Doom II megawad with custom soundtrack and palettes |
+| [Back to Saturn X: Episode 2](https://www.doomworld.com/idgames/levels/doom2/megawads/btsx_e2) | DSDA-Doom | Gothic Adventure | Hard | S-Tier (9.5/10) | Vanilla Doom II megawad with custom soundtrack and palettes |
 | [Deathless](https://www.doomworld.com/idgames/levels/doom/Ports/megawads/deathless) | DSDA-Doom | Classic Run-and-Gun | Casual | A-Tier (8.5/10) | Modern Ultimate Doom episode replacement |
 | [Doom](https://doomwiki.org/wiki/The_Ultimate_Doom) | DSDA-Doom | Classic Campaign | Casual | S-Tier (9.5/10) | Classic IWAD with modern MIDI audio |
 | [Doom II](https://doomwiki.org/wiki/Doom_II) | DSDA-Doom | Classic Campaign | Moderate | S-Tier (9.5/10) | Classic IWAD with modern MIDI audio |
@@ -698,14 +704,14 @@ directly to `going-down-turbo`:
 | [Doom: The Way ID Did](https://www.doomworld.com/idgames/levels/doom/megawads/dtwid) | DSDA-Doom | Classic id Homage | Casual | B-Tier (7.5/10) | Classic vanilla-style homage megawad |
 | [Doom II: The Way ID Did](https://www.doomworld.com/idgames/levels/doom2/megawads/d2twid) | DSDA-Doom | Classic id Homage | Moderate | B-Tier (7.5/10) | Classic vanilla-style homage megawad |
 | [Eviternity](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity) | UZDoom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack and custom monsters |
-| [Eviternity II](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity2) | UZDoom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack, MBF21 features, and custom monsters |
+| [Eviternity II](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/eviternity2) | DSDA-Doom | Adventure and Run-and-Gun | Hard | S-Tier (10/10) | OTEX texture pack, MBF21 features, and custom monsters |
 | [Going Down Turbo](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/gdturbo) | DSDA-Doom | Set-Piece Chaos | Hard | S-Tier (9.5/10) | 10th-anniversary rebalanced edition of Going Down |
 | [Heretic](https://doomwiki.org/wiki/Heretic) | UZDoom | Dark Fantasy FPS | Moderate | A-Tier (8.5/10) | Raven Software classic fantasy shooter |
 | [Hexen](https://doomwiki.org/wiki/Hexen:_Beyond_Heretic) | UZDoom | Hub-Based Fantasy | Moderate | A-Tier (8.0/10) | Raven Software hub-based fantasy shooter |
 | [Legacy of Rust](https://doomwiki.org/wiki/Legacy_of_Rust) | DSDA-Doom | Official ID24 Episode | Hard | A-Tier (8.5/10) | Official ID24 episode with custom weapons and monsters |
 | [Master Levels](https://doomwiki.org/wiki/Master_Levels_for_Doom_II) | DSDA-Doom | 90s Anthology | Moderate | C-Tier (6.0/10) | Full 20-level classic collection |
 | [MyHouse.pk3](https://www.doomworld.com/forum/topic/134292-myhousewad/) | UZDoom | Psychological Horror | Casual | S-Tier (9.5/10) | Non-euclidean psychological horror showcase |
-| [Nostalgia](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/nostalgia) | DSDA-Doom | Compact Run-and-Gun | Casual | A-Tier (8.5/10) | Vanilla-compatible megawad |
+| [Nostalgia](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/nostalgia) | DSDA-Doom | Compact Run-and-Gun | Casual | A-Tier (8.5/10) | Limit-removing classic-style megawad |
 | [No End In Sight](https://www.doomworld.com/idgames/levels/doom/Ports/megawads/neis) | DSDA-Doom | Atmospheric Adventure | Hard | A-Tier (8.5/10) | Classic 4-episode expansion for Ultimate Doom |
 | [No Rest for the Living](https://doomwiki.org/wiki/No_Rest_for_the_Living) | DSDA-Doom | Classic Techbase and Hell | Moderate | A-Tier (8.5/10) | Official 9-level expansion for Doom II |
 | [Overboard](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/overboard) | DSDA-Doom | Set-Piece Adventure | Moderate | S-Tier (9.0/10) | Island-hopping vacation episode with New Game+ remix |
@@ -722,7 +728,7 @@ directly to `going-down-turbo`:
 | [Plutonia 2](https://www.doomworld.com/idgames/levels/doom2/megawads/pl2) | DSDA-Doom | Tactical and Slaughter | Very Hard | S-Tier (9.5/10) | Community sequel to The Plutonia Experiment |
 | [TNT: Evilution](https://doomwiki.org/wiki/TNT:_Evilution) | DSDA-Doom | Adventure Techbase | Moderate | B-Tier (7.0/10) | Classic Final Doom IWAD with modern soundtrack |
 | [TNT: Revilution](https://www.doomworld.com/idgames/levels/doom2/megawads/tntr) | DSDA-Doom | Sci-Fi Adventure | Moderate | A-Tier (8.5/10) | Community sequel to TNT: Evilution |
-| [Valiant](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant) | UZDoom | DeHackEd Action | Hard | S-Tier (9.5/10) | MBF megawad with custom weapons and DeHackEd patch |
+| [Valiant](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant) | DSDA-Doom | DeHackEd Action | Hard | S-Tier (9.5/10) | MBF megawad with custom weapons and DeHackEd patch |
 
 ## Engine profiles and customizations
 

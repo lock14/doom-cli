@@ -53,11 +53,22 @@ All contributions must respect the core repository invariants:
     `doom wads list` to installed presets (plus `LayerUser` custom presets, with `--all` and TUI `F3` or `Ctrl+T` for
     the full catalog), and provide actionable usage hints via `exactArgsWithHint` when positional arguments are omitted.
 *   **Doom engine selection and preset hygiene**:
-    *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
-        and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
-        *Overboard*, *Rowdy Rudy II*, *Sunder*, *Sunlust*, *Legacy of Rust*, and *Sigil*).
-    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom scripting (*MyHouse.pk3*), high-resolution texture packs
-        like OTEX (*Eviternity I & II*), or Raven Software and Rogue Entertainment games (*Heretic*, *Hexen*, *Strife*).
+    *   **DSDA-Doom**: Default for all classic vanilla (`complevel` `2`, `3`, `4`), limit-removing (`2`, `3`), Boom
+        (`9`), MBF (`11`), MBF21 (`21`), and ID24 (`21`) Doom presets where demo accuracy, standard physics, custom
+        256-color software palettes, and speedrunning precision are desired (such as *Alien Vendetta*, *Ancient Aliens*,
+        *AUGER;ZENITH*, *BTSX*, *Eviternity II*, *Going Down Turbo*, *Legacy of Rust*, *Overboard*, *Rowdy Rudy II*,
+        *Sigil*, *Sunder*, *Sunlust*, and *Valiant*). OTEX is a standard-resolution, 8-bit paletted texture pack and
+        runs natively in DSDA-Doom.
+    *   **UZDoom**: Reserved for mapsets requiring ZScript or UDMF scripting (*MyHouse.pk3*), pre-`UMAPINFO` mapsets
+        relying on ZDoom `ZMAPINFO` and `ACS` for chapter menus and weather effects (*Eviternity*, which also declares
+        `"complevel": 11` for Boom-port overrides), and Raven Software or Rogue Entertainment games (*Heretic*, *Hexen*,
+        *Strife*).
+    *   **Hyphenated kebab-case JSON keys and three-tier launch model**: Standardize all `doom-cli` JSON keys across
+        `config.json`, `catalog/*.json`, `<ConfigDir>/catalog.d/*.json`, and `themes/*.json` on hyphenated `kebab-case`
+        (`schema-version`, `display-name`, `args-style`, `prefix-args`, `default-args`, `engine-args`, `release-date`,
+        `load-maps-after-mods`, `append-files`, `append-args`, `append-engine-args`, `exclude-files`, `nerd-fonts`,
+        `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and `brand-cap`), separating typed WAD `complevel`
+        integers (`0..17` or `21`), per-engine `engine-args` maps, and universal `args` slices.
     *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
         declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
         `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
@@ -73,9 +84,9 @@ All contributions must respect the core repository invariants:
         explicitly declare `"game"` (`"heretic"`, `"hexen"`, `"strife"`).
     *   **Unified launch argument and preview synthesis**: `PrepareLaunch` and `FormatLaunchPreview` share
         `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
-        `DefaultArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods` sorting, and missing optional file omission
-        (when `idx != nil`) never diverge between live execution, `doom wads show`, and the TUI `Launch Options`
-        command preview.
+        `DefaultArgs`, Boom `Complevel`, per-engine `EngineArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods`
+        sorting, and missing optional file omission (when `idx != nil`) never diverge between live execution,
+        `doom wads show`, and the TUI `Launch Options` command preview.
     *   **Four-tier preset readiness and acquisition predicates**: `DirIndex.IsPresetInstalled` checks the base IWAD
         plus required files for launch readiness and search indexing; `DirIndex.ArePresetFilesInstalled` checks
         required files only for `wad.Downloader` (reusing a single `DirIndex` across `DownloadAll` and rebuilding only
@@ -219,7 +230,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 1. Add and test the preset locally using the CLI, or create `catalog/preset.<id>.json` directly:
    ```json
    {
-     "schema_version": 1,
+     "schema-version": 1,
      "kind": "preset",
      "id": "my-mapset",
      "name": "My Mapset",
@@ -230,6 +241,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
        { "name": "mymap.deh" },
        { "name": "idkfa 2024.wad", "optional": true }
      ],
+     "complevel": 9,
      "category": "Community Megawad",
      "genre": "Run-and-Gun",
      "difficulty": "Hard",
@@ -237,7 +249,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      "compatibility": "Boom",
      "description": "Short description of the mapset and compatibility",
      "author": "Author Name",
-     "release_date": "2024",
+     "release-date": "2024",
      "sources": [
        {
          "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/m-o/mymap.zip",
@@ -257,7 +269,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      ```bash
      cp ~/.config/doom-cli/catalog.d/preset.my-mapset.json catalog/preset.my-mapset.json
      ```
-     Then ensure `author`, `release_date`, `category`, `genre`, `difficulty`, `quality`, `links`, and a unique positive
+     Then ensure `author`, `release-date`, `category`, `genre`, `difficulty`, `quality`, `links`, and a unique positive
      `sort` integer (spaced by 10s in display order) are set.
    - **IWAD separation and optional game metadata**: Do not include the base game IWAD in `files`. Omit `"game"` on
      Doom-family presets (inferred automatically from `iwad` as `"doom"`), and set `"game"` explicitly (`"heretic"`,
@@ -283,7 +295,7 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
 ### Adding or promoting a curated engine
 
 1. Create `catalog/engine.<id>.json` (or copy from `~/.config/doom-cli/catalog.d/engine.<id>.json`) with
-   `kind: "engine"`, `id`, `display_name`, `description`, `family`, `args_style` (`"boom"` or `"zdoom"`), `binary`,
+   `kind: "engine"`, `id`, `display-name`, `description`, `family`, `args-style` (`"boom"` or `"zdoom"`), `binary`,
    `badge`, and optional `install` recipe.
 2. Run `go run ./cmd/doom wads lint` and `go test -v -race ./...`.
 

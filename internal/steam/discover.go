@@ -99,6 +99,9 @@ func TargetPatternsForCatalog(cat *catalog.Catalog) []TargetPattern {
 			for _, alias := range f.Aliases {
 				addPattern(alias, dest)
 			}
+			if catalog.NormalizeFilename(dest) == "idkfa2024.wad" {
+				addPattern("extras.wad", "extras.wad")
+			}
 		}
 	}
 

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -287,6 +289,24 @@ func newWadsCmd() *cobra.Command {
 					return err
 				}
 			}
+			var complevel *int
+			if strings.TrimSpace(addFlags.complevel) != "" {
+				v, clErr := strconv.Atoi(strings.TrimSpace(addFlags.complevel))
+				if clErr != nil {
+					return fmt.Errorf("invalid --complevel %q: %w", addFlags.complevel, clErr)
+				}
+				if clErr := catalog.ValidateComplevel(v); clErr != nil {
+					return clErr
+				}
+				complevel = &v
+			}
+			var engineArgs map[string][]string
+			if len(addFlags.engineArgs) > 0 {
+				engineArgs, err = parseEngineArgsFlags(addFlags.engineArgs)
+				if err != nil {
+					return err
+				}
+			}
 
 			p := catalog.Preset{
 				ID:          addFlags.id,
@@ -294,6 +314,8 @@ func newWadsCmd() *cobra.Command {
 				Engine:      addFlags.engine,
 				IWAD:        addFlags.iwad,
 				Files:       parseFileSpecs(addFlags.files),
+				Complevel:   complevel,
+				EngineArgs:  engineArgs,
 				Args:        extraArgs,
 				Description: addFlags.description,
 			}
@@ -340,6 +362,37 @@ func newWadsCmd() *cobra.Command {
 				req.IWAD = &v
 				changed = true
 			}
+			if cmd.Flags().Changed("complevel") || setFlags.complevel != "" {
+				rawCL := strings.ToLower(strings.TrimSpace(setFlags.complevel))
+				switch rawCL {
+				case "", "default":
+					req.ClearComplevel = true
+				case "none", "-1":
+					unset := catalog.ComplevelUnset
+					req.Complevel = &unset
+				default:
+					v, clErr := strconv.Atoi(rawCL)
+					if clErr != nil {
+						return fmt.Errorf(
+							"invalid --complevel %q (expected 0..17, 21, default, or none)",
+							setFlags.complevel,
+						)
+					}
+					if clErr := catalog.ValidateComplevel(v); clErr != nil {
+						return clErr
+					}
+					req.Complevel = &v
+				}
+				changed = true
+			}
+			if cmd.Flags().Changed("engine-args") || len(setFlags.engineArgs) > 0 {
+				parsedEngArgs, parseErr := parseEngineArgsFlags(setFlags.engineArgs)
+				if parseErr != nil {
+					return parseErr
+				}
+				req.SetEngineArgs = &parsedEngArgs
+				changed = true
+			}
 			if cmd.Flags().Changed("args") || setFlags.args != "" {
 				v, splitErr := splitCommandArgs(setFlags.args)
 				if splitErr != nil {
@@ -365,8 +418,8 @@ func newWadsCmd() *cobra.Command {
 			}
 			if !changed {
 				return fmt.Errorf(
-					"no option flags provided (use --engine, --args, --iwad, --files, or --exclude-file, "+
-						"or run 'doom wads reset %s')",
+					"no option flags provided (use --engine, --complevel, --engine-args, --args, "+
+						"--iwad, --files, or --exclude-file, or run 'doom wads reset %s')",
 					name,
 				)
 			}
@@ -503,9 +556,11 @@ type wadOptionFlags struct {
 	id           string
 	engine       string
 	iwad         string
+	complevel    string
 	args         string
 	description  string
 	files        []string
+	engineArgs   []string
 	excludeFiles []string
 }
 
@@ -515,7 +570,42 @@ func bindWadCommonFlags(cmd *cobra.Command, f *wadOptionFlags, defaultEngine, de
 	cmd.Flags().StringSliceVar(
 		&f.files, "files", nil, "Comma-separated list of PWAD and DeHackEd files",
 	)
-	cmd.Flags().StringVar(&f.args, "args", "", "Additional launch arguments")
+	cmd.Flags().StringVar(
+		&f.complevel, "complevel", "", "Boom/MBF compatibility level (e.g. 2, 3, 4, 9, 11, 21)",
+	)
+	cmd.Flags().StringArrayVar(
+		&f.engineArgs,
+		"engine-args",
+		nil,
+		"Per-engine launch arguments as <engine>=<flags> (repeatable)",
+	)
+	cmd.Flags().StringVar(&f.args, "args", "", "Universal launch arguments shared across engines")
+}
+
+func parseEngineArgsFlags(entries []string) (map[string][]string, error) {
+	out := make(map[string][]string, len(entries))
+	for _, raw := range entries {
+		engKey, rawFlags, ok := strings.Cut(raw, "=")
+		engKey = strings.TrimSpace(engKey)
+		if !ok || engKey == "" {
+			return nil, fmt.Errorf(
+				"invalid --engine-args %q (expected <engine>=<flags>, e.g. dsda-doom=\"-solonet\")",
+				raw,
+			)
+		}
+		var parsed []string
+		if strings.TrimSpace(rawFlags) != "" {
+			var err error
+			parsed, err = splitCommandArgs(rawFlags)
+			if err != nil {
+				return nil, fmt.Errorf("invalid --engine-args for %q: %w", engKey, err)
+			}
+		} else {
+			parsed = []string{}
+		}
+		out[engKey] = parsed
+	}
+	return out, nil
 }
 
 func parseFileSpecs(raw []string) []catalog.FileSpec {
@@ -742,6 +832,22 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if p.Complevel != nil {
+		fmt.Fprintf(out, "  Complevel:     %s\n", catalog.ComplevelLabel(*p.Complevel))
+	}
+	if len(p.EngineArgs) > 0 {
+		engKeys := make([]string, 0, len(p.EngineArgs))
+		for k := range p.EngineArgs {
+			engKeys = append(engKeys, k)
+		}
+		sort.Strings(engKeys)
+		fmt.Fprintln(out, "  Engine Args:")
+		for _, k := range engKeys {
+			if len(p.EngineArgs[k]) > 0 {
+				fmt.Fprintf(out, "    - %-12s %s\n", k+":", strings.Join(p.EngineArgs[k], " "))
+			}
+		}
+	}
 	if len(p.Args) > 0 {
 		fmt.Fprintf(out, "  Launch Args:   %s\n", strings.Join(p.Args, " "))
 	}

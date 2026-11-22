@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "nostalgia",
   "name": "Nostalgia",
@@ -14,14 +14,15 @@
       "optional": true
     }
   ],
+  "complevel": 2,
   "category": "Community Megawad",
   "genre": "Compact Run-and-Gun",
   "difficulty": "Casual",
   "quality": "A-Tier (8.5/10)",
-  "compatibility": "Vanilla",
-  "description": "Vanilla-compatible megawad",
+  "compatibility": "Limit-Removing",
+  "description": "Limit-removing classic-style megawad",
   "author": "myolden",
-  "release_date": "2022",
+  "release-date": "2022",
   "sources": [
     {
       "url": "https://youfailit.net/pub/idgames/levels/doom2/Ports/megawads/nostalgia.zip",

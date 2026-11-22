@@ -144,10 +144,14 @@ func buildSearchTarget(p catalog.Preset, dirIndex *catalog.DirIndex) string {
 		files.WriteByte(' ')
 		files.WriteString(base)
 	}
+	complevelToken := ""
+	if p.Complevel != nil {
+		complevelToken = fmt.Sprintf(" complevel %d cl%d", *p.Complevel, *p.Complevel)
+	}
 	return strings.TrimSpace(fmt.Sprintf(
-		"%s %s %s %s %s %s %s %s%s %s",
+		"%s %s %s %s %s %s %s %s%s%s %s",
 		p.Name, p.EffectiveGame(), p.Engine, p.Category, p.Genre, p.Difficulty, p.Quality,
-		p.Compatibility, files.String(), readiness,
+		p.Compatibility, complevelToken, files.String(), readiness,
 	))
 }
 

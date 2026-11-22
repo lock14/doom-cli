@@ -193,12 +193,12 @@ func TestConfigEngineAndResetEngineOverride(t *testing.T) {
 	// 3. Invalid style rejected in ConfigEngine and DecodeEntity
 	badStyle := "quake"
 	if _, err := ConfigEngine(userDir, cat, "dsda-doom", EngineOverrideOptions{ArgsStyle: &badStyle}); err == nil {
-		t.Error("expected error for invalid args_style, got nil")
+		t.Error("expected error for invalid args-style, got nil")
 	}
 	if _, err := DecodeEntity([]byte(
-		`{"kind":"override","target":{"kind":"engine","id":"dsda-doom"},"set":{"args_style":"quake"}}`,
+		`{"kind":"override","target":{"kind":"engine","id":"dsda-doom"},"set":{"args-style":"quake"}}`,
 	)); err == nil {
-		t.Error("expected DecodeEntity to reject invalid override set.args_style")
+		t.Error("expected DecodeEntity to reject invalid override set.args-style")
 	}
 
 	// 4. ResetEngineOverride removes override file and backups
@@ -283,6 +283,62 @@ func TestConfigPreset_ExcludeFilesAndBaseAndOverride(t *testing.T) {
 		t.Errorf("expected idkfa 2024.wad restored after clearing exclude_files, got %+v", pReloaded.Files)
 	}
 	if !reflect.DeepEqual(pReloaded.Args, []string{"-skill", "4"}) {
-		t.Errorf("expected AppendArgs preserved when clearing exclude_files, got %v", pReloaded.Args)
+		t.Errorf("expected AppendArgs preserved when clearing exclude-files, got %v", pReloaded.Args)
+	}
+
+	// Verify Complevel and EngineArgs / AppendEngineArgs surgical round-trips
+	clOverride := 21
+	setEngMap := map[string][]string{"dsda": {"-solonet"}, "uzdoom": {"+gl_tonemap", "0"}}
+	if _, _, err := ConfigPreset(userDir, reloaded, "sunlust", OverridePatchRequest{
+		Complevel:     &clOverride,
+		SetEngineArgs: &setEngMap,
+	}); err != nil {
+		t.Fatalf("ConfigPreset complevel/engine-args: %v", err)
+	}
+	appendEngMap := map[string][]string{"dsda-doom": {"-fast"}}
+	if _, _, err := ConfigPreset(userDir, reloaded, "sunlust", OverridePatchRequest{
+		AppendEngineArgs: &appendEngMap,
+	}); err != nil {
+		t.Fatalf("ConfigPreset append-engine-args: %v", err)
+	}
+	mergedSunlustCat, err := LoadLayered(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayered sunlust: %v", err)
+	}
+	pSunlust := mergedSunlustCat.Find("sunlust")
+	if pSunlust == nil || pSunlust.Complevel == nil || *pSunlust.Complevel != 21 {
+		t.Fatalf("expected sunlust Complevel=21, got %+v", pSunlust)
+	}
+	if !reflect.DeepEqual(pSunlust.ArgsForEngine("dsda-doom"), []string{"-solonet", "-fast"}) {
+		t.Errorf("expected sunlust dsda-doom engine-args [-solonet -fast], got %v",
+			pSunlust.ArgsForEngine("dsda-doom"))
+	}
+	if !reflect.DeepEqual(pSunlust.ArgsForEngine("uzdoom"), []string{"+gl_tonemap", "0"}) {
+		t.Errorf("expected sunlust uzdoom engine-args [+gl_tonemap 0], got %v",
+			pSunlust.ArgsForEngine("uzdoom"))
+	}
+
+	// Clear dsda-doom engine-args and revert Complevel back to curated 9 while keeping uzdoom engine-args
+	clearDSDA := map[string][]string{"dsda-doom": {}}
+	if _, _, err := ConfigPreset(userDir, mergedSunlustCat, "sunlust", OverridePatchRequest{
+		ClearComplevel: true,
+		SetEngineArgs:  &clearDSDA,
+	}); err != nil {
+		t.Fatalf("ConfigPreset clear complevel/dsda-doom: %v", err)
+	}
+	reloadedSunlustCat, err := LoadLayered(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayered sunlust after clear: %v", err)
+	}
+	pSunlustCleared := reloadedSunlustCat.Find("sunlust")
+	if pSunlustCleared == nil || pSunlustCleared.Complevel == nil || *pSunlustCleared.Complevel != 9 {
+		t.Fatalf("expected sunlust Complevel reverted to curated 9, got %+v", pSunlustCleared)
+	}
+	if len(pSunlustCleared.ArgsForEngine("dsda-doom")) != 0 {
+		t.Errorf("expected cleared dsda-doom engine-args, got %v", pSunlustCleared.ArgsForEngine("dsda-doom"))
+	}
+	if !reflect.DeepEqual(pSunlustCleared.ArgsForEngine("uzdoom"), []string{"+gl_tonemap", "0"}) {
+		t.Errorf("expected untouched uzdoom engine-args preserved, got %v",
+			pSunlustCleared.ArgsForEngine("uzdoom"))
 	}
 }

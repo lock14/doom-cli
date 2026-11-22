@@ -72,12 +72,26 @@
         `..` traversal, drive-letter, reserved Windows device stems, trailing dots or spaces, and absolute path
         sequences using `fsutil.CleanRel` and `fsutil.SafeJoin(root, rel)` before any filesystem read or write.
 *   **Doom engine selection and preset hygiene**:
-    *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
-        and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
-        *Overboard*, *Rowdy Rudy II*, *Sunder*, *Sunlust*, *Legacy of Rust*, and *Sigil*).
-    *   **UZDoom**: Use for mapsets requiring ZDoom or GZDoom features, advanced scripting (*MyHouse.pk3*),
-        high-resolution texture packs like OTEX (*Eviternity I & II*), or Raven Software and Rogue Entertainment games
-        (*Heretic*, *Hexen*, *Strife*).
+    *   **DSDA-Doom**: Default for all classic vanilla (`complevel` `2`, `3`, `4`), limit-removing (`2`, `3`), Boom
+        (`9`), MBF (`11`), MBF21 (`21`), and ID24 (`21`) Doom presets where demo accuracy, authentic engine physics,
+        custom 256-color software palettes, and speedrunning precision are desired (including *Alien Vendetta*, *Ancient
+        Aliens*, *AUGER;ZENITH*, *BTSX*, *Eviternity II*, *Going Down Turbo*, *Legacy of Rust*, *Overboard*, *Rowdy Rudy
+        II*, *Sigil*, *Sunder*, *Sunlust*, and *Valiant*). Note that OTEX is a standard-resolution, 8-bit paletted
+        texture pack and runs natively in DSDA-Doom.
+    *   **UZDoom**: Reserved for mapsets requiring ZScript or UDMF features (*MyHouse.pk3*), pre-`UMAPINFO` mapsets
+        whose chapter selection menus, episode pistol starts, and `ACS` weather particles rely on ZDoom `ZMAPINFO` and
+        `ACS` (*Eviternity*, which still declares `"complevel": 11` for `-e dsda-doom` or `-e woof` launches), and Raven
+        Software or Rogue Entertainment games (*Heretic*, *Hexen*, *Strife*).
+    *   **Three-tier declarative launch configuration and kebab-case JSON keys**: All `doom-cli` JSON files
+        (`config.json`, `catalog/*.json`, `<ConfigDir>/catalog.d/*.json`, and `themes/*.json`) standardize exclusively
+        on hyphenated `kebab-case` multi-word keys (`schema-version`, `display-name`, `args-style`, `prefix-args`,
+        `default-args`, `engine-args`, `release-date`, `load-maps-after-mods`, `append-files`, `append-args`,
+        `append-engine-args`, `exclude-files`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and
+        `brand-cap`, with zero `snake_case` shims). Presets separate typed WAD compatibility (`complevel` integer
+        `0..17` or `21`, synthesized automatically as `-complevel <N>` for any `args-style: "boom"` port and ignored on
+        `args-style: "zdoom"`), per-engine arguments (`engine-args` map keyed by canonical engine ID, plus
+        `append-engine-args` in overrides and `--engine-args <engine>=<flags>` on the CLI), and universal
+        engine-agnostic arguments (`args` and `append-args`).
     *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
         declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
         `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
@@ -115,9 +129,9 @@
         before engine invocation.
     *   **Unified engine launch synthesis and zero-I/O preview parity**: `PrepareLaunch` and `FormatLaunchPreview` share
         `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
-        `DefaultArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods` sorting, and missing optional file omission
-        (when `idx != nil`) never diverge between live execution, `doom wads show`, and the TUI `Launch Options`
-        command preview.
+        `DefaultArgs`, Boom `Complevel`, per-engine `EngineArgs`, universal preset `Args`, `ExtraArgs`),
+        `LoadMapsAfterMods` sorting, and missing optional file omission (when `idx != nil`) never diverge between live
+        execution, `doom wads show`, and the TUI `Launch Options` command preview.
     *   **Four-tier preset readiness and acquisition predicates**: `DirIndex.IsPresetInstalled` checks the base IWAD
         plus required files for launch readiness and search indexing; `DirIndex.ArePresetFilesInstalled` checks
         required files only for `wad.Downloader` (reusing a single `DirIndex` across `DownloadAll` and rebuilding only
@@ -127,8 +141,8 @@
         optional assets like `idkfa 2024.wad` are missing, with all `FileSpec` lookups routed through
         `DirIndex.ResolveFileSpec`.
     *   **Filename normalization and declarative catalog aliases**: Case-insensitive and whitespace-, dash-, and
-        underscore-normalized matching (`catalog.NormalizeFilename`) across configured WAD roots (`wads_dir` and
-        `wads_dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
+        underscore-normalized matching (`catalog.NormalizeFilename`) across configured WAD roots (`wads-dir` and
+        `wads-dirs`), safe relative sub-paths (`sub/foo.wad`), 1-level child directories (for non-IWAD files), and
         Steam and GOG extraction ensures maps and patches resolve without redundant case or punctuation entries. When
         upstream archives or rerelease add-ons use a genuinely distinct filename stem (such as `sigil.wad` for
         `SIGIL_V1_23.wad`, `sigil2.wad` or `sigil_ii.wad` for `SIGIL_II_V1_0.WAD`, and `sunder.wad` for
@@ -166,7 +180,7 @@
     *   **Universal fallback by default**: Avoid Unicode Private Use Area (PUA) glyphs (such as ``, ``, ``, ``)
         in standard rendering. Default to universal rectangular badges and plain text prompts (`Filter: `,
         `README Viewer`) that render flawlessly in 100% of standard system fonts. Keep Powerlevel10k rounded
-        capsule ends opt-in via `nerd_fonts: true` (`doom config set nerd-fonts on`).
+        capsule ends opt-in via `nerd-fonts: true` (`doom config set nerd-fonts on`).
 
 # Package structure and architecture conventions
 
@@ -213,7 +227,7 @@ Linux, macOS, and Windows:
         (Linux), Library (macOS), and AppData (Windows).
     *   `settings.go`: Settings-only user configuration persistence (`config.json` via `AppConfig`), two-tier path and
         provenance helpers (`ApplyConfigPaths`, `DirSource`, `WadsDirsSource`, `ResolveNerdFontsWithSource`), explicit
-        `nerd_fonts` state tracking, and unknown top-level key preservation.
+        `nerd-fonts` state tracking, and unknown top-level key preservation.
 *   `internal/display/`: Native display resolution and refresh rate auto-detection.
 *   `internal/engine/`:
     *   `runner.go`: Engine execution argument synthesis (`PrepareLaunch`, including `.deh` and `.bex` ordering), pure
@@ -405,17 +419,17 @@ Linux, macOS, and Windows:
     Settings resolve in a strict two-tier hierarchy (`config` in `config.json` takes precedence over platform `default`
     values), with `DOOM_CONFIG_DIR` as the sole application environment variable and zero global persistent flags or
     per-setting `DOOM_*` environment variables. Subcommand-specific flags (`--engine` or `-e` and `--dry-run` on root
-    `doom`; `--all` on `doom wads` and `doom wads list`; `--engine` or `-e` on `doom wads add` and `doom wads set`;
-    `--games` on `doom setup`, `doom wads scan`, and `doom wads fetch`; `--wads` on `doom setup`; and `--force` on
-    `doom engines install`, `doom wads fetch`, `doom wads scan`, and `doom setup`) are scoped locally to their
-    respective Cobra commands. Engine launch synthesis, configuration deployment, `doom config show`, and
-    `doom config get` always adhere to this resolved hierarchy.
+    `doom`; `--all` on `doom wads` and `doom wads list`; `--engine` or `-e`, `--complevel`, and `--engine-args` on
+    `doom wads add` and `doom wads set`; `--games` on `doom setup`, `doom wads scan`, and `doom wads fetch`; `--wads` on
+    `doom setup`; and `--force` on `doom engines install`, `doom wads fetch`, `doom wads scan`, and `doom setup`) are
+    scoped locally to their respective Cobra commands. Engine launch synthesis, configuration deployment,
+    `doom config show`, and `doom config get` always adhere to this resolved hierarchy.
 *   **Symmetric two-layer entity catalog, re-merge idempotency, and query normalization**: Keep user preferences
     (`config.json`) strictly separated from entity definitions (`catalog/*.json` and `<ConfigDir>/catalog.d/*.json`).
     User entities share the identical JSON schema as curated repository entities so user presets and engines can be
     promoted to `catalog/` by copying a single file. `MergeUserDir` resets curated entities to their
     `loadEmbeddedCurated()` baselines before applying `catalog.d` so repeated in-TUI reloads and override resets are
-    idempotent, `LoadPresetBaseAndOverride` loads unmerged base presets and `exclude_files` overrides for
+    idempotent, `LoadPresetBaseAndOverride` loads unmerged base presets and `exclude-files` overrides for
     `Launch Options`, `NormalizePresetQuery` normalizes `.wad`, `.pk3`, `.deh`, and `.bex` extensions and word-level
     Roman numerals across tiered preset lookup (`Find` and `FindExact`, matching exact IDs and names, canonical WAD
     stems, implicit `doom` prefixes, multi-word initialisms, and whole-word token sequences), `RemovePreset` and

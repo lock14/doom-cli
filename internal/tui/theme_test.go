@@ -137,7 +137,7 @@ func TestLoadThemeFile(t *testing.T) {
 	content := `{
 		"name": "synthwave",
 		"description": "Custom synthwave neon",
-		"brand_cap": "#FF007F",
+		"brand-cap": "#FF007F",
 		"prompt": "#00F0FF"
 	}`
 
@@ -155,6 +155,14 @@ func TestLoadThemeFile(t *testing.T) {
 	}
 	if theme.Description != "Custom synthwave neon" {
 		t.Errorf("expected theme.Description 'Custom synthwave neon', got %q", theme.Description)
+	}
+
+	legacySnakeFile := filepath.Join(tmpDir, "legacy.json")
+	if err := os.WriteFile(legacySnakeFile, []byte(`{"name":"bad","brand_cap":"#FF007F"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadThemeFile(legacySnakeFile); err == nil {
+		t.Error("expected LoadThemeFile to reject snake_case key brand_cap")
 	}
 }
 

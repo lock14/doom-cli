@@ -2,8 +2,10 @@
 package tui
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,26 +73,26 @@ type ThemeStyles struct {
 type CustomThemeFile struct {
 	Name           string `json:"name"`
 	Description    string `json:"description"`
-	BrandCap       string `json:"brand_cap,omitempty"`
-	BrandText      string `json:"brand_text,omitempty"`
-	BrandBg        string `json:"brand_bg,omitempty"`
-	StatsCap       string `json:"stats_cap,omitempty"`
-	StatsText      string `json:"stats_text,omitempty"`
-	StatsBg        string `json:"stats_bg,omitempty"`
+	BrandCap       string `json:"brand-cap,omitempty"`
+	BrandText      string `json:"brand-text,omitempty"`
+	BrandBg        string `json:"brand-bg,omitempty"`
+	StatsCap       string `json:"stats-cap,omitempty"`
+	StatsText      string `json:"stats-text,omitempty"`
+	StatsBg        string `json:"stats-bg,omitempty"`
 	Prompt         string `json:"prompt,omitempty"`
-	CursorBar      string `json:"cursor_bar,omitempty"`
-	CursorText     string `json:"cursor_text,omitempty"`
-	BorderActive   string `json:"border_active,omitempty"`
-	BorderInactive string `json:"border_inactive,omitempty"`
-	TitleActive    string `json:"title_active,omitempty"`
-	TitleInactive  string `json:"title_inactive,omitempty"`
+	CursorBar      string `json:"cursor-bar,omitempty"`
+	CursorText     string `json:"cursor-text,omitempty"`
+	BorderActive   string `json:"border-active,omitempty"`
+	BorderInactive string `json:"border-inactive,omitempty"`
+	TitleActive    string `json:"title-active,omitempty"`
+	TitleInactive  string `json:"title-inactive,omitempty"`
 	Label          string `json:"label,omitempty"`
 	Keycap         string `json:"keycap,omitempty"`
-	KeyDesc        string `json:"key_desc,omitempty"`
-	TagDSDA        string `json:"tag_dsda,omitempty"`
-	TagUZDoom      string `json:"tag_uzdoom,omitempty"`
-	StatusReady    string `json:"status_ready,omitempty"`
-	StatusMissing  string `json:"status_missing,omitempty"`
+	KeyDesc        string `json:"key-desc,omitempty"`
+	TagDSDA        string `json:"tag-dsda,omitempty"`
+	TagUZDoom      string `json:"tag-uzdoom,omitempty"`
+	StatusReady    string `json:"status-ready,omitempty"`
+	StatusMissing  string `json:"status-missing,omitempty"`
 	Muted          string `json:"muted,omitempty"`
 }
 
@@ -145,9 +147,16 @@ func LoadThemeFile(path string) (Theme, error) {
 		return Theme{}, fmt.Errorf("reading theme file: %w", err)
 	}
 
+	data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
+	dec := json.NewDecoder(bytes.NewReader(bytes.TrimSpace(data)))
+	dec.DisallowUnknownFields()
+
 	var c CustomThemeFile
-	if err := json.Unmarshal(data, &c); err != nil {
+	if err := dec.Decode(&c); err != nil {
 		return Theme{}, fmt.Errorf("parsing theme JSON: %w", err)
+	}
+	if tok, tailErr := dec.Token(); tailErr != io.EOF {
+		return Theme{}, fmt.Errorf("parsing theme JSON: unexpected trailing token %v", tok)
 	}
 
 	theme := ClassicTheme

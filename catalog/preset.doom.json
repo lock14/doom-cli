@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema-version": 1,
   "kind": "preset",
   "id": "doom",
   "name": "Doom",
@@ -11,6 +11,7 @@
       "optional": true
     }
   ],
+  "complevel": 3,
   "category": "Official IWAD",
   "genre": "Classic Campaign",
   "difficulty": "Casual",
@@ -18,7 +19,7 @@
   "compatibility": "Vanilla",
   "description": "Classic IWAD with modern MIDI audio",
   "author": "id Software",
-  "release_date": "1993",
+  "release-date": "1993",
   "links": [
     {
       "url": "https://doomwiki.org/wiki/The_Ultimate_Doom",
