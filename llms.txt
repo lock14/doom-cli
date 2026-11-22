@@ -132,8 +132,9 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
   `extract.go`, `uninstall.go`, `soundfont.go`).
 - `internal/wadfmt/`: Shared binary Doom `IWAD` and `PWAD` lump directory reader, lump extractor, streaming `PWAD`
   builder, and serializer (`wadfmt.go`).
-- `.agents/`: Conditional TUI design rules (`.agents/rules/monospace-tui.md`) and `mono-tui v0.2.5` design and audit
-  skills (`.agents/skills/mono-tui-design/`, `.agents/skills/mono-tui-audit/`).
+- `.agents/`: Glob-scoped domain rules (`.agents/rules/catalog-curation.md`, `.agents/rules/documentation-style.md`,
+  `.agents/rules/monospace-tui.md`) and `mono-tui v0.2.5` design and audit skills (`.agents/skills/mono-tui-design/`,
+  `.agents/skills/mono-tui-audit/`).
 
 ## Key design invariants
 

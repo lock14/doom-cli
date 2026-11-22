@@ -58,17 +58,18 @@ Use this skill when auditing or reviewing `internal/tui/`, `cmd/doom/wads.go`, `
      truncating.
 5. **Keyboard bindings and footer parity**:
    * Confirm every active keybinding in `Update()` (`internal/tui/launcher.go`, `internal/tui/options.go`, and
-     `internal/tui/config_view.go`) across launcher mode, `Launch Options` (including `!isTextField` gating on `Ctrl+K`,
-     `Ctrl+J`, `←`, `→`, and `Space`), `Configuration Manager` (including unconditional `Ctrl+K` and `Ctrl+J` navigation
-     and live preview rollback on `Esc`), and all three viewport overlays (`m.viewingReadme`, `s.viewingDiff`, and
-     `m.viewingHelp`) is accurately reflected in its corresponding footer key strip (`[OVERRIDE] §2.2`, `§1.4`, `§2.3`,
-     and `§R4.11`).
+     `internal/tui/config_view.go`) across launcher mode (including `F3` or `Ctrl+T` library toggle and `F1` or `Alt+?`
+     help), `Launch Options` (including `!isTextField` gating on `Ctrl+K`, `Ctrl+J`, `←`, `→`, `Space`, and `?`),
+     `Configuration Manager` (including unconditional `Ctrl+K` and `Ctrl+J` navigation, `confirmDiscardEng` unsaved-edit
+     confirmation, and live preview rollback on `Esc`), and all three viewport overlays (`m.viewingReadme`,
+     `s.viewingDiff`, and `m.viewingHelp`, with `Alt+?` and `?` closing help) is accurately reflected in its
+     corresponding footer key strip (`[OVERRIDE] §2.2`, `§1.4`, `§2.3`, and `§R4.11`).
 6. **UI thread performance**:
    * Confirm `View()`, `renderPreviewLines`, `renderLaunchOptionsView`, `renderConfigManagerView`, and
      `refreshPortConfigStatus` use `m.dirIndex` (`*catalog.DirIndex`), `m.readmeCache`, pure zero-I/O
-     `engine.FormatLaunchPreview`, and cached `s.detectedRes` and `s.detectedRate` (`portcfg.RenderAutoexecWithRate`
-     and `portcfg.RenderDSDADoomWithRes`) with zero uncached filesystem directory scans or display-detection
-     subprocess spawns (`[P3]`).
+     `engine.FormatLaunchPreview`, async cancellable `Ctrl+F` downloads (`context.WithCancel`), and cached
+     `s.detectedRes` and `s.detectedRate` (`portcfg.RenderAutoexecWithRate` and `portcfg.RenderDSDADoomWithRes`) with
+     zero uncached filesystem directory scans, blocking downloads, or display-detection subprocess spawns (`[P3]`).
 7. **Override freshness**:
    * Run `go test -v ./internal/repolint -run TestMonospaceTUIOverridesNotStale` to verify every `### [OVERRIDE]` and
      `### [WAIVE]` section in `.agents/rules/monospace-tui.md` includes a verbatim `- **Original**:` quote from

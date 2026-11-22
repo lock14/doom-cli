@@ -67,8 +67,14 @@ All contributions must respect the core repository invariants:
         `config.json`, `catalog/*.json`, `<ConfigDir>/catalog.d/*.json`, and `themes/*.json` on hyphenated `kebab-case`
         (`schema-version`, `display-name`, `args-style`, `prefix-args`, `default-args`, `engine-args`, `release-date`,
         `load-maps-after-mods`, `append-files`, `append-args`, `append-engine-args`, `exclude-files`, `nerd-fonts`,
-        `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and `brand-cap`), separating typed WAD `complevel`
-        integers (`0..17` or `21`), per-engine `engine-args` maps, and universal `args` slices.
+        `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and `brand-cap`) with `DisallowUnknownFields()` on entity
+        and theme decoders, separating typed WAD `complevel` integers (`0..17` or `21`), per-engine `engine-args` maps,
+        and universal `args` slices rather than scraping or stripping flag strings across engine families at runtime.
+    *   **Exact vs fuzzy lookup safety and soundtrack hygiene**: Read and launch commands (`doom <wad>`, `wads show`,
+        `wads fetch`) use 4-tier `Catalog.Find`, whereas mutating or destructive commands (`wads set`, `reset`,
+        `remove`, `uninstall`, and `engines set`, `reset`, `remove`) must use `Catalog.FindExact` or `FindEngine`
+        without substring guessing. Attach optional `idkfa 2024.wad` only to presets using stock Doom or Doom II MIDI
+        slots (never mapsets with bespoke soundtracks like `legacy-of-rust`).
     *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
         declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
         `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
@@ -133,7 +139,7 @@ flowchart TD
 
     subgraph Engines ["Target Source Ports"]
         DSDA["DSDA-Doom\n(MBF21 / Vanilla / Demo-Accurate)"]
-        UZDoom["UZDoom\n(ZDoom / OTEX / Raven Software)"]
+        UZDoom["UZDoom\n(ZScript / UDMF / ZMAPINFO / Raven)"]
         CustomEngines["Custom Ports\n(Woof!, GZDoom, Crispy, etc.)"]
     end
 
@@ -215,8 +221,8 @@ doom-cli/
 │   │   ├── uninstall.go    # Safe preset PWAD uninstaller protecting base IWADs, shared files, and read-only roots
 │   │   └── soundfont.go    # Roland SC-55 SoundFont installer
 │   └── wadfmt/             # Shared binary Doom IWAD and PWAD lump container parser and streaming builder
-└── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
-    ├── rules/              # Project overrides and conventions (monospace-tui.md)
+└── .agents/                # Glob-scoped domain rules and mono-tui v0.2.5 design and audit skills
+    ├── rules/              # Domain rules (catalog-curation.md, documentation-style.md, monospace-tui.md)
     └── skills/             # TUI design and audit skills (mono-tui-design/, mono-tui-audit/)
 ```
 
@@ -379,6 +385,10 @@ The repository includes a `Makefile` for developer verification and local builds
     `clear`, `copy`, `close`, `delete`). Use descriptive identifiers such as `maxVal`, `count`, or `limit`.
 *   **Documentation comments**: All exported packages, types, interfaces, constants, and functions must have
     comprehensive Go doc comments starting with the symbol name and adhering to standard Go and `revive` conventions.
+*   **Package boundaries and file-size discipline**: Keep player-facing runtime packages strictly separated from
+    maintainer-only `internal/repolint` (runtime packages must never import `internal/repolint`), use singular domain
+    package names (`portcfg`, `wadfmt`, `fsutil`), share binary WAD lump primitives via `internal/wadfmt`, and decompose
+    `.go` and co-located `*_test.go` files before they exceed roughly `900` to `1,000` lines.
 *   **Static analysis**: Code must pass `go vet ./...` and `revive -config revive.toml -formatter friendly ./...`
     with zero warnings.
 
@@ -400,8 +410,9 @@ The repository includes a `Makefile` for developer verification and local builds
     catalogs, visual profiles, and `doom` CLI usage. Must not contain internal developer commands or compiler details.
 *   **Contributor-facing documentation**: `CONTRIBUTING.md` covers developer setup, `make` targets, code style,
     modular package maps, how-to guides, and pull request guidelines.
-*   **Agent and architectural invariants**: `AGENTS.md` encodes canonical design invariants, path tokens, safety
-    rules, technical writing and typography conventions, and automated verification checklists.
+*   **Agent and architectural invariants**: `AGENTS.md` encodes core architectural invariants, path tokens, safety
+    rules, and automated verification checklists at the repository root alongside glob-scoped rules in `.agents/rules/`
+    (`catalog-curation.md`, `documentation-style.md`, `monospace-tui.md`).
 *   **Mandatory synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
     mechanics are modified, all relevant documentation (Go doc comments, `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
     and `llms.txt`) must be updated within the same pull request, and `doom wads lint` validates documentation
