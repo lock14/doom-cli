@@ -391,6 +391,9 @@ func presetSortKey(p Preset) int {
 func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 	if ov.Set != nil {
 		s := ov.Set
+		if s.Game != nil && *s.Game != "" {
+			p.Game = *s.Game
+		}
 		if s.Engine != nil && *s.Engine != "" {
 			engName := *s.Engine
 			if eng, ok := findEngineInMap(cat.Engines, strings.ToLower(strings.TrimSpace(engName))); ok {

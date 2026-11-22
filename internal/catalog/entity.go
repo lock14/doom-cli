@@ -217,6 +217,7 @@ type Preset struct {
 	Kind              Kind       `json:"kind"`
 	ID                string     `json:"id"`
 	Name              string     `json:"name"`
+	Game              string     `json:"game,omitempty"`
 	Engine            string     `json:"engine"`
 	IWAD              string     `json:"iwad"`
 	Files             []FileSpec `json:"files,omitempty"`
@@ -285,6 +286,7 @@ type OverrideTarget struct {
 
 // OverrideSet holds optional replacement fields for a preset or engine override.
 type OverrideSet struct {
+	Game              *string     `json:"game,omitempty"`
 	Engine            *string     `json:"engine,omitempty"`
 	IWAD              *string     `json:"iwad,omitempty"`
 	Files             *[]FileSpec `json:"files,omitempty"`
@@ -313,7 +315,8 @@ func (s *OverrideSet) IsEmpty() bool {
 	if s == nil {
 		return true
 	}
-	return s.Engine == nil &&
+	return s.Game == nil &&
+		s.Engine == nil &&
 		s.IWAD == nil &&
 		s.Files == nil &&
 		s.Args == nil &&

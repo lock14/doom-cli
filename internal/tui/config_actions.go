@@ -198,6 +198,13 @@ func (m *model) saveActiveConfigTab() tea.Cmd {
 		m.soundFontsSource = s.sfDirSource
 
 		m.wadRoots = m.paths.WadRoots()
+		if m.autoCatalog && !m.explicitAllSet && m.catalog != nil {
+			probeIdx := catalog.NewDirIndex(m.wadRoots...).WithCatalog(m.catalog)
+			if lib, _ := m.catalog.LibraryPresets(probeIdx); len(lib) > 0 {
+				m.autoCatalog = false
+				m.showAllPresets = false
+			}
+		}
 		m.rebuildIndexAndTargets()
 		s.refreshPortConfigStatus(m.paths)
 		s.statusMsg = fmt.Sprintf("✓ Saved CLI settings to %s", filepath.Base(m.paths.ConfigFile))

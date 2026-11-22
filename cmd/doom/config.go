@@ -54,7 +54,7 @@ func newConfigCmd() *cobra.Command {
 	setCmd := &cobra.Command{
 		Use:   "set <key> <value>",
 		Short: "Set a persistent doom-cli setting (theme, nerd-fonts, wads-dir, wads-dirs, bin-dir, soundfonts-dir)",
-		Args:  cobra.ExactArgs(2),
+		Args:  exactArgsWithHint(2, "specify a setting key and value (e.g. 'doom config set theme blood')"),
 		RunE:  runConfigSet,
 	}
 

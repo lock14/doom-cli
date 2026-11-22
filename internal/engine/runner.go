@@ -194,11 +194,22 @@ func PrepareLaunch(p catalog.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 
 	iwadPath, ok := idx.ResolveFile(p.IWAD)
 	if !ok {
+		if !p.IsCoreGame() {
+			return nil, fmt.Errorf(
+				"base IWAD '%s' not found in %s.\n"+
+					"Run 'doom wads scan --games %s' or 'doom wads fetch %s' if you own the game on Steam or GOG",
+				p.IWAD,
+				primaryDir,
+				p.EffectiveGame(),
+				p.ID,
+			)
+		}
 		return nil, fmt.Errorf(
 			"base IWAD '%s' not found in %s.\n"+
-				"Run 'doom wads scan' or 'doom wads fetch' if you own the game on Steam or GOG",
+				"Run 'doom wads scan' or 'doom wads fetch %s' if you own the game on Steam or GOG",
 			p.IWAD,
 			primaryDir,
+			p.ID,
 		)
 	}
 	iwadPath = absPath(iwadPath)

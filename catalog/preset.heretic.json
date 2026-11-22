@@ -3,6 +3,7 @@
   "kind": "preset",
   "id": "heretic",
   "name": "Heretic",
+  "game": "heretic",
   "engine": "uzdoom",
   "iwad": "HERETIC.WAD",
   "files": [],

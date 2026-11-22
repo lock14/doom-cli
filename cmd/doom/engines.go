@@ -102,7 +102,10 @@ func newEnginesCmd() *cobra.Command {
 	addCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Register a custom Doom source port in catalog.d",
-		Args:  cobra.ExactArgs(1),
+		Args: exactArgsWithHint(
+			1,
+			"specify a name for the custom engine (e.g. 'doom engines add \"Woof!\" --binary woof --style boom')",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			if name == "" {
@@ -174,7 +177,10 @@ func newEnginesCmd() *cobra.Command {
 	setCmd := &cobra.Command{
 		Use:   "set <name>",
 		Short: "Configure binary path, arguments, or metadata overrides for an engine",
-		Args:  cobra.ExactArgs(1),
+		Args: exactArgsWithHint(
+			1,
+			"specify an engine to configure (e.g. 'doom engines set dsda-doom --args \"-complevel 21\"')",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
@@ -247,7 +253,7 @@ func newEnginesCmd() *cobra.Command {
 	resetCmd := &cobra.Command{
 		Use:   "reset <name>",
 		Short: "Clear custom engine overrides for a source port",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgsWithHint(1, "specify an engine to reset (e.g. 'doom engines reset dsda-doom')"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
@@ -265,7 +271,7 @@ func newEnginesCmd() *cobra.Command {
 	removeCmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a custom engine from user catalog",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgsWithHint(1, "specify a custom engine to remove (e.g. 'doom engines remove woof')"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
