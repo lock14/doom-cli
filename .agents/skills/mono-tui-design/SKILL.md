@@ -26,9 +26,10 @@ Always resolve rules in this order (higher overrides lower):
 
 1. **Identify the screen and workflow archetype**:
    * Confirm how the change fits into `doom wads`, `doom engines`, and `doom config`'s `§11.5` fuzzy finder and
-     `Master-Detail` split view (`Presets` list on the left, `Preset Details` preview on the right in `renderPanels`) or
-     `Expand-to-Focus` full-pane views (`README Viewer`, `Launch Options — <Name>`, `Doom CLI & Engine Configuration`,
-     `Configuration Diff`, and `Keybindings & Features`, `§12.4` search-act and `§12.2` inspect-configure workflows).
+     `Master-Detail` split view (`Installed` or `Catalog` preset list on the left with automatic `Catalog` fallback when
+     zero presets are installed, `Preset Details` preview on the right in `renderPanels`) or `Expand-to-Focus` full-pane
+     views (`README Viewer`, `Launch Options — <Name>`, `Doom CLI & Engine Configuration`, `Configuration Diff`, and
+     `Keybindings & Features`, `§12.4` search-act and `§12.2` inspect-configure workflows).
 2. **Apply project overrides and glyph hygiene**:
    * Frame panes via `renderBoxWithTitle` (`internal/tui/render.go`) using `lipgloss.RoundedBorder()`, left-aligned
      titles, and `focused = true` on active panes (`Presets` and `Expand-to-Focus` views) versus `focused = false` on
@@ -36,8 +37,9 @@ Always resolve rules in this order (higher overrides lower):
      `.Faint(true)` `SGR 2` dims the full frame in `MonochromeTheme`, `[OVERRIDE] §6.1`, `§6.3`, `§6.6`).
    * Render list and form cursors (`renderListLines`, `renderLaunchOptionsView`, and `renderConfigManagerView`) with the
      `2`-column left quarter-block cursor bar (`▎ `, `CursorBar`) paired with bold `CursorText` and `ValueBold`
-     (`[OVERRIDE] §7.2 and §8.1`), and dim inapplicable `(Boom)` fields (`-solonet` and `-complevel`) via `.Faint(true)`
-     (`SGR 2`) when a ZDoom-family engine is selected.
+     (`[OVERRIDE] §7.2 and §8.1`), binding `Complevel` to typed `OverrideSet.Complevel` and `-solonet` to
+     `append-engine-args["dsda-doom"]` while dimming inapplicable `(Boom)` fields via `.Faint(true)` (`SGR 2`) when a
+     ZDoom-family engine is selected.
    * Keep default rendering 100% free of emojis and Unicode Private Use Area (PUA) glyphs (`[P1]`). Gate Nerd Font
      powerline capsule caps (`U+E0B6` and `U+E0B4`) in `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill`
      (`internal/tui/theme.go`) as well as the `Launch Options` and `Configuration Manager` header pills
@@ -49,15 +51,17 @@ Always resolve rules in this order (higher overrides lower):
    * In the primary launcher view (`!m.viewingReadme && !m.viewingHelp && !m.viewingLaunchOpts && !m.viewingConfigMgr`),
      all printable characters feed the live fuzzy search input (`m.input`) per `[OVERRIDE] §2.2`.
    * Keep modifier and navigation bindings (`↑`, `↓`, `Ctrl+P`, `Ctrl+N`, `Ctrl+K`, `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`,
-     `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F3` or `Ctrl+T`, `F1`, `Enter`, `Esc`,
-     and `Ctrl+C`, with `Home` and `End` moving the filter text cursor) working regardless of filter state.
-   * In `Launch Options` (`m.viewingLaunchOpts`), gate `Ctrl+K`, `Ctrl+J`, `←`, `→`, and `Space` behind `!isTextField`
-     so text inputs never swallow cursor movement or spaces; in `Configuration Manager` (`m.viewingConfigMgr`), bind
-     `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` unconditionally across selector and
-     action rows and restore unsaved live theme and Nerd Fonts previews on `Esc`.
+     `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F3` or `Ctrl+T`, `F1` or `Alt+?`,
+     `Enter`, `Esc`, and `Ctrl+C`, with `Home` and `End` moving the filter text cursor) working regardless of filter
+     state.
+   * In `Launch Options` (`m.viewingLaunchOpts`), gate `Ctrl+K`, `Ctrl+J`, `←`, `→`, `Space`, and `?` behind
+     `!isTextField` so text inputs never swallow cursor movement, spaces, or `?`; in `Configuration Manager`
+     (`m.viewingConfigMgr`), bind `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab`
+     unconditionally across selector and action rows, guard unsaved Tab 2 engine edits with `confirmDiscardEng`, and
+     restore unsaved live theme and Nerd Fonts previews on `Esc`.
    * Bind `g`, `Home`, `G`, and `End` across all viewport overlays, with `q`, `Q`, `Esc`, `Tab`, or `Ctrl+R` closing
-     `m.viewingReadme`, `q`, `Q`, `Esc`, or `Enter` closing `s.viewingDiff`, and `q`, `Q`, `Esc`, or `F1` closing
-     `m.viewingHelp`.
+     `m.viewingReadme`, `q`, `Q`, `Esc`, or `Enter` closing `s.viewingDiff`, and `q`, `Q`, `Esc`, `F1`, `Alt+?`, or `?`
+     closing `m.viewingHelp`.
    * Keep all six footer key strips (`renderFooter`, `renderReadmeFooter`, `renderHelpFooter`,
      `renderLaunchOptionsFooter`, `renderConfigManagerFooter`, and the inline `viewingDiff` footer) synchronized with
      active bindings for the current mode and clamped with `truncateANSI(..., m.width)`.

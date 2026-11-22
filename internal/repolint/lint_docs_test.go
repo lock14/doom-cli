@@ -202,7 +202,15 @@ func TestLintDocumentation_EdgeCasesAndStackedFormatting(t *testing.T) {
 func TestDocumentationEntityJSONBlocks(t *testing.T) {
 	t.Parallel()
 	rootDir := filepath.Join("..", "..")
-	for _, relDoc := range []string{"README.md", "CONTRIBUTING.md"} {
+	docTargets := []string{"README.md", "CONTRIBUTING.md", "AGENTS.md"}
+	if ruleMatches, err := filepath.Glob(filepath.Join(rootDir, ".agents", "rules", "*.md")); err == nil {
+		for _, m := range ruleMatches {
+			if rel, relErr := filepath.Rel(rootDir, m); relErr == nil {
+				docTargets = append(docTargets, rel)
+			}
+		}
+	}
+	for _, relDoc := range docTargets {
 		relDoc := relDoc
 		t.Run(relDoc, func(t *testing.T) {
 			t.Parallel()
@@ -240,10 +248,114 @@ func TestDocumentationEntityJSONBlocks(t *testing.T) {
 					buf.WriteByte('\n')
 				}
 			}
-			if entityCount == 0 {
+			if (relDoc == "README.md" || relDoc == "CONTRIBUTING.md") && entityCount == 0 {
 				t.Errorf("expected at least one entity JSON block in %s", relDoc)
 			}
 		})
+	}
+}
+
+func TestLintDocumentation_AgentRuleSizeAndDiscovery(t *testing.T) {
+	t.Parallel()
+	tmpRoot := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpRoot, "catalog"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rulesDir := filepath.Join(tmpRoot, ".agents", "rules")
+	skillDir := filepath.Join(tmpRoot, ".agents", "skills", "custom-skill")
+	runtimePkgDir := filepath.Join(tmpRoot, "internal", "catalog")
+	for _, dir := range []string{rulesDir, skillDir, runtimePkgDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	oversizedAgents := "# Root rules\n\nSee [Missing](missing-rule.md).\n\n" +
+		strings.Repeat("* Bullet line.\n", MaxRootAgentsLines+5)
+	if err := os.WriteFile(filepath.Join(tmpRoot, "AGENTS.md"), []byte(oversizedAgents), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	padding := strings.Repeat("Plain rule text without violations.\n", (MaxScopedRuleBytes/32)+10)
+	oversizedScoped := "---\ntrigger: glob\ndescription: \"Scoped rule.\"\nglobs: **/*.go\n---\n\n" +
+		"# Scoped rule\n\n```json\n{bad}\n```\n\n" + padding
+	if err := os.WriteFile(filepath.Join(rulesDir, "custom.md"), []byte(oversizedScoped), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	badTriggerRule := "---\ntrigger: alwaysOn\n---\n\n# Bad trigger\n"
+	if err := os.WriteFile(filepath.Join(rulesDir, "bad-trigger.md"), []byte(badTriggerRule), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	noFmRule := "# Missing frontmatter\n"
+	if err := os.WriteFile(filepath.Join(rulesDir, "no-frontmatter.md"), []byte(noFmRule), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	badSkill := "---\nname: custom-skill\n---\n\n# Custom skill\n\nAvoid **bold `code`**.\n"
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(badSkill), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	badImportGo := "package catalog\n\nimport _ \"github.com/lock14/doom-cli/internal/repolint\"\n"
+	if err := os.WriteFile(filepath.Join(runtimePkgDir, "bad_import.go"), []byte(badImportGo), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	diags, err := LintCatalog(tmpRoot, "")
+	if err != nil {
+		t.Fatalf("LintCatalog error: %v", err)
+	}
+	var joined strings.Builder
+	for _, d := range diags {
+		joined.WriteString(d.String() + "\n")
+	}
+	out := joined.String()
+
+	for _, wantSub := range []string{
+		"AGENTS.md: exceeds 150-line root AGENTS.md budget",
+		"AGENTS.md: broken relative file link \"missing-rule.md\"",
+		"custom.md: exceeds 24000-byte scoped rule limit",
+		"custom.md: frontmatter globs containing '*' must be quoted",
+		"custom.md: invalid JSON code block",
+		"bad-trigger.md: invalid or missing frontmatter trigger \"alwaysOn\"",
+		"bad-trigger.md: missing frontmatter description",
+		"no-frontmatter.md: missing YAML frontmatter block",
+		"SKILL.md: missing frontmatter description",
+		"SKILL.md: contains stacked bold span \"**bold `code`**\"",
+		"bad_import.go: runtime package internal/catalog must not import internal/repolint",
+	} {
+		if !strings.Contains(out, wantSub) {
+			t.Errorf("expected lint diagnostics to contain %q, got:\n%s", wantSub, out)
+		}
+	}
+
+	repoRoot := filepath.Join("..", "..")
+	agentsBytes, err := os.ReadFile(filepath.Join(repoRoot, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("reading AGENTS.md: %v", err)
+	}
+	agentsLines := strings.Count(strings.TrimRight(string(agentsBytes), "\r\n"), "\n") + 1
+	if agentsLines > MaxRootAgentsLines {
+		t.Errorf("AGENTS.md has %d lines, exceeding MaxRootAgentsLines (%d)", agentsLines, MaxRootAgentsLines)
+	}
+
+	matches, err := filepath.Glob(filepath.Join(repoRoot, ".agents", "rules", "*.md"))
+	if err != nil {
+		t.Fatalf("globbing .agents/rules: %v", err)
+	}
+	if len(matches) < 3 {
+		t.Fatalf("expected at least 3 scoped rule files in .agents/rules, got %d", len(matches))
+	}
+	for _, p := range matches {
+		raw, readErr := os.ReadFile(p)
+		if readErr != nil {
+			t.Fatalf("reading %s: %v", p, readErr)
+		}
+		if len(raw) > MaxScopedRuleBytes {
+			t.Errorf("%s is %d bytes, exceeding MaxScopedRuleBytes (%d)", p, len(raw), MaxScopedRuleBytes)
+		}
 	}
 }
 
