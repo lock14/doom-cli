@@ -3,6 +3,7 @@
   "kind": "preset",
   "id": "hexen",
   "name": "Hexen",
+  "game": "hexen",
   "engine": "uzdoom",
   "iwad": "HEXEN.WAD",
   "files": [],

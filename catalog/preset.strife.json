@@ -3,6 +3,7 @@
   "kind": "preset",
   "id": "strife",
   "name": "Strife: Quest for the Sigil",
+  "game": "strife",
   "engine": "uzdoom",
   "iwad": "STRIFE1.WAD",
   "files": [

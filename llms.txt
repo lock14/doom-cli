@@ -12,11 +12,15 @@ multi-mirror community megawad downloading, and interactive terminal launching a
 ## Quick start
 
 ```bash
-# Automated full setup (engines, configs, soundfonts, Steam IWADs, community WADs)
+# Automated 4-step core setup (configs, engines, soundfont, and Steam or GOG Doom IWADs)
 doom setup
 
-# Play The Ultimate Doom immediately, or specify any WAD preset and engine flags
+# Optional: include community megawads and non-Doom id Tech 1 games during setup
+doom setup --wads all --games heretic,hexen
+
+# Play The Ultimate Doom immediately, fetch a megawad, or specify any WAD preset and engine flags
 doom
+doom wads fetch eviternity-ii
 doom eviternity-ii
 doom "Ancient Aliens" -e dsda-doom -skill 4
 
@@ -31,15 +35,20 @@ doom wads
   `doom 2`, `doom sigil2`), WAD stems and filenames (`doom av`, `doom plutonia`, `doom sunlust.wad`), and multi-word
   acronyms (`doom btsx1`, `doom d2twid`, `doom nrftl`), and supporting `--engine` (`-e`), `--dry-run`, and pass-through
   engine arguments (such as `doom -skill 4 -warp 1 1` and `+map E1M1`).
-- `doom wads`: Opens the interactive TUI WAD browser powered by Bubble Tea.
-- `doom wads list`: Lists all presets (built-in and custom), engine assignments, genre, difficulty, quality rating, and
-  on-disk readiness (`[✓ Ready]` or `[✗ Missing]`).
-- `doom wads show <name>`: Displays resolved launch configuration, genre, difficulty, quality rating, `Launch Cmd:`
-  preview, sources, links, and file availability.
-- `doom wads fetch [name|all]`: Downloads and extracts SHA-256 verified community megawads from idgames mirrors and
-  extracts missing commercial IWADs or optional assets (`idkfa 2024.wad`) from local Steam and GOG libraries.
-- `doom wads scan`: Auto-discovers and imports official Steam and GOG commercial IWADs and expansions, and synthesizes
-  `idkfa 2024.wad` from `extras.wad`.
+- `doom wads [--all]`: Opens the interactive TUI WAD browser powered by Bubble Tea (showing installed presets by
+  default, or the full curated catalog with `--all` or `F3` and `Ctrl+T`).
+- `doom wads list [--all]`: Lists installed presets by default (or all curated and custom presets with `--all`), engine
+  assignments, genre, difficulty, quality rating, and on-disk readiness (`[✓ Ready]` or `[✗ Missing]`).
+- `doom wads show <name>`: Displays resolved game, launch configuration, genre, difficulty, quality rating,
+  `Launch Cmd:` preview, sources, links, and file availability.
+- `doom wads fetch <name[,name...]|all>`: Downloads and extracts SHA-256 verified community megawads from idgames
+  mirrors and extracts missing commercial IWADs or optional assets (`idkfa 2024.wad`) from local Steam and GOG
+  libraries (`--games` scopes `all` to include optional non-Doom games).
+- `doom wads uninstall <name[,name...]>`: Deletes preset-exclusive PWAD, PK3, DeHackEd, companion `.txt`, and `.bak.*`
+  files from primary `wads-dir` while protecting base IWADs, shared files, and secondary read-only `wads-dirs`.
+- `doom wads scan [--games <list|all>]`: Auto-discovers and imports official Steam and GOG commercial IWADs and
+  expansions (Doom plus installed optional games by default, or explicit `--games`), and synthesizes `idkfa 2024.wad`
+  from `extras.wad`.
 - `doom wads add <name>`: Adds a custom WAD or preset to `catalog.d/preset.<id>.json`.
 - `doom wads set <name>`: Configures per-WAD overrides in `catalog.d/override.preset.<id>.json`.
 - `doom wads reset <name>`: Clears persistent launch overrides for a WAD.
@@ -64,15 +73,18 @@ doom wads
   `bin-dir`, `soundfonts-dir`), or shows all settings when no key is specified.
 - `doom config set <key> <val>`: Sets a persistent configuration value in `config.json`.
 - `doom config themes`: Lists built-in and custom JSON color themes with ANSI color swatches.
-- `doom setup`: Full automated turnkey setup in a single step.
+- `doom setup`: Turnkey 4-step core setup (configs, engines, SoundFont, and Steam or GOG Doom IWADs), with optional
+  `--wads <none|all|names>` for community megawads and `--games <list|all>` for optional non-Doom id Tech 1 games.
 - `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
 
 ## CLI flags and environment variables
 
 Settings resolve in two-tier precedence order (`config.json` takes precedence over platform defaults):
 
-- Subcommand flags: `--engine` (`-e`) and `--dry-run` on root `doom`; `--engine` (`-e`) on `doom wads add` and
-  `doom wads set`; `--force` on `doom setup`, `doom wads fetch`, `doom wads scan`, and `doom engines install`.
+- Subcommand flags: `--engine` (`-e`) and `--dry-run` on root `doom`; `--all` on `doom wads` and `doom wads list`;
+  `--engine` (`-e`) on `doom wads add` and `doom wads set`; `--games` on `doom setup`, `doom wads scan`, and
+  `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`, `doom wads fetch`, `doom wads scan`, and
+  `doom engines install`.
 - Environment variables: `DOOM_CONFIG_DIR` overrides the `doom-cli` configuration directory (which holds `config.json`,
   `catalog.d/`, and `themes/`), alongside standard OS directory variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `HOME`,
   `LOCALAPPDATA`, `USERPROFILE`).
@@ -86,15 +98,17 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
   `configs/uzdoom/autoexec.cfg`) with runtime placeholder tokens.
 - `cmd/doom/`: Modular Cobra CLI commands:
   - `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path helpers.
-  - `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `scan`, `add`, `set`,
-    `reset`, `remove`, `lint`, and hidden `build`).
+  - `games.go`: Game-scope (`--games`), megawad selection (`--wads`), preset target list, and missing-argument hint
+    helpers (`exactArgsWithHint`).
+  - `wads.go`: `doom wads` interactive TUI browser and subcommands (`list`, `show`, `fetch`, `uninstall`, `scan`, `add`,
+    `set`, `reset`, `remove`, `lint`, and hidden `build`).
   - `engines.go`: `doom engines` interactive TUI engine manager and subcommands (`list`, `install`, `add`, `set`,
     `reset`, `remove`, and `cfg` with `install`, `diff`, and hidden `sync`).
   - `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
   - `setup.go`: `doom setup` automated turnkey workflow.
-- `internal/catalog/`: Runtime two-layer entity catalog, store operations, tiered query normalization, multi-root file
-  and alias resolution, and CP437 decoding (`entity.go`, `codec.go`, `loader.go`, `query.go`, `store.go`, `resolve.go`,
-  `decode.go`).
+- `internal/catalog/`: Runtime two-layer entity catalog, game inference and library scoping, store operations, tiered
+  query normalization, multi-root file and alias resolution, and CP437 decoding (`entity.go`, `games.go`, `codec.go`,
+  `loader.go`, `query.go`, `store.go`, `resolve.go`, `decode.go`).
 - `internal/config/`: Cross-platform path resolution adhering to XDG, Library, and AppData (`paths.go`), plus
   settings-only `config.json` and two-tier provenance helpers (`settings.go`).
 - `internal/display/`: Native display resolution and refresh rate auto-detection.
@@ -111,9 +125,10 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
   from `extras.wad` (`idkfa.go`).
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `options.go`, `config_view.go`, `config_actions.go`,
   `config_tabs.go`, `layout.go`, `render.go`, `modals.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
-- `internal/wad/`: Multi-mirror SHA-256 verified downloader, Zip Slip hardened extractor, embedded `DEHACKED` lump
-  extractor, ranked `.txt` README extractor with `<primaryStem>.txt` fallback normalization, and SoundFont installer
-  (`downloader.go`, `extract.go`, `soundfont.go`).
+- `internal/wad/`: Multi-mirror SHA-256 verified downloader (`DownloadAll`, `DownloadSelected`), Zip Slip hardened
+  extractor, embedded `DEHACKED` lump extractor, ranked `.txt` README extractor with `<primaryStem>.txt` fallback
+  normalization, safe preset PWAD uninstaller (`UninstallPreset`), and SoundFont installer (`downloader.go`,
+  `extract.go`, `uninstall.go`, `soundfont.go`).
 - `internal/wadfmt/`: Shared binary Doom `IWAD` and `PWAD` lump directory reader, lump extractor, streaming `PWAD`
   builder, and serializer (`wadfmt.go`).
 - `.agents/`: Conditional TUI design rules (`.agents/rules/monospace-tui.md`) and `mono-tui v0.2.5` design and audit

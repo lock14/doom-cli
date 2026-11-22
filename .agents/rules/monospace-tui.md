@@ -32,19 +32,22 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 `mono-tui` archetypes:
 
 *   **Screen archetype**: `§11.5` fuzzy finder (`model` in `internal/tui/launcher.go`) paired with a responsive
-    `Master-Detail` split view (`renderPanels` in `internal/tui/render.go` with the `Presets` list pane on the left
-    and the `Preset Details` preview pane on the right) and `Expand-to-Focus` full-pane views for the CP437 document
-    viewer (`viewingReadme` in `internal/tui/modals.go`), the `§11.2` settings form for launch options and per-preset
-    configuration (`viewingLaunchOpts` in `internal/tui/options.go`), the 3-tab configuration manager and live
-    configuration diff viewer (`viewingConfigMgr` and `s.viewingDiff` in `internal/tui/config_view.go`,
+    `Master-Detail` split view (`renderPanels` in `internal/tui/render.go` with the `Installed` or `Catalog` preset list
+    pane on the left and the `Preset Details` preview pane on the right) and `Expand-to-Focus` full-pane views for the
+    CP437 document viewer (`viewingReadme` in `internal/tui/modals.go`), the `§11.2` settings form for launch options
+    and per-preset configuration (`viewingLaunchOpts` in `internal/tui/options.go`), the 3-tab configuration manager and
+    live configuration diff viewer (`viewingConfigMgr` and `s.viewingDiff` in `internal/tui/config_view.go`,
     `internal/tui/config_actions.go`, and `internal/tui/config_tabs.go`), and contextual help (`viewingHelp` in
     `internal/tui/modals.go`).
-*   **Workflow archetype**: `§12.4` search-act and `§12.2` inspect-configure. Typing filters presets in real time across
-    `Name`, `Engine`, `Category`, `Compatibility`, and installation readiness (`ready`, `installed`, `missing`);
-    highlighting a preset previews its IWAD, PWADs, DeHackEd patches, and documentation status; pressing `Enter`
-    launches the selected preset, `Ctrl+O` or `F4` opens launch options, `Ctrl+G` or `F2` opens the 3-tab configuration
-    manager, `Ctrl+F` fetches or extracts missing WADs in place, `Tab` or `Ctrl+R` opens the bundled CP437 README, and
-    `F1` opens contextual help.
+*   **Workflow archetype**: `§12.4` search-act and `§12.2` inspect-configure. The preset list defaults to installed
+    presets plus `LayerUser` custom presets (`Installed (N • F3: +M)`) and automatically opens the full catalog
+    (`Catalog (N • 0 ready)`) when zero presets are installed; typing filters visible presets in real time across
+    `Name`, `Game`, `Engine`, `Category`, `Genre`, `Difficulty`, `Quality`, `Compatibility`, and installation readiness
+    (`ready`, `installed`, `missing`); highlighting a preset previews its game, IWAD, PWADs, DeHackEd patches, and
+    documentation status; pressing `Enter` launches the selected preset, `F3` or `Ctrl+T` toggles between the installed
+    library and the full catalog (dimming uninstalled rows in catalog mode), `Ctrl+O` or `F4` opens launch options,
+    `Ctrl+G` or `F2` opens the 3-tab configuration manager, `Ctrl+F` fetches or extracts missing WADs in place, `Tab` or
+    `Ctrl+R` opens the bundled CP437 README, and `F1` opens contextual help.
 
 ## Project overrides and conventions
 
@@ -68,8 +71,8 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 
 *   **Original**: Window and panel titles MUST be centered in the top border row:
 *   **Project rule**: `renderBoxWithTitle` in `internal/tui/render.go` left-aligns panel titles immediately after the
-    top-left border corner (`╭── Presets (32) ──...──╮` and `╭── Preset Details ──...──╮`), truncating long titles
-    with `…` when the panel width is narrow.
+    top-left border corner (`╭── Installed (12 • F3: +25) ──...──╮`, `╭── Catalog (37 • F3: ready) ──...──╮`, and
+    `╭── Preset Details ──...──╮`), truncating long titles with `…` when the panel width is narrow.
 *   **Reason**: Left-aligned panel titles keep scan lines anchored to the left margin above left-aligned preset rows
     and metadata labels across wide and narrow terminal widths.
 
@@ -141,9 +144,9 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 *   **Project rule**: In the primary launcher view (`!m.viewingReadme && !m.viewingHelp && !m.viewingLaunchOpts &&
     !m.viewingConfigMgr`), the fuzzy search `textinput.Model` (`m.input`) is focused by default (`§11.5`) so all
     printable characters immediately filter presets; modifier and special keys (`↑`, `↓`, `Ctrl+P`, `Ctrl+N`, `Ctrl+K`,
-    `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`, `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F1`
-    or `Alt+?`, `Enter`, `Esc` to cancel an active `Ctrl+F` fetch or quit, and `Ctrl+C`, with `Home` and `End` moving
-    the filter text cursor) work regardless of filter text. In `Launch Options` (`m.viewingLaunchOpts`), `Ctrl+K`,
+    `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`, `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F3`
+    or `Ctrl+T`, `F1` or `Alt+?`, `Enter`, `Esc` to cancel an active `Ctrl+F` fetch or quit, and `Ctrl+C`, with `Home`
+    and `End` moving the filter text cursor) work regardless of filter text. In `Launch Options` (`m.viewingLaunchOpts`), `Ctrl+K`,
     `Ctrl+J`, `←`, `→`, `Space`, and `?` are gated behind `!isTextField` so text inputs (`-warp`, `-record`,
     `-playdemo`, `-timedemo`, `-loadgame`, and `Extra Args`) never swallow cursor movement, spaces, or `?`, whereas
     `Configuration Manager` (`m.viewingConfigMgr`) binds `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`,

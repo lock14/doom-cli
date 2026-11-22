@@ -113,6 +113,11 @@ func validateDecodedEntity(ent Entity) error {
 		if strings.TrimSpace(ent.Preset.Name) == "" {
 			return fmt.Errorf("preset %s: missing name", ent.Preset.ID)
 		}
+		if ent.Preset.Game != "" {
+			if err := ValidateID(ent.Preset.Game); err != nil {
+				return fmt.Errorf("preset %s game: %w", ent.Preset.ID, err)
+			}
+		}
 		if strings.TrimSpace(ent.Preset.IWAD) == "" {
 			return fmt.Errorf("preset %s: missing iwad", ent.Preset.ID)
 		}
@@ -125,6 +130,14 @@ func validateDecodedEntity(ent Entity) error {
 		}
 		if err := ValidateID(ent.Override.Target.ID); err != nil {
 			return fmt.Errorf("override target id: %w", err)
+		}
+		if ent.Override.Set != nil && ent.Override.Set.Game != nil && *ent.Override.Set.Game != "" {
+			if err := ValidateID(*ent.Override.Set.Game); err != nil {
+				return fmt.Errorf(
+					"override %s/%s game: %w",
+					ent.Override.Target.Kind, ent.Override.Target.ID, err,
+				)
+			}
 		}
 		if ent.Override.Set != nil && ent.Override.Set.ArgsStyle != nil {
 			style := *ent.Override.Set.ArgsStyle

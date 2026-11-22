@@ -549,8 +549,10 @@ func RemovePreset(userDir string, curated, layered *Catalog, key string) (*Prese
 	if isCurated {
 		if _, statErr := os.Stat(presetPath); os.IsNotExist(statErr) {
 			return nil, fmt.Errorf(
-				"cannot remove built-in curated preset %q (use 'doom wads reset %s' to clear custom overrides)",
-				target.Name, target.ID,
+				"cannot remove built-in curated preset %q "+
+					"(use 'doom wads uninstall %s' to delete downloaded WAD files, "+
+					"or 'doom wads reset %s' to clear custom overrides)",
+				target.Name, target.ID, target.ID,
 			)
 		}
 	}

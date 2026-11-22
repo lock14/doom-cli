@@ -574,3 +574,150 @@ func TestExtractWADLumpFromReaderAndZipSymlinkSkipped(t *testing.T) {
 		t.Errorf("good.wad = %q (%v), want good-pwad", string(data), err)
 	}
 }
+
+func TestDownloadAllIWADGateAndUninstallPresetSafety(t *testing.T) {
+	t.Parallel()
+
+	zipBytes := createTestZip(t, map[string]string{
+		"sunder.wad": "sunder-pwad",
+		"sunder.txt": "sunder-readme",
+		"pl2.wad":    "plutonia2-pwad",
+	})
+	sum := sha256.Sum256(zipBytes)
+	zipHex := hex.EncodeToString(sum[:])
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/zip")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(zipBytes)
+	}))
+	t.Cleanup(srv.Close)
+
+	wadsDir := filepath.Join(t.TempDir(), "wads")
+	extraDir := filepath.Join(t.TempDir(), "readonly_wads")
+	for _, d := range []string{wadsDir, extraDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Only DOOM2.WAD and shared idkfa 2024.wad are installed; PLUTONIA.WAD is absent.
+	if err := os.WriteFile(filepath.Join(wadsDir, "DOOM2.WAD"), []byte("iwad"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wadsDir, "idkfa 2024.wad"), []byte("music"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sunderPreset := catalog.Preset{
+		ID:     "sunder",
+		Name:   "Sunder",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files: []catalog.FileSpec{
+			{Name: "sunder.wad"},
+			{Name: "idkfa 2024.wad", Optional: true},
+		},
+		Sources: []catalog.Source{{URL: srv.URL + "/sunder.zip", SHA256: zipHex}},
+	}
+	pl2Preset := catalog.Preset{
+		ID:      "plutonia-2",
+		Name:    "Plutonia 2",
+		Engine:  "dsda-doom",
+		IWAD:    "PLUTONIA.WAD",
+		Files:   []catalog.FileSpec{{Name: "pl2.wad"}},
+		Sources: []catalog.Source{{URL: srv.URL + "/pl2.zip", SHA256: zipHex}},
+	}
+	doom2Preset := catalog.Preset{
+		ID:     "doom-ii",
+		Name:   "Doom II",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files:  []catalog.FileSpec{{Name: "idkfa 2024.wad", Optional: true}},
+	}
+	cat := &catalog.Catalog{
+		Presets: []catalog.Preset{doom2Preset, sunderPreset, pl2Preset},
+	}
+
+	var dlOut bytes.Buffer
+	dl := NewDownloader([]string{wadsDir}, false, &dlOut)
+	dl.Client = srv.Client()
+	if err := dl.DownloadAll(cat); err != nil {
+		t.Fatalf("DownloadAll failed: %v", err)
+	}
+	if !strings.Contains(dlOut.String(), "Skipping Plutonia 2 (base IWAD PLUTONIA.WAD not installed)") {
+		t.Errorf("expected DownloadAll to skip Plutonia 2 due to missing PLUTONIA.WAD, got:\n%s", dlOut.String())
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "pl2.wad")); !os.IsNotExist(err) {
+		t.Errorf("expected pl2.wad not to be downloaded when PLUTONIA.WAD is missing")
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "sunder.wad")); err != nil {
+		t.Fatalf("expected sunder.wad to be downloaded: %v", err)
+	}
+
+	// DownloadSelected explicitly downloads Plutonia 2 even without PLUTONIA.WAD
+	if err := dl.DownloadSelected([]catalog.Preset{pl2Preset}, cat); err != nil {
+		t.Fatalf("DownloadSelected failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "pl2.wad")); err != nil {
+		t.Fatalf("expected DownloadSelected to install pl2.wad: %v", err)
+	}
+
+	// Create a backup file for sunder.wad to verify backup cleanup on uninstall
+	sunderBak := filepath.Join(wadsDir, "sunder.wad.bak.20260101-000000")
+	if err := os.WriteFile(sunderBak, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Base IWAD presets are protected from UninstallPreset
+	if _, err := UninstallPreset(doom2Preset, cat, wadsDir, nil, nil); err == nil ||
+		!strings.Contains(err.Error(), "base IWADs are protected") {
+		t.Fatalf("expected base IWAD protection error, got %v", err)
+	}
+
+	// 2. UninstallPreset removes sunder.wad, sunder.txt, and .bak.*, while preserving DOOM2.WAD and idkfa 2024.wad
+	var unOut bytes.Buffer
+	removed, err := UninstallPreset(sunderPreset, cat, wadsDir, nil, &unOut)
+	if err != nil {
+		t.Fatalf("UninstallPreset(sunder) error: %v", err)
+	}
+	if removed != 2 {
+		t.Errorf("UninstallPreset removed %d files, want 2 (sunder.wad + sunder.txt); out:\n%s",
+			removed, unOut.String())
+	}
+	for _, gone := range []string{"sunder.wad", "sunder.txt", "sunder.wad.bak.20260101-000000"} {
+		if _, statErr := os.Stat(filepath.Join(wadsDir, gone)); !os.IsNotExist(statErr) {
+			t.Errorf("expected %s to be removed", gone)
+		}
+	}
+	for _, kept := range []string{"DOOM2.WAD", "idkfa 2024.wad"} {
+		if _, statErr := os.Stat(filepath.Join(wadsDir, kept)); statErr != nil {
+			t.Errorf("expected shared file %s to be preserved: %v", kept, statErr)
+		}
+	}
+
+	// 3. Re-running UninstallPreset when already uninstalled is a clean no-op
+	removedAgain, err := UninstallPreset(sunderPreset, cat, wadsDir, nil, &unOut)
+	if err != nil || removedAgain != 0 {
+		t.Errorf("second UninstallPreset = (%d, %v), want (0, nil)", removedAgain, err)
+	}
+
+	// 4. Files residing in secondary read-only extraWadRoots are never deleted
+	roWad := filepath.Join(extraDir, "ro_map.wad")
+	if err := os.WriteFile(roWad, []byte("readonly"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	roPreset := catalog.Preset{
+		ID:     "ro-map",
+		Name:   "ReadOnly Map",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files:  []catalog.FileSpec{{Name: "ro_map.wad"}},
+	}
+	if _, err := UninstallPreset(roPreset, cat, wadsDir, []string{extraDir}, nil); err == nil ||
+		!strings.Contains(err.Error(), "read-only wads-dirs") {
+		t.Errorf("expected read-only wads-dirs error, got %v", err)
+	}
+	if _, err := os.Stat(roWad); err != nil {
+		t.Errorf("read-only WAD %s was unexpectedly deleted", roWad)
+	}
+}

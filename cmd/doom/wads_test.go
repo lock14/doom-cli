@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lock14/doom-cli/internal/catalog"
 	"github.com/lock14/doom-cli/internal/repolint"
 	"github.com/lock14/doom-cli/internal/wadfmt"
 )
@@ -34,7 +35,9 @@ func TestWadsCommands(t *testing.T) {
 	// Verify expected wads subcommands exist and legacy extract/config do not
 	wadsCmd := newWadsCmd()
 	subCommands := make(map[string]*bool)
-	for _, want := range []string{"list", "show", "fetch", "scan", "add", "set", "reset", "remove", "lint", "build"} {
+	for _, want := range []string{
+		"list", "show", "fetch", "uninstall", "scan", "add", "set", "reset", "remove", "lint", "build",
+	} {
 		b := false
 		subCommands[want] = &b
 	}
@@ -52,7 +55,8 @@ func TestWadsCommands(t *testing.T) {
 		}
 	}
 
-	// 1. wads list shows [✓ Ready] for Doom II, [✗ Missing] for unextracted megawads, and category tags
+	// 1. default wads list shows only installed presets ([✓ Ready] Doom II) and hidden count;
+	// wads list --all shows all presets including [✗ Missing] community megawads
 	var listOut bytes.Buffer
 	wadsCmd = newWadsCmd()
 	wadsCmd.SetOut(&listOut)
@@ -60,9 +64,27 @@ func TestWadsCommands(t *testing.T) {
 	if err := wadsCmd.Execute(); err != nil {
 		t.Fatalf("wads list failed: %v", err)
 	}
+	for _, want := range []string{
+		"=== Installed Doom Presets ===", "Doom II", "[✓ Ready]", "uninstalled presets hidden",
+	} {
+		if !strings.Contains(listOut.String(), want) {
+			t.Errorf("expected default wads list to contain %q, got:\n%s", want, listOut.String())
+		}
+	}
+	if strings.Contains(listOut.String(), "Alien Vendetta") || strings.Contains(listOut.String(), "Heretic") {
+		t.Errorf("expected default wads list to hide uninstalled presets, got:\n%s", listOut.String())
+	}
+
+	listOut.Reset()
+	wadsCmd = newWadsCmd()
+	wadsCmd.SetOut(&listOut)
+	wadsCmd.SetArgs([]string{"list", "--all"})
+	if err := wadsCmd.Execute(); err != nil {
+		t.Fatalf("wads list --all failed: %v", err)
+	}
 	for _, want := range []string{"[✓ Ready]", "[✗ Missing]", "[Official IWAD", "[Community Megawad"} {
 		if !strings.Contains(listOut.String(), want) {
-			t.Errorf("expected wads list to contain %q, got:\n%s", want, listOut.String())
+			t.Errorf("expected wads list --all to contain %q, got:\n%s", want, listOut.String())
 		}
 	}
 
@@ -147,16 +169,16 @@ func TestWadsCommands(t *testing.T) {
 		t.Fatalf("wads reset evilution failed: %v", err)
 	}
 
-	// Verify wads list displays (custom) and (overridden)
+	// Verify wads list --all displays (custom) and (overridden), and default wads list keeps custom presets visible
 	listOut.Reset()
 	wadsCmd = newWadsCmd()
 	wadsCmd.SetOut(&listOut)
-	wadsCmd.SetArgs([]string{"list"})
+	wadsCmd.SetArgs([]string{"list", "--all"})
 	if err := wadsCmd.Execute(); err != nil {
-		t.Fatalf("wads list after add/set failed: %v", err)
+		t.Fatalf("wads list --all after add/set failed: %v", err)
 	}
 	if !strings.Contains(listOut.String(), "(custom)") || !strings.Contains(listOut.String(), "(overridden)") {
-		t.Errorf("expected wads list to show (custom) and (overridden), got:\n%s", listOut.String())
+		t.Errorf("expected wads list --all to show (custom) and (overridden), got:\n%s", listOut.String())
 	}
 
 	_, _, cat, err := loadAppState()
@@ -279,19 +301,21 @@ func TestRunWadsTUISingleShot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, cat, err := loadAppState()
+	paths, _, cat, err := loadAppState()
 	if err != nil {
 		t.Fatalf("loadAppState: %v", err)
 	}
+	dirIdx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+	libPresets, _ := cat.LibraryPresets(dirIdx)
 	doom2Idx := -1
-	for i, p := range cat.Presets {
+	for i, p := range libPresets {
 		if p.ID == "doom-ii" {
 			doom2Idx = i + 1
 			break
 		}
 	}
 	if doom2Idx == -1 {
-		t.Fatal("doom-ii preset not found in catalog")
+		t.Fatal("doom-ii preset not found in installed library")
 	}
 
 	rPlay, wPlay, err := os.Pipe()
@@ -319,15 +343,53 @@ func TestRunWadsTUISingleShot(t *testing.T) {
 
 func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
 	tempDir := t.TempDir()
-	t.Setenv("DOOM_CONFIG_DIR", tempDir)
+	wadsDir := filepath.Join(tempDir, "wads")
+	if err := os.MkdirAll(wadsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	if err := runConfigSet(nil, []string{"wads-dir", wadsDir}); err != nil {
+		t.Fatal(err)
+	}
 
+	// 1. 0 installed presets shows empty-library guidance
+	var emptyBuf bytes.Buffer
+	emptyCmd := newRootCmd()
+	emptyCmd.SetOut(&emptyBuf)
+	emptyCmd.SetErr(&emptyBuf)
+	emptyCmd.SetArgs([]string{"wads", "list"})
+	if err := emptyCmd.Execute(); err != nil {
+		t.Fatalf("empty wads list failed: %v", err)
+	}
+	if !strings.Contains(emptyBuf.String(), "No installed presets found") ||
+		!strings.Contains(emptyBuf.String(), "doom wads list --all") {
+		t.Errorf("expected empty-library guidance, got:\n%s", emptyBuf.String())
+	}
+
+	// 2. Placing HERETIC.WAD in wads-dir auto-reveals Heretic in default wads list
+	if err := os.WriteFile(filepath.Join(wadsDir, "HERETIC.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var hereticBuf bytes.Buffer
+	hereticListCmd := newRootCmd()
+	hereticListCmd.SetOut(&hereticBuf)
+	hereticListCmd.SetErr(&hereticBuf)
+	hereticListCmd.SetArgs([]string{"wads", "list"})
+	if err := hereticListCmd.Execute(); err != nil {
+		t.Fatalf("wads list with HERETIC.WAD failed: %v", err)
+	}
+	if !strings.Contains(hereticBuf.String(), "Heretic") || strings.Contains(hereticBuf.String(), "Hexen") {
+		t.Errorf("expected Heretic visible and Hexen hidden, got:\n%s", hereticBuf.String())
+	}
+
+	// 3. wads list --all displays full catalog taxonomy metadata
 	var listBuf bytes.Buffer
 	listCmd := newRootCmd()
 	listCmd.SetOut(&listBuf)
 	listCmd.SetErr(&listBuf)
-	listCmd.SetArgs([]string{"wads", "list"})
+	listCmd.SetArgs([]string{"wads", "list", "--all"})
 	if err := listCmd.Execute(); err != nil {
-		t.Fatalf("wads list failed: %v", err)
+		t.Fatalf("wads list --all failed: %v", err)
 	}
 	listOut := listBuf.String()
 	for _, want := range []string{
@@ -337,7 +399,7 @@ func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
 		"Strife: Quest for the Sigil",
 	} {
 		if !strings.Contains(listOut, want) {
-			t.Errorf("expected wads list output to contain %q, got:\n%s", want, listOut)
+			t.Errorf("expected wads list --all output to contain %q, got:\n%s", want, listOut)
 		}
 	}
 
@@ -351,6 +413,7 @@ func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
 	}
 	showOut := showBuf.String()
 	for _, want := range []string{
+		"Game:          Doom",
 		"Genre:         Cyberpunk Adventure",
 		"Difficulty:    Moderate",
 		"Quality:       S-Tier (9.5/10)",
@@ -359,6 +422,19 @@ func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
 		if !strings.Contains(showOut, want) {
 			t.Errorf("expected wads show output to contain %q, got:\n%s", want, showOut)
 		}
+	}
+
+	showBuf.Reset()
+	showCmd = newRootCmd()
+	showCmd.SetOut(&showBuf)
+	showCmd.SetErr(&showBuf)
+	showCmd.SetArgs([]string{"wads", "show", "heretic"})
+	if err := showCmd.Execute(); err != nil {
+		t.Fatalf("wads show heretic failed: %v", err)
+	}
+	if !strings.Contains(showBuf.String(), "Game:          Heretic (optional)") {
+		t.Errorf("expected wads show heretic to display 'Game:          Heretic (optional)', got:\n%s",
+			showBuf.String())
 	}
 }
 
@@ -507,5 +583,126 @@ func TestRootExecFlag_BuildLauncherNilCfg_ThemeDirReject_And_FetchBehavior(t *te
 	}
 	if !strings.Contains(listErr.String(), "Warning: could not parse") {
 		t.Errorf("expected malformed config warning on cmd stderr, got:\n%s", listErr.String())
+	}
+}
+
+func TestWadsFetchScopingUninstallScanAndArgHints(t *testing.T) {
+	tempDir := t.TempDir()
+	wadsDir := filepath.Join(tempDir, "wads")
+	if err := os.MkdirAll(wadsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", tempDir)
+	t.Setenv("USERPROFILE", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("XDG_DATA_HOME", tempDir)
+	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
+	if err := runConfigSet(nil, []string{"wads-dir", wadsDir}); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Actionable 0-arg hints across mutating/lookup subcommands
+	hintCases := []struct {
+		args []string
+		want string
+	}{
+		{args: []string{"wads", "fetch"}, want: "doom wads fetch all"},
+		{args: []string{"wads", "uninstall"}, want: "doom wads uninstall"},
+		{args: []string{"wads", "show"}, want: "doom wads show"},
+		{args: []string{"wads", "add"}, want: "doom wads add"},
+		{args: []string{"wads", "set"}, want: "doom wads set"},
+		{args: []string{"wads", "reset"}, want: "doom wads reset"},
+		{args: []string{"wads", "remove"}, want: "doom wads uninstall"},
+		{args: []string{"engines", "add"}, want: "doom engines add"},
+		{args: []string{"engines", "set"}, want: "doom engines set"},
+		{args: []string{"engines", "reset"}, want: "doom engines reset"},
+		{args: []string{"engines", "remove"}, want: "doom engines remove"},
+		{args: []string{"config", "set"}, want: "doom config set"},
+	}
+	for _, tc := range hintCases {
+		root := newRootCmd()
+		root.SetOut(&bytes.Buffer{})
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs(tc.args)
+		err := root.Execute()
+		if err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("command %v error = %v, want hint containing %q", tc.args, err, tc.want)
+		}
+	}
+
+	// 2. Single-preset fetch isolates Steam discovery (fetching doom-ii does not extract HERETIC.WAD)
+	for _, steamSub := range []string{
+		filepath.Join(tempDir, "GOG Games", "bundle"),
+		filepath.Join(tempDir, "Saved Games", "Nightdive Studios", "DOOM", "bundle"),
+	} {
+		if err := os.MkdirAll(steamSub, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(steamSub, "DOOM2.WAD"), []byte("IWAD"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(steamSub, "HERETIC.WAD"), []byte("IWAD"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	root := newRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"wads", "fetch", "doom-ii"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("wads fetch doom-ii failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "HERETIC.WAD")); !os.IsNotExist(err) {
+		t.Errorf("expected wads fetch doom-ii not to extract HERETIC.WAD")
+	}
+
+	// Reject --games on named wads fetch
+	root = newRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"wads", "fetch", "doom-ii", "--games", "all"})
+	if err := root.Execute(); err == nil {
+		t.Errorf("expected wads fetch doom-ii --games all to fail")
+	}
+
+	// Explicit wads fetch heretic extracts HERETIC.WAD
+	root = newRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"wads", "fetch", "heretic"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("wads fetch heretic failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "HERETIC.WAD")); err != nil {
+		t.Errorf("expected wads fetch heretic to extract HERETIC.WAD: %v", err)
+	}
+
+	// 3. wads uninstall removes Sunder PWAD while protecting DOOM2.WAD
+	sunderWad := filepath.Join(wadsDir, "Sunder 2512.wad")
+	if err := os.WriteFile(sunderWad, []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	root = newRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"wads", "uninstall", "sunder"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("wads uninstall sunder failed: %v", err)
+	}
+	if _, err := os.Stat(sunderWad); !os.IsNotExist(err) {
+		t.Errorf("expected Sunder 2512.wad removed after uninstall")
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "DOOM2.WAD")); err != nil {
+		t.Errorf("expected DOOM2.WAD preserved after uninstall: %v", err)
+	}
+
+	// Base IWAD uninstall is rejected
+	root = newRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"wads", "uninstall", "doom-ii"})
+	if err := root.Execute(); err == nil {
+		t.Errorf("expected wads uninstall doom-ii to reject base IWAD deletion")
 	}
 }

@@ -55,6 +55,12 @@ func padOrTruncateName(name string, width int) string {
 
 func (m model) renderListLines(geom layoutGeometry) []string {
 	if len(m.filtered) == 0 {
+		if strings.TrimSpace(m.input.Value()) == "" && !m.showAllPresets && m.hiddenCount > 0 {
+			return []string{
+				"  No installed presets yet.",
+				"  Press F3 to browse catalog, or run 'doom setup'.",
+			}
+		}
 		return []string{"  No presets matching search."}
 	}
 
@@ -97,7 +103,11 @@ func (m model) renderListLines(geom layoutGeometry) []string {
 			selected := m.styles.CursorBar.Render("▎ ") + m.styles.CursorText.Render(paddedName) + " " + tag
 			listLines = append(listLines, selected)
 		} else {
-			listLines = append(listLines, "  "+paddedName+" "+tag)
+			displayName := paddedName
+			if m.showAllPresets && !p.IsCustom() && !m.isPresetReady(p) {
+				displayName = m.styles.Help.Render(paddedName)
+			}
+			listLines = append(listLines, "  "+displayName+" "+tag)
 		}
 	}
 	return listLines
@@ -249,6 +259,12 @@ func (m model) renderPreviewLines(geom layoutGeometry) ([]string, bool) {
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Type:          "), m.styles.TagUZDoom.Render("[Overridden]")),
 		)
 	}
+	if !cur.IsCoreGame() {
+		gameVal := catalog.GameDisplayName(cur.EffectiveGame()) + " " + m.styles.Help.Render("[Optional Game]")
+		previewLines = append(previewLines,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Game:          "), gameVal),
+		)
+	}
 	if cur.Author != "" {
 		previewLines = append(previewLines,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Author:        "), cur.Author),
@@ -375,6 +391,12 @@ func (m model) condensePreviewLines(
 	}
 
 	var metaCandidates []string
+	if !cur.IsCoreGame() {
+		gameVal := catalog.GameDisplayName(cur.EffectiveGame()) + " " + m.styles.Help.Render("[Optional Game]")
+		metaCandidates = append(metaCandidates,
+			fmt.Sprintf("%s%s", m.styles.Label.Render("Game:          "), gameVal),
+		)
+	}
 	if len(cur.Args) > 0 {
 		metaCandidates = append(metaCandidates,
 			fmt.Sprintf("%s%s", m.styles.Label.Render("Launch Args:   "), strings.Join(cur.Args, " ")),
@@ -534,16 +556,24 @@ func renderHeaderBar(leftPart, rightPart string, width int) string {
 
 func (m model) renderHeader() string {
 	leftPart := m.styles.RenderBrandPill(m.nerdFonts) + m.styles.FilterPrompt.Render("  Filter: ") + m.input.View()
-	totalPresets := 0
-	if m.catalog != nil {
-		totalPresets = len(m.catalog.Presets)
-	}
-	rightPart := m.styles.RenderStatsPill(len(m.filtered), totalPresets, m.nerdFonts)
+	rightPart := m.styles.RenderStatsPill(len(m.filtered), len(m.visiblePresets), m.nerdFonts)
 	return renderHeaderBar(leftPart, rightPart, m.width)
 }
 
 func (m model) renderPanels(geom layoutGeometry, listLines, previewLines []string) string {
+	totalCatalog := 0
+	if m.catalog != nil {
+		totalCatalog = len(m.catalog.Presets)
+	}
 	leftTitle := fmt.Sprintf("Presets (%d)", len(m.filtered))
+	switch {
+	case !m.showAllPresets && m.hiddenCount > 0:
+		leftTitle = fmt.Sprintf("Installed (%d • F3: +%d)", len(m.filtered), m.hiddenCount)
+	case m.showAllPresets && m.installedCount > 0 && m.installedCount < totalCatalog:
+		leftTitle = fmt.Sprintf("Catalog (%d • F3: ready)", len(m.filtered))
+	case m.showAllPresets && m.installedCount == 0 && totalCatalog > 0:
+		leftTitle = fmt.Sprintf("Catalog (%d • 0 ready)", len(m.filtered))
+	}
 	rightTitle := "Preset Details"
 
 	if geom.sideBySide {
@@ -577,11 +607,22 @@ func (m model) renderFooter(hasReadme bool) string {
 		if hasReadme {
 			items = append(items, keyHelp{"Tab", "README"})
 		}
+		totalCatalog := 0
+		if m.catalog != nil {
+			totalCatalog = len(m.catalog.Presets)
+		}
 		items = append(items,
 			keyHelp{"Ctrl+O", "Opts"},
 			keyHelp{"Ctrl+G", "Cfg"},
 			keyHelp{"Ctrl+F", "Fetch"},
 			keyHelp{"F1", "Help"},
+		)
+		if !m.showAllPresets && m.hiddenCount > 0 {
+			items = append(items, keyHelp{"F3", "All"})
+		} else if m.showAllPresets && totalCatalog > m.installedCount {
+			items = append(items, keyHelp{"F3", "Ready"})
+		}
+		items = append(items,
 			keyHelp{"Enter", "Launch"},
 			keyHelp{"Esc", "Quit"},
 		)

@@ -254,6 +254,11 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		}
 
 		validateFiles(where, p.ID, p.IWAD, p.Files)
+		if p.Game != "" {
+			if err := catalog.ValidateID(p.Game); err != nil {
+				addErr(where, "preset %s has invalid game %q: %v", p.ID, p.Game, err)
+			}
+		}
 
 		for _, s := range p.Sources {
 			if !strings.HasPrefix(s.URL, "https://") {
@@ -276,6 +281,20 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 		}
 
 		if te.curated {
+			inferredGame := catalog.InferGameFromIWAD(p.IWAD)
+			if inferredGame != catalog.CoreGame && strings.TrimSpace(p.Game) == "" {
+				addErr(
+					where,
+					"curated non-Doom preset %s (iwad %s) must explicitly declare \"game\": %q",
+					p.ID, p.IWAD, inferredGame,
+				)
+			} else if strings.TrimSpace(p.Game) != "" && p.Game != inferredGame {
+				addErr(
+					where,
+					"curated preset %s declares game %q which conflicts with iwad %q (inferred %q)",
+					p.ID, p.Game, p.IWAD, inferredGame,
+				)
+			}
 			if strings.TrimSpace(p.Author) == "" ||
 				strings.TrimSpace(p.ReleaseDate) == "" ||
 				strings.TrimSpace(p.Category) == "" ||
@@ -312,6 +331,11 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 			}
 			ovIWAD := presetIWADs[ov.Target.ID]
 			if ov.Set != nil {
+				if ov.Set.Game != nil && *ov.Set.Game != "" {
+					if err := catalog.ValidateID(*ov.Set.Game); err != nil {
+						addErr(where, "override preset %s has invalid game %q: %v", ov.Target.ID, *ov.Set.Game, err)
+					}
+				}
 				if ov.Set.IWAD != nil && *ov.Set.IWAD != "" {
 					ovIWAD = *ov.Set.IWAD
 				}

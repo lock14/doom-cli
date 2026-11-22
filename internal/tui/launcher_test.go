@@ -402,6 +402,16 @@ func TestModel_SearchTokens_CompatibilityAndReadiness(t *testing.T) {
 
 	m := initialModel(cat, []string{wadsDir}, ClassicTheme, false)
 
+	// Default Installed view hides uninstalled eviternity-ii
+	m.updateFiltered("missing")
+	if len(m.filtered) != 0 {
+		t.Errorf("expected Installed mode to hide uninstalled presets, got %+v", m.filtered)
+	}
+
+	// Switch to full Catalog view via F3 to search across installed and uninstalled presets
+	newM, _ := m.Update(tea.KeyMsg{Type: tea.KeyF3})
+	m = newM.(model)
+
 	// Filter by compatibility "MBF21"
 	m.updateFiltered("MBF21")
 	if len(m.filtered) != 1 || m.filtered[0].ID != "eviternity-ii" {
@@ -567,5 +577,86 @@ func TestModel_FilteringAndPreviewTaxonomyMetadata(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Errorf("expected TUI view to contain %q, got:\n%s", want, view)
 		}
+	}
+}
+
+func TestModel_InstalledLibraryToggleAutoCatalogAndOptionalGamePreview(t *testing.T) {
+	t.Parallel()
+	cat, err := catalog.LoadCurated()
+	if err != nil {
+		t.Fatalf("LoadCurated: %v", err)
+	}
+
+	// 1. 0 installed presets automatically opens in Catalog mode
+	emptyDir := t.TempDir()
+	mZero := initialModel(cat, []string{emptyDir}, ClassicTheme, false)
+	newM, _ := mZero.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	mZero = newM.(model)
+	if !mZero.showAllPresets || !mZero.autoCatalog || len(mZero.filtered) != len(cat.Presets) {
+		t.Fatalf("expected 0-installed model to auto-open catalog (%d), got showAll=%v auto=%v len=%d",
+			len(cat.Presets), mZero.showAllPresets, mZero.autoCatalog, len(mZero.filtered))
+	}
+	if view := mZero.View(); !strings.Contains(view, "Catalog (37 • 0 ready)") {
+		t.Errorf("expected 'Catalog (37 • 0 ready)' title, got:\n%s", view)
+	}
+
+	// 2. Saving a populated WADs Dir in Config Manager transitions out of autoCatalog into Installed mode
+	populatedDir := t.TempDir()
+	for _, fname := range []string{"DOOM2.WAD", "HERETIC.WAD"} {
+		if err := os.WriteFile(filepath.Join(populatedDir, fname), []byte("IWAD"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	paths := isolatedConfigPaths(t)
+	mZero.paths = paths
+	mZero.appConfig = &config.AppConfig{}
+	newM, _ = mZero.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	mZero = newM.(model)
+	mZero.cfgMgr.wadsDirInput.SetValue(populatedDir)
+	newM, _ = mZero.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	mZero = newM.(model)
+	newM, _ = mZero.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	mZero = newM.(model)
+	if mZero.showAllPresets || len(mZero.filtered) != 2 {
+		t.Fatalf("expected transition to Installed mode with 2 presets after saving WADs Dir, got showAll=%v len=%d",
+			mZero.showAllPresets, len(mZero.filtered))
+	}
+
+	// 3. InitialModel with installed presets resolves initialPreset against visiblePresets and toggles via F3/Ctrl+T
+	mLib := initialModel(cat, []string{populatedDir}, ClassicTheme, false, "heretic")
+	newM, _ = mLib.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	mLib = newM.(model)
+	if mLib.showAllPresets || len(mLib.filtered) != 2 ||
+		mLib.cursor != 1 || mLib.filtered[mLib.cursor].ID != "heretic" {
+		t.Fatalf("expected Installed mode with cursor=1 (heretic), got showAll=%v len=%d cursor=%d",
+			mLib.showAllPresets, len(mLib.filtered), mLib.cursor)
+	}
+
+	hereticView := mLib.View()
+	if lines := strings.Split(hereticView, "\n"); len(lines) > 24 {
+		t.Errorf("Heretic preview at 80x24 produced %d lines, want <= 24", len(lines))
+	}
+	for _, want := range []string{"Installed (2 • F3: +35)", "Game:", "Heretic", "[Optional Game]"} {
+		if !strings.Contains(hereticView, want) {
+			t.Errorf("expected Heretic 80x24 view to contain %q, got:\n%s", want, hereticView)
+		}
+	}
+
+	// F3 switches to full Catalog mode; Ctrl+T switches back to Installed mode
+	newM, _ = mLib.Update(tea.KeyMsg{Type: tea.KeyF3})
+	mLib = newM.(model)
+	if !mLib.showAllPresets || len(mLib.filtered) != len(cat.Presets) {
+		t.Fatalf("expected F3 to show all %d presets, got showAll=%v len=%d",
+			len(cat.Presets), mLib.showAllPresets, len(mLib.filtered))
+	}
+	if !strings.Contains(mLib.View(), "Catalog (37 • F3: ready)") {
+		t.Errorf("expected 'Catalog (37 • F3: ready)' title in catalog mode")
+	}
+
+	newM, _ = mLib.Update(tea.KeyMsg{Type: tea.KeyCtrlT})
+	mLib = newM.(model)
+	if mLib.showAllPresets || len(mLib.filtered) != 2 {
+		t.Fatalf("expected Ctrl+T to return to 2 installed presets, got showAll=%v len=%d",
+			mLib.showAllPresets, len(mLib.filtered))
 	}
 }

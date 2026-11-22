@@ -49,8 +49,8 @@ Always resolve rules in this order (higher overrides lower):
    * In the primary launcher view (`!m.viewingReadme && !m.viewingHelp && !m.viewingLaunchOpts && !m.viewingConfigMgr`),
      all printable characters feed the live fuzzy search input (`m.input`) per `[OVERRIDE] §2.2`.
    * Keep modifier and navigation bindings (`↑`, `↓`, `Ctrl+P`, `Ctrl+N`, `Ctrl+K`, `Ctrl+J`, `PgUp`, `PgDn`, `Ctrl+U`,
-     `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F1`, `Enter`, `Esc`, and `Ctrl+C`, with
-     `Home` and `End` moving the filter text cursor) working regardless of filter state.
+     `Ctrl+D`, `Ctrl+O` or `F4`, `Ctrl+G` or `F2`, `Ctrl+F`, `Tab` or `Ctrl+R`, `F3` or `Ctrl+T`, `F1`, `Enter`, `Esc`,
+     and `Ctrl+C`, with `Home` and `End` moving the filter text cursor) working regardless of filter state.
    * In `Launch Options` (`m.viewingLaunchOpts`), gate `Ctrl+K`, `Ctrl+J`, `←`, `→`, and `Space` behind `!isTextField`
      so text inputs never swallow cursor movement or spaces; in `Configuration Manager` (`m.viewingConfigMgr`), bind
      `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` unconditionally across selector and

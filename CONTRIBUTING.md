@@ -25,12 +25,15 @@ All contributions must respect the core repository invariants:
     `doom engines install`, `doom setup`, `doom config set`, `doom engines add`, `doom engines set`, `doom wads add`,
     `doom wads set`, and `Ctrl+S` in the TUI `Launch Options` and `Configuration Manager` views) must write atomically
     and generate non-clobbering timestamped backups (`.bak.<timestamp>`, retaining at most `MaxBackupsPerFile = 3` per
-    file and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion, in-TUI `Ctrl+R` resets, and
-    repository templates during `doom engines cfg sync`) before overwriting any existing user file.
-    `fsutil.WriteFileAtomic`, `fsutil.WriteReaderAtomic`, `fsutil.CopyFileAtomic`, and `fsutil.DownloadVerified` share
-    `writeReaderTempAndRename`, which streams to a same-directory `.doom-tmp-*` file, applies `Chmod`, `Sync`, and
-    `Close`, and runs any validation callback (including SHA-256 verification) before calling `fsutil.BackupFile` and
-    `os.Rename` so failed or corrupt writes never create spurious `.bak.*` files.
+    file and cleaning up backups via `fsutil.RemoveBackups` on entity or override deletion, `doom wads uninstall`,
+    in-TUI `Ctrl+R` resets, and repository templates during `doom engines cfg sync`) before overwriting any existing
+    user file. `fsutil.WriteFileAtomic`, `fsutil.WriteReaderAtomic`, `fsutil.CopyFileAtomic`, and
+    `fsutil.DownloadVerified` share `writeReaderTempAndRename`, which streams to a same-directory `.doom-tmp-*` file,
+    applies `Chmod`, `Sync`, and `Close`, and runs any validation callback (including SHA-256 verification) before
+    calling `fsutil.BackupFile` and `os.Rename` so failed or corrupt writes never create spurious `.bak.*` files.
+    `doom wads uninstall` (`wad.UninstallPreset`) removes only preset-exclusive PWAD, PK3, DeHackEd, companion `.txt`,
+    and `.bak.*` files inside primary `wads-dir`, refusing to delete base IWADs, shared files (`idkfa 2024.wad`,
+    `VOICES.WAD`), symlinks escaping `wads-dir`, or files inside secondary read-only `wads-dirs`.
 *   **Verified HTTP downloads and archive security**: All outbound HTTP downloads (`engine.Installer`,
     `wad.Downloader`, and `wad.InstallSoundFontContext`) must use `fsutil.DownloadVerified` or
     `fsutil.DownloadVerifiedContext` and `fsutil.UserAgent` (`"doom-cli/2.0"`), enforcing bounded stream sizes and
@@ -39,10 +42,16 @@ All contributions must respect the core repository invariants:
     with `DefaultSoundFontSHA256`. All archive extractions (`archive/zip`), direct downloads, and relative sub-path
     resolutions must sanitize entry paths via `fsutil.CleanRel` and `fsutil.SafeJoin` and verify containment before any
     filesystem write.
-*   **Two-tier settings precedence**: CLI settings (`theme`, `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, and
-    `soundfonts-dir`) resolve in a strict two-tier hierarchy (`config` in `config.json` takes precedence over platform
-    `default` values), with `DOOM_CONFIG_DIR` as the sole application environment variable and zero global persistent
-    flags or per-setting `DOOM_*` environment variables.
+*   **Two-tier settings precedence and disk-as-state separation**: CLI settings (`theme`, `nerd-fonts`, `wads-dir`,
+    `wads-dirs`, `bin-dir`, and `soundfonts-dir`) resolve in a strict two-tier hierarchy (`config` in `config.json`
+    takes precedence over platform `default` values), with `DOOM_CONFIG_DIR` as the sole application environment
+    variable and zero global persistent flags or per-setting `DOOM_*` environment variables. Never store installed-game
+    state in `config.json`; derive installed optional games (`heretic`, `hexen`, `strife`) directly from IWADs on disk
+    via `Catalog.InstalledOptionalGames` (with explicit `--games` overrides on `doom setup`, `doom wads scan`, and
+    `doom wads fetch all`), default `doom setup` to 4 core steps (`--wads none`), require an explicit preset target or
+    `all` on `doom wads fetch`, gate bulk `DownloadAll` runs on base IWAD presence, default `doom wads` and
+    `doom wads list` to installed presets (plus `LayerUser` custom presets, with `--all` and TUI `F3` or `Ctrl+T` for
+    the full catalog), and provide actionable usage hints via `exactArgsWithHint` when positional arguments are omitted.
 *   **Doom engine selection and preset hygiene**:
     *   **DSDA-Doom**: Use for classic vanilla, Boom, MBF, and MBF21 maps where demo accuracy, standard physics,
         and speedrunning precision are desired (such as *Alien Vendetta*, *AUGER;ZENITH*, *BTSX*, *Going Down Turbo*,
@@ -58,7 +67,10 @@ All contributions must respect the core repository invariants:
         GZDoom 4.14 and UZDoom), curate the definitive edition rather than duplicating versions or keeping incompatible
         older mirrors, and route shorthand queries (`doom gd`, `doom going-down`) to the canonical preset via
         `NormalizePresetQuery`.
-    *   **No duplicate IWADs**: Never include the base game IWAD in `files`. The IWAD must only be specified in `iwad`.
+    *   **No duplicate IWADs and DRY game classification**: Never include the base game IWAD in `files`. The IWAD must
+        only be specified in `iwad`. Doom-family IWADs (`DOOM.WAD`, `DOOM2.WAD`, `TNT.WAD`, `PLUTONIA.WAD`) infer
+        `"doom"` automatically via `catalog.InferGameFromIWAD` and omit `"game"`, whereas non-Doom curated presets must
+        explicitly declare `"game"` (`"heretic"`, `"hexen"`, `"strife"`).
     *   **Unified launch argument and preview synthesis**: `PrepareLaunch` and `FormatLaunchPreview` share
         `resolveEngineConfig` and `buildEngineArgs` so argument ordering (`PrefixArgs`, `-iwad`, `-file`, `-deh`,
         `DefaultArgs`, preset `Args`, `ExtraArgs`), `LoadMapsAfterMods` sorting, and missing optional file omission
@@ -140,13 +152,15 @@ doom-cli/
 │   └── uzdoom/             # UZDoom autoexec configuration template (autoexec.cfg)
 ├── cmd/doom/               # Command-line interface definitions using Cobra
 │   ├── main.go             # Entrypoint, root direct game launcher, path and catalog helpers
-│   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, scan, add, set, reset, remove, lint, build)
+│   ├── games.go            # Game-scope (--games), megawad (--wads), target list, and missing-arg hint helpers
+│   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, uninstall, scan, add, set, reset, remove, lint, build)
 │   ├── engines.go          # 'doom engines' TUI manager (list, install, add, set, reset, remove, cfg)
 │   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, themes)
 │   └── setup.go            # 'doom setup' turnkey installation workflow
 ├── internal/
 │   ├── catalog/            # Runtime two-layer entity catalog, store, file resolver, and CP437 decoder
 │   │   ├── entity.go       # EngineConfig, Preset, FileSpec, SourceSpec, LinkSpec, and Catalog models
+│   │   ├── games.go        # Game inference (InferGameFromIWAD), optional game scoping, and LibraryPresets helpers
 │   │   ├── codec.go        # Strict single-document JSON entity decoder and personal-path scanner
 │   │   ├── loader.go       # Embedded curated loader, user catalog.d quarantine, and layered merge
 │   │   ├── query.go        # Tiered preset and engine query normalization and lookup
@@ -184,9 +198,10 @@ doom-cli/
 │   │   ├── menu.go         # Fallback numbered terminal menu for basic or non-TTY environments
 │   │   ├── theme.go        # Theme loading, custom JSON theme decoding, and ANSI and TrueColor styles
 │   │   └── builtin_themes.go # Curated color palettes adhering to the 60-30-10 design principle
-│   ├── wad/                # WAD downloading, archive extraction, and SoundFont deployment
+│   ├── wad/                # WAD downloading, archive extraction, uninstallation, and SoundFont deployment
 │   │   ├── downloader.go   # Multi-mirror SHA-256 verified downloader for community megawads
 │   │   ├── extract.go      # Zip Slip hardened extractor, DEHACKED lump extractor, and ranked README extractor
+│   │   ├── uninstall.go    # Safe preset PWAD uninstaller protecting base IWADs, shared files, and read-only roots
 │   │   └── soundfont.go    # Roland SC-55 SoundFont installer
 │   └── wadfmt/             # Shared binary Doom IWAD and PWAD lump container parser and streaming builder
 └── .agents/                # Scoped conditional TUI rules and mono-tui v0.2.5 design and audit skills
@@ -244,7 +259,9 @@ Because user entities in `<ConfigDir>/catalog.d/preset.<id>.json` share the exac
      ```
      Then ensure `author`, `release_date`, `category`, `genre`, `difficulty`, `quality`, `links`, and a unique positive
      `sort` integer (spaced by 10s in display order) are set.
-   - **IWAD separation**: Do not include the base game IWAD in `files`.
+   - **IWAD separation and optional game metadata**: Do not include the base game IWAD in `files`. Omit `"game"` on
+     Doom-family presets (inferred automatically from `iwad` as `"doom"`), and set `"game"` explicitly (`"heretic"`,
+     `"hexen"`, `"strife"`) on non-Doom id Tech 1 presets.
    - **Canonical archive filenames and aliases**: `files[].name` must match the exact canonical filename inside the
      upstream `.zip` archive (`Eviternity II.wad`, `Sunder 2512.wad`, `SODfinal.wad`, `aaliens.wad`, `scythe.wad`,
      `TNTR.WAD`), while `files[].aliases` is reserved strictly for genuine external distribution or Steam and GOG

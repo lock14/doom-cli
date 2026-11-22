@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,33 +18,62 @@ import (
 )
 
 func newWadsCmd() *cobra.Command {
+	var wadsAll bool
 	wadsCmd := &cobra.Command{
 		Use:          "wads",
 		Short:        "Browse, launch, fetch, and configure WAD presets",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE:         runWadsTUI,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runWadsTUIWithOptions(cmd, args, wadsAll)
+		},
 	}
+	wadsCmd.Flags().BoolVar(
+		&wadsAll,
+		"all",
+		false,
+		"Show all catalog presets including uninstalled WADs and optional non-Doom games",
+	)
 
+	var listAll bool
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all available WAD presets with readiness and engine badges",
+		Short: "List installed WAD presets (or pass --all for the full catalog)",
 		Args:  cobra.NoArgs,
-		RunE:  runWadsList,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runWadsListWithOptions(cmd, listAll)
+		},
 	}
+	listCmd.Flags().BoolVar(
+		&listAll,
+		"all",
+		false,
+		"List all catalog presets including uninstalled WADs and optional non-Doom games",
+	)
 
 	showCmd := &cobra.Command{
 		Use:   "show <name>",
 		Short: "Display detailed metadata, file resolution, and launch preview for a WAD preset",
-		Args:  cobra.ExactArgs(1),
-		RunE:  runWadsShow,
+		Args: exactArgsWithHint(
+			1,
+			"specify a WAD preset to inspect (e.g. 'doom wads show eviternity'); "+
+				"run 'doom wads list --all' to see all presets",
+		),
+		RunE: runWadsShow,
 	}
 
-	var fetchForce bool
+	var (
+		fetchForce bool
+		fetchGames []string
+	)
 	fetchCmd := &cobra.Command{
-		Use:   "fetch [name|all]",
+		Use:   "fetch <name[,name...]|all>",
 		Short: "Extract commercial IWADs from Steam/GOG and download community megawads",
-		Args:  cobra.MaximumNArgs(1),
+		Args: exactArgsWithHint(
+			1,
+			"specify a WAD preset to fetch (e.g. 'doom wads fetch eviternity'), "+
+				"or run 'doom wads fetch all' to download all curated megawads",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 			if err != nil {
@@ -52,78 +82,94 @@ func newWadsCmd() *cobra.Command {
 			out := cmdOut(cmd)
 			ctx := cmd.Context()
 
-			target := "all"
-			if len(args) > 0 {
-				target = args[0]
+			isAll, targets, err := parsePresetTargetList(cat, args[0], true)
+			if err != nil {
+				return err
 			}
 
-			if strings.EqualFold(target, "all") {
+			if isAll {
+				dirIdx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+				scope, scopeErr := resolveGameScope(cat, dirIdx, fetchGames, cmd.Flags().Changed("games"))
+				if scopeErr != nil {
+					return scopeErr
+				}
+				scopedCat := cat.FilterByGames(scope.allowed)
 				searchRoots := steam.GetSearchRoots()
 				if len(searchRoots) > 0 {
 					if _, err := steam.DiscoverAndExtractContext(
-						ctx, cat, searchRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+						ctx, scopedCat, searchRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
 					); err != nil {
 						return err
 					}
 				}
 				dl := wad.NewDownloader(paths.WadRoots(), fetchForce, out)
 				dl.Ctx = ctx
-				return dl.DownloadAll(cat)
+				return dl.DownloadAll(scopedCat)
 			}
 
-			p := findPreset(cat, target)
-			if p == nil {
-				return fmt.Errorf(
-					"WAD preset %q not found. Run 'doom wads list' to see available WADs",
-					target,
-				)
+			if cmd.Flags().Changed("games") {
+				return errors.New("flag --games only applies to 'doom wads fetch all'")
 			}
 
 			idx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
-			alreadyInstalled := strings.TrimSpace(p.IWAD) != "" && idx.IsPresetInstalled(*p)
+			alreadyInstalled := make(map[string]bool, len(targets))
+			anyNeedsSteam := fetchForce
+			for _, t := range targets {
+				alreadyInstalled[t.ID] = strings.TrimSpace(t.IWAD) != "" && idx.IsPresetInstalled(t)
+				if idx.NeedsSteamDiscovery(t) {
+					anyNeedsSteam = true
+				}
+			}
+
 			var extracted int
-			if fetchForce || idx.NeedsSteamDiscovery(*p) {
+			if anyNeedsSteam {
 				var discErr error
 				extracted, discErr = steam.DiscoverAndExtractContext(
-					ctx, cat, nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+					ctx, cat.ForPresets(targets...), nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
 				)
 				if discErr != nil {
 					return discErr
 				}
 			}
 
-			if len(p.Sources) == 0 {
-				idx = catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
-				if !idx.IsPresetInstalled(*p) {
-					if !p.IsCustom() {
-						fmt.Fprintf(
-							out,
-							"%s is a commercial game and could not be found in local Steam or GOG libraries.\n",
-							p.Name,
-						)
-					} else {
-						fmt.Fprintf(
-							out,
-							"%s has no download sources configured and required WAD files are missing.\n",
-							p.Name,
-						)
+			for _, p := range targets {
+				if len(p.Sources) == 0 {
+					idx = catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+					if !idx.IsPresetInstalled(p) {
+						if !p.IsCustom() {
+							fmt.Fprintf(
+								out,
+								"%s is a commercial game and could not be found in local Steam or GOG libraries.\n",
+								p.Name,
+							)
+						} else {
+							fmt.Fprintf(
+								out,
+								"%s has no download sources configured and required WAD files are missing.\n",
+								p.Name,
+							)
+						}
+						return fmt.Errorf("missing required files for %s", p.Name)
 					}
-					return fmt.Errorf("missing required files for %s", p.Name)
+					if alreadyInstalled[p.ID] && !fetchForce && extracted == 0 {
+						fmt.Fprintf(out, "✓ %s already installed\n", p.Name)
+					}
+					continue
 				}
-				if alreadyInstalled && !fetchForce && extracted == 0 {
-					fmt.Fprintf(out, "✓ %s already installed\n", p.Name)
-				}
-				return nil
-			}
 
-			dl := wad.NewDownloader(paths.WadRoots(), fetchForce, out)
-			dl.Ctx = ctx
-			if err := dl.DownloadPreset(*p); err != nil {
-				return err
-			}
-			idx = catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
-			if !idx.IsPresetInstalled(*p) {
-				return fmt.Errorf("missing required files for %s (ensure base IWAD %s is installed)", p.Name, p.IWAD)
+				dl := wad.NewDownloader(paths.WadRoots(), fetchForce, out)
+				dl.Ctx = ctx
+				if err := dl.DownloadPreset(p); err != nil {
+					return err
+				}
+				idx = catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+				if !idx.IsPresetInstalled(p) {
+					return fmt.Errorf(
+						"missing required files for %s (ensure base IWAD %s is installed)",
+						p.Name,
+						p.IWAD,
+					)
+				}
 			}
 			return nil
 		},
@@ -131,8 +177,44 @@ func newWadsCmd() *cobra.Command {
 	fetchCmd.Flags().BoolVar(
 		&fetchForce, "force", false, "Re-download and re-extract WADs even if already installed",
 	)
+	fetchCmd.Flags().StringSliceVar(
+		&fetchGames,
+		"games",
+		nil,
+		"Include optional non-Doom games when fetching all (heretic, hexen, strife, all, or doom)",
+	)
 
-	var scanForce bool
+	uninstallCmd := &cobra.Command{
+		Use:   "uninstall <name[,name...]>",
+		Short: "Remove downloaded PWAD, PK3, DeHackEd, and README files for a WAD preset",
+		Args: exactArgsWithHint(
+			1,
+			"specify one or more WAD presets to uninstall (e.g. 'doom wads uninstall sunder'); "+
+				"run 'doom wads list' to see installed presets",
+		),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
+			if err != nil {
+				return err
+			}
+			out := cmdOut(cmd)
+			_, targets, err := parsePresetTargetList(cat, args[0], false)
+			if err != nil {
+				return err
+			}
+			for _, p := range targets {
+				if _, err := wad.UninstallPreset(p, cat, paths.WadsDir, paths.WadsDirs, out); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+
+	var (
+		scanForce bool
+		scanGames []string
+	)
 	scanCmd := &cobra.Command{
 		Use:   "scan",
 		Short: "Scan local Steam and GOG libraries to extract commercial IWADs and expansions",
@@ -142,21 +224,47 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			out := cmdOut(cmd)
+			dirIdx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
+			scope, err := resolveGameScope(cat, dirIdx, scanGames, cmd.Flags().Changed("games"))
+			if err != nil {
+				return err
+			}
+			scopedCat := cat.FilterByGames(scope.allowed)
 			_, err = steam.DiscoverAndExtractContext(
-				cmd.Context(), cat, nil, paths.WadsDir, scanForce, cmdOut(cmd), paths.WadsDirs...,
+				cmd.Context(), scopedCat, nil, paths.WadsDir, scanForce, out, paths.WadsDirs...,
 			)
-			return err
+			if err != nil {
+				return err
+			}
+			if len(scope.skippedOptional) > 0 {
+				fmt.Fprintf(
+					out,
+					"Optional non-Doom games skipped: %s (pass --games <list|all> to include).\n",
+					strings.Join(scope.skippedOptional, ", "),
+				)
+			}
+			return nil
 		},
 	}
 	scanCmd.Flags().BoolVar(
 		&scanForce, "force", false, "Overwrite existing WAD files in destination directory",
+	)
+	scanCmd.Flags().StringSliceVar(
+		&scanGames,
+		"games",
+		nil,
+		"Include optional non-Doom games (heretic, hexen, strife, all, or doom)",
 	)
 
 	var addFlags wadOptionFlags
 	addCmd := &cobra.Command{
 		Use:   "add <name>",
 		Short: "Add a custom WAD or preset to your personal catalog",
-		Args:  cobra.ExactArgs(1),
+		Args: exactArgsWithHint(
+			1,
+			"specify a name for the custom WAD preset (e.g. 'doom wads add \"My Map\" --files mymap.wad')",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			if name == "" {
@@ -209,7 +317,10 @@ func newWadsCmd() *cobra.Command {
 	setCmd := &cobra.Command{
 		Use:   "set <name>",
 		Short: "Configure per-preset overrides (engine, iwad, extra args, extra files, excluded files)",
-		Args:  cobra.ExactArgs(1),
+		Args: exactArgsWithHint(
+			1,
+			"specify a WAD preset to configure (e.g. 'doom wads set sunlust -e uzdoom --args \"-skill 4\"')",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
@@ -277,7 +388,7 @@ func newWadsCmd() *cobra.Command {
 	resetCmd := &cobra.Command{
 		Use:   "reset <name>",
 		Short: "Clear custom launch overrides for a WAD preset",
-		Args:  cobra.ExactArgs(1),
+		Args:  exactArgsWithHint(1, "specify a WAD preset to reset (e.g. 'doom wads reset sunlust')"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
@@ -301,7 +412,11 @@ func newWadsCmd() *cobra.Command {
 	removeCmd := &cobra.Command{
 		Use:   "remove <name>",
 		Short: "Remove a custom WAD preset from your personal catalog",
-		Args:  cobra.ExactArgs(1),
+		Args: exactArgsWithHint(
+			1,
+			"specify a custom WAD preset to remove (e.g. 'doom wads remove my-map'), "+
+				"or use 'doom wads uninstall <name>' to delete downloaded WAD files",
+		),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := strings.TrimSpace(args[0])
 			paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
@@ -372,6 +487,7 @@ func newWadsCmd() *cobra.Command {
 		listCmd,
 		showCmd,
 		fetchCmd,
+		uninstallCmd,
 		scanCmd,
 		addCmd,
 		setCmd,
@@ -412,7 +528,11 @@ func parseFileSpecs(raw []string) []catalog.FileSpec {
 	return specs
 }
 
-func runWadsTUI(cmd *cobra.Command, _ []string) error {
+func runWadsTUI(cmd *cobra.Command, args []string) error {
+	return runWadsTUIWithOptions(cmd, args, false)
+}
+
+func runWadsTUIWithOptions(cmd *cobra.Command, _ []string, showAll bool) error {
 	errOut := cmdErr(cmd)
 	paths, cfg, cat, err := loadAppStateWithErr(errOut)
 	if err != nil {
@@ -422,6 +542,7 @@ func runWadsTUI(cmd *cobra.Command, _ []string) error {
 	theme, nerdFonts, launcherOpts := buildLauncherOptions(
 		paths, cfg, nil, tui.InitialModeWads,
 	)
+	launcherOpts.ShowAllPresets = showAll
 
 	selected, err := tui.RunInteractiveLauncherWithOptions(
 		cat,
@@ -463,7 +584,7 @@ func runWadsTUI(cmd *cobra.Command, _ []string) error {
 	return engine.Execute(plan, out, errOut)
 }
 
-func runWadsList(cmd *cobra.Command, _ []string) error {
+func runWadsListWithOptions(cmd *cobra.Command, showAll bool) error {
 	paths, _, cat, err := loadAppStateWithErr(cmdErr(cmd))
 	if err != nil {
 		return err
@@ -471,8 +592,25 @@ func runWadsList(cmd *cobra.Command, _ []string) error {
 	dirIdx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
 	out := cmdOut(cmd)
 
-	fmt.Fprintln(out, "=== Available Doom Presets ===")
-	for i, p := range cat.Presets {
+	var presets []catalog.Preset
+	hiddenCount := 0
+	if showAll {
+		fmt.Fprintln(out, "=== Available Doom Presets (All) ===")
+		presets = cat.Presets
+	} else {
+		fmt.Fprintln(out, "=== Installed Doom Presets ===")
+		presets, hiddenCount = cat.LibraryPresets(dirIdx)
+		if len(presets) == 0 {
+			fmt.Fprintf(out, "No installed presets found (%d presets available in catalog).\n", len(cat.Presets))
+			fmt.Fprintln(
+				out,
+				"Run 'doom setup' to install core assets, or 'doom wads list --all' to browse all presets.",
+			)
+			return nil
+		}
+	}
+
+	for i, p := range presets {
 		tag := fmt.Sprintf("[%-8s]", cat.EngineBadge(p.Engine))
 		catLabel := p.Category
 		if catLabel == "" && p.IsCustom() {
@@ -510,6 +648,19 @@ func runWadsList(cmd *cobra.Command, _ []string) error {
 			i+1, p.Name, tag, catTag, installStatus, statusFlag, metaSuffix,
 		)
 	}
+
+	if !showAll && hiddenCount > 0 {
+		noun := "presets"
+		if hiddenCount == 1 {
+			noun = "preset"
+		}
+		fmt.Fprintf(
+			out,
+			"\n%d uninstalled %s hidden. Run 'doom wads list --all' to show all.\n",
+			hiddenCount,
+			noun,
+		)
+	}
 	return nil
 }
 
@@ -529,6 +680,11 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 	if p.IsCustom() {
 		fmt.Fprintf(out, "  Type:          Custom WAD\n")
 	}
+	gameLabel := catalog.GameDisplayName(p.EffectiveGame())
+	if !p.IsCoreGame() {
+		gameLabel += " (optional)"
+	}
+	fmt.Fprintf(out, "  Game:          %s\n", gameLabel)
 	if p.Author != "" {
 		fmt.Fprintf(out, "  Author:        %s\n", p.Author)
 	}

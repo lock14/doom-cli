@@ -88,15 +88,16 @@ func (m model) buildHelpContent(fromMode int) string {
 		row("Tab, Ctrl+R", "Open README Viewer for selected preset"),
 		row("Ctrl+O, F4", "Open Launch Options & Preset Config"),
 		row("Ctrl+G, F2", "Open 3-Tab Config Manager"),
+		row("F3, Ctrl+T", "Toggle Installed library and full Catalog"),
 		row("Ctrl+F", "Fetch or extract missing WADs asynchronously"),
 		row("F1, Alt+?", "Open Contextual Help"),
 		row("Enter", "Launch selected preset"),
 		row("Esc, Ctrl+C", "Cancel active fetch or quit launcher"),
 		"",
 		h("Fuzzy Search Tokens"),
-		"  Filter by title, WAD filename, engine (dsda-doom, uzdoom), category (Doom II, Heretic),",
-		"  genre (slaughter, cyberpunk), difficulty (casual, hard, extreme), quality (s-tier),",
-		"  compatibility (MBF21, Boom, Vanilla, ID24), or readiness (ready, installed, missing).",
+		"  Filter by title, WAD filename, game (doom, heretic, hexen, strife), engine,",
+		"  category, genre (slaughter, cyberpunk), difficulty (casual, hard, extreme),",
+		"  quality (s-tier), compatibility (MBF21, Boom, Vanilla, ID24), or readiness.",
 	}
 
 	launchTitle := "Launch Options & Preset Config (Ctrl+O / F4)"
