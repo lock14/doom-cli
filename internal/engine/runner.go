@@ -237,6 +237,9 @@ func PrepareLaunch(p catalog.Preset, opts LaunchOptions) (*LaunchPlan, error) {
 
 	var resolved []resolvedFile
 	for _, f := range p.Files {
+		if f.Disabled {
+			continue
+		}
 		clean := strings.TrimSpace(f.Name)
 		if clean == "" {
 			continue
@@ -378,6 +381,9 @@ func FormatLaunchPreview(
 
 	var resolved []resolvedFile
 	for _, f := range p.Files {
+		if f.Disabled {
+			continue
+		}
 		clean := strings.TrimSpace(f.Name)
 		if clean == "" {
 			continue

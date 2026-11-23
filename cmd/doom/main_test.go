@@ -395,6 +395,7 @@ func TestSubcommandFlagScoping(t *testing.T) {
 func TestRootDirectLauncherDryRunAndEngineOverride(t *testing.T) {
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("XDG_DATA_HOME", tempDir)
 	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 	for _, kv := range [][2]string{
 		{"bin-dir", tempDir},
@@ -653,6 +654,7 @@ func TestSplitCommandArgsAndQuotedCLIFlags(t *testing.T) {
 
 	tempDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("XDG_DATA_HOME", tempDir)
 	t.Setenv("DOOM_CONFIG_DIR", filepath.Join(tempDir, "doom-cli"))
 
 	engCmd := newEnginesCmd()
@@ -694,5 +696,34 @@ func TestSplitCommandArgsAndQuotedCLIFlags(t *testing.T) {
 	wantWadArgs := []string{"-record", "/opt/my demos/run 1.lmp"}
 	if doomPreset == nil || !reflect.DeepEqual(doomPreset.Args, wantWadArgs) {
 		t.Errorf("doomPreset.Args = %#v, want %#v", doomPreset, wantWadArgs)
+	}
+
+	// Verify 'doom wads show' displays [Disabled] for default-off soundtrack and '--include-file' enables it
+	var showBefore bytes.Buffer
+	showCmd1 := newWadsCmd()
+	showCmd1.SetOut(&showBefore)
+	showCmd1.SetArgs([]string{"show", "tnt-evilution"})
+	if err := showCmd1.Execute(); err != nil {
+		t.Fatalf("wads show tnt-evilution failed: %v", err)
+	}
+	if !strings.Contains(showBefore.String(), "[Disabled]") {
+		t.Errorf("expected [Disabled] in wads show tnt-evilution, got:\n%s", showBefore.String())
+	}
+
+	incCmd := newWadsCmd()
+	incCmd.SetArgs([]string{"set", "tnt-evilution", "--include-file", "idkfa 2024.wad"})
+	if err := incCmd.Execute(); err != nil {
+		t.Fatalf("wads set --include-file failed: %v", err)
+	}
+
+	var showAfter bytes.Buffer
+	showCmd2 := newWadsCmd()
+	showCmd2.SetOut(&showAfter)
+	showCmd2.SetArgs([]string{"show", "tnt-evilution"})
+	if err := showCmd2.Execute(); err != nil {
+		t.Fatalf("wads show tnt-evilution after include-file failed: %v", err)
+	}
+	if strings.Contains(showAfter.String(), "[Disabled]") || !strings.Contains(showAfter.String(), "[Optional]") {
+		t.Errorf("expected [Optional] instead of [Disabled] after --include-file, got:\n%s", showAfter.String())
 	}
 }

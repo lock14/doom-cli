@@ -274,7 +274,7 @@ func TestModel_80x24_CustomPresetLongFilenamesAndManyFiles(t *testing.T) {
 					{Name: "second_col_patch.deh"},
 					{Name: "third_long_custom_resource_pack_v1.wad"},
 					{Name: "fourth_col_music.wad", Optional: true},
-					{Name: "fifth_extra_textures_pack_final.wad"},
+					{Name: "fifth_disabled_ost.wad", Optional: true, Disabled: true},
 					{Name: "sixth_col_fix.bex"},
 				},
 				Layer: catalog.LayerUser,
@@ -315,6 +315,7 @@ func TestModel_80x24_CustomPresetLongFilenamesAndManyFiles(t *testing.T) {
 		"[✓ Found]",
 		"second_col_patch… [✗ Missing]",
 		"[Optional]",
+		"[Disabled]",
 		"sixth_col_fix.bex [✗ Missing]",
 	} {
 		if !strings.Contains(viewLong, want) {

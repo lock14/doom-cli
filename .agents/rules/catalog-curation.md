@@ -73,16 +73,19 @@ Follow these rules whenever adding, modifying, linting, extracting, or launching
     renames generic `readme.txt` fallbacks to `<primaryWadStem>.txt` so manuals never collide in `wads-dir`;
     `DirIndex.ResolveReadme` matches versioned suffixes via `IsReadmeSuffix` without matching sequel numbers (`2`) or
     borrowing base IWAD `.txt` files for PWAD presets.
-*   **Soundtrack and subset WAD hygiene**: Attach optional `{"name": "idkfa 2024.wad", "optional": true}` only to
-    presets that rely on stock Doom or Doom II `D_*` MIDI slots without a bespoke replacement soundtrack (`doom`,
-    `doom-ii`, `tnt-evilution`, `the-plutonia-experiment`, `master-levels`, `no-rest-for-the-living`, `deathless`,
-    `doom-the-way-id-did`, `doom-ii-the-way-id-did`, `doom-zero`, `nostalgia`). Never attach `idkfa 2024.wad` to
-    expansions or megawads that bundle original custom music (such as `legacy-of-rust`, `sigil`, `ancient-aliens`, or
-    `eviternity-ii`), where loading `idkfa 2024.wad` after the map PWAD overwrites custom soundtrack lumps. Never list
-    modder-only standalone subset WADs (`id1-res.wad`, `id1-weap.wad`) alongside full runtime archives (`id24res.wad`
-    and `id1.wad`), and never add `extras.wad` to preset `files`: `steam.TargetPatternsForCatalog` automatically
-    includes `extras.wad` whenever `idkfa 2024.wad` is referenced, ranking Nightdive `rerelease/` paths ahead of legacy
-    `base/` paths and synthesizing `<WadsDir>/idkfa 2024.wad` via `steam.SynthesizeIDKFAWAD`.
+*   **Soundtrack and subset WAD hygiene**: Attach default-enabled `{"name": "idkfa 2024.wad", "optional": true}` to
+    presets that rely on stock Doom or Doom II `D_*` MIDI slots without a custom soundtrack (`doom`, `doom-ii`,
+    `master-levels`, `no-rest-for-the-living`, `doom-the-way-id-did`, `doom-ii-the-way-id-did`, `no-end-in-sight`). For
+    presets that support standard `D_*` slot replacement while supplying their own custom or remapped soundtrack
+    (`tnt-evilution`, `the-plutonia-experiment`, `deathless`, `doom-zero`, `nostalgia`), attach
+    `{"name": "idkfa 2024.wad", "optional": true, "disabled": true}` so the mapset's original music plays by default and
+    players can opt in via `include-files` (`doom wads set <name> --include-file "idkfa 2024.wad"` or TUI
+    `Launch Options`). Never attach `idkfa 2024.wad` to expansions or megawads with bespoke scores (`legacy-of-rust`,
+    `sigil`, `ancient-aliens`, `eviternity-ii`, and similar mapsets). Never list modder-only standalone subset WADs
+    (`id1-res.wad`, `id1-weap.wad`) alongside full runtime archives (`id24res.wad` and `id1.wad`), and never add
+    `extras.wad` to preset `files`: `steam.TargetPatternsForCatalog` automatically includes `extras.wad` whenever
+    `idkfa 2024.wad` is referenced, ranking Nightdive `rerelease/` paths ahead of legacy `base/` paths and synthesizing
+    `<WadsDir>/idkfa 2024.wad` via `steam.SynthesizeIDKFAWAD`.
 
 ## Verified sources and synchronization workflow
 

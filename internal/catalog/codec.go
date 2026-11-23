@@ -104,6 +104,15 @@ func validateEngineArgsKeys(m map[string][]string) error {
 	return nil
 }
 
+func validateFileSpecs(files []FileSpec) error {
+	for _, f := range files {
+		if f.Disabled && !f.Optional {
+			return fmt.Errorf("file %q cannot set \"disabled\": true without \"optional\": true", f.Name)
+		}
+	}
+	return nil
+}
+
 func validateDecodedEntity(ent Entity) error {
 	switch {
 	case ent.Engine != nil:
@@ -142,6 +151,9 @@ func validateDecodedEntity(ent Entity) error {
 		if err := validateEngineArgsKeys(ent.Preset.EngineArgs); err != nil {
 			return fmt.Errorf("preset %s: %w", ent.Preset.ID, err)
 		}
+		if err := validateFileSpecs(ent.Preset.Files); err != nil {
+			return fmt.Errorf("preset %s: %w", ent.Preset.ID, err)
+		}
 	case ent.Override != nil:
 		if ent.Override.Target.Kind != KindPreset && ent.Override.Target.Kind != KindEngine {
 			return fmt.Errorf("override target kind %q must be \"preset\" or \"engine\"", ent.Override.Target.Kind)
@@ -175,6 +187,20 @@ func validateDecodedEntity(ent Entity) error {
 					ent.Override.Target.Kind, ent.Override.Target.ID, err,
 				)
 			}
+		}
+		if ent.Override.Set != nil && ent.Override.Set.Files != nil {
+			if err := validateFileSpecs(*ent.Override.Set.Files); err != nil {
+				return fmt.Errorf(
+					"override %s/%s: %w",
+					ent.Override.Target.Kind, ent.Override.Target.ID, err,
+				)
+			}
+		}
+		if err := validateFileSpecs(ent.Override.AppendFiles); err != nil {
+			return fmt.Errorf(
+				"override %s/%s: %w",
+				ent.Override.Target.Kind, ent.Override.Target.ID, err,
+			)
 		}
 		if err := validateEngineArgsKeys(ent.Override.AppendEngineArgs); err != nil {
 			return fmt.Errorf(

@@ -15,127 +15,6 @@ import (
 	"github.com/lock14/doom-cli/internal/engine"
 )
 
-type spinOption struct {
-	value string
-	label string
-}
-
-var skillOptions = []spinOption{
-	{value: "", label: "Default"},
-	{value: "1", label: "1: ITYTD"},
-	{value: "2", label: "2: HNTR"},
-	{value: "3", label: "3: HMP"},
-	{value: "4", label: "4: Ultra-Violence"},
-	{value: "5", label: "5: Nightmare!"},
-}
-
-var complevelOptions = []spinOption{
-	{value: "", label: "Default"},
-	{value: "2", label: "2: Vanilla"},
-	{value: "3", label: "3: Ult. Doom"},
-	{value: "4", label: "4: Final Doom"},
-	{value: "9", label: "9: Boom"},
-	{value: "11", label: "11: MBF"},
-	{value: "21", label: "21: MBF21"},
-}
-
-type optionalFileToggle struct {
-	spec    catalog.FileSpec
-	enabled bool
-}
-
-type launchOptionsState struct {
-	presetID      string
-	presetName    string
-	base          catalog.Preset
-	existingOv    *catalog.Override
-	engines       []catalog.EngineConfig
-	engineIdx     int
-	skillIdx      int
-	warpInput     textinput.Model
-	pistolStart   bool
-	fast          bool
-	noMonsters    bool
-	respawn       bool
-	soloNet       bool
-	complevelIdx  int
-	optionalFiles []optionalFileToggle
-	extraInput    textinput.Model
-	focusIdx      int
-	statusMsg     string
-}
-
-const (
-	launchFieldEngine      = 0
-	launchFieldSkill       = 1
-	launchFieldWarp        = 2
-	launchFieldPistolStart = 3
-	launchFieldFast        = 4
-	launchFieldNoMonsters  = 5
-	launchFieldRespawn     = 6
-	launchFieldSoloNet     = 7
-	launchFieldComplevel   = 8
-	launchFieldOptBase     = 9
-)
-
-func (s *launchOptionsState) extraFieldIdx() int {
-	return launchFieldOptBase + len(s.optionalFiles)
-}
-
-func (s *launchOptionsState) totalFields() int {
-	return launchFieldOptBase + len(s.optionalFiles) + 1
-}
-
-func (s *launchOptionsState) selectedEngine() catalog.EngineConfig {
-	if len(s.engines) == 0 {
-		return catalog.EngineConfig{ID: "dsda-doom", DisplayName: "DSDA-Doom", ArgsStyle: "boom"}
-	}
-	if s.engineIdx < 0 || s.engineIdx >= len(s.engines) {
-		return s.engines[0]
-	}
-	return s.engines[s.engineIdx]
-}
-
-func (s *launchOptionsState) isBoomEngine() bool {
-	return s.selectedEngine().EffectiveArgsStyle() == "boom"
-}
-
-func (s *launchOptionsState) isFieldDisabled(idx int) bool {
-	if !s.isBoomEngine() {
-		return idx == launchFieldSoloNet || idx == launchFieldComplevel
-	}
-	return false
-}
-
-func (s *launchOptionsState) moveFocus(delta int) {
-	total := s.totalFields()
-	if total <= 0 {
-		s.focusIdx = 0
-		return
-	}
-	for range total {
-		s.focusIdx = (s.focusIdx + delta + total) % total
-		if !s.isFieldDisabled(s.focusIdx) {
-			return
-		}
-	}
-}
-
-func (s *launchOptionsState) syncInputFocus() tea.Cmd {
-	var cmds []tea.Cmd
-	if s.focusIdx == launchFieldWarp {
-		cmds = append(cmds, s.warpInput.Focus())
-	} else {
-		s.warpInput.Blur()
-	}
-	if s.focusIdx == s.extraFieldIdx() {
-		cmds = append(cmds, s.extraInput.Focus())
-	} else {
-		s.extraInput.Blur()
-	}
-	return tea.Batch(cmds...)
-}
-
 func (m model) availableEngines() []catalog.EngineConfig {
 	seen := make(map[string]catalog.EngineConfig)
 	if m.catalog != nil {
@@ -167,23 +46,6 @@ func (m model) availableEngines() []catalog.EngineConfig {
 		out = append(out, seen[k])
 	}
 	return out
-}
-
-func clonePresetShallowSlices(src catalog.Preset) catalog.Preset {
-	cp := src
-	cp.Files = append([]catalog.FileSpec(nil), src.Files...)
-	cp.Args = append([]string(nil), src.Args...)
-	if src.Complevel != nil {
-		cl := *src.Complevel
-		cp.Complevel = &cl
-	}
-	if len(src.EngineArgs) > 0 {
-		cp.EngineArgs = make(map[string][]string, len(src.EngineArgs))
-		for k, v := range src.EngineArgs {
-			cp.EngineArgs[k] = append([]string(nil), v...)
-		}
-	}
-	return cp
 }
 
 func (m *model) openLaunchOptions() tea.Cmd {
@@ -227,16 +89,10 @@ func (m *model) openLaunchOptions() tea.Cmd {
 		}
 	}
 
-	excludedNorm := make(map[string]bool)
+	var includedNorm, excludedNorm map[string]bool
 	if ov != nil {
-		for _, ex := range ov.ExcludeFiles {
-			if norm := catalog.NormalizeFilename(ex); norm != "" {
-				excludedNorm[norm] = true
-			}
-			if baseNorm := catalog.NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
-				excludedNorm[baseNorm] = true
-			}
-		}
+		includedNorm = fileNormSet(ov.IncludeFiles)
+		excludedNorm = fileNormSet(ov.ExcludeFiles)
 	}
 
 	var optFiles []optionalFileToggle
@@ -244,9 +100,12 @@ func (m *model) openLaunchOptions() tea.Cmd {
 		if !f.Optional {
 			continue
 		}
-		norm := catalog.NormalizeFilename(f.Name)
-		baseNorm := catalog.NormalizeFilename(filepath.Base(f.Name))
-		enabled := !excludedNorm[norm] && !excludedNorm[baseNorm]
+		isExcluded := matchesFileNorm(excludedNorm, f.Name)
+		isIncluded := matchesFileNorm(includedNorm, f.Name)
+		enabled := !isExcluded
+		if f.Disabled {
+			enabled = isIncluded && !isExcluded
+		}
 		optFiles = append(optFiles, optionalFileToggle{
 			spec:    f,
 			enabled: enabled,
@@ -319,282 +178,6 @@ func (m *model) openLaunchOptions() tea.Cmd {
 	m.launchOpts = state
 	m.viewingLaunchOpts = true
 	return cmd
-}
-
-func (s *launchOptionsState) parseArgsIntoFields(args []string) {
-	s.skillIdx = 0
-	s.warpInput.SetValue("")
-	s.pistolStart = false
-	s.fast = false
-	s.noMonsters = false
-	s.respawn = false
-	s.soloNet = false
-	s.complevelIdx = 0
-
-	var extra []string
-	for i := 0; i < len(args); i++ {
-		tok := args[i]
-		switch strings.ToLower(tok) {
-		case "-skill":
-			if i+1 < len(args) {
-				val := args[i+1]
-				matched := false
-				for idx, opt := range skillOptions {
-					if opt.value == val {
-						s.skillIdx = idx
-						matched = true
-						break
-					}
-				}
-				if matched {
-					i++
-					continue
-				}
-			}
-		case "-warp":
-			var warpParts []string
-			for i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") && len(warpParts) < 2 {
-				i++
-				warpParts = append(warpParts, args[i])
-			}
-			if len(warpParts) > 0 {
-				s.warpInput.SetValue(strings.Join(warpParts, " "))
-				continue
-			}
-		case "-pistolstart":
-			s.pistolStart = true
-			continue
-		case "-fast":
-			s.fast = true
-			continue
-		case "-nomonsters":
-			s.noMonsters = true
-			continue
-		case "-respawn":
-			s.respawn = true
-			continue
-		case "-solonet":
-			s.soloNet = true
-			continue
-		case "-complevel":
-			if i+1 < len(args) {
-				val := args[i+1]
-				matched := false
-				for idx, opt := range complevelOptions {
-					if opt.value == val {
-						s.complevelIdx = idx
-						matched = true
-						break
-					}
-				}
-				if matched {
-					i++
-					continue
-				}
-			}
-		}
-		extra = append(extra, tok)
-	}
-	s.extraInput.SetValue(strings.Join(extra, " "))
-}
-
-func containsFlag(args []string, flag string) bool {
-	for _, tok := range args {
-		if strings.EqualFold(strings.TrimSpace(tok), flag) {
-			return true
-		}
-	}
-	return false
-}
-
-func filterOutFlag(args []string, flag string) []string {
-	var out []string
-	for _, tok := range args {
-		if !strings.EqualFold(strings.TrimSpace(tok), flag) {
-			out = append(out, tok)
-		}
-	}
-	return out
-}
-
-func (s *launchOptionsState) selectedComplevelOverride() (*int, bool) {
-	if !s.isBoomEngine() || s.complevelIdx <= 0 || s.complevelIdx >= len(complevelOptions) {
-		return nil, true
-	}
-	cl, err := strconv.Atoi(complevelOptions[s.complevelIdx].value)
-	if err != nil {
-		return nil, true
-	}
-	if s.base.Complevel != nil && *s.base.Complevel == cl {
-		return nil, true
-	}
-	return &cl, false
-}
-
-func (s *launchOptionsState) complevelDisplayLabel() string {
-	if s.complevelIdx == 0 && s.base.Complevel != nil {
-		return fmt.Sprintf("Default (%s)", catalog.ComplevelLabel(*s.base.Complevel))
-	}
-	if s.complevelIdx >= 0 && s.complevelIdx < len(complevelOptions) {
-		return complevelOptions[s.complevelIdx].label
-	}
-	return complevelOptions[0].label
-}
-
-func (s *launchOptionsState) synthesizeAppendEngineArgs() map[string][]string {
-	out := make(map[string][]string)
-	engID := s.selectedEngine().ID
-	if s.existingOv != nil {
-		for k, slice := range s.existingOv.AppendEngineArgs {
-			if strings.EqualFold(k, engID) {
-				kept := filterOutFlag(slice, "-solonet")
-				if len(kept) > 0 {
-					out[engID] = kept
-				}
-			} else if len(slice) > 0 {
-				out[k] = append([]string(nil), slice...)
-			}
-		}
-	}
-	if s.isBoomEngine() && s.soloNet {
-		out[engID] = append(out[engID], "-solonet")
-	} else if s.existingOv != nil {
-		for k, slice := range s.existingOv.AppendEngineArgs {
-			if strings.EqualFold(k, engID) && containsFlag(slice, "-solonet") {
-				if _, exists := out[engID]; !exists {
-					out[engID] = []string{}
-				}
-			}
-		}
-	}
-	return out
-}
-
-func (s *launchOptionsState) synthesizeAppendArgs() []string {
-	var args []string
-	if s.skillIdx > 0 && s.skillIdx < len(skillOptions) {
-		args = append(args, "-skill", skillOptions[s.skillIdx].value)
-	}
-	if warpFields := strings.Fields(s.warpInput.Value()); len(warpFields) > 0 {
-		args = append(args, "-warp")
-		args = append(args, warpFields...)
-	}
-	if s.pistolStart {
-		args = append(args, "-pistolstart")
-	}
-	if s.fast {
-		args = append(args, "-fast")
-	}
-	if s.noMonsters {
-		args = append(args, "-nomonsters")
-	}
-	if s.respawn {
-		args = append(args, "-respawn")
-	}
-	if extraFields := strings.Fields(s.extraInput.Value()); len(extraFields) > 0 {
-		args = append(args, extraFields...)
-	}
-	return args
-}
-
-func (s *launchOptionsState) excludedFileNames() []string {
-	var excluded []string
-	optNorms := make(map[string]bool, len(s.optionalFiles))
-	for _, opt := range s.optionalFiles {
-		norm := catalog.NormalizeFilename(opt.spec.Name)
-		optNorms[norm] = true
-		if !opt.enabled {
-			excluded = append(excluded, opt.spec.Name)
-		}
-	}
-	if s.existingOv != nil {
-		for _, ex := range s.existingOv.ExcludeFiles {
-			if !optNorms[catalog.NormalizeFilename(ex)] {
-				excluded = append(excluded, ex)
-			}
-		}
-	}
-	return excluded
-}
-
-func (s *launchOptionsState) buildLaunchPreset() catalog.Preset {
-	p := clonePresetShallowSlices(s.base)
-
-	if s.existingOv != nil {
-		if s.existingOv.Set != nil {
-			if s.existingOv.Set.IWAD != nil && *s.existingOv.Set.IWAD != "" {
-				p.IWAD = *s.existingOv.Set.IWAD
-			}
-			if s.existingOv.Set.Files != nil {
-				p.Files = append([]catalog.FileSpec(nil), (*s.existingOv.Set.Files)...)
-			}
-			if s.existingOv.Set.EngineArgs != nil {
-				if p.EngineArgs == nil {
-					p.EngineArgs = make(map[string][]string)
-				}
-				for k, v := range *s.existingOv.Set.EngineArgs {
-					if len(v) == 0 {
-						delete(p.EngineArgs, k)
-					} else {
-						p.EngineArgs[k] = append([]string(nil), v...)
-					}
-				}
-			}
-			if s.existingOv.Set.Args != nil {
-				p.Args = nil
-			}
-		}
-		if len(s.existingOv.AppendFiles) > 0 {
-			p.Files = append(p.Files, s.existingOv.AppendFiles...)
-		}
-	}
-
-	eng := s.selectedEngine()
-	p.Engine = eng.ID
-	p.EngineOverridden = true
-	if clOverride, clearCL := s.selectedComplevelOverride(); !clearCL && clOverride != nil {
-		cl := *clOverride
-		p.Complevel = &cl
-	}
-	appendEngArgs := s.synthesizeAppendEngineArgs()
-	for k, slice := range appendEngArgs {
-		if len(slice) == 0 {
-			continue
-		}
-		if p.EngineArgs == nil {
-			p.EngineArgs = make(map[string][]string)
-		}
-		p.EngineArgs[k] = append(append([]string(nil), p.EngineArgs[k]...), slice...)
-	}
-
-	excluded := s.excludedFileNames()
-	if len(excluded) > 0 {
-		exMap := make(map[string]bool, len(excluded)*2)
-		for _, ex := range excluded {
-			if norm := catalog.NormalizeFilename(ex); norm != "" {
-				exMap[norm] = true
-			}
-			if baseNorm := catalog.NormalizeFilename(filepath.Base(ex)); baseNorm != "" {
-				exMap[baseNorm] = true
-			}
-		}
-		var kept []catalog.FileSpec
-		for _, f := range p.Files {
-			norm := catalog.NormalizeFilename(f.Name)
-			baseNorm := catalog.NormalizeFilename(filepath.Base(f.Name))
-			if (norm != "" && exMap[norm]) || (baseNorm != "" && exMap[baseNorm]) {
-				continue
-			}
-			kept = append(kept, f)
-		}
-		p.Files = kept
-	}
-
-	appendArgs := s.synthesizeAppendArgs()
-	if len(appendArgs) > 0 {
-		p.Args = append(p.Args, appendArgs...)
-	}
-	return p
 }
 
 func (m model) updateLaunchOptions(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -748,9 +331,11 @@ func (m *model) saveLaunchOptionsOverride() {
 	engID := s.selectedEngine().ID
 	appendArgs := s.synthesizeAppendArgs()
 	appendEngArgs := s.synthesizeAppendEngineArgs()
+	includeFiles := s.includedFileNames()
 	excludeFiles := s.excludedFileNames()
 
 	req := catalog.OverridePatchRequest{
+		IncludeFiles: &includeFiles,
 		ExcludeFiles: &excludeFiles,
 	}
 	if len(appendEngArgs) > 0 {
@@ -813,7 +398,7 @@ func (m *model) resetLaunchOptionsOverride() {
 	}
 	s.parseArgsIntoFields(nil)
 	for i := range s.optionalFiles {
-		s.optionalFiles[i].enabled = true
+		s.optionalFiles[i].enabled = !s.optionalFiles[i].spec.Disabled
 	}
 	m.reloadCatalogAndIndex()
 	s.statusMsg = fmt.Sprintf("✓ Reset %s to curated defaults", s.presetName)

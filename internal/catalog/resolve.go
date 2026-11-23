@@ -481,7 +481,7 @@ func (idx *DirIndex) NeedsSteamDiscovery(p Preset) bool {
 		}
 	}
 	for _, f := range p.Files {
-		if f.Optional {
+		if f.Optional && !f.Disabled {
 			if _, ok := idx.ResolveFileSpec(f); !ok {
 				return true
 			}

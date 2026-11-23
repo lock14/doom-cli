@@ -11,7 +11,8 @@
     },
     {
       "name": "idkfa 2024.wad",
-      "optional": true
+      "optional": true,
+      "disabled": true
     }
   ],
   "complevel": 2,

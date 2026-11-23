@@ -122,7 +122,9 @@ func (m model) buildFileEntries(cur catalog.Preset, readmePath string, hasReadme
 	var entries []previewFileEntry
 	for _, f := range cur.Files {
 		fStatus := m.styles.StatusMissing.Render("[✗ Missing]")
-		if _, ok := m.dirIndex.ResolveFileSpec(f); ok {
+		if f.Disabled {
+			fStatus = m.styles.Help.Render("[Disabled]")
+		} else if _, ok := m.dirIndex.ResolveFileSpec(f); ok {
 			fStatus = m.styles.StatusReady.Render("[✓ Found]")
 		} else if f.Optional {
 			fStatus = m.styles.Help.Render("[Optional]")

@@ -218,6 +218,7 @@ type FileSpec struct {
 	Name     string   `json:"name"`
 	Aliases  []string `json:"aliases,omitempty"`
 	Optional bool     `json:"optional,omitempty"`
+	Disabled bool     `json:"disabled,omitempty"`
 }
 
 // Source describes a downloadable archive or file mirror for a preset.
@@ -406,6 +407,7 @@ type Override struct {
 	AppendFiles      []FileSpec          `json:"append-files,omitempty"`
 	AppendArgs       []string            `json:"append-args,omitempty"`
 	AppendEngineArgs map[string][]string `json:"append-engine-args,omitempty"`
+	IncludeFiles     []string            `json:"include-files,omitempty"`
 	ExcludeFiles     []string            `json:"exclude-files,omitempty"`
 
 	Path string `json:"-"`

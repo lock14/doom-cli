@@ -11,6 +11,10 @@
     },
     {
       "name": "NEIS.deh"
+    },
+    {
+      "name": "idkfa 2024.wad",
+      "optional": true
     }
   ],
   "complevel": 3,

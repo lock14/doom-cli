@@ -366,6 +366,9 @@ func (m model) areAllPresetFilesPresent(p catalog.Preset) bool {
 		}
 	}
 	for _, f := range p.Files {
+		if f.Disabled {
+			continue
+		}
 		if _, ok := m.dirIndex.ResolveFileSpec(f); !ok {
 			return false
 		}
