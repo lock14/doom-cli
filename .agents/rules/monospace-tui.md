@@ -206,8 +206,8 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
 ### [P1] universal rectangular badges by default and opt-in Nerd Fonts capsules
 
 *   **Project rule**: Default all badges (` DOOM `, `[DSDA]`, `[UZDoom]`, `[✓ Found]`, `[✗ Missing]`, `[Optional]`,
-    `[✓ Readme]`) and prompts (`  Filter: `, `  README Viewer`) to universal ASCII and standard Unicode glyphs (`•`,
-    `✓`, `✗`, `…`) with zero Unicode Private Use Area (PUA) characters or emojis. `formatEngineTagWithCatalog`
+    `[Disabled]`, `[✓ Readme]`) and prompts (`  Filter: `, `  README Viewer`) to universal ASCII and standard Unicode
+    glyphs (`•`, `✓`, `✗`, `…`) with zero Unicode Private Use Area (PUA) characters or emojis. `formatEngineTagWithCatalog`
     (`internal/tui/render.go`) formats custom engine badges (`EngineConfig.BadgeText()`) as 8-column bracketed tags
     (`"[" + padOrTruncateName(badge, 6) + "]"`) to align with `[DSDA]  ` and `[UZDoom]`, styling `boom` engines with
     `TagDSDA` and `zdoom` engines with `TagUZDoom`. `RenderBrandPill`, `RenderStatsPill`, and `RenderScrollPill`

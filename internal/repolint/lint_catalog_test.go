@@ -223,6 +223,17 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
   "sort": 30
 }`
 	_ = os.WriteFile(filepath.Join(lintCatDir, "preset.conflict-game.json"), []byte(conflictingGame), 0o644)
+	emptyIncludeOverride := `{
+  "schema-version": 1,
+  "kind": "override",
+  "target": {"kind": "preset", "id": "conflict-game"},
+  "include-files": ["   "]
+}`
+	_ = os.WriteFile(
+		filepath.Join(lintCatDir, "override.preset.conflict-game.json"),
+		[]byte(emptyIncludeOverride),
+		0o644,
+	)
 	diags, err := LintCatalog(lintRoot, "")
 	if err != nil {
 		t.Fatalf("LintCatalog: %v", err)
@@ -237,6 +248,7 @@ func TestLintCatalog_CuratedSHA256_IWADAlias_And_NonRepoSkip(t *testing.T) {
 		"contains hardcoded personal path",
 		"must explicitly declare \"game\": \"heretic\"",
 		"declares game \"heretic\" which conflicts with iwad \"DOOM2.WAD\"",
+		"has an empty include-files entry",
 	} {
 		if !strings.Contains(diagText.String(), want) {
 			t.Errorf("expected lint output to contain %q, got:\n%s", want, diagText.String())

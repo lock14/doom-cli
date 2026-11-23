@@ -304,3 +304,67 @@ func TestLaunchOptions_BoomFieldSkipping_SetArgs_And_SurgicalConfigSave(t *testi
 		t.Errorf("expected second Right press to confirm discard and switch engine")
 	}
 }
+
+func TestLaunchOptions_DefaultDisabledOptionalFile_ToggleSaveAndReset(t *testing.T) {
+	t.Parallel()
+	userDir := t.TempDir()
+	wadsDir := t.TempDir()
+	for _, name := range []string{"DOOM2.WAD", "Nostalgia.wad", "idkfa 2024.wad"} {
+		if err := os.WriteFile(filepath.Join(wadsDir, name), []byte("wad"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cat, err := catalog.LoadLayered(userDir, false)
+	if err != nil {
+		t.Fatalf("LoadLayered: %v", err)
+	}
+
+	m := initialModel(cat, []string{wadsDir}, ClassicTheme, false, "nostalgia")
+	m.customCatalogDir = userDir
+	newM, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 28})
+	m = newM.(model)
+
+	if !strings.Contains(m.View(), "[Disabled]") {
+		t.Errorf("expected Preset Details to show [Disabled] for default-off optional file:\n%s", m.View())
+	}
+
+	// Open Launch Options via Ctrl+O; optional file checkbox should start unchecked ([ ])
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
+	m = newM.(model)
+	if len(m.launchOpts.optionalFiles) != 1 || m.launchOpts.optionalFiles[0].enabled {
+		t.Fatalf("expected nostalgia optional file to default to enabled=false, got %+v", m.launchOpts.optionalFiles)
+	}
+	if strings.Contains(m.View(), "idkfa 2024.wad\n") {
+		t.Errorf("expected Command Preview to omit disabled idkfa 2024.wad:\n%s", m.View())
+	}
+
+	// Focus Optional File checkbox and toggle ON via Space
+	m.launchOpts.focusIdx = launchFieldOptBase
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
+	m = newM.(model)
+	if !m.launchOpts.optionalFiles[0].enabled {
+		t.Fatal("expected Space to enable default-off optional file")
+	}
+	if !strings.Contains(m.View(), "[X] idkfa 2024.wad (Optional)") {
+		t.Errorf("expected checked optional file in Launch Options view:\n%s", m.View())
+	}
+
+	// Save via Ctrl+S and verify include-files is persisted without exclude-files
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	_, ov, err := catalog.LoadPresetBaseAndOverride(userDir, "nostalgia")
+	if err != nil || ov == nil {
+		t.Fatalf("expected saved override for nostalgia, got ov=%+v err=%v", ov, err)
+	}
+	if len(ov.IncludeFiles) != 1 || ov.IncludeFiles[0] != "idkfa 2024.wad" || len(ov.ExcludeFiles) != 0 {
+		t.Errorf("expected IncludeFiles=[idkfa 2024.wad] and empty ExcludeFiles, got %+v", ov)
+	}
+
+	// Reset via Ctrl+R and verify checkbox returns to unchecked ([ ])
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = newM.(model)
+	if m.launchOpts.optionalFiles[0].enabled {
+		t.Error("expected Ctrl+R to reset default-disabled optional file back to enabled=false")
+	}
+}

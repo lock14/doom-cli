@@ -329,6 +329,28 @@ func TestFormatLaunchPreview(t *testing.T) {
 	if strings.Contains(previewMulti, "missing_opt.wad") {
 		t.Errorf("FormatLaunchPreview should omit missing_opt.wad, got %q", previewMulti)
 	}
+
+	// Disabled optional files are omitted even when present on disk
+	pDisabled := catalog.Preset{
+		ID:     "nostalgia",
+		Name:   "Nostalgia",
+		Engine: "dsda-doom",
+		IWAD:   "DOOM2.WAD",
+		Files: []catalog.FileSpec{
+			{Name: "av.wad"},
+			{Name: "idkfa 2024.wad", Optional: true, Disabled: true},
+		},
+	}
+	if previewDisabled := FormatLaunchPreview(pDisabled, nil, idxWithOptional, nil); strings.Contains(
+		previewDisabled, "idkfa",
+	) {
+		t.Errorf("FormatLaunchPreview should omit disabled optional file, got %q", previewDisabled)
+	}
+	if previewDisabledNilIdx := FormatLaunchPreview(pDisabled, nil, nil, nil); strings.Contains(
+		previewDisabledNilIdx, "idkfa",
+	) {
+		t.Errorf("FormatLaunchPreview(nil idx) should omit disabled optional file, got %q", previewDisabledNilIdx)
+	}
 }
 
 func TestExecute_RelativePathsAndDashPrefixedWAD(t *testing.T) {

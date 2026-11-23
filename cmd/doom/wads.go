@@ -406,6 +406,16 @@ func newWadsCmd() *cobra.Command {
 				req.AppendFiles = &specs
 				changed = true
 			}
+			if cmd.Flags().Changed("include-file") || len(setFlags.includeFiles) > 0 {
+				var included []string
+				for _, f := range setFlags.includeFiles {
+					if trimmed := strings.TrimSpace(f); trimmed != "" {
+						included = append(included, trimmed)
+					}
+				}
+				req.IncludeFiles = &included
+				changed = true
+			}
 			if cmd.Flags().Changed("exclude-file") || len(setFlags.excludeFiles) > 0 {
 				var excluded []string
 				for _, f := range setFlags.excludeFiles {
@@ -419,7 +429,7 @@ func newWadsCmd() *cobra.Command {
 			if !changed {
 				return fmt.Errorf(
 					"no option flags provided (use --engine, --complevel, --engine-args, --args, "+
-						"--iwad, --files, or --exclude-file, or run 'doom wads reset %s')",
+						"--iwad, --files, --include-file, or --exclude-file, or run 'doom wads reset %s')",
 					name,
 				)
 			}
@@ -434,6 +444,12 @@ func newWadsCmd() *cobra.Command {
 		},
 	}
 	bindWadCommonFlags(setCmd, &setFlags, "", "")
+	setCmd.Flags().StringSliceVar(
+		&setFlags.includeFiles,
+		"include-file",
+		nil,
+		"Disabled or excluded optional PWAD files to enable for this preset",
+	)
 	setCmd.Flags().StringSliceVar(
 		&setFlags.excludeFiles, "exclude-file", nil, "Optional or default PWAD files to exclude from this preset",
 	)
@@ -561,6 +577,7 @@ type wadOptionFlags struct {
 	description  string
 	files        []string
 	engineArgs   []string
+	includeFiles []string
 	excludeFiles []string
 }
 
@@ -823,7 +840,9 @@ func runWadsShow(cmd *cobra.Command, args []string) error {
 		for _, f := range p.Files {
 			fpath, fFound := idx.ResolveFileSpec(f)
 			fStatus := "[✗ Missing]"
-			if fFound {
+			if f.Disabled {
+				fStatus = "[Disabled]"
+			} else if fFound {
 				fStatus = fmt.Sprintf("[✓ Found: %s]", fpath)
 			} else if f.Optional {
 				fStatus = "[Optional]"

@@ -8,7 +8,8 @@
   "files": [
     {
       "name": "idkfa 2024.wad",
-      "optional": true
+      "optional": true,
+      "disabled": true
     }
   ],
   "complevel": 4,
@@ -17,7 +18,7 @@
   "difficulty": "Hard",
   "quality": "S-Tier (9.0/10)",
   "compatibility": "Vanilla",
-  "description": "Classic Final Doom IWAD with modern soundtrack",
+  "description": "Classic Final Doom IWAD with optional modern soundtrack",
   "author": "Dario Casali & Milo Casali",
   "release-date": "1996",
   "links": [

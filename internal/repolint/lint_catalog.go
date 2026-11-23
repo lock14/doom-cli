@@ -137,6 +137,9 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 				addErr(where, "preset %s has an empty file name", ownerID)
 				continue
 			}
+			if f.Disabled && !f.Optional {
+				addErr(where, "preset %s file %q cannot set disabled without optional", ownerID, f.Name)
+			}
 			if _, err := fsutil.CleanRel(strings.TrimSpace(f.Name)); err != nil {
 				addErr(where, "preset %s file %q has invalid relative path: %v", ownerID, f.Name, err)
 			}
@@ -350,6 +353,11 @@ func LintCatalog(rootDir, userDir string) ([]catalog.Diagnostic, error) {
 			}
 			if len(ov.AppendFiles) > 0 {
 				validateFiles(where, ov.Target.ID, ovIWAD, ov.AppendFiles)
+			}
+			for _, inc := range ov.IncludeFiles {
+				if strings.TrimSpace(inc) == "" {
+					addErr(where, "preset %s has an empty include-files entry", ov.Target.ID)
+				}
 			}
 			for _, ex := range ov.ExcludeFiles {
 				if strings.TrimSpace(ex) == "" {

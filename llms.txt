@@ -83,9 +83,10 @@ doom wads
 Settings resolve in two-tier precedence order (`config.json` takes precedence over platform defaults):
 
 - Subcommand flags: `--engine` (`-e`) and `--dry-run` on root `doom`; `--all` on `doom wads` and `doom wads list`;
-  `--engine` (`-e`), `--complevel`, and `--engine-args` on `doom wads add` and `doom wads set`; `--games` on
-  `doom setup`, `doom wads scan`, and `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`,
-  `doom wads fetch`, `doom wads scan`, and `doom engines install`.
+  `--engine` (`-e`), `--complevel`, `--engine-args`, `--files`, `--args`, and `--iwad` on `doom wads add` and
+  `doom wads set` (plus `--include-file` and `--exclude-file` on `doom wads set`); `--games` on `doom setup`,
+  `doom wads scan`, and `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`, `doom wads fetch`,
+  `doom wads scan`, and `doom engines install`.
 - Environment variables: `DOOM_CONFIG_DIR` overrides the `doom-cli` configuration directory (which holds `config.json`,
   `catalog.d/`, and `themes/`), alongside standard OS directory variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `HOME`,
   `LOCALAPPDATA`, `USERPROFILE`).
@@ -124,8 +125,9 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
 - `internal/steam/`: Multi-library `libraryfolders.vdf` parsing (`vdf.go`), catalog-driven game file extraction
   prioritizing `rerelease/` candidates over `base/` (`discover.go`), and streaming `idkfa 2024.wad` soundtrack synthesis
   from `extras.wad` (`idkfa.go`).
-- `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `options.go`, `config_view.go`, `config_actions.go`,
-  `config_tabs.go`, `layout.go`, `render.go`, `modals.go`, `menu.go`, `theme.go`, `builtin_themes.go`).
+- `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `options.go`, `options_state.go`, `config_view.go`,
+  `config_actions.go`, `config_tabs.go`, `layout.go`, `render.go`, `modals.go`, `menu.go`, `theme.go`,
+  `builtin_themes.go`).
 - `internal/wad/`: Multi-mirror SHA-256 verified downloader (`DownloadAll`, `DownloadSelected`), Zip Slip hardened
   extractor, embedded `DEHACKED` lump extractor, ranked `.txt` README extractor with `<primaryStem>.txt` fallback
   normalization, safe preset PWAD uninstaller (`UninstallPreset`), and SoundFont installer (`downloader.go`,

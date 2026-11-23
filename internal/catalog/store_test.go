@@ -318,6 +318,54 @@ func TestConfigPreset_ExcludeFilesAndBaseAndOverride(t *testing.T) {
 			pSunlust.ArgsForEngine("uzdoom"))
 	}
 
+	// Verify default-disabled optional files (nostalgia) vs default-enabled (no-end-in-sight) and IncludeFiles toggle
+	pNEIS, err := mergedSunlustCat.FindExact("no-end-in-sight")
+	if err != nil || len(pNEIS.Files) != 3 || !pNEIS.Files[2].Optional || pNEIS.Files[2].Disabled {
+		t.Fatalf("expected no-end-in-sight to include default-enabled idkfa 2024.wad, got %+v (err=%v)", pNEIS, err)
+	}
+	pNostalgiaDefault, err := mergedSunlustCat.FindExact("nostalgia")
+	if err != nil || len(pNostalgiaDefault.Files) != 2 || !pNostalgiaDefault.Files[1].Disabled {
+		t.Fatalf("expected nostalgia idkfa 2024.wad Disabled=true by default, got %+v (err=%v)", pNostalgiaDefault, err)
+	}
+	included := []string{"idkfa_2024.wad"}
+	if _, _, err := ConfigPreset(userDir, mergedSunlustCat, "nostalgia", OverridePatchRequest{
+		IncludeFiles: &included,
+	}); err != nil {
+		t.Fatalf("ConfigPreset IncludeFiles: %v", err)
+	}
+	baseNos, ovNos, err := LoadPresetBaseAndOverride(userDir, "nostalgia")
+	if err != nil || baseNos == nil || !baseNos.Files[1].Disabled {
+		t.Fatalf("expected base nostalgia to retain Disabled=true, got %+v (err=%v)", baseNos, err)
+	}
+	if ovNos == nil || !reflect.DeepEqual(ovNos.IncludeFiles, []string{"idkfa_2024.wad"}) {
+		t.Fatalf("expected ovNos.IncludeFiles=[idkfa_2024.wad], got %+v", ovNos)
+	}
+	enabledCat, err := MergeUserDir(mergedSunlustCat, userDir)
+	if err != nil {
+		t.Fatalf("MergeUserDir after IncludeFiles: %v", err)
+	}
+	pNosEnabled, err := enabledCat.FindExact("nostalgia")
+	if err != nil || pNosEnabled.Files[1].Disabled {
+		t.Fatalf("expected nostalgia idkfa 2024.wad enabled after IncludeFiles, got %+v (err=%v)", pNosEnabled, err)
+	}
+	// Passing ExcludeFiles without IncludeFiles removes matching entry from IncludeFiles
+	reExclude := []string{"idkfa 2024.wad"}
+	if _, _, err := ConfigPreset(userDir, enabledCat, "nostalgia", OverridePatchRequest{
+		ExcludeFiles: &reExclude,
+	}); err != nil {
+		t.Fatalf("ConfigPreset ExcludeFiles after IncludeFiles: %v", err)
+	}
+	_, ovNosAfterEx, err := LoadPresetBaseAndOverride(userDir, "nostalgia")
+	if err != nil || ovNosAfterEx == nil || len(ovNosAfterEx.IncludeFiles) != 0 {
+		t.Fatalf("expected IncludeFiles cleared when excluded, got %+v (err=%v)", ovNosAfterEx, err)
+	}
+	// Non-optional file with disabled: true is rejected by DecodeEntity
+	invalidDisabledJSON := `{"schema-version":1,"kind":"preset","id":"bad","name":"Bad","engine":"dsda-doom",` +
+		`"iwad":"DOOM2.WAD","files":[{"name":"bad.wad","disabled":true}]}`
+	if _, decErr := DecodeEntity([]byte(invalidDisabledJSON)); decErr == nil {
+		t.Error("expected DecodeEntity to reject disabled:true without optional:true")
+	}
+
 	// Clear dsda-doom engine-args and revert Complevel back to curated 9 while keeping uzdoom engine-args
 	clearDSDA := map[string][]string{"dsda-doom": {}}
 	if _, _, err := ConfigPreset(userDir, mergedSunlustCat, "sunlust", OverridePatchRequest{

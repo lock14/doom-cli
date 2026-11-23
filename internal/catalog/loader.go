@@ -519,21 +519,19 @@ func applyPresetOverride(cat *Catalog, p *Preset, ov *Override) {
 	if len(ov.AppendFiles) > 0 {
 		p.Files = append(cloneFileSpecs(p.Files), cloneFileSpecs(ov.AppendFiles)...)
 	}
-	if len(ov.ExcludeFiles) > 0 && len(p.Files) > 0 {
-		excluded := make(map[string]bool, len(ov.ExcludeFiles)*2)
-		for _, ex := range ov.ExcludeFiles {
-			if norm := NormalizeFilename(ex); norm != "" {
-				excluded[norm] = true
-			}
-			if baseNorm := NormalizeFilename(SlashBase(ex)); baseNorm != "" {
-				excluded[baseNorm] = true
+	if len(ov.IncludeFiles) > 0 && len(p.Files) > 0 {
+		included := buildNormalizedFileSet(ov.IncludeFiles)
+		for i := range p.Files {
+			if p.Files[i].Disabled && matchesNormalizedFileSet(included, p.Files[i].Name) {
+				p.Files[i].Disabled = false
 			}
 		}
+	}
+	if len(ov.ExcludeFiles) > 0 && len(p.Files) > 0 {
+		excluded := buildNormalizedFileSet(ov.ExcludeFiles)
 		var kept []FileSpec
 		for _, f := range p.Files {
-			norm := NormalizeFilename(f.Name)
-			baseNorm := NormalizeFilename(SlashBase(f.Name))
-			if (norm != "" && excluded[norm]) || (baseNorm != "" && excluded[baseNorm]) {
+			if matchesNormalizedFileSet(excluded, f.Name) {
 				continue
 			}
 			kept = append(kept, f)
@@ -638,6 +636,7 @@ func LoadPresetBaseAndOverride(catalogDir string, id string) (*Preset, *Override
 						ov.AppendFiles = cloneFileSpecs(ent.Override.AppendFiles)
 						ov.AppendArgs = append([]string(nil), ent.Override.AppendArgs...)
 						ov.AppendEngineArgs = cloneEngineArgsMap(ent.Override.AppendEngineArgs)
+						ov.IncludeFiles = append([]string(nil), ent.Override.IncludeFiles...)
 						ov.ExcludeFiles = append([]string(nil), ent.Override.ExcludeFiles...)
 						return base, &ov, nil
 					}
@@ -681,4 +680,23 @@ func applyEngineOverride(e *EngineConfig, ov *Override) {
 		e.DefaultArgs = append(append([]string(nil), e.DefaultArgs...), ov.AppendArgs...)
 	}
 	e.Overridden = true
+}
+
+func buildNormalizedFileSet(names []string) map[string]bool {
+	set := make(map[string]bool, len(names)*2)
+	for _, raw := range names {
+		if norm := NormalizeFilename(raw); norm != "" {
+			set[norm] = true
+		}
+		if baseNorm := NormalizeFilename(SlashBase(raw)); baseNorm != "" {
+			set[baseNorm] = true
+		}
+	}
+	return set
+}
+
+func matchesNormalizedFileSet(set map[string]bool, name string) bool {
+	norm := NormalizeFilename(name)
+	baseNorm := NormalizeFilename(SlashBase(name))
+	return (norm != "" && set[norm]) || (baseNorm != "" && set[baseNorm])
 }

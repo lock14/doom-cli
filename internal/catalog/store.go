@@ -427,6 +427,30 @@ func resolveStoreEngineArgs(
 	return out, nil
 }
 
+func cleanFileList(in []string) []string {
+	var cleaned []string
+	for _, f := range in {
+		if trimmed := strings.TrimSpace(f); trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	return cleaned
+}
+
+func filterOutMatchingFiles(existing, remove []string) []string {
+	if len(existing) == 0 || len(remove) == 0 {
+		return existing
+	}
+	remSet := buildNormalizedFileSet(remove)
+	var kept []string
+	for _, item := range existing {
+		if !matchesNormalizedFileSet(remSet, item) {
+			kept = append(kept, item)
+		}
+	}
+	return kept
+}
+
 // OverridePatchRequest specifies the fields to update on a preset override.
 type OverridePatchRequest struct {
 	Engine           *string
@@ -438,6 +462,7 @@ type OverridePatchRequest struct {
 	SetArgs          *[]string
 	AppendArgs       *[]string
 	AppendFiles      *[]FileSpec
+	IncludeFiles     *[]string
 	ExcludeFiles     *[]string
 }
 
@@ -605,14 +630,17 @@ func ConfigPreset(userDir string, layered *Catalog, key string, req OverridePatc
 	if req.AppendFiles != nil {
 		ov.AppendFiles = cloneFileSpecs(*req.AppendFiles)
 	}
-	if req.ExcludeFiles != nil {
-		var cleaned []string
-		for _, f := range *req.ExcludeFiles {
-			if trimmed := strings.TrimSpace(f); trimmed != "" {
-				cleaned = append(cleaned, trimmed)
-			}
+	if req.IncludeFiles != nil {
+		ov.IncludeFiles = cleanFileList(*req.IncludeFiles)
+		if req.ExcludeFiles == nil && len(ov.IncludeFiles) > 0 {
+			ov.ExcludeFiles = filterOutMatchingFiles(ov.ExcludeFiles, ov.IncludeFiles)
 		}
-		ov.ExcludeFiles = cleaned
+	}
+	if req.ExcludeFiles != nil {
+		ov.ExcludeFiles = cleanFileList(*req.ExcludeFiles)
+		if req.IncludeFiles == nil && len(ov.ExcludeFiles) > 0 {
+			ov.IncludeFiles = filterOutMatchingFiles(ov.IncludeFiles, ov.ExcludeFiles)
+		}
 	}
 
 	data, err := MarshalEntity(ov)

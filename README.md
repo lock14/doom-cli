@@ -248,8 +248,8 @@ interface powered by Bubble Tea:
 - **Side-by-side preview pane**: Displays the required IWAD, PWAD file list, DeHackEd patches, launch arguments, genre,
   difficulty, quality rating, optional non-Doom game badge (`[Optional Game]`), documentation link, and release
   metadata.
-- **File readiness indicators**: Displays `[✓ Found]` when required files resolve on disk, `[✗ Missing]` when required
-  files are absent, and `[Optional]` when optional files are absent.
+- **File readiness indicators**: Displays `[✓ Found]` when files resolve on disk, `[✗ Missing]` when required files are
+  absent, `[Optional]` when enabled optional files are absent, and `[Disabled]` when optional files default to off.
 - **Launch options and preset configuration**: Press `Ctrl+O` or `F4` to configure target engine, skill level
   (`-skill`), map warp (`-warp`), gameplay flags (`-pistolstart`, `-fast`, `-nomonsters`, `-respawn`, `-solonet`),
   compatibility level (`-complevel`), optional WAD toggles (such as `idkfa 2024.wad`), and extra arguments with a live
@@ -496,9 +496,9 @@ doom "KDiZD"
 ### Configure per-WAD launch options
 
 Customize engine (`-e` or `--engine`), compatibility level (`--complevel`), per-engine arguments (`--engine-args`),
-IWAD (`--iwad`), additional files (`--files`), excluded optional files (`--exclude-file`), or universal launch arguments
-(`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear overrides with `doom wads reset`, without
-modifying repository defaults:
+IWAD (`--iwad`), additional files (`--files`), enabled or excluded optional files (`--include-file` or `--exclude-file`),
+or universal launch arguments (`--args`) for any WAD (`catalog.d/override.preset.<id>.json`), or clear overrides with
+`doom wads reset`, without modifying repository defaults:
 
 ```bash
 # Always launch Sunlust in Woof! with ultra-violence skill (inherits complevel 9 automatically)
@@ -507,7 +507,8 @@ doom wads set "Sunlust" -e woof --args "-skill 4"
 # Add DSDA-Doom specific flags or override complevel on a preset
 doom wads set "Sunlust" --engine-args dsda-doom="-solonet" --complevel 9
 
-# Disable optional soundtrack WAD for a preset
+# Enable a default-off optional soundtrack WAD or disable a default-on one
+doom wads set "TNT: Evilution" --include-file "idkfa 2024.wad"
 doom wads set "Doom II" --exclude-file "idkfa 2024.wad"
 
 # Reset custom launch options back to curated defaults
@@ -724,9 +725,9 @@ directly to `going-down-turbo`:
 | [Strife: Quest for the Sigil](https://doomwiki.org/wiki/Strife:_Quest_for_the_Sigil) | UZDoom | Hub-Based Action RPG | Moderate | A-Tier (8.5/10) | Rogue Entertainment sci-fi fantasy FPS and RPG hybrid |
 | [Sunder](https://dsdarchive.com/wads/sunder) | DSDA-Doom | Architectural Slaughter | Extreme | S-Tier (9.5/10) | Monumental architectural slaughter megawad |
 | [Sunlust](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/sunlust) | DSDA-Doom | Combat Puzzle and Slaughter | Extreme | S-Tier (10/10) | 32-level visual and gameplay masterpiece |
-| [The Plutonia Experiment](https://doomwiki.org/wiki/The_Plutonia_Experiment) | DSDA-Doom | Tactical Combat | Hard | S-Tier (9.0/10) | Classic Final Doom IWAD with modern soundtrack |
+| [The Plutonia Experiment](https://doomwiki.org/wiki/The_Plutonia_Experiment) | DSDA-Doom | Tactical Combat | Hard | S-Tier (9.0/10) | Classic Final Doom IWAD with optional modern soundtrack |
 | [Plutonia 2](https://www.doomworld.com/idgames/levels/doom2/megawads/pl2) | DSDA-Doom | Tactical and Slaughter | Very Hard | S-Tier (9.5/10) | Community sequel to The Plutonia Experiment |
-| [TNT: Evilution](https://doomwiki.org/wiki/TNT:_Evilution) | DSDA-Doom | Adventure Techbase | Moderate | B-Tier (7.0/10) | Classic Final Doom IWAD with modern soundtrack |
+| [TNT: Evilution](https://doomwiki.org/wiki/TNT:_Evilution) | DSDA-Doom | Adventure Techbase | Moderate | B-Tier (7.0/10) | Classic Final Doom IWAD with optional modern soundtrack |
 | [TNT: Revilution](https://www.doomworld.com/idgames/levels/doom2/megawads/tntr) | DSDA-Doom | Sci-Fi Adventure | Moderate | A-Tier (8.5/10) | Community sequel to TNT: Evilution |
 | [Valiant](https://www.doomworld.com/idgames/levels/doom2/Ports/megawads/valiant) | DSDA-Doom | DeHackEd Action | Hard | S-Tier (9.5/10) | MBF megawad with custom weapons and DeHackEd patch |
 

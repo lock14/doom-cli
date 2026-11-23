@@ -66,15 +66,18 @@ All contributions must respect the core repository invariants:
     *   **Hyphenated kebab-case JSON keys and three-tier launch model**: Standardize all `doom-cli` JSON keys across
         `config.json`, `catalog/*.json`, `<ConfigDir>/catalog.d/*.json`, and `themes/*.json` on hyphenated `kebab-case`
         (`schema-version`, `display-name`, `args-style`, `prefix-args`, `default-args`, `engine-args`, `release-date`,
-        `load-maps-after-mods`, `append-files`, `append-args`, `append-engine-args`, `exclude-files`, `nerd-fonts`,
-        `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and `brand-cap`) with `DisallowUnknownFields()` on entity
-        and theme decoders, separating typed WAD `complevel` integers (`0..17` or `21`), per-engine `engine-args` maps,
-        and universal `args` slices rather than scraping or stripping flag strings across engine families at runtime.
+        `load-maps-after-mods`, `append-files`, `append-args`, `append-engine-args`, `include-files`, `exclude-files`,
+        `nerd-fonts`, `wads-dir`, `wads-dirs`, `bin-dir`, `soundfonts-dir`, and `brand-cap`) with
+        `DisallowUnknownFields()` on entity and theme decoders, separating typed WAD `complevel` integers (`0..17` or
+        `21`), per-engine `engine-args` maps, and universal `args` slices rather than scraping or stripping flag strings
+        across engine families at runtime.
     *   **Exact vs fuzzy lookup safety and soundtrack hygiene**: Read and launch commands (`doom <wad>`, `wads show`,
         `wads fetch`) use 4-tier `Catalog.Find`, whereas mutating or destructive commands (`wads set`, `reset`,
         `remove`, `uninstall`, and `engines set`, `reset`, `remove`) must use `Catalog.FindExact` or `FindEngine`
-        without substring guessing. Attach optional `idkfa 2024.wad` only to presets using stock Doom or Doom II MIDI
-        slots (never mapsets with bespoke soundtracks like `legacy-of-rust`).
+        without substring guessing. Enable optional `idkfa 2024.wad` by default only on presets using stock Doom or Doom
+        II MIDI slots, mark it `"disabled": true` (toggleable via `include-files`) on presets that support `D_*`
+        replacement while supplying custom or remapped music, and omit it from bespoke-score megawads like
+        `legacy-of-rust`.
     *   **Curated edition policy and taxonomy metadata**: Every curated preset in `catalog/preset.<id>.json` must
         declare `genre`, `difficulty`, `quality`, and `links` (with `PrimaryURL()` rendered as a clickable title link in
         `README.md` and surfaced alongside `Engine`, `Genre`, `Difficulty`, and `Quality` in `doom wads list`,
@@ -205,7 +208,8 @@ doom-cli/
 │   │   └── idkfa.go        # Streaming idkfa 2024.wad soundtrack synthesis from extras.wad
 │   ├── tui/                # Terminal user interface components powered by Bubble Tea and Lip Gloss
 │   │   ├── launcher.go     # Bubble Tea state machine, update loop, in-TUI asset fetch, and message routing
-│   │   ├── options.go      # Unified launch options and per-preset configuration view (Ctrl+O or F4)
+│   │   ├── options.go      # Unified launch options view, key handling, and override actions (Ctrl+O or F4)
+│   │   ├── options_state.go # Launch options form state, argument parsing, and preset synthesis helpers
 │   │   ├── config_view.go  # 3-tab in-TUI configuration manager state, navigation, and diff viewport (Ctrl+G or F2)
 │   │   ├── config_actions.go # Configuration manager persistence, override resets, and port config actions
 │   │   ├── config_tabs.go  # Tab content and footer rendering for the 3-tab configuration manager
