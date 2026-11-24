@@ -7,8 +7,8 @@ globs: "**/*.md, llms.txt, .github/**/*"
 # Technical writing, typography, and documentation rules
 
 Follow these standards whenever editing Markdown documentation (`README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
-`SECURITY.md`, `.agents/**/*.md`), `llms.txt`, GitHub templates and workflows (`.github/**/*`), Go comments, commit
-messages, or pull request descriptions.
+`SECURITY.md`, `.agents/**/*.md`, `skills/**/*.md`), `llms.txt`, GitHub templates and workflows (`.github/**/*`), Go
+comments, commit messages, or pull request descriptions.
 
 ## Typography and formatting restraint
 
@@ -31,7 +31,7 @@ messages, or pull request descriptions.
     expressions, ASCII arrows (`->`, `<-`, `<->`, `=>`), and inequality signs as prose connectors outside code blocks
     and diagrams. Write plain English verbs ("maps to", "resolves to", "takes precedence over") instead.
 *   **No horizontal section dividers**: Never place horizontal rules (`---`) between sections; Markdown headings provide
-    structural hierarchy (YAML frontmatter `---` at line 1 of `.agents/` files is permitted).
+    structural hierarchy (YAML frontmatter `---` at line 1 of `.agents/` and `skills/` files is permitted).
 *   **Clean punctuation and list discipline**: Never use italic parenthetical asides (`*(Note: ...)*`, `*(Tip: ...)*`,
     `*(Alternatively ...)*`); state details as normal sentences or table entries. Do not use slashes (`/`) in prose to
     join alternatives (write "or" or "and" instead), reserving `/` for file paths, URLs, and literal commands or keys.
@@ -52,8 +52,9 @@ messages, or pull request descriptions.
 *   **Developer guide**: Dedicate `CONTRIBUTING.md` to human open-source contributors covering architecture, Makefile
     targets, Go code style, how-to workflows, testing requirements, and pull request guidelines.
 *   **Agent constitution**: Keep [AGENTS.md](../../AGENTS.md) at the repository root (with zero `.agents/AGENTS.md`
-    copies or `CLAUDE.md` symlinks) as the universal always-on summary, delegating domain-specific rules and workflows
-    to `.agents/rules/*.md` and `.agents/skills/*/SKILL.md`.
+    copies or `CLAUDE.md` symlinks) as the universal always-on summary, delegating contributor rules and TUI workflows
+    to `.agents/rules/*.md` and `.agents/skills/*/SKILL.md` while keeping the player-facing CLI skill isolated at
+    [SKILL.md](../../skills/doom-cli/SKILL.md).
 *   **LLM summary**: Keep [llms.txt](../../llms.txt) synchronized whenever CLI commands, flags, environment variables,
     packages, or core invariants change.
 *   **Pull request descriptions**: Follow the Google CL Description style using

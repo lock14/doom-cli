@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/lock14/doom-cli/internal/catalog"
 )
 
 // MaxRootAgentsLines caps the line count of root AGENTS.md so always-on instructions stay lean.
@@ -67,6 +69,7 @@ func discoverDocFiles(rootDir string) []string {
 	for _, pattern := range []string{
 		filepath.Join(rootDir, ".agents", "rules", "*.md"),
 		filepath.Join(rootDir, ".agents", "skills", "*", "SKILL.md"),
+		filepath.Join(rootDir, "skills", "*", "SKILL.md"),
 	} {
 		matches, err := filepath.Glob(pattern)
 		if err != nil {
@@ -128,7 +131,7 @@ func lintDocumentation(rootDir string, addErr func(where, format string, a ...an
 
 		lines := strings.Split(text, "\n")
 		slashRel := filepath.ToSlash(relDoc)
-		isAgentDoc := strings.HasPrefix(slashRel, ".agents/")
+		isAgentDoc := strings.HasPrefix(slashRel, ".agents/") || strings.HasPrefix(slashRel, "skills/")
 		if relDoc == "AGENTS.md" {
 			trimmedText := strings.TrimRight(text, "\r\n")
 			lineCount := 0
@@ -537,9 +540,22 @@ func lintAgentFrontmatter(where, slashRel string, lines []string, addErr func(wh
 		}
 	}
 
-	if strings.HasPrefix(slashRel, ".agents/skills/") {
-		if isScalarPlaceholder(cleanFields["name"]) {
+	if strings.HasPrefix(slashRel, ".agents/skills/") || strings.HasPrefix(slashRel, "skills/") {
+		skillName := cleanFields["name"]
+		if isScalarPlaceholder(skillName) {
 			addErr(where, "missing frontmatter name")
+		} else {
+			if err := catalog.ValidateID(skillName); err != nil {
+				addErr(where, "invalid frontmatter skill name %q: %v", skillName, err)
+			}
+			wantDir := filepath.Base(filepath.Dir(filepath.FromSlash(slashRel)))
+			if skillName != wantDir {
+				addErr(
+					where,
+					"frontmatter skill name %q must match parent directory %q",
+					skillName, wantDir,
+				)
+			}
 		}
 		if isScalarPlaceholder(cleanFields["description"]) {
 			addErr(where, "missing frontmatter description")

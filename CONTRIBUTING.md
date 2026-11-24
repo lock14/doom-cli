@@ -165,18 +165,21 @@ The repository features a unified, zero-dependency Go CLI (`doom`) that compiles
 
 ```
 doom-cli/
-├── embed.go                # Single root embed.FS (catalog/*.json, configs/dsda-doom/*.cfg, configs/uzdoom/*.cfg)
+├── embed.go                # Single root embed.FS (catalog/*.json, configs/*/*.cfg, skills/doom-cli/SKILL.md)
 ├── catalog/                # One-entity-per-file curated catalog (engine.<id>.json, preset.<id>.json)
 ├── configs/                # Source port configuration templates with runtime placeholder tokens
 │   ├── dsda-doom/          # DSDA-Doom configuration template (dsda-doom.cfg)
 │   └── uzdoom/             # UZDoom autoexec configuration template (autoexec.cfg)
+├── skills/                 # Distributable end-user Agent Skill embedded into the doom binary
+│   └── doom-cli/           # Portable CLI operator skill (SKILL.md) installed via 'doom skill install'
 ├── cmd/doom/               # Command-line interface definitions using Cobra
 │   ├── main.go             # Entrypoint, root direct game launcher, path and catalog helpers
 │   ├── games.go            # Game-scope (--games), megawad (--wads), target list, and missing-arg hint helpers
 │   ├── wads.go             # 'doom wads' TUI browser (list, show, fetch, uninstall, scan, add, set, reset, remove, lint, build)
 │   ├── engines.go          # 'doom engines' TUI manager (list, install, add, set, reset, remove, cfg)
 │   ├── config.go           # 'doom config' interactive TUI settings editor and subcommands (show, get, set, themes)
-│   └── setup.go            # 'doom setup' turnkey installation workflow
+│   ├── setup.go            # 'doom setup' turnkey installation workflow
+│   └── skill.go            # 'doom skill' embedded SKILL.md stdout emitter, installer, and uninstaller
 ├── internal/
 │   ├── catalog/            # Runtime two-layer entity catalog, store, file resolver, and CP437 decoder
 │   │   ├── entity.go       # EngineConfig, Preset, FileSpec, SourceSpec, LinkSpec, and Catalog models
@@ -416,11 +419,13 @@ The repository includes a `Makefile` for developer verification and local builds
     modular package maps, how-to guides, and pull request guidelines.
 *   **Agent and architectural invariants**: `AGENTS.md` encodes core architectural invariants, path tokens, safety
     rules, and automated verification checklists at the repository root alongside glob-scoped rules in `.agents/rules/`
-    (`catalog-curation.md`, `documentation-style.md`, `monospace-tui.md`).
+    (`catalog-curation.md`, `documentation-style.md`, `monospace-tui.md`) and contributor TUI skills in
+    `.agents/skills/`, while [`skills/doom-cli/SKILL.md`](skills/doom-cli/SKILL.md) supplies the embedded player-facing
+    CLI operator skill exposed via `doom skill`.
 *   **Mandatory synchronization**: Whenever presets, engine settings, build targets, directory layouts, or CLI
     mechanics are modified, all relevant documentation (Go doc comments, `README.md`, `CONTRIBUTING.md`, `AGENTS.md`,
-    and `llms.txt`) must be updated within the same pull request, and `doom wads lint` validates documentation
-    typography, links, anchors, and JSON blocks.
+    `skills/doom-cli/SKILL.md`, and `llms.txt`) must be updated within the same pull request, and `doom wads lint`
+    validates documentation typography, links, anchors, frontmatter, and JSON blocks.
 
 ## Pre-completion verification checklist
 

@@ -77,6 +77,9 @@ doom wads
 - `doom setup`: Turnkey 4-step core setup (configs, engines, SoundFont, and Steam or GOG Doom IWADs), with optional
   `--wads <none|all|names>` for community megawads and `--games <list|all>` for optional non-Doom id Tech 1 games.
 - `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
+- `doom skill [install|uninstall]`: Prints the embedded `doom-cli` Agent Skill (`SKILL.md`) to `stdout`, or installs and
+  uninstalls `<skills-dir>/doom-cli/SKILL.md` across `agents`, `antigravity`, `claude`, `codex`, `cursor`, `gemini`, or
+  explicit `--dir <path>` targets (`--force` overwrites with a timestamped backup).
 
 ## CLI flags and environment variables
 
@@ -93,11 +96,13 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
 
 ## Architecture and modular packages
 
-- `embed.go`: Single root `embed.FS` embedding `catalog/*.json`, `configs/dsda-doom/dsda-doom.cfg`, and
-  `configs/uzdoom/autoexec.cfg`.
+- `embed.go`: Single root `embed.FS` embedding `catalog/*.json`, `configs/dsda-doom/dsda-doom.cfg`,
+  `configs/uzdoom/autoexec.cfg`, and `skills/doom-cli/SKILL.md`.
 - `catalog/`: Per-entity curated JSON files (`engine.<id>.json`, `preset.<id>.json`).
 - `configs/`: Curated source port configuration templates (`configs/dsda-doom/dsda-doom.cfg` and
   `configs/uzdoom/autoexec.cfg`) with runtime placeholder tokens.
+- `skills/doom-cli/`: Portable player-facing Agent Skill (`SKILL.md`) embedded into the `doom` binary and installed via
+  `doom skill install`.
 - `cmd/doom/`: Modular Cobra CLI commands:
   - `main.go`: Entrypoint, root direct game launcher (`doom [wad] [flags]`), and path helpers.
   - `games.go`: Game-scope (`--games`), megawad selection (`--wads`), preset target list, and missing-argument hint
@@ -108,6 +113,7 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
     `reset`, `remove`, and `cfg` with `install`, `diff`, and hidden `sync`).
   - `config.go`: `doom config` interactive TUI settings editor and subcommands (`show`, `get`, `set`, `themes`).
   - `setup.go`: `doom setup` automated turnkey workflow.
+  - `skill.go`: `doom skill` embedded `SKILL.md` `stdout` emitter, cross-agent installer, and uninstaller.
 - `internal/catalog/`: Runtime two-layer entity catalog, game inference and library scoping, store operations, tiered
   query normalization, multi-root file and alias resolution, and CP437 decoding (`entity.go`, `games.go`, `codec.go`,
   `loader.go`, `query.go`, `store.go`, `resolve.go`, `decode.go`).

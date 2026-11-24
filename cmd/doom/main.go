@@ -121,6 +121,7 @@ preset name or ID ('doom doom-ii', 'doom sunlust -skill 4 -warp 1 1'), or run
 		newEnginesCmd(),
 		newConfigCmd(),
 		newSetupCmd(),
+		newSkillCmd(),
 	)
 
 	return rootCmd
