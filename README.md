@@ -24,6 +24,7 @@ Linux, macOS, and Windows.
   - [Engine management](#engine-management)
   - [Configuration and theme management](#configuration-and-theme-management)
   - [Shell autocompletion](#shell-autocompletion)
+  - [AI agent skill](#ai-agent-skill)
 - [Interactive TUI launcher](#interactive-tui-launcher)
   - [Main preset browser controls](#main-preset-browser-controls)
   - [Launch options and preset configuration controls](#launch-options-and-preset-configuration-controls)
@@ -228,6 +229,35 @@ doom completion fish > ~/.config/fish/completions/doom.fish
 # PowerShell
 doom completion powershell | Out-String | Invoke-Expression
 ```
+
+### AI agent skill
+
+The `doom` binary embeds a portable [Agent Skill](https://agentskills.io) (`SKILL.md`) so AI coding and desktop agents
+can set up engines, scan Steam and GOG libraries, fetch megawads, and configure custom presets non-interactively:
+
+```bash
+# Install to the cross-agent global skills directory (~/.agents/skills/doom-cli/SKILL.md)
+doom skill install
+
+# Or install for a specific agent harness (claude, codex, cursor, gemini, antigravity) or custom path
+doom skill install claude
+doom skill install --dir ~/.custom-agent/skills
+
+# Overwrite an existing installed skill after upgrading doom, or remove it cleanly
+doom skill install --force
+doom skill uninstall
+
+# Print the embedded SKILL.md directly to stdout (similar to 'doom completion')
+doom skill
+```
+
+| Command | Description |
+| :--- | :--- |
+| `doom skill` | Prints the embedded `SKILL.md` directly to `stdout` |
+| `doom skill install [agent]` | Installs `SKILL.md` for `agents`, `antigravity`, `claude`, `codex`, `cursor`, or `gemini` |
+| `doom skill install --dir <path>` | Installs `<path>/doom-cli/SKILL.md` into an explicit skills root directory |
+| `doom skill install --force` | Overwrites an existing `SKILL.md` atomically with a timestamped backup |
+| `doom skill uninstall [agent]` | Removes an installed `doom-cli/SKILL.md` and its `.bak.*` backups (or `--dir`) |
 
 ## Interactive TUI launcher
 

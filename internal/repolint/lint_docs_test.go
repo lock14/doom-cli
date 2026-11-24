@@ -263,8 +263,9 @@ func TestLintDocumentation_AgentRuleSizeAndDiscovery(t *testing.T) {
 	}
 	rulesDir := filepath.Join(tmpRoot, ".agents", "rules")
 	skillDir := filepath.Join(tmpRoot, ".agents", "skills", "custom-skill")
+	publicSkillDir := filepath.Join(tmpRoot, "skills", "mismatched-dir")
 	runtimePkgDir := filepath.Join(tmpRoot, "internal", "catalog")
-	for _, dir := range []string{rulesDir, skillDir, runtimePkgDir} {
+	for _, dir := range []string{rulesDir, skillDir, publicSkillDir, runtimePkgDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -298,6 +299,11 @@ func TestLintDocumentation_AgentRuleSizeAndDiscovery(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	badPublicSkill := "---\nname: wrong-name\ndescription: \"Public skill.\"\n---\n\n# Public skill\n\nStep A -> B\n"
+	if err := os.WriteFile(filepath.Join(publicSkillDir, "SKILL.md"), []byte(badPublicSkill), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	badImportGo := "package catalog\n\nimport _ \"github.com/lock14/doom-cli/internal/repolint\"\n"
 	if err := os.WriteFile(filepath.Join(runtimePkgDir, "bad_import.go"), []byte(badImportGo), 0o644); err != nil {
 		t.Fatal(err)
@@ -324,6 +330,8 @@ func TestLintDocumentation_AgentRuleSizeAndDiscovery(t *testing.T) {
 		"no-frontmatter.md: missing YAML frontmatter block",
 		"SKILL.md: missing frontmatter description",
 		"SKILL.md: contains stacked bold span \"**bold `code`**\"",
+		"frontmatter skill name \"wrong-name\" must match parent directory \"mismatched-dir\"",
+		"mismatched-dir/SKILL.md: contains ASCII arrow \"->\"",
 		"bad_import.go: runtime package internal/catalog must not import internal/repolint",
 	} {
 		if !strings.Contains(out, wantSub) {

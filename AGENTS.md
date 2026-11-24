@@ -11,8 +11,8 @@
     maintainer commands with `Hidden: true`).
 *   **PR and learning hygiene**: Follow imperative Chris Beams commit rules, verify `git diff` introduces zero personal
     paths, complete `.github/PULL_REQUEST_TEMPLATE.md`, update PR descriptions via `gh pr edit` on follow-up commits,
-    synchronize `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `.agents/`, and `llms.txt` in the same PR, and immediately
-    encode user corrections into `AGENTS.md` or the relevant `.agents/rules/*.md` file.
+    synchronize `README.md`, `CONTRIBUTING.md`, `AGENTS.md`, `.agents/`, `skills/`, and `llms.txt` in the same PR, and
+    immediately encode user corrections into `AGENTS.md` or the relevant `.agents/rules/*.md` file.
 
 ## Scoped domain rules and skills
 
@@ -61,11 +61,13 @@ corresponding domain file before modifying its area:
     `Catalog.Find`, whereas mutating or destructive commands (`set`, `reset`, `remove`, `uninstall`) must use
     `Catalog.FindExact` or `FindEngine` without substring guessing.
 *   **Five-pillar CLI and unified launch synthesis**: Organize commands around `doom [wad] [flags]`, `doom wads`,
-    `doom engines`, `doom config`, and `doom setup`, restricting `DisableFlagParsing: true` + `UnknownFlags: true`
-    strictly to root `doom` (zero `reflect` on unexported Cobra or pflag fields), enforcing `cobra.NoArgs` on
-    non-positional commands and `exactArgsWithHint` on positional subcommands, and wiring `signal.NotifyContext` into
-    `ExecuteContext`. `PrepareLaunch` (`filepath.Abs` canonicalization) and pure zero-I/O `FormatLaunchPreview` must
-    share `resolveEngineConfig` and `buildEngineArgs`; route file readiness checks through `DirIndex.ResolveFileSpec`.
+    `doom engines`, `doom config`, and `doom setup` (plus environment helpers `doom completion` and `doom skill`, which
+    embeds player-only [SKILL.md](skills/doom-cli/SKILL.md) separately from contributor `.agents/skills/`), restricting
+    `DisableFlagParsing: true` + `UnknownFlags: true` strictly to root `doom` (zero `reflect` on unexported Cobra or
+    pflag fields), enforcing `cobra.NoArgs` on non-positional commands and `exactArgsWithHint` on positional
+    subcommands, and wiring `signal.NotifyContext` into `ExecuteContext`. `PrepareLaunch` (`filepath.Abs`
+    canonicalization) and pure zero-I/O `FormatLaunchPreview` must share `resolveEngineConfig` and `buildEngineArgs`;
+    route file readiness checks through `DirIndex.ResolveFileSpec`.
 
 ## Safety, portability, and code boundaries
 

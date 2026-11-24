@@ -61,7 +61,7 @@ bench:
 
 check: format-check tidy-check lint test
 	@echo "Auditing path invariants..."
-	@! grep -rE '/home/[a-zA-Z0-9_-]+' internal/ catalog/ configs/ cmd/
+	@! grep -rE '/home/[a-zA-Z0-9_-]+' internal/ catalog/ configs/ cmd/ skills/
 	@echo "✓ All checks, linters, and tests passed!"
 
 format-check:
