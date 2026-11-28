@@ -82,9 +82,54 @@ func (m *model) activatePortConfigAction() {
 			return
 		}
 		s.refreshPortConfigStatus(m.paths)
-		s.statusMsg = "✓ Deployed curated autoexec.cfg and dsda-doom.cfg"
+		s.statusMsg = "✓ Deployed autoexec.cfg and dsda-doom.cfg"
 		m.statusMsg = s.statusMsg
+	case portFieldSave:
+		m.savePortConfigOverrides()
 	}
+}
+
+func (m *model) savePortConfigOverrides() {
+	s := m.cfgMgr
+	if s == nil {
+		return
+	}
+	m.ensurePathsAndConfig()
+	var buf bytes.Buffer
+	if err := portcfg.SaveUserConfigs(m.paths, "all", &buf); err != nil {
+		s.statusMsg = fmt.Sprintf("✗ Save failed: %v", err)
+		return
+	}
+	s.refreshPortConfigStatus(m.paths)
+	uzLines, dsdaKeys := portcfg.UserOverlayCounts(m.paths)
+	if uzLines == 0 && dsdaKeys == 0 {
+		s.statusMsg = "✓ Live port configs match curated defaults"
+	} else {
+		s.statusMsg = fmt.Sprintf("✓ Saved personal overrides to %s", m.paths.PortCfgDir)
+	}
+	m.statusMsg = s.statusMsg
+}
+
+func (m *model) resetPortConfigOverrides() tea.Cmd {
+	s := m.cfgMgr
+	if s == nil {
+		return nil
+	}
+	m.ensurePathsAndConfig()
+	var buf bytes.Buffer
+	removed, err := portcfg.ResetUserConfigs(m.paths, "all", &buf)
+	if err != nil {
+		s.statusMsg = fmt.Sprintf("✗ Reset failed: %v", err)
+		return nil
+	}
+	s.refreshPortConfigStatus(m.paths)
+	if removed {
+		s.statusMsg = "✓ Reset personal port config overrides"
+	} else {
+		s.statusMsg = "ℹ No personal port config overrides configured"
+	}
+	m.statusMsg = s.statusMsg
+	return nil
 }
 
 func (m *model) saveActiveConfigTab() tea.Cmd {
@@ -267,7 +312,7 @@ func (m *model) saveActiveConfigTab() tea.Cmd {
 		return cmd
 
 	case configTabPorts:
-		m.activatePortConfigAction()
+		m.savePortConfigOverrides()
 		return nil
 	}
 	return nil

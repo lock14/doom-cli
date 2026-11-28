@@ -43,13 +43,13 @@ doom wads
 - `doom wads show <name>`: Displays resolved game, launch configuration, genre, difficulty, quality rating,
   `Launch Cmd:` preview, sources, links, and file availability.
 - `doom wads fetch <name[,name...]|all>`: Downloads and extracts SHA-256 verified community megawads from idgames
-  mirrors and extracts missing commercial IWADs or optional assets (`idkfa 2024.wad`) from local Steam and GOG
-  libraries (`--games` scopes `all` to include optional non-Doom games).
+  mirrors and extracts missing commercial IWADs or optional assets (`idkfa 2024.wad`) from local Steam, GOG, Xbox, and
+  Epic libraries (`--games` scopes `all` to include optional non-Doom games; `--from` scans explicit directories).
 - `doom wads uninstall <name[,name...]>`: Deletes preset-exclusive PWAD, PK3, DeHackEd, companion `.txt`, and `.bak.*`
   files from primary `wads-dir` while protecting base IWADs, shared files, and secondary read-only `wads-dirs`.
-- `doom wads scan [--games <list|all>]`: Auto-discovers and imports official Steam and GOG commercial IWADs and
-  expansions (Doom plus installed optional games by default, or explicit `--games`), and synthesizes `idkfa 2024.wad`
-  from `extras.wad`.
+- `doom wads scan [--games <list|all>] [--from <dir[,dir...]>]`: Auto-discovers and imports official Steam, GOG, Xbox,
+  and Epic commercial IWADs and expansions (Doom plus installed optional games by default, or explicit `--games` and
+  `--from` directories), and synthesizes `idkfa 2024.wad` from `extras.wad`.
 - `doom wads add <name>`: Adds a custom WAD or preset to `catalog.d/preset.<id>.json`.
 - `doom wads set <name>`: Configures per-WAD overrides in `catalog.d/override.preset.<id>.json`.
 - `doom wads reset <name>`: Clears persistent launch overrides for a WAD.
@@ -65,8 +65,9 @@ doom wads
 - `doom engines set <name>`: Configures per-engine overrides in `catalog.d/override.engine.<id>.json`.
 - `doom engines reset <name>`: Clears persistent overrides for an engine.
 - `doom engines remove <name>`: Removes a custom engine from the user catalog.
-- `doom engines cfg [diff|install|sync]`: Inspects or deploys curated engine `.cfg` templates with native display
-  auto-detection and timestamped backups (`sync` is a hidden maintainer command).
+- `doom engines cfg [diff|install|save|reset|sync]`: Inspects, deploys, saves personal `<ConfigDir>/portcfg/` keybind
+  and CVAR overlays from live in-game configs (`save`), clears saved personal overlays (`reset`), or deploys curated and
+  personal `.cfg` templates with native display auto-detection and backups (`sync` is a hidden maintainer command).
 - `doom config`: Opens the interactive TUI CLI settings editor on TTY terminals (or displays active settings on
   non-TTY stdout).
 - `doom config show`: Displays effective CLI settings (`config` or `default`) and source annotations.
@@ -75,7 +76,8 @@ doom wads
 - `doom config set <key> <val>`: Sets a persistent configuration value in `config.json`.
 - `doom config themes`: Lists built-in and custom JSON color themes with ANSI color swatches.
 - `doom setup`: Turnkey 4-step core setup (configs, engines, SoundFont, and Steam or GOG Doom IWADs), with optional
-  `--wads <none|all|names>` for community megawads and `--games <list|all>` for optional non-Doom id Tech 1 games.
+  `--wads <none|all|names>` for community megawads, `--games <list|all>` for optional non-Doom id Tech 1 games, and
+  `--from <dir[,dir...]>` for custom game or storefront directories.
 - `doom completion <shell>`: Generates shell autocompletion for bash, zsh, fish, or powershell.
 - `doom skill [install|uninstall]`: Prints the embedded `doom-cli` Agent Skill (`SKILL.md`) to `stdout`, or installs and
   uninstalls `<skills-dir>/doom-cli/SKILL.md` across `agents`, `antigravity`, `claude`, `codex`, `cursor`, `gemini`, or
@@ -87,12 +89,12 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
 
 - Subcommand flags: `--engine` (`-e`) and `--dry-run` on root `doom`; `--all` on `doom wads` and `doom wads list`;
   `--engine` (`-e`), `--complevel`, `--engine-args`, `--files`, `--args`, and `--iwad` on `doom wads add` and
-  `doom wads set` (plus `--include-file` and `--exclude-file` on `doom wads set`); `--games` on `doom setup`,
-  `doom wads scan`, and `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`, `doom wads fetch`,
-  `doom wads scan`, and `doom engines install`.
+  `doom wads set` (plus `--include-file` and `--exclude-file` on `doom wads set`); `--games` and `--from` on
+  `doom setup`, `doom wads scan`, and `doom wads fetch`; `--wads` on `doom setup`; `--force` on `doom setup`,
+  `doom wads fetch`, `doom wads scan`, and `doom engines install`.
 - Environment variables: `DOOM_CONFIG_DIR` overrides the `doom-cli` configuration directory (which holds `config.json`,
-  `catalog.d/`, and `themes/`), alongside standard OS directory variables (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `HOME`,
-  `LOCALAPPDATA`, `USERPROFILE`).
+  `catalog.d/`, `portcfg/`, and `themes/`), alongside standard OS directory variables (`XDG_CONFIG_HOME`,
+  `XDG_DATA_HOME`, `HOME`, `LOCALAPPDATA`, `USERPROFILE`).
 
 ## Architecture and modular packages
 
@@ -124,13 +126,15 @@ Settings resolve in two-tier precedence order (`config.json` takes precedence ov
   synthesis (`PrepareLaunch`), and zero-I/O command preview formatting (`FormatLaunchPreview` in `runner.go`).
 - `internal/fsutil/`: Atomic file writes with timestamped backups, SHA-256 verified HTTP downloads (`DownloadVerified`
   and `UserAgent`), and path-containment helpers (`fsutil.go`).
-- `internal/portcfg/`: Embedded source port configuration template rendering, diffing, atomic backup deployment, and
-  maintainer reverse synchronization (`render.go`, `deploy.go`, `sync.go`).
+- `internal/portcfg/`: Two-layer embedded source port configuration template rendering with `<ConfigDir>/portcfg/` user
+  overlays (`render.go`), portable user override capture and reset (`overlay.go`), atomic backup deployment
+  (`deploy.go`), and LCS diffing plus maintainer reverse synchronization stripping user overlays (`sync.go`).
 - `internal/repolint/`: Maintainer catalog schema and invariant linter, documentation linter, and `README.md` preset
   table synchronizer (`lint_catalog.go`, `lint_docs.go`, `readme.go`).
-- `internal/steam/`: Multi-library `libraryfolders.vdf` parsing (`vdf.go`), catalog-driven game file extraction
-  prioritizing `rerelease/` candidates over `base/` (`discover.go`), and streaming `idkfa 2024.wad` soundtrack synthesis
-  from `extras.wad` (`idkfa.go`).
+- `internal/steam/`: Multi-library `libraryfolders.vdf`, Windows Registry, `steamapps/common`, Proton `compatdata`,
+  Flatpak, CrossOver, Whisky, and nested-root pruned storefront discovery (`vdf.go`), pre-walk readiness checks,
+  symlink-safe traversal, and catalog-driven extraction prioritizing `rerelease/` candidates over `base/`
+  (`discover.go`), and streaming `idkfa 2024.wad` soundtrack synthesis from `extras.wad` (`idkfa.go`).
 - `internal/tui/`: Interactive Bubble Tea launcher (`launcher.go`, `options.go`, `options_state.go`, `config_view.go`,
   `config_actions.go`, `config_tabs.go`, `layout.go`, `render.go`, `modals.go`, `menu.go`, `theme.go`,
   `builtin_themes.go`).

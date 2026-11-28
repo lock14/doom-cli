@@ -34,7 +34,9 @@ corresponding domain file before modifying its area:
 
 *   **Two-layer catalog and baseline isolation**: `catalog/*.json` (`LayerCurated`, embedded via root `embed.go`) and
     `<ConfigDir>/catalog.d/*.json` (`LayerUser` entities and `override.*` files) share an identical schema for
-    single-file `cp` promotion, while `config.json` stores CLI settings only. `LoadCurated`, `LoadLayered`, and
+    single-file `cp` promotion, `<ConfigDir>/portcfg/{dsda-doom.cfg,autoexec.cfg}` layers portable user keybinds and
+    CVARs onto curated `configs/` templates (`doom engines cfg save` and `reset`, stripped during maintainer `sync`),
+    and `config.json` stores CLI settings only. `LoadCurated`, `LoadLayered`, and
     `MergeUserDir` must deep-copy all slices and maps and reset `loadEmbeddedCurated` baselines before merging
     `catalog.d` so reloads are idempotent and never mutate cached arrays. Quarantine malformed `catalog.d` files without
     breaking siblings, and block shadowing curated engine IDs or aliases or deleting `LayerCurated` entities.
@@ -77,7 +79,8 @@ corresponding domain file before modifying its area:
     and WASD Profile 0 defaults. On Windows, deploy `dsda-doom.cfg` and `autoexec.cfg` directly to `BinDir` (`$PROGDIR`
     portable locality). Bound OS display probes to `1500ms` (`display.DetectDisplay()`), probing once per diff, deploy,
     or TUI session. Skip existing binaries and `.cfg` files unless `--force` is passed, check all `WadRoots` (`WadsDir`
-    and read-only `WadsDirs`) before downloading or extracting, and resolve Steam symlinks up to depth 15.
+    and read-only `WadsDirs`) before downloading or walking game libraries (narrowing Steam roots to `steamapps/common`
+    and supporting `--from` custom directories), and resolve Steam symlinks up to depth 15 with cycle guards.
 *   **Atomic writes, verified downloads, and OS confinement**: All config and catalog writes must use `fsutil`
     post-validation atomic rename (`writeReaderTempAndRename`) with bounded backups (`MaxBackupsPerFile = 3`, cleaned up
     via `RemoveBackups`), preserving untouched fields across partial updates. `wad.UninstallPreset` deletes only

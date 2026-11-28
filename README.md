@@ -37,6 +37,7 @@ Linux, macOS, and Windows.
 - [Extensibility](#extensibility)
   - [Add custom engines](#add-custom-engines)
   - [Configure engine overrides](#configure-engine-overrides)
+  - [Save personal keybinds and port configurations](#save-personal-keybinds-and-port-configurations)
   - [Add custom WADs and presets](#add-custom-wads-and-presets)
   - [Configure per-WAD launch options](#configure-per-wad-launch-options)
 - [Configuration and user catalog schema](#configuration-and-user-catalog-schema)
@@ -113,7 +114,7 @@ go build -o $HOME/bin/doom.exe ./cmd/doom
 ## Automated setup (`doom setup`)
 
 Configure engines, templates, audio, and official Doom game files in a single step (with optional `--wads`, `--games`,
-and `--force` flags):
+`--from`, and `--force` flags):
 
 ```bash
 # Core 4-step setup (configs, engines, soundfont, and Steam or GOG Doom IWADs)
@@ -122,6 +123,9 @@ doom setup
 # Include community megawads (--wads all or comma-separated preset names) and optional games
 doom setup --wads all
 doom setup --wads eviternity-ii,ancient-aliens --games heretic,hexen
+
+# Scan a custom archive or storefront directory instead of default locations
+doom setup --from "D:\Backups\Doom"
 ```
 
 By default (`--wads none`), `doom setup` performs four core steps scoped to classic Doom plus any optional non-Doom
@@ -132,10 +136,13 @@ id Tech 1 games (`heretic`, `hexen`, `strife`) whose base IWAD is already presen
 2. **Installs source ports**: Downloads portable binaries for UZDoom and DSDA-Doom into your local binary path.
 3. **Deploys MIDI SoundFont**: Downloads and installs the Roland SC-55 SoundFont (`GeneralUser-GS.sf2`) for FluidSynth
    MIDI playback.
-4. **Extracts official game files**: Scans Steam and GOG library folders across drives for *Doom + Doom II (2024)*
-   (plus *Heretic*, *Hexen*, or *Strife* when already installed or requested via `--games`), importing commercial IWADs
-   and official expansions (prioritizing Nightdive `rerelease/` widescreen IWADs over legacy `base/` files) and
-   synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into your WADs directory.
+4. **Extracts official game files**: Scans Steam (`steamapps/common` and Proton `compatdata`), GOG, GOG Galaxy, Xbox
+   (`XboxGames`), Epic, Heroic, Lutris, Bottles, CrossOver, Whisky, and Linux system WAD directories across drives (or
+   explicit `--from` directories) for *Doom + Doom II (2024)* (plus *Heretic*, *Hexen*, or *Strife* when already
+   installed or requested via `--games`), skipping filesystem walks when all target files are already installed unless
+   `--force` is passed, importing commercial IWADs and official expansions (prioritizing Nightdive `rerelease/`
+   widescreen IWADs over legacy `base/` files), and synthesizing the `idkfa 2024.wad` soundtrack from `extras.wad` into
+   your WADs directory.
 
 Passing `--wads all` or `--wads <name[,name...]>` adds a fifth step (**Downloads community megawads**) that fetches and
 extracts SHA-256 verified community megawads (*Eviternity I & II*, *Back to Saturn X*, *Ancient Aliens*, *Doom Zero*,
@@ -150,7 +157,8 @@ names (`doom Doom II`, `doom Ancient Aliens -skill 4`), Roman or Arabic numerals
 (`doom btsx1`, `doom d2twid`, `doom nrftl`). Engine flags and console commands passed to `doom [wad]` (such as
 `-skill 4`, `-warp 15`, or `+map MAP01`) are forwarded directly to the target source port engine. Preset browsers and
 listings (`doom wads` and `doom wads list`) show installed presets by default and accept `--all` to display the full
-curated catalog, while `doom setup`, `doom wads scan`, and `doom wads fetch all` accept `--games <list|all>` to include
+curated catalog, while `doom setup`, `doom wads scan`, and `doom wads fetch` accept `--from <dir[,dir...]>` for custom
+search directories and `--games <list|all>` (on `doom setup`, `doom wads scan`, and `doom wads fetch all`) to include
 optional non-Doom games (`heretic`, `hexen`, `strife`):
 
 ### Core commands
@@ -166,6 +174,7 @@ optional non-Doom games (`heretic`, `hexen`, `strife`):
 | `doom setup` | Runs 4-step turnkey core installation of configurations, engines, SoundFont, and Doom game files |
 | `doom setup --wads <none\|all\|names>` | Controls community megawad downloads during setup (`none` by default, `all`, or preset names) |
 | `doom setup --games <list\|all>` | Includes optional non-Doom games (`heretic`, `hexen`, `strife`, or `all`) during setup |
+| `doom setup --from <dir[,dir...]>` | Scans custom game or storefront directories instead of default locations |
 | `doom setup --force` | Re-downloads and overwrites existing engines, configurations, SoundFont, and game files |
 
 ### WADs and preset management
@@ -177,9 +186,11 @@ optional non-Doom games (`heretic`, `hexen`, `strife`):
 | `doom wads show <name>` | Displays resolved game, engine, IWAD, PWADs, `Launch Cmd:` preview, sources, links, and status |
 | `doom wads fetch <name[,name...]\|all>` | Downloads community megawads or extracts Steam and GOG files for named presets or `all` |
 | `doom wads fetch <target> --games <list\|all>` | Scopes `doom wads fetch all` to include optional non-Doom games (`heretic`, `hexen`, `strife`, or `all`) |
+| `doom wads fetch <target> --from <dir[,dir...]>` | Scans custom game or storefront directories when extracting missing commercial IWADs |
 | `doom wads fetch <target> --force` | Re-downloads and overwrites existing WAD files for the specified target |
 | `doom wads uninstall <name[,name...]>` | Removes preset-exclusive PWAD, PK3, DeHackEd, and `.txt` files from `wads-dir` (preserving base IWADs and shared assets) |
-| `doom wads scan [--games <list\|all>]` | Imports Steam and GOG IWADs and expansions, and synthesizes `idkfa 2024.wad` from `extras.wad` |
+| `doom wads scan [--games <list\|all>]` | Imports commercial IWADs and expansions from Steam, GOG, Xbox, and Epic libraries, and synthesizes `idkfa 2024.wad` from `extras.wad` |
+| `doom wads scan --from <dir[,dir...]>` | Scans explicit custom game or storefront directories instead of default locations |
 | `doom wads scan --force` | Re-extracts and overwrites existing IWADs and expansions in the destination directory |
 | `doom wads add <name> [flags]` | Registers a custom WAD or mapset preset in `catalog.d/preset.<id>.json` |
 | `doom wads set <name> [flags]` | Sets per-WAD overrides in `catalog.d/override.preset.<id>.json` |
@@ -199,8 +210,10 @@ optional non-Doom games (`heretic`, `hexen`, `strife`):
 | `doom engines set <name> [flags]` | Sets per-engine overrides in `catalog.d/override.engine.<id>.json` |
 | `doom engines reset <name>` | Clears custom engine overrides, reverting to base engine defaults |
 | `doom engines remove <name>` | Removes a custom engine from your user catalog |
-| `doom engines cfg [diff]` | Shows differences between repository templates and live installed configurations |
-| `doom engines cfg install` | Deploys source port configuration files with display auto-detection and backups |
+| `doom engines cfg [diff]` | Shows differences between rendered templates (including `portcfg/` overlays) and live configurations |
+| `doom engines cfg install` | Deploys curated and personal `portcfg/` configuration files with display auto-detection and backups |
+| `doom engines cfg save [engine\|all]` | Captures personal in-game keybinds and tweaks from live configs into `<config-dir>/portcfg/` |
+| `doom engines cfg reset [engine\|all]` | Clears saved personal port-configuration overrides from `<config-dir>/portcfg/` |
 
 ### Configuration and theme management
 
@@ -345,10 +358,10 @@ browser:
 When managing settings via `Ctrl+G` or `F2`, switch between `1. CLI Settings`, `2. Engine Overrides`, and
 `3. Port Configs` with `1`, `2`, `3`, `[`, or `]`, navigate fields with `↑`, `↓`, `Tab`, `Shift+Tab`, `Ctrl+P`,
 `Ctrl+N`, `Ctrl+K`, or `Ctrl+J`, cycle spin selectors (`Theme`, `Engine`, `Args Style`) or action buttons
-(`< View Diff >`, `< Deploy Curated Configs >`) with `←` and `→`, toggle checkboxes or trigger port configuration
-actions with `Space` or `Enter`, save the active tab atomically with `Ctrl+S`, reset engine overrides on Tab 2 with
-`Ctrl+R`, press `F1`, `Alt+?`, or `?` for help, or press `Esc` to close and revert unsaved live theme and Nerd Fonts
-previews:
+(`< View Diff >`, `< Deploy Configs >`, `< Save Personal Overrides >`) with `←` and `→`, toggle checkboxes or trigger
+port configuration actions with `Space` or `Enter`, save the active tab (or personal port overrides on Tab 3) atomically
+with `Ctrl+S`, reset engine or port overrides on Tab 2 and Tab 3 with `Ctrl+R`, press `F1`, `Alt+?`, or `?` for help, or
+press `Esc` to close and revert unsaved live theme and Nerd Fonts previews:
 
 | Key | Action |
 | :--- | :--- |
@@ -356,9 +369,9 @@ previews:
 | `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` | Move focus to previous setting field |
 | `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` | Move focus to next setting field |
 | `←` or `→` | Cycle spin selector values or Tab 3 action buttons |
-| `Space` or `Enter` | Toggle checkbox or trigger Tab 3 `< View Diff >` and `< Deploy Curated Configs >` actions |
-| `Ctrl+S` | Save active tab settings atomically with timestamped backups |
-| `Ctrl+R` | Reset selected engine override on Tab 2 back to base defaults |
+| `Space` or `Enter` | Toggle checkbox or trigger Tab 3 `< View Diff >`, `< Deploy Configs >`, and `< Save Personal Overrides >` |
+| `Ctrl+S` | Save active tab settings or Tab 3 personal port overrides atomically with backups |
+| `Ctrl+R` | Reset selected engine override (Tab 2) or personal port overrides (Tab 3) |
 | `F1`, `Alt+?`, or `?` | Open contextual help (`?` on non-text rows and diff viewer) |
 | `Esc` | Close configuration manager and revert unsaved live previews |
 | `Ctrl+C` | Quit launcher |
@@ -505,6 +518,29 @@ doom engines set dsda-doom --prefix-args "-config /opt/doom/dsda-doom.cfg"
 # Reset custom engine overrides back to base defaults
 doom engines reset dsda-doom
 ```
+
+### Save personal keybinds and port configurations
+
+Bind keys, adjust mouse sensitivity, or tweak HUD and audio settings directly inside DSDA-Doom's in-game Options menu
+(or append custom `bind` commands to UZDoom's `autoexec.cfg`), then capture your personal customizations into
+`<config-dir>/portcfg/`:
+
+```bash
+# Save personal keybinds and tweaks from live dsda-doom.cfg and autoexec.cfg into <config-dir>/portcfg/
+doom engines cfg save
+
+# Re-deploy port configs after switching monitors or upgrading engines (preserving saved personal binds)
+doom engines cfg install
+
+# Inspect differences between rendered configs and live disk files, or clear saved personal overrides
+doom engines cfg diff
+doom engines cfg reset
+```
+
+`doom engines cfg save` strips machine-specific display resolutions, refresh rates, and SoundFont paths so
+`<config-dir>/portcfg/dsda-doom.cfg` and `<config-dir>/portcfg/autoexec.cfg` stay portable across Linux, macOS, and
+Windows and can be committed directly to a personal dotfiles repository alongside `config.json`, `catalog.d/`, and
+`themes/`.
 
 ### Add custom WADs and presets
 
@@ -666,12 +702,12 @@ Custom engines, presets, and overrides are stored one entity per file inside `<c
 
 ## Environment variables
 
-`DOOM_CONFIG_DIR` overrides the directory used for `config.json`, `themes/`, and `catalog.d/`, while standard platform
-variables control base user directories:
+`DOOM_CONFIG_DIR` overrides the directory used for `config.json`, `themes/`, `portcfg/`, and `catalog.d/`, while
+standard platform variables control base user directories:
 
 | Variable | Description | Default |
 | :--- | :--- | :--- |
-| `DOOM_CONFIG_DIR` | Directory for `config.json`, `themes/`, and `catalog.d/` | Platform CLI config directory |
+| `DOOM_CONFIG_DIR` | Directory for `config.json`, `themes/`, `portcfg/`, and `catalog.d/` | Platform CLI config directory |
 | `XDG_CONFIG_HOME` | Base configuration directory on Linux | `~/.config` |
 | `XDG_DATA_HOME` | Base data directory on Linux | `~/.local/share` |
 
@@ -687,6 +723,7 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 | DSDA-Doom configuration | `~/.local/share/dsda-doom/dsda-doom.cfg` | `~/Library/Application Support/dsda-doom/dsda-doom.cfg` | `%USERPROFILE%\Games\Doom\bin\dsda-doom.cfg` |
 | CLI configuration and themes | `~/.config/doom-cli/` | `~/Library/Application Support/doom-cli/` | `%LOCALAPPDATA%\doom-cli\` |
 | User catalog | `~/.config/doom-cli/catalog.d/` | `~/Library/Application Support/doom-cli/catalog.d/` | `%LOCALAPPDATA%\doom-cli\catalog.d\` |
+| Personal port overrides | `~/.config/doom-cli/portcfg/` | `~/Library/Application Support/doom-cli/portcfg/` | `%LOCALAPPDATA%\doom-cli\portcfg\` |
 | SoundFonts | `~/.local/share/soundfonts/` | `~/Library/Application Support/soundfonts/` | `%USERPROFILE%\Games\Doom\soundfonts\` |
 
 ## Game files and content setup
@@ -696,10 +733,10 @@ The `doom` CLI uses standard, platform-idiomatic paths:
 > automated fetch tools. You must provide your own legally acquired game files:
 > - **Commercial IWADs and official expansions**: Acquire `DOOM.WAD`, `DOOM2.WAD`, `PLUTONIA.WAD`, and `TNT.WAD` (plus
 >   optional `HERETIC.WAD`, `HEXEN.WAD`, and `STRIFE1.WAD`) from digital storefronts, and run `doom wads scan` (or
->   `doom wads scan --games all` to include *Heretic*, *Hexen*, and *Strife*) to auto-discover and import commercial
->   IWADs, official expansions (*Legacy of Rust*, *No Rest for the Living*, *Master Levels*, *Sigil*, *Sigil II*, and
->   `VOICES.WAD` for *Strife*), and the synthesized `idkfa 2024.wad` soundtrack (extracted from `extras.wad`) directly
->   from your Steam and GOG libraries:
+>   `doom wads scan --games all` to include *Heretic*, *Hexen*, and *Strife*, and `--from <dir>` for custom archive or
+>   drive folders) to auto-discover and import commercial IWADs, official expansions (*Legacy of Rust*, *No Rest for the
+>   Living*, *Master Levels*, *Sigil*, *Sigil II*, and `VOICES.WAD` for *Strife*), and the synthesized `idkfa 2024.wad`
+>   soundtrack (extracted from `extras.wad`) directly from your Steam, GOG, Xbox, and Epic libraries:
 >   - *Doom + Doom II*: [Steam](https://store.steampowered.com/app/2280/DOOM_DOOM_II/) or
 >     [GOG](https://www.gog.com/en/game/doom_doom_ii)
 >   - *Heretic + Hexen*: [Steam](https://store.steampowered.com/app/3286930/Heretic__Hexen/) or
@@ -800,9 +837,10 @@ or `doom engines install` automatically manages standalone binaries in your user
 
 ### "Base IWAD not found" error when launching
 Ensure commercial IWADs (`DOOM2.WAD`, `DOOM.WAD`, and others) are in your WAD directory
-(`~/.local/share/games/doom/` on Linux). If you own the game on Steam or GOG, run:
+(`~/.local/share/games/doom/` on Linux). If you own the game on Steam, GOG, Xbox, or Epic, run:
 ```bash
 doom wads scan
+doom wads scan --from /path/to/custom/library
 ```
 Or configure a custom WAD directory with `doom config set wads-dir <path>`.
 

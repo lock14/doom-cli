@@ -134,6 +134,9 @@ func TestResolveFor_DOOMConfigDirAndIgnoredEnvVars(t *testing.T) {
 	if p.ThemesDir != filepath.Join(customCfgDir, "themes") {
 		t.Errorf("expected ThemesDir under DOOM_CONFIG_DIR, got %q", p.ThemesDir)
 	}
+	if p.PortCfgDir != filepath.Join(customCfgDir, "portcfg") {
+		t.Errorf("expected PortCfgDir under DOOM_CONFIG_DIR, got %q", p.PortCfgDir)
+	}
 	if p.WadsDir == "/ignored/env/wads" {
 		t.Errorf("expected DOOM_WADS_DIR to be ignored, got WadsDir=%q", p.WadsDir)
 	}

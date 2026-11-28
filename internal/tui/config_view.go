@@ -46,7 +46,8 @@ const (
 const (
 	portFieldViewDiff = 0
 	portFieldDeploy   = 1
-	portFieldCount    = 2
+	portFieldSave     = 2
+	portFieldCount    = 3
 )
 
 type configManagerState struct {
@@ -95,12 +96,13 @@ type configManagerState struct {
 	confirmDiscardEng bool
 
 	// Tab 3: Port Configs
-	detectedRes  string
-	detectedRate int
-	uzdoomStatus string
-	dsdaStatus   string
-	viewingDiff  bool
-	diffViewport viewport.Model
+	detectedRes        string
+	detectedRate       int
+	uzdoomStatus       string
+	dsdaStatus         string
+	portOverlaySummary string
+	viewingDiff        bool
+	diffViewport       viewport.Model
 
 	statusMsg string
 }
@@ -137,6 +139,9 @@ func (m *model) ensurePathsAndConfig() {
 				m.paths.WadsDirs = append([]string(nil), m.wadRoots[1:]...)
 			}
 		}
+	}
+	if m.paths != nil && m.paths.PortCfgDir == "" && m.paths.ConfigDir != "" {
+		m.paths.PortCfgDir = filepath.Join(m.paths.ConfigDir, "portcfg")
 	}
 	if m.appConfig == nil {
 		cfg, err := config.LoadConfig(m.paths)
@@ -274,14 +279,27 @@ func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
 	if paths == nil {
 		s.uzdoomStatus = "[✗ Not Installed]"
 		s.dsdaStatus = "[✗ Not Installed]"
+		s.portOverlaySummary = "(none)"
 		return
 	}
+	uzLines, dsdaKeys := portcfg.UserOverlayCounts(paths)
+	switch {
+	case uzLines > 0 && dsdaKeys > 0:
+		s.portOverlaySummary = fmt.Sprintf("[✓ UZDoom: %d, DSDA: %d]", uzLines, dsdaKeys)
+	case uzLines > 0:
+		s.portOverlaySummary = fmt.Sprintf("[✓ UZDoom: %d]", uzLines)
+	case dsdaKeys > 0:
+		s.portOverlaySummary = fmt.Sprintf("[✓ DSDA: %d]", dsdaKeys)
+	default:
+		s.portOverlaySummary = "(none)"
+	}
+
 	autoDest := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
 	if diskData, err := os.ReadFile(autoDest); err != nil {
 		s.uzdoomStatus = "[✗ Not Installed]"
 	} else {
 		expected := portcfg.RenderAutoexecWithRate(paths, s.detectedRate)
-		if strings.TrimSpace(string(diskData)) == strings.TrimSpace(expected) {
+		if portcfg.ConfigsInSync(expected, string(diskData)) {
 			s.uzdoomStatus = "[✓ In Sync]"
 		} else {
 			s.uzdoomStatus = "[● Modified]"
@@ -293,7 +311,7 @@ func (s *configManagerState) refreshPortConfigStatus(paths *config.Paths) {
 		s.dsdaStatus = "[✗ Not Installed]"
 	} else {
 		expected := portcfg.RenderDSDADoomWithRes(paths, s.detectedRes)
-		if strings.TrimSpace(string(diskData)) == strings.TrimSpace(expected) {
+		if portcfg.ConfigsInSync(expected, string(diskData)) {
 			s.dsdaStatus = "[✓ In Sync]"
 		} else {
 			s.dsdaStatus = "[● Modified]"
@@ -497,8 +515,11 @@ func (m model) updateConfigManager(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.saveActiveConfigTab()
 
 		case "ctrl+r":
-			if s.activeTab == configTabEngines {
+			switch s.activeTab {
+			case configTabEngines:
 				return m, m.resetEngineConfigOverride()
+			case configTabPorts:
+				return m, m.resetPortConfigOverrides()
 			}
 			return m, nil
 
@@ -635,7 +656,7 @@ func (m model) renderConfigManagerView() string {
 		bodyLines = m.renderConfigTabEngines()
 	case configTabPorts:
 		bodyLines = m.renderConfigTabPorts()
-		focusLine = 4 + s.focusIdx
+		focusLine = 5 + s.focusIdx
 	}
 
 	bodyBudget := interiorHeight - 2

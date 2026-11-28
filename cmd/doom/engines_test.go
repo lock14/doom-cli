@@ -161,6 +161,71 @@ func TestEnginesCommands(t *testing.T) {
 		t.Errorf("expected engines cfg to run diff, got:\n%s", cfgOut.String())
 	}
 
+	// 5b. engines cfg save, forced cfg install preserving saved binds, and engines cfg reset
+	paths := resolveAppPaths()
+	dsdaLive := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
+	liveData, err := os.ReadFile(dsdaLive)
+	if err != nil {
+		t.Fatalf("reading deployed dsda-doom.cfg: %v", err)
+	}
+	customLive := strings.Replace(
+		string(liveData),
+		"input_reverse                   47 -1 -1 | 47 -1 8 | 47 -1 8",
+		"input_reverse                   120 -1 -1 | 47 -1 8 | 47 -1 8",
+		1,
+	)
+	if err := os.WriteFile(dsdaLive, []byte(customLive), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfgOut.Reset()
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetOut(&cfgOut)
+	enginesCmd.SetArgs([]string{"cfg", "save", "dsda-doom"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines cfg save dsda-doom failed: %v", err)
+	}
+	if !strings.Contains(cfgOut.String(), "Saved 1 DSDA-Doom override key(s)") {
+		t.Errorf("unexpected engines cfg save output:\n%s", cfgOut.String())
+	}
+
+	// Re-running cfg install preserves saved input_reverse 120 override
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetOut(&bytes.Buffer{})
+	enginesCmd.SetArgs([]string{"cfg", "install"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines cfg install after save failed: %v", err)
+	}
+	afterInstall, _ := os.ReadFile(dsdaLive)
+	if !strings.Contains(string(afterInstall), "input_reverse                   120 -1 -1") {
+		t.Errorf("expected saved input_reverse 120 preserved across engines cfg install")
+	}
+
+	// Resetting clears portcfg override; invalid engine target returns error
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetOut(&bytes.Buffer{})
+	enginesCmd.SetErr(&bytes.Buffer{})
+	enginesCmd.SetArgs([]string{"cfg", "save", "unknown-port"})
+	if err := enginesCmd.Execute(); err == nil {
+		t.Errorf("expected engines cfg save unknown-port to fail")
+	}
+
+	cfgOut.Reset()
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetOut(&cfgOut)
+	enginesCmd.SetArgs([]string{"cfg", "reset"})
+	if err := enginesCmd.Execute(); err != nil {
+		t.Fatalf("engines cfg reset failed: %v", err)
+	}
+	if !strings.Contains(cfgOut.String(), "Removed personal DSDA-Doom overrides") {
+		t.Errorf("unexpected engines cfg reset output:\n%s", cfgOut.String())
+	}
+	// Restore clean stock config for subsequent assertions
+	enginesCmd = newEnginesCmd()
+	enginesCmd.SetOut(&bytes.Buffer{})
+	enginesCmd.SetArgs([]string{"cfg", "install"})
+	_ = enginesCmd.Execute()
+
 	// 6. engines install (without --force) preserves existing .cfg files and verifies SoundFont
 	for _, binName := range []string{"uzdoom", "dsda-doom", "uzdoom.exe", "dsda-doom.exe"} {
 		if err := os.WriteFile(filepath.Join(binDir, binName), []byte("bin"), 0o755); err != nil {

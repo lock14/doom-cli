@@ -17,12 +17,14 @@ import (
 func newSetupCmd() *cobra.Command {
 	var (
 		force     bool
+		fromFlag  []string
 		gamesFlag []string
 		wadsFlag  []string
 	)
 	setupCmd := &cobra.Command{
-		Use:          "setup",
-		Short:        "Turnkey core setup (configs, engines, soundfont, and IWADs; optional --wads and --games)",
+		Use: "setup",
+		Short: "Turnkey core setup (configs, engines, soundfont, and IWADs; " +
+			"optional --wads, --games, and --from)",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -38,6 +40,10 @@ func newSetupCmd() *cobra.Command {
 				return err
 			}
 			wadSel, err := resolveWadSelection(cat, scope.allowed, wadsFlag, cmd.Flags().Changed("wads"))
+			if err != nil {
+				return err
+			}
+			scanRoots, err := resolveScanRoots(fromFlag, cmd.Flags().Changed("from"))
 			if err != nil {
 				return err
 			}
@@ -110,7 +116,7 @@ func newSetupCmd() *cobra.Command {
 				fmt.Fprintf(out, ">>> Step 4/%d: Auto-discovering official Steam and GOG game files...\n", totalSteps)
 			}
 			if _, err := steam.DiscoverAndExtractContext(
-				ctx, scopedCat, nil, paths.WadsDir, force, out, paths.WadsDirs...,
+				ctx, scopedCat, scanRoots, paths.WadsDir, force, out, paths.WadsDirs...,
 			); err != nil {
 				if ctx.Err() != nil {
 					return ctx.Err()
@@ -177,6 +183,12 @@ func newSetupCmd() *cobra.Command {
 		},
 	}
 	setupCmd.Flags().BoolVar(&force, "force", false, "Force re-download and overwrite existing files")
+	setupCmd.Flags().StringSliceVar(
+		&fromFlag,
+		"from",
+		nil,
+		"Custom game or Steam/GOG directories to scan instead of default locations",
+	)
 	setupCmd.Flags().StringSliceVar(
 		&gamesFlag,
 		"games",
