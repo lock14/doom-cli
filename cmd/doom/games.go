@@ -3,12 +3,93 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/lock14/doom-cli/internal/catalog"
+	"github.com/lock14/doom-cli/internal/config"
+	"github.com/lock14/doom-cli/internal/steam"
 )
+
+var defaultSearchRoots = steam.GetSearchRoots
+
+func resolveScanRoots(fromFlag []string, fromChanged bool) ([]string, error) {
+	if !fromChanged {
+		roots := defaultSearchRoots()
+		if roots == nil {
+			return []string{}, nil
+		}
+		return roots, nil
+	}
+
+	var dirs []string
+	seen := make(map[string]bool)
+	for _, raw := range fromFlag {
+		for _, parsed := range config.ParsePathList(raw) {
+			clean := filepath.Clean(parsed)
+			if seen[clean] {
+				continue
+			}
+			seen[clean] = true
+			dirs = append(dirs, parsed)
+		}
+	}
+	if len(dirs) == 0 {
+		return nil, errors.New("flag --from cannot be empty (specify one or more existing directories)")
+	}
+	for _, dir := range dirs {
+		fi, err := os.Stat(dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return nil, fmt.Errorf("search directory %q does not exist", dir)
+			}
+			return nil, fmt.Errorf("checking search directory %q: %w", dir, err)
+		}
+		if !fi.IsDir() {
+			return nil, fmt.Errorf("search path %q is not a directory", dir)
+		}
+	}
+	return steam.ExpandSearchRoots(dirs), nil
+}
+
+func parseEngineArgsFlags(entries []string) (map[string][]string, error) {
+	out := make(map[string][]string, len(entries))
+	for _, raw := range entries {
+		engKey, rawFlags, ok := strings.Cut(raw, "=")
+		engKey = strings.TrimSpace(engKey)
+		if !ok || engKey == "" {
+			return nil, fmt.Errorf(
+				"invalid --engine-args %q (expected <engine>=<flags>, e.g. dsda-doom=\"-solonet\")",
+				raw,
+			)
+		}
+		var parsed []string
+		if strings.TrimSpace(rawFlags) != "" {
+			var err error
+			parsed, err = splitCommandArgs(rawFlags)
+			if err != nil {
+				return nil, fmt.Errorf("invalid --engine-args for %q: %w", engKey, err)
+			}
+		} else {
+			parsed = []string{}
+		}
+		out[engKey] = parsed
+	}
+	return out, nil
+}
+
+func parseFileSpecs(raw []string) []catalog.FileSpec {
+	var specs []catalog.FileSpec
+	for _, f := range raw {
+		if trimmed := strings.TrimSpace(f); trimmed != "" {
+			specs = append(specs, catalog.FileSpec{Name: trimmed})
+		}
+	}
+	return specs
+}
 
 func exactArgsWithHint(n int, zeroArgsHint string) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {

@@ -16,6 +16,8 @@ import (
 	"github.com/lock14/doom-cli/internal/fsutil"
 )
 
+const maxSearchDepth = 15
+
 // TargetPattern maps a candidate source filename to its canonical destination name in WADs directory.
 type TargetPattern struct {
 	SourcePattern string
@@ -115,6 +117,80 @@ var skippedSteamSubdirs = map[string]bool{
 	"temp":        true,
 	"depotcache":  true,
 	"appcache":    true,
+	"dosdevices":  true,
+}
+
+func isIndexableGameFile(lowerName string) bool {
+	return strings.HasSuffix(lowerName, ".wad") ||
+		strings.HasSuffix(lowerName, ".pk3") ||
+		strings.HasSuffix(lowerName, ".deh") ||
+		strings.HasSuffix(lowerName, ".bex")
+}
+
+func walkSearchRoot(
+	ctx context.Context,
+	root, cleanWadsDir string,
+	visitFile func(filePath, entryName string),
+) error {
+	visited := make(map[string]bool)
+	var walk func(dir string, depth int) error
+	walk = func(dir string, depth int) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if depth > maxSearchDepth {
+			return nil
+		}
+		realDir := filepath.Clean(dir)
+		if resolved, err := filepath.EvalSymlinks(realDir); err == nil {
+			realDir = filepath.Clean(resolved)
+		}
+		if depth > 0 && dedupDirKey(realDir) == dedupDirKey(cleanWadsDir) {
+			return nil
+		}
+		dirKey := dedupDirKey(realDir)
+		if visited[dirKey] {
+			return nil
+		}
+		visited[dirKey] = true
+
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return nil
+		}
+		for _, d := range entries {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			name := d.Name()
+			entryPath := filepath.Join(dir, name)
+			isDir := d.IsDir()
+			if !isDir && d.Type()&os.ModeSymlink != 0 {
+				fi, statErr := os.Stat(entryPath)
+				if statErr != nil {
+					continue
+				}
+				isDir = fi.IsDir()
+			}
+			if isDir {
+				if skippedSteamSubdirs[strings.ToLower(name)] {
+					continue
+				}
+				if err := walk(entryPath, depth+1); err != nil {
+					return err
+				}
+				continue
+			}
+			if dedupDirKey(realDir) == dedupDirKey(cleanWadsDir) {
+				continue
+			}
+			if isIndexableGameFile(strings.ToLower(name)) {
+				visitFile(entryPath, name)
+			}
+		}
+		return nil
+	}
+	return walk(root, 0)
 }
 
 // DiscoverAndExtract searches for official game files and catalog WADs across search roots
@@ -134,6 +210,8 @@ func DiscoverAndExtract(
 }
 
 // DiscoverAndExtractContext searches for official game files and catalog WADs under ctx.
+// Passing searchRoots == nil auto-discovers platform Steam, GOG, Xbox, and Epic directories,
+// whereas a non-nil slice restricts scanning to those directories (after VDF/common expansion).
 func DiscoverAndExtractContext(
 	ctx context.Context,
 	cat *catalog.Catalog,
@@ -159,14 +237,88 @@ func DiscoverAndExtractContext(
 		cleanWadsDir = filepath.Clean(resolved)
 	}
 
-	if len(searchRoots) == 0 {
-		searchRoots = GetSearchRoots()
+	if cat == nil {
+		cat, _ = catalog.LoadCurated()
+	}
+	patterns := TargetPatternsForCatalog(cat)
+	wadRoots := append([]string{wadsDir}, extraWadRoots...)
+	dirIdx := catalog.NewDirIndex(wadRoots...).WithCatalog(cat)
+
+	var destOrder []string
+	destNames := make(map[string]string, len(patterns))
+	patternsByDest := make(map[string][]TargetPattern, len(patterns))
+	var idkfaDestName string
+	for _, tp := range patterns {
+		if idkfaDestName == "" && catalog.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
+			idkfaDestName = tp.DestName
+		}
+		destLower := strings.ToLower(tp.DestName)
+		if _, exists := destNames[destLower]; !exists {
+			destNames[destLower] = tp.DestName
+			destOrder = append(destOrder, destLower)
+		}
+		patternsByDest[destLower] = append(patternsByDest[destLower], tp)
 	}
 
-	existingRoots := normalizeExistingDirs(searchRoots)
+	isDestInstalled := func(destLower string) bool {
+		destName := destNames[destLower]
+		destFile, joinErr := fsutil.SafeJoin(wadsDir, destName)
+		if joinErr != nil {
+			return true
+		}
+		if fi, err := os.Stat(destFile); err == nil && fi.Size() > 0 {
+			return true
+		}
+		if _, ok := dirIdx.ResolveFile(destName); ok {
+			return true
+		}
+		for _, p := range patternsByDest[destLower] {
+			if _, ok := dirIdx.ResolveFile(p.SourcePattern); ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	existingCount := 0
+	alreadyInstalled := make(map[string]bool, len(destOrder))
+	if !force {
+		for _, destLower := range destOrder {
+			if isDestInstalled(destLower) {
+				alreadyInstalled[destLower] = true
+				existingCount++
+			}
+		}
+		if len(destOrder) > 0 && existingCount == len(destOrder) {
+			fmt.Fprintf(out, "=== Doom IWAD & Commercial Expansion Extractor ===\n")
+			fmt.Fprintf(out, "Target WADs directory: %s\n\n", wadsDir)
+			fmt.Fprintf(
+				out,
+				"All %d target game file(s) are already installed (pass --force to re-extract).\n",
+				existingCount,
+			)
+			return 0, nil
+		}
+	}
+
+	var existingRoots []string
+	if searchRoots == nil {
+		existingRoots = GetSearchRoots()
+	} else {
+		existingRoots = ExpandSearchRoots(searchRoots)
+	}
 
 	if len(existingRoots) == 0 {
-		fmt.Fprintf(out, "No Steam or GOG directories found on this system.\n")
+		if !force && existingCount > 0 {
+			fmt.Fprintf(
+				out,
+				"No Steam or GOG directories found on this system "+
+					"(%d existing file(s) already installed).\n",
+				existingCount,
+			)
+		} else {
+			fmt.Fprintf(out, "No Steam or GOG directories found on this system.\n")
+		}
 		return 0, nil
 	}
 
@@ -185,111 +337,38 @@ func DiscoverAndExtractContext(
 		if err := ctx.Err(); err != nil {
 			return 0, err
 		}
-		walkErr := filepath.WalkDir(root, func(walkPath string, d os.DirEntry, err error) error {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
-			}
-			if err != nil || d == nil {
-				return nil
-			}
-			cleanCur := filepath.Clean(walkPath)
-			if d.IsDir() {
-				if cleanCur == cleanWadsDir && cleanCur != root {
-					return filepath.SkipDir
-				}
-				if skippedSteamSubdirs[strings.ToLower(d.Name())] {
-					return filepath.SkipDir
-				}
-			}
-			rel, relErr := filepath.Rel(root, walkPath)
-			if relErr == nil && strings.Count(rel, string(filepath.Separator)) > 15 {
-				if d.IsDir() {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if d.IsDir() {
-				return nil
-			}
-			if filepath.Dir(cleanCur) == cleanWadsDir {
-				return nil
-			}
-
-			lowerName := strings.ToLower(d.Name())
-			if strings.HasSuffix(lowerName, ".wad") ||
-				strings.HasSuffix(lowerName, ".pk3") ||
-				strings.HasSuffix(lowerName, ".deh") ||
-				strings.HasSuffix(lowerName, ".bex") {
-				indexed[lowerName] = append(indexed[lowerName], walkPath)
-				normName := catalog.NormalizeFilename(d.Name())
-				indexedNorm[normName] = append(indexedNorm[normName], walkPath)
-			}
-			return nil
+		walkErr := walkSearchRoot(ctx, root, cleanWadsDir, func(filePath, entryName string) {
+			lowerName := strings.ToLower(entryName)
+			indexed[lowerName] = append(indexed[lowerName], filePath)
+			normName := catalog.NormalizeFilename(entryName)
+			indexedNorm[normName] = append(indexedNorm[normName], filePath)
 		})
 		if errors.Is(walkErr, context.Canceled) || errors.Is(walkErr, context.DeadlineExceeded) {
 			return 0, walkErr
 		}
 	}
 
-	if cat == nil {
-		cat, _ = catalog.LoadCurated()
-	}
-	patterns := TargetPatternsForCatalog(cat)
-	wadRoots := append([]string{wadsDir}, extraWadRoots...)
-	dirIdx := catalog.NewDirIndex(wadRoots...).WithCatalog(cat)
 	foundCount := 0
 	installedTargets := make(map[string]bool)
-	processedTargets := make(map[string]bool)
-	var idkfaDestName string
-
-	patternsByDest := make(map[string][]TargetPattern, len(patterns))
-	for _, tp := range patterns {
-		destLower := strings.ToLower(tp.DestName)
-		patternsByDest[destLower] = append(patternsByDest[destLower], tp)
-	}
-
-	for _, tp := range patterns {
+	for _, destLower := range destOrder {
 		if err := ctx.Err(); err != nil {
 			return foundCount, err
 		}
-		if idkfaDestName == "" && catalog.NormalizeFilename(tp.DestName) == "idkfa2024.wad" {
-			idkfaDestName = tp.DestName
-		}
-		destLower := strings.ToLower(tp.DestName)
-		if processedTargets[destLower] {
+		if !force && alreadyInstalled[destLower] {
 			continue
 		}
-		processedTargets[destLower] = true
 
-		destFile, joinErr := fsutil.SafeJoin(wadsDir, tp.DestName)
+		destName := destNames[destLower]
+		destFile, joinErr := fsutil.SafeJoin(wadsDir, destName)
 		if joinErr != nil {
 			continue
 		}
 
 		destPatterns := patternsByDest[destLower]
-		if !force {
-			if fi, err := os.Stat(destFile); err == nil && fi.Size() > 0 {
-				continue
-			}
-			if _, ok := dirIdx.ResolveFile(tp.DestName); ok {
-				continue
-			}
-			alreadyResolved := false
-			for _, p := range destPatterns {
-				if _, ok := dirIdx.ResolveFile(p.SourcePattern); ok {
-					alreadyResolved = true
-					break
-				}
-			}
-			if alreadyResolved {
-				continue
-			}
-		}
-
 		var candidates []string
 		seenCand := make(map[string]bool)
 		addCandidate := func(c string) {
-			if filepath.Clean(c) == filepath.Clean(destFile) {
+			if dedupDirKey(filepath.Clean(c)) == dedupDirKey(filepath.Clean(destFile)) {
 				return
 			}
 			if !seenCand[c] {
@@ -312,7 +391,7 @@ func DiscoverAndExtractContext(
 		}
 		for _, src := range candidates {
 			if err := copyFile(src, destFile); err == nil {
-				fmt.Fprintf(out, "✓ Found & Installed: %s\n    Source: %s\n", tp.DestName, src)
+				fmt.Fprintf(out, "✓ Found & Installed: %s\n    Source: %s\n", destName, src)
 				foundCount++
 				installedTargets[destLower] = true
 				break
@@ -324,16 +403,9 @@ func DiscoverAndExtractContext(
 		if err := ctx.Err(); err != nil {
 			return foundCount, err
 		}
+		idkfaLower := strings.ToLower(idkfaDestName)
 		if destFile, err := fsutil.SafeJoin(wadsDir, idkfaDestName); err == nil {
-			alreadyExists := false
-			if !force {
-				if fi, statErr := os.Stat(destFile); statErr == nil && fi.Size() > 0 {
-					alreadyExists = true
-				} else if _, ok := dirIdx.ResolveFile(idkfaDestName); ok {
-					alreadyExists = true
-				}
-			}
-			if !alreadyExists {
+			if force || !alreadyInstalled[idkfaLower] {
 				extrasCandidates := rankRereleaseCandidates(indexed["extras.wad"])
 				if existingExtras, ok := dirIdx.ResolveFile("extras.wad"); ok {
 					extrasCandidates = append(extrasCandidates, existingExtras)
@@ -349,7 +421,7 @@ func DiscoverAndExtractContext(
 							idkfaDestName, tracks, extrasSrc,
 						)
 						foundCount++
-						installedTargets[strings.ToLower(idkfaDestName)] = true
+						installedTargets[idkfaLower] = true
 						break
 					}
 				}
@@ -358,10 +430,22 @@ func DiscoverAndExtractContext(
 	}
 
 	fmt.Fprintln(out)
-	if foundCount > 0 {
+	switch {
+	case foundCount > 0:
 		fmt.Fprintf(out, "Extracted %d game file(s) into %s\n", foundCount, wadsDir)
-	} else {
-		fmt.Fprintf(out, "No new game files found to extract. (Existing files were preserved)\n")
+	case !force && existingCount > 0:
+		fmt.Fprintf(
+			out,
+			"No new game files found to extract "+
+				"(%d existing file(s) already installed; pass --force to re-extract).\n",
+			existingCount,
+		)
+	default:
+		fmt.Fprintf(
+			out,
+			"No matching game files found across searched directories "+
+				"(pass --from <dir> to scan a custom location).\n",
+		)
 	}
 
 	return foundCount, nil

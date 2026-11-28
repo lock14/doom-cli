@@ -6,10 +6,27 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/lock14/doom-cli/internal/steam"
 )
+
+func isolateMockSearchRoots(t *testing.T, tempDir string) {
+	t.Helper()
+	prev := defaultSearchRoots
+	defaultSearchRoots = func() []string {
+		return steam.ExpandSearchRoots([]string{
+			filepath.Join(tempDir, "GOG Games"),
+			filepath.Join(tempDir, "Saved Games", "Nightdive Studios", "DOOM"),
+		})
+	}
+	t.Cleanup(func() {
+		defaultSearchRoots = prev
+	})
+}
 
 func TestSetupCommandPartialFailure(t *testing.T) {
 	tempDir := t.TempDir()
+	isolateMockSearchRoots(t, tempDir)
 	t.Setenv("HOME", tempDir)
 	t.Setenv("USERPROFILE", tempDir)
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -65,6 +82,7 @@ func TestSetupCommandPartialFailure(t *testing.T) {
 
 func TestSetupCommand_CoreStepsGamesAndWadsSelection(t *testing.T) {
 	tempDir := t.TempDir()
+	isolateMockSearchRoots(t, tempDir)
 	t.Setenv("HOME", tempDir)
 	t.Setenv("USERPROFILE", tempDir)
 	t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -112,19 +130,51 @@ func TestSetupCommand_CoreStepsGamesAndWadsSelection(t *testing.T) {
 		}
 	}
 
-	// 1. Invalid --games or --wads fails fast before Step 1
+	// 1. Invalid --games, --wads, or --from fails fast before Step 1
+	notADir := filepath.Join(tempDir, "regular-file.txt")
+	if err := os.WriteFile(notADir, []byte("text"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, badArgs := range [][]string{
 		{"--games", "quake"},
 		{"--games", "all,heretic"},
 		{"--wads", "nonexistent-megawad"},
 		{"--wads", "all,sunlust"},
 		{"--wads", "heretic"},
+		{"--from", ""},
+		{"--from", filepath.Join(tempDir, "missing-scan-dir")},
+		{"--from", notADir},
 	} {
 		cmd := newSetupCmd()
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
 		cmd.SetArgs(badArgs)
 		if err := cmd.Execute(); err == nil {
 			t.Errorf("expected setup %v to fail validation, got nil", badArgs)
 		}
+	}
+
+	// 1b. --from restricts setup discovery strictly to the specified directory
+	customFromDir := filepath.Join(tempDir, "custom-from")
+	if err := os.MkdirAll(customFromDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(customFromDir, "TNT.WAD"), []byte("IWAD-TNT"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var fromOut, fromErr bytes.Buffer
+	fromSetup := newSetupCmd()
+	fromSetup.SetOut(&fromOut)
+	fromSetup.SetErr(&fromErr)
+	fromSetup.SetArgs([]string{"--from", customFromDir})
+	if err := fromSetup.Execute(); err != nil {
+		t.Fatalf("doom setup --from failed: %v\nerr:\n%s", err, fromErr.String())
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "TNT.WAD")); err != nil {
+		t.Errorf("expected TNT.WAD extracted from --from dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "DOOM2.WAD")); !os.IsNotExist(err) {
+		t.Errorf("expected DOOM2.WAD from default mock roots to be ignored when --from is passed")
 	}
 
 	// 2. Default setup runs 4 core steps (Doom-only, --wads none)

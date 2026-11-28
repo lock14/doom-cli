@@ -454,6 +454,7 @@ func TestWadsListAndShowTaxonomyMetadata(t *testing.T) {
 
 func TestRootExecFlag_BuildLauncherNilCfg_ThemeDirReject_And_FetchBehavior(t *testing.T) {
 	tempDir := t.TempDir()
+	isolateMockSearchRoots(t, tempDir)
 	wadsDir := filepath.Join(tempDir, "wads")
 	binDir := filepath.Join(tempDir, "bin")
 	for _, d := range []string{wadsDir, binDir} {
@@ -602,6 +603,7 @@ func TestRootExecFlag_BuildLauncherNilCfg_ThemeDirReject_And_FetchBehavior(t *te
 
 func TestWadsFetchScopingUninstallScanAndArgHints(t *testing.T) {
 	tempDir := t.TempDir()
+	isolateMockSearchRoots(t, tempDir)
 	wadsDir := filepath.Join(tempDir, "wads")
 	if err := os.MkdirAll(wadsDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -718,5 +720,77 @@ func TestWadsFetchScopingUninstallScanAndArgHints(t *testing.T) {
 	root.SetArgs([]string{"wads", "uninstall", "doom-ii"})
 	if err := root.Execute(); err == nil {
 		t.Errorf("expected wads uninstall doom-ii to reject base IWAD deletion")
+	}
+
+	// 4. wads scan and wads fetch --from validation and custom directory extraction
+	filePath := filepath.Join(tempDir, "not-a-dir.txt")
+	if err := os.WriteFile(filePath, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, badArgs := range [][]string{
+		{"wads", "scan", "--from", ""},
+		{"wads", "scan", "--from", filepath.Join(tempDir, "does-not-exist")},
+		{"wads", "scan", "--from", filePath},
+		{"wads", "fetch", "doom", "--from", filepath.Join(tempDir, "does-not-exist")},
+	} {
+		badCmd := newRootCmd()
+		badCmd.SetOut(&bytes.Buffer{})
+		badCmd.SetErr(&bytes.Buffer{})
+		badCmd.SetArgs(badArgs)
+		if err := badCmd.Execute(); err == nil {
+			t.Errorf("expected %v to fail --from validation, got nil", badArgs)
+		}
+	}
+
+	customScanA := filepath.Join(tempDir, "custom_a")
+	customScanB := filepath.Join(tempDir, "custom_b", "steamapps", "common", "Hexen")
+	for _, d := range []string{customScanA, customScanB} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(customScanA, "PLUTONIA.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(customScanB, "HEXEN.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	scanCmd := newRootCmd()
+	scanCmd.SetOut(&bytes.Buffer{})
+	scanCmd.SetErr(&bytes.Buffer{})
+	scanCmd.SetArgs([]string{
+		"wads", "scan",
+		"--from", customScanA + "," + filepath.Join(tempDir, "custom_b"),
+		"--games", "hexen",
+	})
+	if err := scanCmd.Execute(); err != nil {
+		t.Fatalf("wads scan --from failed: %v", err)
+	}
+	for _, want := range []string{"PLUTONIA.WAD", "HEXEN.WAD"} {
+		if _, err := os.Stat(filepath.Join(wadsDir, want)); err != nil {
+			t.Errorf("expected %s extracted via wads scan --from: %v", want, err)
+		}
+	}
+
+	customFetchDir := filepath.Join(tempDir, "custom_fetch")
+	if err := os.MkdirAll(customFetchDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(customFetchDir, "STRIFE1.WAD"), []byte("IWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(customFetchDir, "VOICES.WAD"), []byte("PWAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fetchFromCmd := newRootCmd()
+	fetchFromCmd.SetOut(&bytes.Buffer{})
+	fetchFromCmd.SetErr(&bytes.Buffer{})
+	fetchFromCmd.SetArgs([]string{"wads", "fetch", "strife", "--from", customFetchDir})
+	if err := fetchFromCmd.Execute(); err != nil {
+		t.Fatalf("wads fetch strife --from failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wadsDir, "STRIFE1.WAD")); err != nil {
+		t.Errorf("expected STRIFE1.WAD extracted via wads fetch --from: %v", err)
 	}
 }

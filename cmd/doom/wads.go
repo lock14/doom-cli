@@ -66,6 +66,7 @@ func newWadsCmd() *cobra.Command {
 
 	var (
 		fetchForce bool
+		fetchFrom  []string
 		fetchGames []string
 	)
 	fetchCmd := &cobra.Command{
@@ -88,6 +89,10 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			scanRoots, err := resolveScanRoots(fetchFrom, cmd.Flags().Changed("from"))
+			if err != nil {
+				return err
+			}
 
 			if isAll {
 				dirIdx := catalog.NewDirIndex(paths.WadRoots()...).WithCatalog(cat)
@@ -96,10 +101,9 @@ func newWadsCmd() *cobra.Command {
 					return scopeErr
 				}
 				scopedCat := cat.FilterByGames(scope.allowed)
-				searchRoots := steam.GetSearchRoots()
-				if len(searchRoots) > 0 {
+				if len(scanRoots) > 0 {
 					if _, err := steam.DiscoverAndExtractContext(
-						ctx, scopedCat, searchRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+						ctx, scopedCat, scanRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
 					); err != nil {
 						return err
 					}
@@ -127,7 +131,7 @@ func newWadsCmd() *cobra.Command {
 			if anyNeedsSteam {
 				var discErr error
 				extracted, discErr = steam.DiscoverAndExtractContext(
-					ctx, cat.ForPresets(targets...), nil, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
+					ctx, cat.ForPresets(targets...), scanRoots, paths.WadsDir, fetchForce, out, paths.WadsDirs...,
 				)
 				if discErr != nil {
 					return discErr
@@ -180,6 +184,12 @@ func newWadsCmd() *cobra.Command {
 		&fetchForce, "force", false, "Re-download and re-extract WADs even if already installed",
 	)
 	fetchCmd.Flags().StringSliceVar(
+		&fetchFrom,
+		"from",
+		nil,
+		"Custom game or Steam/GOG directories to scan for commercial IWADs",
+	)
+	fetchCmd.Flags().StringSliceVar(
 		&fetchGames,
 		"games",
 		nil,
@@ -215,6 +225,7 @@ func newWadsCmd() *cobra.Command {
 
 	var (
 		scanForce bool
+		scanFrom  []string
 		scanGames []string
 	)
 	scanCmd := &cobra.Command{
@@ -232,9 +243,13 @@ func newWadsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			scanRoots, err := resolveScanRoots(scanFrom, cmd.Flags().Changed("from"))
+			if err != nil {
+				return err
+			}
 			scopedCat := cat.FilterByGames(scope.allowed)
 			_, err = steam.DiscoverAndExtractContext(
-				cmd.Context(), scopedCat, nil, paths.WadsDir, scanForce, out, paths.WadsDirs...,
+				cmd.Context(), scopedCat, scanRoots, paths.WadsDir, scanForce, out, paths.WadsDirs...,
 			)
 			if err != nil {
 				return err
@@ -251,6 +266,12 @@ func newWadsCmd() *cobra.Command {
 	}
 	scanCmd.Flags().BoolVar(
 		&scanForce, "force", false, "Overwrite existing WAD files in destination directory",
+	)
+	scanCmd.Flags().StringSliceVar(
+		&scanFrom,
+		"from",
+		nil,
+		"Custom game or Steam/GOG directories to scan instead of default locations",
 	)
 	scanCmd.Flags().StringSliceVar(
 		&scanGames,
@@ -597,42 +618,6 @@ func bindWadCommonFlags(cmd *cobra.Command, f *wadOptionFlags, defaultEngine, de
 		"Per-engine launch arguments as <engine>=<flags> (repeatable)",
 	)
 	cmd.Flags().StringVar(&f.args, "args", "", "Universal launch arguments shared across engines")
-}
-
-func parseEngineArgsFlags(entries []string) (map[string][]string, error) {
-	out := make(map[string][]string, len(entries))
-	for _, raw := range entries {
-		engKey, rawFlags, ok := strings.Cut(raw, "=")
-		engKey = strings.TrimSpace(engKey)
-		if !ok || engKey == "" {
-			return nil, fmt.Errorf(
-				"invalid --engine-args %q (expected <engine>=<flags>, e.g. dsda-doom=\"-solonet\")",
-				raw,
-			)
-		}
-		var parsed []string
-		if strings.TrimSpace(rawFlags) != "" {
-			var err error
-			parsed, err = splitCommandArgs(rawFlags)
-			if err != nil {
-				return nil, fmt.Errorf("invalid --engine-args for %q: %w", engKey, err)
-			}
-		} else {
-			parsed = []string{}
-		}
-		out[engKey] = parsed
-	}
-	return out, nil
-}
-
-func parseFileSpecs(raw []string) []catalog.FileSpec {
-	var specs []catalog.FileSpec
-	for _, f := range raw {
-		if trimmed := strings.TrimSpace(f); trimmed != "" {
-			specs = append(specs, catalog.FileSpec{Name: trimmed})
-		}
-	}
-	return specs
 }
 
 func runWadsTUI(cmd *cobra.Command, args []string) error {
