@@ -20,6 +20,7 @@ type Paths struct {
 	ConfigFile    string
 	CatalogDir    string
 	ThemesDir     string
+	PortCfgDir    string
 	SoundFontFile string
 }
 
@@ -91,12 +92,13 @@ func ResolveFor(targetOS string) *Paths {
 	return p
 }
 
-// SetConfigDir updates ConfigDir and synchronizes ConfigFile, CatalogDir, and ThemesDir.
+// SetConfigDir updates ConfigDir and synchronizes ConfigFile, CatalogDir, ThemesDir, and PortCfgDir.
 func (p *Paths) SetConfigDir(dir string) {
 	p.ConfigDir = dir
 	p.ConfigFile = filepath.Join(dir, "config.json")
 	p.CatalogDir = filepath.Join(dir, "catalog.d")
 	p.ThemesDir = filepath.Join(dir, "themes")
+	p.PortCfgDir = filepath.Join(dir, "portcfg")
 }
 
 // SetBinDir updates BinDir and, on Windows, synchronizes UZDoomDir and DSDADir.

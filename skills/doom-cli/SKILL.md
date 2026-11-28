@@ -46,8 +46,9 @@ doom wads list --all
 # Inspect a preset's resolved IWAD, PWADs, complevel, launch command preview, and file status
 doom wads show eviternity-ii
 
-# Import Steam and GOG IWADs or fetch SHA-256 verified community megawads
+# Import Steam, GOG, Xbox, and Epic IWADs (or scan a custom directory) and fetch community megawads
 doom wads scan --games all
+doom wads scan --from /mnt/backup/doom
 doom wads fetch eviternity-ii,sunlust
 doom wads fetch all
 ```
@@ -58,6 +59,10 @@ doom wads fetch all
 *   **Optional game scoping** (`--games`): `doom setup`, `doom wads scan`, and `doom wads fetch all` default to `doom`
     plus optional games whose base IWAD is already installed on disk. Pass `--games heretic,hexen,strife` or
     `--games all` to discover and extract newly purchased Raven Software or Rogue Entertainment titles.
+*   **Custom scan directories** (`--from`): `doom setup`, `doom wads scan`, and `doom wads fetch` auto-discover Steam
+    (`steamapps/common` and Proton `compatdata`), GOG, GOG Galaxy, Xbox (`XboxGames`), Epic, Heroic, Lutris, Bottles,
+    CrossOver, Whisky, and Linux system WAD folders. Pass `--from <dir[,dir...]>` to import commercial IWADs from an
+    external drive, network share, or custom archive folder.
 *   **Uninstalling files vs removing presets**: `doom wads uninstall <id[,id...]>` deletes downloaded PWAD, PK3,
     DeHackEd, and `.txt` files from primary `wads-dir` while protecting base IWADs, shared `idkfa 2024.wad` and
     `VOICES.WAD`, and secondary read-only `wads-dirs`. `doom wads remove <id>` deletes a custom
@@ -112,8 +117,11 @@ doom sunlust --dry-run
 
 *   **CLI settings and environment**: Manage persistent settings via `doom config show`, `doom config get [key]`, and
     `doom config set <key> <value>` for keys `theme`, `nerd-fonts`, `wads-dir`, `wads-dirs` (comma-separated read-only
-    extra WAD directories), `bin-dir`, and `soundfonts-dir`. `DOOM_CONFIG_DIR` is the sole application environment
-    variable; do not invent `DOOM_*` directory variables or global `--config` flags.
-*   **Common fixes**: Resolve missing commercial IWADs with `doom wads scan` or `doom config set wads-dir <path>`;
-    resolve missing engine binaries or silent FluidSynth MIDI with `doom engines install`; re-detect monitor resolution
-    and refresh rate in port configurations with `doom engines cfg install`.
+    extra WAD directories), `bin-dir`, and `soundfonts-dir`. Capture personal in-game keybinds and tweaks into
+    `<config-dir>/portcfg/` via `doom engines cfg save [engine|all]` (or clear them with `doom engines cfg reset`) so
+    they survive `doom engines cfg install` and `--force` upgrades and stay portable in dotfiles. `DOOM_CONFIG_DIR` is
+    the sole application environment variable; do not invent `DOOM_*` directory variables or global `--config` flags.
+*   **Common fixes**: Resolve missing commercial IWADs with `doom wads scan`, `doom wads scan --from <dir>`, or
+    `doom config set wads-dir <path>`; resolve missing engine binaries or silent FluidSynth MIDI with
+    `doom engines install`; re-detect monitor resolution and refresh rate in port configurations with
+    `doom engines cfg install`.

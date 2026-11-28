@@ -161,9 +161,19 @@ func (m model) renderConfigTabPorts() []string {
 	s := m.cfgMgr
 	autoPath := "autoexec.cfg"
 	dsdaPath := "dsda-doom.cfg"
+	portCfgDir := "portcfg"
 	if m.paths != nil {
 		autoPath = filepath.Join(m.paths.UZDoomDir, "autoexec.cfg")
 		dsdaPath = filepath.Join(m.paths.DSDADir, "dsda-doom.cfg")
+		if m.paths.PortCfgDir != "" {
+			portCfgDir = m.paths.PortCfgDir
+		}
+	}
+	ovSummary := s.portOverlaySummary
+	if ovSummary == "" || ovSummary == "(none)" {
+		ovSummary = m.styles.Help.Render("(none)")
+	} else {
+		ovSummary = m.styles.StatusReady.Render(ovSummary)
 	}
 
 	out := []string{
@@ -185,12 +195,19 @@ func (m model) renderConfigTabPorts() []string {
 			m.stylePortStatus(s.dsdaStatus),
 			m.styles.Help.Render(dsdaPath),
 		),
+		fmt.Sprintf(
+			"  %s %s %s",
+			m.styles.Label.Render(padOrTruncateName("User Overrides:", 18)),
+			ovSummary,
+			m.styles.Help.Render(portCfgDir),
+		),
 		"",
 	}
 
 	actions := []string{
 		"< View Diff >",
-		"< Deploy Curated Configs >",
+		"< Deploy Configs >",
+		"< Save Personal Overrides >",
 	}
 	for idx, act := range actions {
 		prefix := "  "
@@ -215,6 +232,8 @@ func (m model) renderConfigManagerFooter() string {
 			{"1/2/3/[/]", "Tab"},
 			{"↑/↓/←/→", "Action"},
 			{"Enter/Space", "Run"},
+			{"Ctrl+S", "Save"},
+			{"Ctrl+R", "Reset"},
 			{"F1", "Help"},
 			{"Esc", "Close"},
 		}

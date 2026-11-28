@@ -296,3 +296,141 @@ func TestRenderWindowsBackslashAndCRLFNormalization(t *testing.T) {
 		t.Errorf("expected SyncConfigs to write LF-only template without CRLF")
 	}
 }
+
+func TestUserPortOverlays_SaveDeployDiffResetAndSyncIsolation(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+
+	paths := &config.Paths{
+		BinDir:        filepath.Join(tmpDir, "bin"),
+		WadsDir:       filepath.Join(tmpDir, "wads"),
+		SoundFontsDir: filepath.Join(tmpDir, "soundfonts"),
+		SoundFontFile: filepath.Join(tmpDir, "soundfonts", "GeneralUser-GS.sf2"),
+		UZDoomDir:     filepath.Join(tmpDir, "uzdoom"),
+		DSDADir:       filepath.Join(tmpDir, "dsda-doom"),
+		PortCfgDir:    filepath.Join(tmpDir, "doom-cli", "portcfg"),
+	}
+
+	// 1. Deploy stock configs at 1920x1080 @ 60Hz
+	if err := DeployConfigsWithDisplay(paths, "1920x1080", 60, true, io.Discard); err != nil {
+		t.Fatalf("initial DeployConfigsWithDisplay: %v", err)
+	}
+
+	// 2. Simulate user customizing binds in-game (DSDA-Doom) and appending binds in UZDoom autoexec.cfg
+	dsdaFile := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
+	rawDSDA, err := os.ReadFile(dsdaFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modDSDA := strings.Replace(
+		string(rawDSDA),
+		"input_turnleft                  172 -1 -1 | 101 -1 -1 | 101 -1 -1",
+		"input_turnleft                  108 -1 -1 | 101 -1 -1 | 101 -1 -1",
+		1,
+	)
+	modDSDA = strings.Replace(
+		modDSDA,
+		"input_fire                      157 0 22 | 157 0 22 | 157 0 22",
+		"input_fire                      111,112 0 -1 | 157 0 22 | 157 0 22",
+		1,
+	)
+	if err := os.WriteFile(dsdaFile, []byte(modDSDA), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	autoFile := filepath.Join(paths.UZDoomDir, "autoexec.cfg")
+	rawAuto, err := os.ReadFile(autoFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modAuto := string(rawAuto) + "\n// --- CAMERA CONTROLS ---\nbind \"l\" \"+left\"\nm_sensitivity_x 0.6\n"
+	if err := os.WriteFile(autoFile, []byte(modAuto), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify LCS diff shows only the modified lines (not 400+ shifted lines on an inserted line)
+	var diffOut bytes.Buffer
+	if err := DiffConfigsWithDisplay(paths, "1920x1080", 60, &diffOut); err != nil {
+		t.Fatalf("DiffConfigsWithDisplay before save: %v", err)
+	}
+	if strings.Contains(diffOut.String(), "more line differences") {
+		t.Errorf("expected concise LCS diff without cascading shifts, got:\n%s", diffOut.String())
+	}
+
+	// 3. Save personal overrides via SaveUserConfigs
+	var saveOut bytes.Buffer
+	if err := SaveUserConfigs(paths, "all", &saveOut); err != nil {
+		t.Fatalf("SaveUserConfigs: %v", err)
+	}
+	uzLines, dsdaKeys := UserOverlayCounts(paths)
+	if uzLines != 2 || dsdaKeys != 2 {
+		t.Fatalf("UserOverlayCounts = (%d, %d), want (2, 2)", uzLines, dsdaKeys)
+	}
+
+	// Verify saved overlay files exclude machine-specific resolution, refresh rate, and SoundFont paths
+	savedDSDAOv, err := os.ReadFile(filepath.Join(paths.PortCfgDir, "dsda-doom.cfg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(savedDSDAOv), "screen_resolution") ||
+		strings.Contains(string(savedDSDAOv), "snd_soundfont") ||
+		strings.Contains(string(savedDSDAOv), "GeneralUser-GS.sf2") {
+		t.Errorf("saved dsda-doom overlay leaked machine settings:\n%s", string(savedDSDAOv))
+	}
+	savedAutoOv, err := os.ReadFile(filepath.Join(paths.PortCfgDir, "autoexec.cfg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(savedAutoOv), "vid_maxfps") ||
+		strings.Contains(string(savedAutoOv), "fluid_patchset") {
+		t.Errorf("saved autoexec overlay leaked machine settings:\n%s", string(savedAutoOv))
+	}
+
+	// 4. Redeploy on a new 4K 240Hz monitor with force=true: resolution updates while personal binds survive!
+	if err := DeployConfigsWithDisplay(paths, "3840x2160", 240, true, io.Discard); err != nil {
+		t.Fatalf("redeploy on new monitor: %v", err)
+	}
+	redeployedDSDA, _ := os.ReadFile(dsdaFile)
+	if !strings.Contains(string(redeployedDSDA), `screen_resolution               "3840x2160"`) ||
+		!strings.Contains(string(redeployedDSDA), "input_turnleft                  108 -1 -1") {
+		t.Errorf("expected 3840x2160 and preserved input_turnleft 108 after redeploy, got:\n%s", string(redeployedDSDA))
+	}
+	redeployedAuto, _ := os.ReadFile(autoFile)
+	if !strings.Contains(string(redeployedAuto), "vid_maxfps 240") ||
+		!strings.Contains(string(redeployedAuto), `bind "l" "+left"`) {
+		t.Errorf("expected vid_maxfps 240 and preserved bind \"l\" after redeploy, got:\n%s", string(redeployedAuto))
+	}
+
+	diffOut.Reset()
+	if err := DiffConfigsWithDisplay(paths, "3840x2160", 240, &diffOut); err != nil {
+		t.Fatalf("DiffConfigsWithDisplay after redeploy: %v", err)
+	}
+	if strings.Count(diffOut.String(), "is in sync with system") != 2 {
+		t.Errorf("expected both configs in sync with overlay active, got:\n%s", diffOut.String())
+	}
+
+	// 5. Maintainer SyncConfigs strips personal PortCfgDir overrides so repo templates stay clean
+	repoDir := filepath.Join(tmpDir, "repo")
+	_ = os.MkdirAll(filepath.Join(repoDir, "configs", "uzdoom"), 0o755)
+	_ = os.MkdirAll(filepath.Join(repoDir, "configs", "dsda-doom"), 0o755)
+	if err := SyncConfigs(paths, repoDir, io.Discard); err != nil {
+		t.Fatalf("SyncConfigs with active overlays: %v", err)
+	}
+	repoDSDA, _ := os.ReadFile(filepath.Join(repoDir, "configs", "dsda-doom", "dsda-doom.cfg"))
+	if strings.Contains(string(repoDSDA), "input_turnleft                  108") {
+		t.Errorf("SyncConfigs leaked personal DSDA-Doom bind into repo template")
+	}
+	repoAuto, _ := os.ReadFile(filepath.Join(repoDir, "configs", "uzdoom", "autoexec.cfg"))
+	if strings.Contains(string(repoAuto), `bind "l" "+left"`) {
+		t.Errorf("SyncConfigs leaked personal UZDoom bind into repo template")
+	}
+
+	// 6. ResetUserConfigs removes overlays and backups cleanly
+	removed, err := ResetUserConfigs(paths, "all", io.Discard)
+	if err != nil || !removed {
+		t.Fatalf("ResetUserConfigs = (%v, %v), want (true, nil)", removed, err)
+	}
+	if uz, ds := UserOverlayCounts(paths); uz != 0 || ds != 0 {
+		t.Errorf("expected (0, 0) overlay counts after reset, got (%d, %d)", uz, ds)
+	}
+}

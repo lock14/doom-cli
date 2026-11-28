@@ -48,7 +48,8 @@ All contributions must respect the core repository invariants:
     variable and zero global persistent flags or per-setting `DOOM_*` environment variables. Never store installed-game
     state in `config.json`; derive installed optional games (`heretic`, `hexen`, `strife`) directly from IWADs on disk
     via `Catalog.InstalledOptionalGames` (with explicit `--games` overrides on `doom setup`, `doom wads scan`, and
-    `doom wads fetch all`), default `doom setup` to 4 core steps (`--wads none`), require an explicit preset target or
+    `doom wads fetch all`, plus explicit `--from` directory overrides on `doom setup`, `doom wads scan`, and
+    `doom wads fetch`), default `doom setup` to 4 core steps (`--wads none`), require an explicit preset target or
     `all` on `doom wads fetch`, gate bulk `DownloadAll` runs on base IWAD presence, default `doom wads` and
     `doom wads list` to installed presets (plus `LayerUser` custom presets, with `--all` and TUI `F3` or `Ctrl+T` for
     the full catalog), and provide actionable usage hints via `exactArgsWithHint` when positional arguments are omitted.
@@ -197,17 +198,18 @@ doom-cli/
 │   │   ├── installer.go    # Declarative GitHub release and pinned fallback binary installer
 │   │   └── macapp.go       # macOS .app bundle extraction and codesign helper
 │   ├── fsutil/             # Atomic writes, backups, SHA-256 verified HTTP downloads (DownloadVerified), and SafeJoin
-│   ├── portcfg/            # Source port configuration rendering, diffing, backup deployment, and reverse sync
-│   │   ├── render.go       # Placeholder token substitution for UZDoom and DSDA-Doom templates
-│   │   ├── deploy.go       # Configuration diffing and atomic timestamped backup deployment
-│   │   └── sync.go         # Maintainer reverse template synchronization (doom engines cfg sync)
+│   ├── portcfg/            # Two-layer source port configuration rendering, user overlays, diffing, and sync
+│   │   ├── render.go       # Placeholder substitution and <ConfigDir>/portcfg/ user overlay application
+│   │   ├── overlay.go      # Portable personal override capture (cfg save) and cleanup (cfg reset)
+│   │   ├── deploy.go       # Atomic timestamped backup configuration deployment
+│   │   └── sync.go         # LCS configuration diffing and maintainer template sync (stripping user overlays)
 │   ├── repolint/           # Maintainer catalog, documentation, and README table synchronization tooling
 │   │   ├── lint_catalog.go # Schema, reference, digest, personal-path, and template linter
 │   │   ├── lint_docs.go    # Documentation typography, relative link, anchor, and JSON block linter
 │   │   └── readme.go       # Synchronizes curated catalog/*.json into README.md (doom wads build)
-│   ├── steam/              # Steam and GOG discovery, catalog target synthesis, and idkfa 2024.wad synthesis
-│   │   ├── vdf.go          # Valve Data Format (libraryfolders.vdf) parser
-│   │   ├── discover.go     # Multi-library search roots, target synthesis, and rerelease-first extraction
+│   ├── steam/              # Storefront discovery, catalog target synthesis, and idkfa 2024.wad synthesis
+│   │   ├── vdf.go          # VDF, Windows Registry, Steam and Proton, GOG, Xbox, Epic, Flatpak, and macOS roots
+│   │   ├── discover.go     # Pre-walk readiness checks, symlink-safe traversal, and rerelease-first extraction
 │   │   └── idkfa.go        # Streaming idkfa 2024.wad soundtrack synthesis from extras.wad
 │   ├── tui/                # Terminal user interface components powered by Bubble Tea and Lip Gloss
 │   │   ├── launcher.go     # Bubble Tea state machine, update loop, in-TUI asset fetch, and message routing

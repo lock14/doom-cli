@@ -333,7 +333,7 @@ func bindEngineCommonFlags(cmd *cobra.Command, f *engineOptionFlags) {
 func newEnginesCfgCmd() *cobra.Command {
 	cfgCmd := &cobra.Command{
 		Use:   "cfg",
-		Short: "Inspect, deploy, or synchronize source port configuration files",
+		Short: "Inspect, deploy, save, or reset source port configuration files",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return portcfg.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
@@ -342,7 +342,7 @@ func newEnginesCfgCmd() *cobra.Command {
 
 	installCmd := &cobra.Command{
 		Use:   "install",
-		Short: "Deploy curated autoexec.cfg and dsda-doom.cfg to system directories",
+		Short: "Deploy curated and personal overlay autoexec.cfg and dsda-doom.cfg to system directories",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return portcfg.DeployConfigsTo(resolveAppPaths(), cmdOut(cmd))
@@ -351,10 +351,37 @@ func newEnginesCfgCmd() *cobra.Command {
 
 	diffCmd := &cobra.Command{
 		Use:   "diff",
-		Short: "Compare embedded engine templates against live system configurations",
+		Short: "Compare rendered engine templates and personal overlays against live system configurations",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return portcfg.DiffConfigs(resolveAppPaths(), cmdOut(cmd))
+		},
+	}
+
+	saveCmd := &cobra.Command{
+		Use:   "save [engine|all]",
+		Short: "Save personal keybinds and tweaks from live engine configs to your portcfg directory",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := "all"
+			if len(args) > 0 {
+				target = args[0]
+			}
+			return portcfg.SaveUserConfigs(resolveAppPaths(), target, cmdOut(cmd))
+		},
+	}
+
+	resetCmd := &cobra.Command{
+		Use:   "reset [engine|all]",
+		Short: "Clear saved personal port configuration overrides from your portcfg directory",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target := "all"
+			if len(args) > 0 {
+				target = args[0]
+			}
+			_, err := portcfg.ResetUserConfigs(resolveAppPaths(), target, cmdOut(cmd))
+			return err
 		},
 	}
 
@@ -372,7 +399,7 @@ func newEnginesCfgCmd() *cobra.Command {
 		},
 	}
 
-	cfgCmd.AddCommand(installCmd, diffCmd, syncCmd)
+	cfgCmd.AddCommand(installCmd, diffCmd, saveCmd, resetCmd, syncCmd)
 	return cfgCmd
 }
 

@@ -111,7 +111,7 @@ func TestModel_ConfigManagerView_TabsSaveAndRevert(t *testing.T) {
 		t.Errorf("Config Manager Tab 3 at 80x24 produced %d lines, want <= 24", len(lines))
 	}
 
-	// Trigger < Deploy Curated Configs > on Tab 3 (Right arrow then Enter)
+	// Trigger < Deploy Configs > on Tab 3 (Right arrow then Enter)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyRight})
 	m = newM.(model)
 	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -119,6 +119,37 @@ func TestModel_ConfigManagerView_TabsSaveAndRevert(t *testing.T) {
 	if m.cfgMgr.uzdoomStatus != "[✓ In Sync]" || m.cfgMgr.dsdaStatus != "[✓ In Sync]" {
 		t.Errorf("expected both port configs In Sync after deploy, got uzdoom=%q dsda=%q",
 			m.cfgMgr.uzdoomStatus, m.cfgMgr.dsdaStatus)
+	}
+
+	// Customize dsda-doom.cfg on disk with CRLF, verify [● Modified], save via Ctrl+S, and reset via Ctrl+R
+	dsdaFile := filepath.Join(paths.DSDADir, "dsda-doom.cfg")
+	rawDSDA, err := os.ReadFile(dsdaFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crlfCustom := strings.ReplaceAll(
+		strings.Replace(string(rawDSDA), "autorun                         1", "autorun                         0", 1),
+		"\n",
+		"\r\n",
+	)
+	if err := os.WriteFile(dsdaFile, []byte(crlfCustom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m.cfgMgr.refreshPortConfigStatus(paths)
+	if m.cfgMgr.dsdaStatus != "[● Modified]" {
+		t.Errorf("expected dsdaStatus=[● Modified] before Ctrl+S, got %q", m.cfgMgr.dsdaStatus)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = newM.(model)
+	if m.cfgMgr.dsdaStatus != "[✓ In Sync]" || !strings.Contains(m.cfgMgr.portOverlaySummary, "DSDA: 1") {
+		t.Errorf("expected In Sync and DSDA: 1 after Ctrl+S on Tab 3, got status=%q summary=%q",
+			m.cfgMgr.dsdaStatus, m.cfgMgr.portOverlaySummary)
+	}
+	newM, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = newM.(model)
+	if m.cfgMgr.portOverlaySummary != "(none)" || m.cfgMgr.dsdaStatus != "[● Modified]" {
+		t.Errorf("expected overlay cleared and dsdaStatus=[● Modified] after Ctrl+R, got summary=%q status=%q",
+			m.cfgMgr.portOverlaySummary, m.cfgMgr.dsdaStatus)
 	}
 }
 

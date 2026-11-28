@@ -153,8 +153,9 @@ The `doom wads`, `doom engines`, and `doom config` interactive TUI views (`inter
     and `End` moving the filter text cursor) work regardless of filter text. In `Launch Options`
     (`m.viewingLaunchOpts`), `Ctrl+K`, `Ctrl+J`, `←`, `→`, `Space`, and `?` are gated behind `!isTextField` so text
     inputs (`-warp`, `-record`, `-playdemo`, `-timedemo`, `-loadgame`, and `Extra Args`) never swallow cursor movement,
-    spaces, or `?`, whereas `Configuration Manager` (`m.viewingConfigMgr`) binds `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab` and `↓`, `Ctrl+N`,
-    `Ctrl+J`, or `Tab` unconditionally across selector and action rows, guards unsaved Tab 2 engine edits with a
+    spaces, or `?`, whereas `Configuration Manager` (`m.viewingConfigMgr`) binds `↑`, `Ctrl+P`, `Ctrl+K`, or `Shift+Tab`
+    and `↓`, `Ctrl+N`, `Ctrl+J`, or `Tab` unconditionally across selector and action rows, binds `Ctrl+S` and `Ctrl+R`
+    across Tab 2 engine overrides and Tab 3 personal port-config overrides, guards unsaved Tab 2 engine edits with a
     two-press confirmation (`confirmDiscardEng`) before switching engines on `←`, `→`, or `Space`, and restores unsaved
     live theme and Nerd Fonts previews (`m.theme`, `m.styles`, and `m.nerdFonts`) on `Esc`. Inside the viewport overlays
     (`m.viewingReadme`, `s.viewingDiff`, and `m.viewingHelp`), Vim and pager keys are bound deliberately by case (`j`
