@@ -365,16 +365,29 @@ func dedupDirKey(clean string) string {
 }
 
 func isStrictSubdir(child, parent string) bool {
-	cKey := dedupDirKey(filepath.Clean(child))
-	pKey := dedupDirKey(filepath.Clean(parent))
-	if cKey == pKey {
+	cClean := filepath.Clean(child)
+	pClean := filepath.Clean(parent)
+	if dedupDirKey(cClean) == dedupDirKey(pClean) {
 		return false
 	}
 	sep := string(filepath.Separator)
-	if !strings.HasSuffix(pKey, sep) {
-		pKey += sep
+	pPrefix := pClean
+	if !strings.HasSuffix(pPrefix, sep) {
+		pPrefix += sep
 	}
-	return strings.HasPrefix(cKey, pKey)
+	if strings.HasPrefix(cClean, pPrefix) {
+		return true
+	}
+	pLower := strings.ToLower(pPrefix)
+	if !strings.HasPrefix(strings.ToLower(cClean), pLower) ||
+		len(cClean) <= len(pPrefix) ||
+		cClean[len(pPrefix)-1] != filepath.Separator {
+		return false
+	}
+	candParent := filepath.Clean(cClean[:len(pPrefix)])
+	fiCand, err1 := os.Stat(candParent)
+	fiParent, err2 := os.Stat(pClean)
+	return err1 == nil && err2 == nil && os.SameFile(fiCand, fiParent)
 }
 
 func pruneNestedDirs(dirs []string) []string {
@@ -399,6 +412,7 @@ func pruneNestedDirs(dirs []string) []string {
 
 func normalizeExistingDirs(candidates []string) []string {
 	var existing []string
+	var existingInfos []os.FileInfo
 	seen := make(map[string]bool)
 	for _, r := range candidates {
 		if strings.TrimSpace(r) == "" {
@@ -413,9 +427,22 @@ func normalizeExistingDirs(candidates []string) []string {
 			continue
 		}
 		seen[key] = true
-		if fi, err := os.Stat(clean); err == nil && fi.IsDir() {
-			existing = append(existing, clean)
+		fi, err := os.Stat(clean)
+		if err != nil || !fi.IsDir() {
+			continue
 		}
+		same := false
+		for _, prev := range existingInfos {
+			if os.SameFile(prev, fi) {
+				same = true
+				break
+			}
+		}
+		if same {
+			continue
+		}
+		existing = append(existing, clean)
+		existingInfos = append(existingInfos, fi)
 	}
 	return existing
 }

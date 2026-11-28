@@ -512,9 +512,18 @@ HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\GOG.com\Games\1435848814
 	}
 }
 
+func evalTempDir(t *testing.T) string {
+	t.Helper()
+	d := t.TempDir()
+	if resolved, err := filepath.EvalSymlinks(d); err == nil {
+		return filepath.Clean(resolved)
+	}
+	return filepath.Clean(d)
+}
+
 func TestResolveSteamCommonDirsAndExpandSearchRoots(t *testing.T) {
 	t.Parallel()
-	tmpDir := t.TempDir()
+	tmpDir := evalTempDir(t)
 
 	// Primary Steam install has steamapps + libraryfolders.vdf, but no common/ directory.
 	primarySteam := filepath.Join(tmpDir, "PrimarySteam")
@@ -681,7 +690,7 @@ func TestDiscoverAndExtract_FollowsSymlinkDirAndGuardsCycles(t *testing.T) {
 
 func TestMacBundlesProtonCompatAndPruneNestedDirs(t *testing.T) {
 	t.Parallel()
-	tmpDir := t.TempDir()
+	tmpDir := evalTempDir(t)
 
 	// 1. Case-insensitive macOS app bundle discovery across system and user Applications dirs
 	sysApps := filepath.Join(tmpDir, "Applications")
